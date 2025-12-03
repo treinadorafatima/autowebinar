@@ -78,11 +78,14 @@ export default function CarlosReplayPage() {
                 }
               `}</style>
               <iframe
-                src="https://autowebinar-znc5.onrender.com/w/carlos/replay?embed=1"
+                id="webinar-compact-carlos-replay"
+                src="https://autowebinar-znc5.onrender.com/w/carlos/replay?embed=1&compact=1"
                 className="absolute top-0 left-0 w-full h-full"
                 frameBorder="0"
-                allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
+                scrolling="no"
+                allow="autoplay; fullscreen"
                 allowFullScreen
+                loading="lazy"
                 data-testid="iframe-carlos-replay"
               />
             </div>
