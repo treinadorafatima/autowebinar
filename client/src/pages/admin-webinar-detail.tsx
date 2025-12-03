@@ -69,7 +69,7 @@ function DomainConfigSection({ domain, serverHost }: { domain: string; serverHos
       const data = await res.json();
       setStatus(data);
       toast({
-        title: data.configured ? "DNS Configurado!" : "DNS Pendente",
+        title: data.configured ? "Registro Configurado!" : "Registro Pendente",
         description: data.message,
         variant: data.configured ? "default" : "destructive",
       });
@@ -126,7 +126,7 @@ function DomainConfigSection({ domain, serverHost }: { domain: string; serverHos
             ) : status?.configured ? (
               <><CheckCircle2 className="w-3 h-3 mr-1" /> Verificado</>
             ) : (
-              <><RefreshCw className="w-3 h-3 mr-1" /> Testar DNS</>
+              <><RefreshCw className="w-3 h-3 mr-1" /> Testar Registro</>
             )}
           </Button>
           {status && (
@@ -138,7 +138,7 @@ function DomainConfigSection({ domain, serverHost }: { domain: string; serverHos
       </div>
 
       <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 p-3 sm:p-4 rounded-lg space-y-4">
-        <p className="font-semibold text-sm text-amber-800 dark:text-amber-200">Instruções de Configuração DNS</p>
+        <p className="font-semibold text-sm text-amber-800 dark:text-amber-200">Configuração de Registros</p>
         
         <div className="text-sm text-amber-900 dark:text-amber-100 space-y-4">
           {isRootDomain ? (
@@ -197,7 +197,7 @@ function DomainConfigSection({ domain, serverHost }: { domain: string; serverHos
           </div>
 
           <p className="text-xs text-amber-700 dark:text-amber-300">
-            Após configurar, clique em "Testar DNS" para confirmar. A propagação pode levar de 15 minutos a 24 horas.
+            Após configurar os registros, clique em "Testar Registro" para confirmar. A propagação pode levar de 15 minutos a 24 horas.
           </p>
         </div>
       </div>
