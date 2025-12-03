@@ -418,8 +418,7 @@ function generateReplayHTML(webinar) {
       margin-bottom: 16px;
       border-radius: 12px;
       overflow: hidden;
-      border: 4px solid ${playerBorderColor};
-      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
     }
     @media (min-width: 768px) { .video-container { margin-bottom: 48px; } }
     
