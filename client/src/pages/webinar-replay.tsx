@@ -79,8 +79,21 @@ export default function WebinarReplayPage() {
   useEffect(() => {
     if (!isEmbed) return;
     
+    // Remove margens do body/html quando em modo embed
+    const originalBodyMargin = document.body.style.margin;
+    const originalBodyPadding = document.body.style.padding;
+    const originalHtmlMargin = document.documentElement.style.margin;
+    const originalHtmlPadding = document.documentElement.style.padding;
+    const originalBodyOverflow = document.body.style.overflow;
+    
+    document.body.style.margin = '0';
+    document.body.style.padding = '0';
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.margin = '0';
+    document.documentElement.style.padding = '0';
+    
     const sendHeight = () => {
-      const height = document.documentElement.scrollHeight;
+      const height = document.body.scrollHeight;
       window.parent.postMessage({ type: 'webinar-resize', height }, '*');
     };
 
@@ -96,6 +109,11 @@ export default function WebinarReplayPage() {
     return () => {
       resizeObserver.disconnect();
       clearInterval(interval);
+      document.body.style.margin = originalBodyMargin;
+      document.body.style.padding = originalBodyPadding;
+      document.body.style.overflow = originalBodyOverflow;
+      document.documentElement.style.margin = originalHtmlMargin;
+      document.documentElement.style.padding = originalHtmlPadding;
     };
   }, [isEmbed]);
 
