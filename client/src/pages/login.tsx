@@ -105,11 +105,11 @@ export default function LoginPage() {
         
         <div className="w-full max-w-md relative z-10">
           {/* Logo mobile - sem caixa quadrada */}
-          <div className="lg:hidden flex justify-center mb-6">
+          <div className="lg:hidden flex justify-center mb-8">
             <img 
               src={logoImage} 
               alt="AutoWebinar" 
-              className="h-14 w-auto object-contain"
+              className="w-56 h-auto object-contain"
               data-testid="img-logo-mobile"
             />
           </div>
