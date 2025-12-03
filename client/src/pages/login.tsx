@@ -49,6 +49,7 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex">
+      {/* Desktop: painel esquerdo com branding */}
       <div className="hidden lg:flex lg:w-1/2 bg-[#0a1628] relative overflow-hidden">
         <div className="absolute inset-0">
           <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl" />
@@ -94,27 +95,35 @@ export default function LoginPage() {
         </div>
       </div>
 
-      <div className="w-full lg:w-1/2 flex items-center justify-center bg-white p-8">
-        <div className="w-full max-w-md">
-          <div className="lg:hidden flex justify-center mb-8">
-            <div className="bg-[#0a1628] p-4 rounded-xl">
-              <img 
-                src={logoImage} 
-                alt="AutoWebinar" 
-                className="h-12 w-auto object-contain"
-                data-testid="img-logo-mobile"
-              />
-            </div>
+      {/* Mobile: fundo escuro com gradiente / Desktop: fundo branco */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center bg-[#0a1628] lg:bg-white p-6 lg:p-8 relative overflow-hidden">
+        {/* Efeitos de blur no mobile */}
+        <div className="lg:hidden absolute inset-0">
+          <div className="absolute top-10 right-10 w-48 h-48 bg-cyan-500/15 rounded-full blur-3xl" />
+          <div className="absolute bottom-20 left-5 w-32 h-32 bg-blue-500/15 rounded-full blur-3xl" />
+        </div>
+        
+        <div className="w-full max-w-md relative z-10">
+          {/* Logo mobile - sem caixa quadrada */}
+          <div className="lg:hidden flex justify-center mb-6">
+            <img 
+              src={logoImage} 
+              alt="AutoWebinar" 
+              className="h-14 w-auto object-contain"
+              data-testid="img-logo-mobile"
+            />
           </div>
 
-          <div className="text-center mb-8">
-            <h1 className="text-2xl font-semibold text-gray-900 mb-2">
-              Bem-vindo de volta!
-            </h1>
-            <p className="text-gray-500">
-              Insira seu e-mail e senha para continuar
-            </p>
-          </div>
+          {/* Card de login no mobile */}
+          <div className="bg-white/95 lg:bg-transparent backdrop-blur-sm lg:backdrop-blur-none rounded-2xl lg:rounded-none p-6 lg:p-0 shadow-xl lg:shadow-none">
+            <div className="text-center mb-6 lg:mb-8">
+              <h1 className="text-xl lg:text-2xl font-semibold text-gray-900 mb-1 lg:mb-2">
+                Bem-vindo de volta!
+              </h1>
+              <p className="text-gray-500 text-sm lg:text-base">
+                Insira seu e-mail e senha para continuar
+              </p>
+            </div>
 
           <form onSubmit={handleLogin} className="space-y-5">
             <div className="space-y-2">
@@ -183,10 +192,11 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          <div className="mt-8 pt-6 border-t border-gray-200">
-            <p className="text-center text-sm text-gray-500">
-              Todos os direitos reservados <span className="font-medium text-gray-700">AutoWebinar</span>
-            </p>
+            <div className="mt-6 lg:mt-8 pt-4 lg:pt-6 border-t border-gray-200">
+              <p className="text-center text-sm text-gray-500">
+                Todos os direitos reservados <span className="font-medium text-gray-700">AutoWebinar</span>
+              </p>
+            </div>
           </div>
         </div>
       </div>
