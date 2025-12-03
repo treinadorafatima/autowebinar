@@ -59,7 +59,10 @@ export default function CarlosPage() {
           <div style={{ 
             borderRadius: "12px", 
             overflow: "hidden", 
-            boxShadow: "0 4px 20px rgba(0,0,0,0.15)" 
+            boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
+            position: "relative",
+            paddingBottom: "56.25%",
+            height: 0
           }}>
             <iframe
               id="webinar-compact-carlos"
@@ -70,10 +73,12 @@ export default function CarlosPage() {
               allowFullScreen
               loading="lazy"
               style={{ 
+                position: "absolute",
+                top: 0,
+                left: 0,
                 width: "100%", 
-                height: "600px", 
-                border: "none", 
-                display: "block" 
+                height: "100%", 
+                border: "none"
               }}
               data-testid="iframe-carlos"
             />
