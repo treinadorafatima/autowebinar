@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Script para exportar páginas do webinar "carlos" como HTML estático
- * para hospedar no WordPress ou outra plataforma
+ * Script para exportar páginas do webinar "carlos" como iframes
+ * que carregam diretamente do servidor Render
  */
 
 import fs from 'fs';
@@ -10,11 +10,50 @@ import path from 'path';
 const API_BASE = 'http://localhost:5000';
 const OUTPUT_DIR = './dist/carlos';
 
+// URL do servidor em produção (Render)
+const RENDER_URL = 'https://autowebinar.onrender.com';
+
 async function fetchWebinarData() {
   console.log('Buscando dados do webinar carlos...');
   const res = await fetch(`${API_BASE}/api/webinars/carlos`);
   if (!res.ok) throw new Error('Webinar não encontrado');
   return res.json();
+}
+
+// Gera página iframe que carrega diretamente do servidor
+function generateIframePage(title, serverPath, faviconUrl, description) {
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${title}</title>
+  <meta name="description" content="${description}">
+  <link rel="icon" href="${faviconUrl}">
+  <link rel="apple-touch-icon" href="${faviconUrl}">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { 
+      width: 100%; 
+      height: 100%; 
+      overflow: hidden;
+    }
+    iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <iframe 
+    src="${RENDER_URL}${serverPath}"
+    allow="autoplay; fullscreen"
+    allowfullscreen
+  ></iframe>
+</body>
+</html>`;
 }
 
 function generateTransmissaoHTML(webinar) {
@@ -964,27 +1003,46 @@ function generateAula1HTML() {
 
 async function main() {
   try {
-    // Buscar dados do webinar
+    // Buscar dados do webinar para obter favicon e descrição
     const webinar = await fetchWebinarData();
     console.log(`Webinar encontrado: ${webinar.name} (${webinar.slug})`);
+    
+    // Favicon padrão
+    const faviconUrl = webinar.seoFaviconUrl || 'https://erodfrfuuhxdaeqfjzsn.supabase.co/storage/v1/object/public/webinar-images/seo/0aa8144e-4978-40b9-9dc6-dc0367a19091/default-webinar-id/favicon.png';
+    const description = webinar.seoDescription || 'Webinar Bíblia+';
     
     // Criar diretório de saída
     if (!fs.existsSync(OUTPUT_DIR)) {
       fs.mkdirSync(OUTPUT_DIR, { recursive: true });
     }
     
-    // Gerar página de transmissão
-    const transmissaoHTML = generateTransmissaoHTML(webinar);
+    // Gerar página de transmissão (iframe do servidor)
+    const transmissaoHTML = generateIframePage(
+      'Aulão | Bíblia+',
+      '/carlos',
+      faviconUrl,
+      description
+    );
     fs.writeFileSync(path.join(OUTPUT_DIR, 'index.html'), transmissaoHTML);
     console.log('✅ Página de transmissão criada: dist/carlos/index.html');
     
-    // Gerar página de replay
-    const replayHTML = generateReplayHTML(webinar);
+    // Gerar página de replay (iframe do servidor)
+    const replayHTML = generateIframePage(
+      'Replay: COMO LER E ENTENDER A BÍBLIA DE VERDADE | Bíblia+',
+      '/carlos/replay',
+      faviconUrl,
+      description
+    );
     fs.writeFileSync(path.join(OUTPUT_DIR, 'replay.html'), replayHTML);
     console.log('✅ Página de replay criada: dist/carlos/replay.html');
     
-    // Gerar página aula-1
-    const aula1HTML = generateAula1HTML();
+    // Gerar página aula-1 (iframe do servidor)
+    const aula1HTML = generateIframePage(
+      'Aula 1 - O Susto do Evangelho | Bíblia+',
+      '/carlos/aula-1',
+      faviconUrl,
+      'Aula 1 do curso Evangelho de Mateus'
+    );
     fs.writeFileSync(path.join(OUTPUT_DIR, 'aula-1.html'), aula1HTML);
     console.log('✅ Página aula-1 criada: dist/carlos/aula-1.html');
     
@@ -998,6 +1056,7 @@ async function main() {
     console.log('   - replay.html (página de replay)');
     console.log('   - aula-1.html (página aula 1)');
     console.log('   - .htaccess (configurações Apache)');
+    console.log('\n📌 As páginas carregam diretamente do servidor Render via iframe.');
     
   } catch (error) {
     console.error('❌ Erro:', error.message);
