@@ -64,7 +64,7 @@ export default function CarlosPage() {
           }}>
             <iframe
               id="webinar-compact-carlos"
-              src="https://autowebinar-znc5.onrender.com/w/carlos?embed=1"
+              src="/w/carlos?embed=1"
               frameBorder="0"
               scrolling="no"
               allow="autoplay; fullscreen"

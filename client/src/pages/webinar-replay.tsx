@@ -68,6 +68,7 @@ export default function WebinarReplayPage() {
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
@@ -79,41 +80,58 @@ export default function WebinarReplayPage() {
   useEffect(() => {
     if (!isEmbed) return;
     
-    // Remove margens do body/html quando em modo embed
-    const originalBodyMargin = document.body.style.margin;
-    const originalBodyPadding = document.body.style.padding;
-    const originalHtmlMargin = document.documentElement.style.margin;
-    const originalHtmlPadding = document.documentElement.style.padding;
-    const originalBodyOverflow = document.body.style.overflow;
-    
+    // Remove margens do body/html quando em modo embed e esconde overflow
     document.body.style.margin = '0';
     document.body.style.padding = '0';
     document.body.style.overflow = 'hidden';
+    document.body.style.background = 'transparent';
     document.documentElement.style.margin = '0';
     document.documentElement.style.padding = '0';
+    document.documentElement.style.overflow = 'hidden';
+    document.documentElement.style.background = 'transparent';
+    
+    let lastHeight = 0;
     
     const sendHeight = () => {
-      const height = document.body.scrollHeight;
-      window.parent.postMessage({ type: 'webinar-resize', height }, '*');
+      if (!containerRef.current) return;
+      // Usa getBoundingClientRect para medição mais precisa
+      const rect = containerRef.current.getBoundingClientRect();
+      const height = Math.ceil(rect.height);
+      if (height !== lastHeight && height > 0) {
+        lastHeight = height;
+        window.parent.postMessage({ type: 'webinar-resize', height }, '*');
+      }
     };
 
-    sendHeight();
+    // Aguarda alguns frames para garantir que o layout está pronto
+    setTimeout(sendHeight, 100);
+    setTimeout(sendHeight, 300);
+    setTimeout(sendHeight, 500);
     
     const resizeObserver = new ResizeObserver(() => {
-      sendHeight();
+      requestAnimationFrame(sendHeight);
     });
-    resizeObserver.observe(document.body);
     
+    const mutationObserver = new MutationObserver(() => {
+      setTimeout(sendHeight, 50);
+    });
+    
+    if (containerRef.current) {
+      resizeObserver.observe(containerRef.current);
+      mutationObserver.observe(containerRef.current, { 
+        childList: true, 
+        subtree: true, 
+        attributes: true 
+      });
+    }
+    
+    // Backup interval para casos onde observers não disparam
     const interval = setInterval(sendHeight, 500);
     
     return () => {
       resizeObserver.disconnect();
+      mutationObserver.disconnect();
       clearInterval(interval);
-      document.body.style.margin = originalBodyMargin;
-      document.body.style.padding = originalBodyPadding;
-      document.body.style.overflow = originalBodyOverflow;
-      document.documentElement.style.margin = originalHtmlMargin;
-      document.documentElement.style.padding = originalHtmlPadding;
     };
   }, [isEmbed]);
 
@@ -295,7 +313,14 @@ export default function WebinarReplayPage() {
   const buttonColor = webinar.replayButtonColor || "#22c55e";
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: bgColor }}>
+    <div 
+      ref={containerRef}
+      className={isEmbed ? "w-full" : "min-h-screen"} 
+      style={{ 
+        backgroundColor: isEmbed ? "transparent" : bgColor,
+        overflow: isEmbed ? "hidden" : undefined
+      }}
+    >
       <section className="container mx-auto py-3 md:py-16">
         <div className="mx-auto px-3 md:px-4" style={{ maxWidth: "960px" }}>
           {(webinar.replayBadgeText || webinar.replayTitle) && (
