@@ -79,6 +79,13 @@ function DomainConfigSection({ domain, serverHost }: { domain: string; serverHos
     setVerifying(false);
   };
 
+  const domainParts = domain.split('.');
+  const isRootDomain = domainParts.length === 2 || 
+    (domainParts.length === 3 && domainParts[1].length <= 3);
+  const isSubdomain = domain.startsWith('www.') || (!isRootDomain && domainParts.length >= 3);
+  const rootDomain = isSubdomain ? domainParts.slice(-2).join('.') : domain;
+  const subdomain = domain.startsWith('www.') ? 'www' : domainParts[0];
+
   return (
     <div className="space-y-3">
       <div className={`p-3 rounded-lg border ${
@@ -119,7 +126,7 @@ function DomainConfigSection({ domain, serverHost }: { domain: string; serverHos
             ) : status?.configured ? (
               <><CheckCircle2 className="w-3 h-3 mr-1" /> Verificado</>
             ) : (
-              <><RefreshCw className="w-3 h-3 mr-1" /> Verificar DNS</>
+              <><RefreshCw className="w-3 h-3 mr-1" /> Testar DNS</>
             )}
           </Button>
           {status && (
@@ -130,51 +137,67 @@ function DomainConfigSection({ domain, serverHost }: { domain: string; serverHos
         </div>
       </div>
 
-      <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 p-3 sm:p-4 rounded-lg space-y-3">
+      <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 p-3 sm:p-4 rounded-lg space-y-4">
         <p className="font-semibold text-sm text-amber-800 dark:text-amber-200">Instruções de Configuração DNS</p>
         
-        <div className="text-sm text-amber-900 dark:text-amber-100">
-          <p className="mb-2">Configure um registro <strong>CNAME</strong> no seu provedor de domínio:</p>
-          
-          <div className="bg-white dark:bg-slate-800 p-2 sm:p-3 rounded space-y-3">
-            <div className="text-sm">
-              <span><strong>Tipo:</strong> CNAME</span>
+        <div className="text-sm text-amber-900 dark:text-amber-100 space-y-4">
+          {isRootDomain ? (
+            <div className="space-y-2">
+              <p className="font-medium">Para domínio raiz ({domain}):</p>
+              <div className="bg-white dark:bg-slate-800 p-2 sm:p-3 rounded space-y-2">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
+                  <span><strong>Tipo:</strong> A</span>
+                </div>
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
+                  <span><strong>Host:</strong> @</span>
+                  <Button size="sm" variant="ghost" onClick={() => { navigator.clipboard.writeText('@'); toast({ title: "Copiado!" }); }} className="w-full sm:w-auto">
+                    <Copy className="w-3 h-3 mr-1" /><span>Copiar</span>
+                  </Button>
+                </div>
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
+                  <span><strong>Aponta para:</strong> 216.24.57.1</span>
+                  <Button size="sm" variant="ghost" onClick={() => { navigator.clipboard.writeText('216.24.57.1'); toast({ title: "Copiado!" }); }} className="w-full sm:w-auto">
+                    <Copy className="w-3 h-3 mr-1" /><span>Copiar</span>
+                  </Button>
+                </div>
+              </div>
             </div>
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
-              <span className="break-all"><strong>Host:</strong> {domain.includes('.') ? domain.split('.')[0] : '@'}</span>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => {
-                  const host = domain.includes('.') ? domain.split('.')[0] : '@';
-                  navigator.clipboard.writeText(host);
-                  toast({ title: "Copiado!" });
-                }}
-                className="w-full sm:w-auto"
-              >
-                <Copy className="w-3 h-3 mr-1" />
-                <span>Copiar</span>
-              </Button>
+          ) : (
+            <div className="space-y-2">
+              <p className="font-medium">Para subdomínio ({domain}):</p>
+              <div className="bg-white dark:bg-slate-800 p-2 sm:p-3 rounded space-y-2">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
+                  <span><strong>Tipo:</strong> CNAME</span>
+                </div>
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
+                  <span><strong>Host:</strong> {subdomain}</span>
+                  <Button size="sm" variant="ghost" onClick={() => { navigator.clipboard.writeText(subdomain); toast({ title: "Copiado!" }); }} className="w-full sm:w-auto">
+                    <Copy className="w-3 h-3 mr-1" /><span>Copiar</span>
+                  </Button>
+                </div>
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
+                  <span className="break-all"><strong>Aponta para:</strong> {serverHost}</span>
+                  <Button size="sm" variant="ghost" onClick={() => { navigator.clipboard.writeText(serverHost); toast({ title: "Copiado!" }); }} className="w-full sm:w-auto">
+                    <Copy className="w-3 h-3 mr-1" /><span>Copiar</span>
+                  </Button>
+                </div>
+              </div>
             </div>
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
-              <span className="break-all"><strong>Aponta para:</strong> {serverHost}</span>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => {
-                  navigator.clipboard.writeText(serverHost);
-                  toast({ title: "Copiado!" });
-                }}
-                className="w-full sm:w-auto"
-              >
-                <Copy className="w-3 h-3 mr-1" />
-                <span>Copiar</span>
-              </Button>
-            </div>
+          )}
+
+          <div className="bg-blue-50 dark:bg-blue-900/30 p-3 rounded border border-blue-200 dark:border-blue-800">
+            <p className="font-medium text-blue-800 dark:text-blue-200 mb-2">Dica: Configure ambos!</p>
+            <p className="text-xs text-blue-700 dark:text-blue-300">
+              Para melhor funcionamento, configure tanto o domínio raiz quanto o www:
+            </p>
+            <ul className="text-xs text-blue-700 dark:text-blue-300 mt-1 space-y-1">
+              <li><strong>{rootDomain}</strong> - Registro A apontando para 216.24.57.1</li>
+              <li><strong>www.{rootDomain}</strong> - Registro CNAME apontando para {serverHost}</li>
+            </ul>
           </div>
 
-          <p className="mt-3 text-xs text-amber-700 dark:text-amber-300">
-            Após configurar, clique em "Verificar DNS" para confirmar. Pode levar 15-30 minutos para propagar.
+          <p className="text-xs text-amber-700 dark:text-amber-300">
+            Após configurar, clique em "Testar DNS" para confirmar. A propagação pode levar de 15 minutos a 24 horas.
           </p>
         </div>
       </div>
