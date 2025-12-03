@@ -9,6 +9,8 @@ import { AdminLayout } from "@/components/admin-layout";
 import WebinarPublicPage from "@/pages/webinar-public";
 import WebinarReplayPage from "@/pages/webinar-replay";
 import Aula1Page from "@/pages/aula-1";
+import CarlosPage from "@/pages/carlos";
+import CarlosReplayPage from "@/pages/carlos-replay";
 import LoginPage from "@/pages/login";
 import AdminPage from "@/pages/admin";
 import AdminUsersPage from "@/pages/admin-users";
@@ -137,6 +139,8 @@ function Router() {
       <Route path="/forgot-password" component={ForgotPasswordPage} />
       <Route path="/reset-password" component={ResetPasswordPage} />
       <Route path="/aula-1" component={Aula1Page} />
+      <Route path="/carlos" component={CarlosPage} />
+      <Route path="/carlos/replay" component={CarlosReplayPage} />
       <Route path="/w/:slug" component={WebinarPublicPage} />
       <Route path="/w/:slug/replay" component={WebinarReplayPage} />
       <Route path="/w/:slug/moderate" component={WebinarModeratorPage} />
