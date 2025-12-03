@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useRoute } from "wouter";
+import { useRoute, useSearch } from "wouter";
 import { Check, Play, Pause, Volume2, VolumeX, Maximize, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -58,6 +58,8 @@ function stripHtml(html: string): string {
 export default function WebinarReplayPage() {
   const [, params] = useRoute("/w/:slug/replay");
   const slug = params?.slug;
+  const searchString = useSearch();
+  const isEmbed = searchString.includes("embed=1");
 
   const [webinar, setWebinar] = useState<Webinar | null>(null);
   const [video, setVideo] = useState<VideoInfo | null>(null);
@@ -73,6 +75,29 @@ export default function WebinarReplayPage() {
   const [duration, setDuration] = useState(0);
   const [showControls, setShowControls] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
+
+  useEffect(() => {
+    if (!isEmbed) return;
+    
+    const sendHeight = () => {
+      const height = document.documentElement.scrollHeight;
+      window.parent.postMessage({ type: 'webinar-resize', height }, '*');
+    };
+
+    sendHeight();
+    
+    const resizeObserver = new ResizeObserver(() => {
+      sendHeight();
+    });
+    resizeObserver.observe(document.body);
+    
+    const interval = setInterval(sendHeight, 500);
+    
+    return () => {
+      resizeObserver.disconnect();
+      clearInterval(interval);
+    };
+  }, [isEmbed]);
 
   useEffect(() => {
     if (!slug) return;
