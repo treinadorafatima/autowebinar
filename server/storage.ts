@@ -134,6 +134,9 @@ export interface IStorage {
   deleteImage(imageId: string): Promise<void>;
   getImageUrl(imageId: string): string;
   getImageFromR2(filename: string): Promise<Buffer | null>;
+  // Generic Media Files (for WhatsApp)
+  uploadMediaFile(buffer: Buffer, filename: string, mimeType: string): Promise<string>;
+  getMediaFileUrl(fileId: string): string;
   // SEO Images (organized by owner/webinar)
   uploadSeoImage(buffer: Buffer, originalFilename: string, ownerId: string, webinarId: string, type: 'favicon' | 'share'): Promise<string>;
   deleteSeoImagesByWebinar(ownerId: string, webinarId: string): Promise<void>;
@@ -1811,6 +1814,72 @@ export class DatabaseStorage implements IStorage {
     }
     // Fallback to local URL - served by /api/images endpoint
     return `/api/images/${imageId}`;
+  }
+
+  // Generic media file upload for WhatsApp (audio, video, image, document)
+  async uploadMediaFile(buffer: Buffer, originalFilename: string, mimeType: string): Promise<string> {
+    const ext = originalFilename.split('.').pop() || 'bin';
+    const fileId = `media_${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
+    
+    console.log(`[storage] Uploading media file: ${fileId} (${mimeType})`);
+    
+    // Try Supabase Storage first
+    if (supabaseClient) {
+      try {
+        const { error } = await supabaseClient.storage
+          .from('webinar-images')
+          .upload(`media/${fileId}`, buffer, {
+            contentType: mimeType,
+            upsert: false,
+          });
+
+        if (error) {
+          console.error(`[storage] Supabase media upload error:`, error);
+        } else {
+          console.log(`[storage] Media uploaded to Supabase: ${fileId}`);
+          return fileId;
+        }
+      } catch (error) {
+        console.error("[storage] Supabase media upload failed, trying R2:", error);
+      }
+    }
+    
+    // Try Cloudflare R2
+    if (r2Client) {
+      try {
+        const command = new PutObjectCommand({
+          Bucket: R2_BUCKET_NAME,
+          Key: `media/${fileId}`,
+          Body: buffer,
+          ContentType: mimeType,
+        });
+        await r2Client.send(command);
+        console.log(`[storage] Media uploaded to R2: ${fileId}`);
+        return fileId;
+      } catch (error) {
+        console.error("[storage] R2 media upload failed, falling back to disk:", error);
+      }
+    }
+    
+    // Fallback to local disk
+    const mediaDir = path.join(process.cwd(), "uploads", "media");
+    if (!fs.existsSync(mediaDir)) {
+      fs.mkdirSync(mediaDir, { recursive: true });
+    }
+    
+    const filePath = path.join(mediaDir, fileId);
+    fs.writeFileSync(filePath, buffer);
+    console.log(`[storage] Media saved to disk: ${filePath}`);
+    
+    return fileId;
+  }
+
+  getMediaFileUrl(fileId: string): string {
+    if (supabaseClient && supabaseUrl) {
+      return `${supabaseUrl}/storage/v1/object/public/webinar-images/media/${fileId}`;
+    }
+    // Fallback to local URL - served by /api/media endpoint
+    return `/api/media/${fileId}`;
   }
 
   // SEO Image upload - organized by owner/webinar for proper isolation and cleanup

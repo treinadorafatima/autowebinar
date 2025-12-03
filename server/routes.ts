@@ -3046,6 +3046,112 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Upload generic file for WhatsApp media (audio, video, image, document)
+  app.post("/api/upload-file", upload.single("file"), async (req: MulterRequest, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin) {
+        return res.status(401).json({ error: "Admin not found" });
+      }
+      
+      if (!isAdminPlanActive(admin)) {
+        return res.status(403).json({ 
+          error: "Plano expirado. Renove seu plano para fazer upload de arquivos.",
+          reason: "plan_expired"
+        });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ error: "No file provided" });
+      }
+
+      const ext = path.extname(req.file.originalname).toLowerCase();
+      const mimeType = req.file.mimetype;
+      
+      // Allowed extensions and MIME types for WhatsApp media
+      const allowedMedia: Record<string, { exts: string[], mimes: string[], maxSize: number }> = {
+        image: { 
+          exts: [".jpg", ".jpeg", ".png"], 
+          mimes: ["image/jpeg", "image/png", "image/jpg"],
+          maxSize: 5 * 1024 * 1024 // 5MB
+        },
+        audio: { 
+          exts: [".ogg", ".mp3", ".m4a", ".wav", ".opus"], 
+          mimes: ["audio/ogg", "audio/mpeg", "audio/mp4", "audio/wav", "audio/x-m4a", "audio/opus"],
+          maxSize: 16 * 1024 * 1024 // 16MB
+        },
+        video: { 
+          exts: [".mp4", ".3gp"], 
+          mimes: ["video/mp4", "video/3gpp"],
+          maxSize: 16 * 1024 * 1024 // 16MB
+        },
+        document: { 
+          exts: [".pdf"], 
+          mimes: ["application/pdf"],
+          maxSize: 100 * 1024 * 1024 // 100MB
+        }
+      };
+
+      // Detect media type based on extension or MIME
+      let mediaType: string | null = null;
+      for (const [type, config] of Object.entries(allowedMedia)) {
+        if (config.exts.includes(ext) || config.mimes.includes(mimeType)) {
+          mediaType = type;
+          break;
+        }
+      }
+
+      if (!mediaType) {
+        // Clean up temp file
+        if (req.file.path && existsSync(req.file.path)) {
+          unlinkSync(req.file.path);
+        }
+        return res.status(400).json({ 
+          error: "Tipo de arquivo não suportado. Use: jpg, png, ogg, mp3, m4a, wav, mp4, 3gp, pdf" 
+        });
+      }
+
+      const config = allowedMedia[mediaType];
+      if (req.file.size > config.maxSize) {
+        // Clean up temp file
+        if (req.file.path && existsSync(req.file.path)) {
+          unlinkSync(req.file.path);
+        }
+        return res.status(400).json({ 
+          error: `Arquivo muito grande. Limite para ${mediaType}: ${Math.round(config.maxSize / 1024 / 1024)}MB` 
+        });
+      }
+
+      console.log(`[upload-file] Uploading ${mediaType}: ${req.file.originalname} (${(req.file.size / 1024).toFixed(2)} KB)`);
+      
+      // Read file from disk and upload to R2
+      const fileBuffer = readFileSync(req.file.path);
+      const fileId = await storage.uploadMediaFile(fileBuffer, req.file.originalname, mimeType);
+      const url = storage.getMediaFileUrl(fileId);
+      
+      // Clean up temp file
+      if (req.file.path && existsSync(req.file.path)) {
+        unlinkSync(req.file.path);
+      }
+      
+      console.log(`[upload-file] File uploaded: ${fileId} -> ${url}`);
+      res.json({ url, fileId, mediaType, mimeType });
+    } catch (error: any) {
+      console.error("[upload-file] Error:", error);
+      // Clean up temp file on error
+      if (req.file?.path && existsSync(req.file.path)) {
+        unlinkSync(req.file.path);
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Upload SEO images (favicon or share image) - organized by owner/webinar
   app.post("/api/webinars/:id/upload-seo-image", memoryUpload.single("image"), async (req: MulterRequest, res) => {
     try {
@@ -3151,6 +3257,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(404).json({ error: "Image not found" });
     } catch (error: any) {
       console.error("[images] Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Serve uploaded media files (for WhatsApp) - local disk fallback
+  app.get("/api/media/:filename", async (req, res) => {
+    try {
+      const filename = req.params.filename;
+      const mediaDir = path.join(process.cwd(), "uploads", "media");
+      const filePath = path.join(mediaDir, filename);
+      
+      const ext = path.extname(filename).toLowerCase();
+      const mimeTypes: Record<string, string> = {
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+        ".gif": "image/gif",
+        ".webp": "image/webp",
+        ".ogg": "audio/ogg",
+        ".mp3": "audio/mpeg",
+        ".m4a": "audio/mp4",
+        ".wav": "audio/wav",
+        ".opus": "audio/opus",
+        ".mp4": "video/mp4",
+        ".3gp": "video/3gpp",
+        ".pdf": "application/pdf",
+      };
+      
+      // Try local disk first
+      if (existsSync(filePath)) {
+        res.setHeader("Content-Type", mimeTypes[ext] || "application/octet-stream");
+        res.setHeader("Cache-Control", "public, max-age=31536000");
+        return createReadStream(filePath).pipe(res);
+      }
+      
+      return res.status(404).json({ error: "Media file not found" });
+    } catch (error: any) {
+      console.error("[media] Error:", error);
       res.status(500).json({ error: error.message });
     }
   });
