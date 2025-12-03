@@ -1,0 +1,675 @@
+import { z } from "zod";
+import { pgTable, text, integer, timestamp, boolean } from "drizzle-orm/pg-core";
+import { createInsertSchema } from "drizzle-zod";
+
+export const webinarInfoSchema = z.object({
+  title: z.string(),
+  description: z.string(),
+  embedUrl: z.string().url(),
+  date: z.string().optional(),
+  time: z.string().optional(),
+  isLive: z.boolean().default(false),
+});
+
+export type WebinarInfo = z.infer<typeof webinarInfoSchema>;
+
+// Admin users table
+export const admins = pgTable("admins", {
+  id: text("id").primaryKey(),
+  name: text("name").default("Administrador"),
+  email: text("email").notNull().unique(),
+  password: text("password").notNull(),
+  role: text("role").notNull().default("user"), // 'superadmin' ou 'user'
+  webinarLimit: integer("webinar_limit").notNull().default(5), // limite de webinars
+  uploadLimit: integer("upload_limit").notNull().default(5), // limite de uploads
+  planoId: text("plano_id"), // FK para plano de assinatura (opcional)
+  isActive: boolean("is_active").notNull().default(true),
+  accessExpiresAt: timestamp("access_expires_at"), // Data de expiração do acesso (null = sem expiração)
+  accountDomain: text("account_domain"), // Domínio customizado da conta (ex: minhaempresa.com)
+  landingPageTitle: text("landing_page_title").default("Meus Webinários"), // Título da página inicial
+  landingPageDescription: text("landing_page_description").default(""), // Descrição da página inicial
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const adminInsertSchema = createInsertSchema(admins).omit({ id: true, createdAt: true });
+export type Admin = typeof admins.$inferSelect;
+export type AdminInsert = z.infer<typeof adminInsertSchema>;
+
+// Webinars table - cada webinário tem suas próprias configurações
+export const webinars = pgTable("webinars", {
+  id: text("id").primaryKey(),
+  ownerId: text("owner_id"), // ID do admin que criou (null = super admin)
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  description: text("description").default(""),
+  videoUrl: text("video_url").notNull().default(""),
+  uploadedVideoId: text("uploaded_video_id"),
+  videoDuration: integer("video_duration").notNull().default(3600),
+  startHour: integer("start_hour").notNull().default(18),
+  startMinute: integer("start_minute").notNull().default(0),
+  recurrence: text("recurrence").notNull().default("daily"),
+  onceDate: text("once_date"),
+  dayOfWeek: integer("day_of_week"),
+  dayOfMonth: integer("day_of_month"),
+  countdownText: text("countdown_text").default("O webinário começa em:"),
+  nextWebinarText: text("next_webinar_text").default("Próximo webinário em:"),
+  endedBadgeText: text("ended_badge_text").default("TRANSMISSÃO ENCERRADA"),
+  countdownColor: text("countdown_color").default("#FFD700"),
+  liveButtonColor: text("live_button_color").default("#e74c3c"),
+  backgroundColor: text("background_color").default("#1a1a2e"),
+  backgroundImageUrl: text("background_image_url").default(""),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  // Campos da página
+  pageTitle: text("page_title").default(""),
+  pageBadgeText: text("page_badge_text").default(""),
+  pageBackgroundColor: text("page_background_color").default("#4A8BB5"),
+  // Campos da oferta
+  offerEnabled: boolean("offer_enabled").notNull().default(false),
+  offerDelaySeconds: integer("offer_delay_seconds").notNull().default(300),
+  offerStartSeconds: integer("offer_start_seconds").notNull().default(0),
+  offerEndsAtEnd: boolean("offer_ends_at_end").notNull().default(true),
+  offerDurationSeconds: integer("offer_duration_seconds").notNull().default(0),
+  offerBadgeText: text("offer_badge_text").default("OFERTA ESPECIAL"),
+  offerTitle: text("offer_title").default(""),
+  offerTitleColor: text("offer_title_color").default("#ffffff"),
+  offerSubtitle: text("offer_subtitle").default(""),
+  offerSubtitleColor: text("offer_subtitle_color").default("#ffffff"),
+  offerImageUrl: text("offer_image_url").default(""),
+  offerPriceText: text("offer_price_text").default("O valor da inscricao e 12x R$ XX,XX no cartao ou um valor unico de R$ XXX,XX por 12 meses de estudos."),
+  offerPriceBorderColor: text("offer_price_border_color").default("#84cc16"),
+  offerPriceBoxBgColor: text("offer_price_box_bg_color").default("rgba(0,0,0,0.3)"),
+  offerPriceBoxShadow: boolean("offer_price_box_shadow").default(true),
+  offerPriceBoxPadding: text("offer_price_box_padding").default("md"),
+  offerPriceIconColor: text("offer_price_icon_color").default("#84cc16"),
+  offerPriceHighlightColor: text("offer_price_highlight_color").default("#eab308"),
+  offerPriceLabel: text("offer_price_label").default("INVESTIMENTO"),
+  offerButtonText: text("offer_button_text").default("FAZER MINHA INSCRICAO AGORA"),
+  offerButtonUrl: text("offer_button_url").default(""),
+  offerButtonColor: text("offer_button_color").default("#22c55e"),
+  offerButtonSize: text("offer_button_size").default("lg"),
+  offerButtonShadow: boolean("offer_button_shadow").default(true),
+  offerButtonTextColor: text("offer_button_text_color").default("#ffffff"),
+  offerBenefits: text("offer_benefits").default("[]"),
+  // Campos do banner
+  bannerEnabled: boolean("banner_enabled").notNull().default(false),
+  bannerStartSeconds: integer("banner_start_seconds").notNull().default(0),
+  bannerEndsAtEnd: boolean("banner_ends_at_end").notNull().default(true),
+  bannerDurationSeconds: integer("banner_duration_seconds").notNull().default(0),
+  bannerBackgroundColor: text("banner_background_color").default("#1a1a2e"),
+  bannerButtonText: text("banner_button_text").default("Saiba Mais"),
+  bannerButtonUrl: text("banner_button_url").default(""),
+  bannerButtonColor: text("banner_button_color").default("#22c55e"),
+  bannerButtonTextColor: text("banner_button_text_color").default("#ffffff"),
+  // Configurações de contagem de participantes
+  participantCount: integer("participant_count").default(200),
+  participantOscillationPercent: integer("participant_oscillation_percent").default(20),
+  // Tema dos comentários
+  commentTheme: text("comment_theme").default("dark"),
+  // Configuração de captura de leads
+  leadsEnabled: boolean("leads_enabled").notNull().default(false),
+  leadsCollectEmail: boolean("leads_collect_email").notNull().default(true),
+  leadsCollectWhatsapp: boolean("leads_collect_whatsapp").notNull().default(true),
+  views: integer("views").default(0),
+  // Configuração de indicador "AO VIVO"
+  showLiveIndicator: boolean("show_live_indicator").notNull().default(true),
+  liveIndicatorStyle: text("live_indicator_style").notNull().default("full"), // 'full' (número + texto), 'number' (só número), 'hidden' (nada)
+  // Configurações pós-término
+  showEndedScreen: boolean("show_ended_screen").notNull().default(true), // Mostrar tela "Transmissão Encerrada"
+  showNextCountdown: boolean("show_next_countdown").notNull().default(true), // Mostrar countdown para próxima sessão
+  showNextSessionDate: boolean("show_next_session_date").notNull().default(true), // Mostrar data/hora próxima sessão
+  offerDisplayAfterEnd: integer("offer_display_after_end").notNull().default(0), // Minutos para mostrar oferta (0 = não mostrar)
+  showOfferInsteadOfEnded: boolean("show_offer_instead_of_ended").notNull().default(false), // Mostrar oferta em vez de "Transmissão Encerrada"
+  offerDisplayHours: integer("offer_display_hours").notNull().default(0), // Horas para oferta ficar visível
+  offerDisplayMinutes: integer("offer_display_minutes").notNull().default(30), // Minutos para oferta ficar visível
+  customDomain: text("custom_domain"), // Domínio customizado (ex: webinar.seusite.com)
+  moderatorToken: text("moderator_token"), // Token único para moderação
+  // Campos do Replay
+  replayEnabled: boolean("replay_enabled").notNull().default(false),
+  replayVideoId: text("replay_video_id"), // ID do vídeo selecionado para replay
+  replayShowControls: boolean("replay_show_controls").notNull().default(true), // Mostrar controles do player
+  replayAutoplay: boolean("replay_autoplay").notNull().default(false), // Iniciar automaticamente
+  replayThumbnailUrl: text("replay_thumbnail_url").default(""), // Miniatura antes de iniciar
+  replayPlayerColor: text("replay_player_color").default("#3b82f6"), // Cor do player
+  replayPlayerBorderColor: text("replay_player_border_color").default("#ffffff"), // Cor da borda do player
+  replayBackgroundColor: text("replay_background_color").default("#4A8BB5"), // Cor de fundo da página
+  replayBadgeText: text("replay_badge_text").default(""), // Badge acima do título (ex: "AULÃO REPLAY")
+  replayTitle: text("replay_title").default(""), // Título principal
+  replayOfferBadgeText: text("replay_offer_badge_text").default(""), // Badge da oferta (ex: "OFERTA ESPECIAL")
+  replayOfferTitle: text("replay_offer_title").default(""), // Título da oferta
+  replayOfferSubtitle: text("replay_offer_subtitle").default(""), // Subtítulo da oferta
+  replayOfferImageUrl: text("replay_offer_image_url").default(""), // Imagem da oferta/logo
+  replayBenefits: text("replay_benefits").default("[]"), // Lista de benefícios em JSON
+  replayPriceText: text("replay_price_text").default(""), // Texto de preço
+  replayButtonText: text("replay_button_text").default("FAZER MINHA INSCRIÇÃO AGORA"), // Texto do botão
+  replayButtonUrl: text("replay_button_url").default(""), // URL do botão
+  replayButtonColor: text("replay_button_color").default("#22c55e"), // Cor do botão
+  // Campos de SEO e compartilhamento
+  seoSiteName: text("seo_site_name").default(""), // Nome do site (aparece na aba do navegador)
+  seoPageTitle: text("seo_page_title").default(""), // Título da página para SEO
+  seoDescription: text("seo_description").default(""), // Descrição para meta tags
+  seoFaviconUrl: text("seo_favicon_url").default(""), // URL do favicon personalizado
+  seoShareImageUrl: text("seo_share_image_url").default(""), // Imagem de compartilhamento (Open Graph)
+});
+
+export const webinarInsertSchema = createInsertSchema(webinars).omit({ id: true, createdAt: true });
+export type Webinar = typeof webinars.$inferSelect;
+export type WebinarInsert = z.infer<typeof webinarInsertSchema>;
+
+// Legacy: Database table for webinar configuration (mantido para compatibilidade)
+export const webinarConfigs = pgTable("webinar_configs", {
+  id: text("id").primaryKey().default("default"),
+  videoUrl: text("video_url").notNull(),
+  uploadedVideoId: text("uploaded_video_id"),
+  startHour: integer("start_hour").notNull().default(18),
+  startMinute: integer("start_minute").notNull().default(50),
+  videoDuration: integer("video_duration").notNull().default(11035),
+  recurrence: text("recurrence").notNull().default("daily"),
+  adminPassword: text("admin_password").notNull().default("admin123"),
+  countdownText: text("countdown_text").default("O webinário começa em:"),
+  nextWebinarText: text("next_webinar_text").default("Próximo webinário em:"),
+  endedBadgeText: text("ended_badge_text").default("TRANSMISSÃO ENCERRADA"),
+  countdownColor: text("countdown_color").default("#FFD700"),
+  liveButtonColor: text("live_button_color").default("#e74c3c"),
+  backgroundColor: text("background_color").default("#1a1a2e"),
+  backgroundImageUrl: text("background_image_url").default(""),
+});
+
+export const webinarConfigInsertSchema = createInsertSchema(webinarConfigs).omit({ id: true });
+export type WebinarConfig = typeof webinarConfigs.$inferSelect;
+export type WebinarConfigInsert = z.infer<typeof webinarConfigInsertSchema>;
+
+// User table (basic)
+export const users = pgTable("users", {
+  id: text("id").primaryKey(),
+  username: text("username").notNull().unique(),
+  password: text("password").notNull(),
+});
+
+export const insertUserSchema = createInsertSchema(users).omit({ id: true });
+export type User = typeof users.$inferSelect;
+export type InsertUser = z.infer<typeof insertUserSchema>;
+
+// Videos table for tracking uploaded videos
+export const uploadedVideos = pgTable("uploaded_videos", {
+  id: text("id").primaryKey(),
+  uploadedVideoId: text("uploaded_video_id").notNull().unique(),
+  filename: text("filename").notNull(),
+  title: text("title").notNull().default("Sem título"),
+  duration: integer("duration").notNull(),
+  fileSize: integer("file_size"), // Tamanho do arquivo em bytes
+  ownerId: text("owner_id"), // ID do admin que criou o video
+  uploadedAt: timestamp("uploaded_at").defaultNow(),
+  hlsPlaylistUrl: text("hls_playlist_url"),
+  hlsStatus: text("hls_status").default("pending"), // 'pending', 'processing', 'completed', 'failed'
+});
+
+export type UploadedVideo = typeof uploadedVideos.$inferSelect;
+export const uploadedVideoInsertSchema = createInsertSchema(uploadedVideos).omit({ id: true, uploadedAt: true });
+export type UploadedVideoInsert = z.infer<typeof uploadedVideoInsertSchema>;
+
+// Comments table for programmed comments during livestream
+export const comments = pgTable("comments", {
+  id: text("id").primaryKey(),
+  webinarId: text("webinar_id"),
+  text: text("text").notNull(),
+  author: text("author").notNull().default("Sistema"),
+  timestamp: integer("timestamp").notNull(),
+  isSimulated: boolean("is_simulated").notNull().default(true),
+  persistForFutureSessions: boolean("persist_for_future_sessions").notNull().default(true),
+  sessionDate: text("session_date"),
+  sessionId: text("session_id"), // ID da sessão do usuário (para comentários reais)
+  moderatorName: text("moderator_name"), // Nome do moderador (se for msg do moderador)
+  isModeratorMessage: boolean("is_moderator_message").notNull().default(false), // True se for mensagem do moderador
+  approved: boolean("approved").notNull().default(true), // False se pendente de aprovação (comentários reais)
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type Comment = typeof comments.$inferSelect;
+export const commentInsertSchema = createInsertSchema(comments).omit({ id: true, createdAt: true });
+export type CommentInsert = z.infer<typeof commentInsertSchema>;
+
+// Sessions table for persistent session management
+export const sessions = pgTable("sessions", {
+  token: text("token").primaryKey(),
+  email: text("email").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type Session = typeof sessions.$inferSelect;
+export const sessionInsertSchema = createInsertSchema(sessions).omit({ createdAt: true });
+export type SessionInsert = z.infer<typeof sessionInsertSchema>;
+
+// Settings table for system configuration (API keys, etc)
+export const settings = pgTable("settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type Setting = typeof settings.$inferSelect;
+export const settingInsertSchema = createInsertSchema(settings).omit({ updatedAt: true });
+export type SettingInsert = z.infer<typeof settingInsertSchema>;
+
+// Viewer sessions table for analytics tracking
+export const viewerSessions = pgTable("viewer_sessions", {
+  id: text("id").primaryKey(),
+  webinarId: text("webinar_id").notNull(),
+  sessionId: text("session_id").notNull(),
+  viewedAt: timestamp("viewed_at").defaultNow(),
+  viewDurationSeconds: integer("view_duration_seconds").notNull().default(0),
+  maxVideoPositionSeconds: integer("max_video_position_seconds").notNull().default(0),
+  sessionDate: text("session_date").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type ViewerSession = typeof viewerSessions.$inferSelect;
+export const viewerSessionInsertSchema = createInsertSchema(viewerSessions).omit({ id: true, createdAt: true });
+export type ViewerSessionInsert = z.infer<typeof viewerSessionInsertSchema>;
+
+// Leads table for capturing lead data
+export const leads = pgTable("leads", {
+  id: text("id").primaryKey(),
+  webinarId: text("webinar_id").notNull(),
+  name: text("name").notNull(),
+  email: text("email"),
+  whatsapp: text("whatsapp"),
+  city: text("city"),
+  state: text("state"),
+  customData: text("custom_data"), // JSON for future custom fields
+  capturedAt: timestamp("captured_at").defaultNow(),
+  sessionId: text("session_id"),
+});
+
+export type Lead = typeof leads.$inferSelect;
+export const leadInsertSchema = createInsertSchema(leads).omit({ id: true, capturedAt: true });
+export type LeadInsert = z.infer<typeof leadInsertSchema>;
+
+// Scripts table for webinar scripts and message generation
+export const webinarScripts = pgTable("webinar_scripts", {
+  id: text("id").primaryKey(),
+  webinarId: text("webinar_id").notNull(),
+  title: text("title").notNull(),
+  script: text("script").notNull(),
+  emailMessage: text("email_message"),
+  whatsappMessage: text("whatsapp_message"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type WebinarScript = typeof webinarScripts.$inferSelect;
+export const webinarScriptInsertSchema = createInsertSchema(webinarScripts).omit({ id: true, createdAt: true, updatedAt: true });
+export type WebinarScriptInsert = z.infer<typeof webinarScriptInsertSchema>;
+
+// AI Configurations table - stores system prompts that super admin can edit
+export const aiConfigs = pgTable("ai_configs", {
+  id: text("id").primaryKey(),
+  title: text("title").notNull().default("Configuração de IA"),
+  systemPrompt: text("system_prompt").notNull().default(""),
+  generatorType: text("generator_type").notNull().default("script"), // 'script' ou 'message' - cada um tem seu próprio prompt
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type AiConfig = typeof aiConfigs.$inferSelect;
+export const aiConfigInsertSchema = createInsertSchema(aiConfigs).omit({ id: true, createdAt: true, updatedAt: true });
+export type AiConfigInsert = z.infer<typeof aiConfigInsertSchema>;
+
+// AI Memories table - stores context files/texts that AI uses for generation
+export const aiMemories = pgTable("ai_memories", {
+  id: text("id").primaryKey(),
+  configId: text("config_id").notNull(),
+  generatorType: text("generator_type").notNull().default("script"), // 'script' ou 'message'
+  label: text("label").notNull(),
+  sourceType: text("source_type").notNull().default("text"),
+  content: text("content"),
+  fileUrl: text("file_url"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type AiMemory = typeof aiMemories.$inferSelect;
+export const aiMemoryInsertSchema = createInsertSchema(aiMemories).omit({ id: true, createdAt: true });
+export type AiMemoryInsert = z.infer<typeof aiMemoryInsertSchema>;
+
+// ============================================
+// CHECKOUT SYSTEM TABLES
+// ============================================
+
+// Checkout Plans table - subscription plans for the SaaS
+export const checkoutPlanos = pgTable("checkout_planos", {
+  id: text("id").primaryKey(),
+  nome: text("nome").notNull(),
+  descricao: text("descricao").default(""),
+  preco: integer("preco").notNull(), // Valor em centavos (ex: 9990 = R$ 99,90)
+  prazoDias: integer("prazo_dias").notNull().default(30), // Dias de acesso após pagamento
+  webinarLimit: integer("webinar_limit").notNull().default(5), // Limite de webinars no plano
+  uploadLimit: integer("upload_limit").notNull().default(999), // Uploads ilimitados
+  storageLimit: integer("storage_limit").notNull().default(5), // Limite de armazenamento em GB
+  ativo: boolean("ativo").notNull().default(true),
+  gateway: text("gateway").notNull().default("mercadopago"), // 'mercadopago' ou 'stripe'
+  tipoCobranca: text("tipo_cobranca").notNull().default("unico"), // 'unico' ou 'recorrente'
+  frequencia: integer("frequencia").default(1), // Para recorrente: a cada X períodos
+  frequenciaTipo: text("frequencia_tipo").default("months"), // 'days', 'months', 'years'
+  disponivelRenovacao: boolean("disponivel_renovacao").notNull().default(false),
+  beneficios: text("beneficios").default("[]"), // JSON array de benefícios
+  destaque: boolean("destaque").notNull().default(false), // Destacar plano na página
+  ordem: integer("ordem").notNull().default(0), // Ordem de exibição
+  criadoEm: timestamp("criado_em").defaultNow(),
+  atualizadoEm: timestamp("atualizado_em").defaultNow(),
+});
+
+export type CheckoutPlano = typeof checkoutPlanos.$inferSelect;
+export const checkoutPlanoInsertSchema = createInsertSchema(checkoutPlanos).omit({ id: true, criadoEm: true, atualizadoEm: true });
+export type CheckoutPlanoInsert = z.infer<typeof checkoutPlanoInsertSchema>;
+
+// Checkout Payments table - payment transactions
+export const checkoutPagamentos = pgTable("checkout_pagamentos", {
+  id: text("id").primaryKey(),
+  email: text("email").notNull(),
+  nome: text("nome").notNull(),
+  cpf: text("cpf"),
+  telefone: text("telefone"),
+  planoId: text("plano_id").notNull(),
+  valor: integer("valor").notNull(), // Valor em centavos
+  status: text("status").notNull().default("checkout_iniciado"), // 'checkout_iniciado', 'pending', 'approved', 'rejected', 'cancelled', 'in_process'
+  statusDetail: text("status_detail"),
+  metodoPagamento: text("metodo_pagamento"), // 'pix', 'boleto', 'credit_card', etc
+  mercadopagoPaymentId: text("mercadopago_payment_id"),
+  stripePaymentIntentId: text("stripe_payment_intent_id"),
+  stripeSubscriptionId: text("stripe_subscription_id"),
+  stripeCustomerId: text("stripe_customer_id"),
+  dataPagamento: timestamp("data_pagamento"),
+  dataAprovacao: timestamp("data_aprovacao"),
+  dataExpiracao: timestamp("data_expiracao"),
+  adminId: text("admin_id"), // FK para admins, preenchido após aprovação
+  pixQrCode: text("pix_qr_code"), // QR Code PIX base64
+  pixCopiaCola: text("pix_copia_cola"), // Código PIX copia e cola
+  boletoUrl: text("boleto_url"), // URL do boleto
+  boletoCodigo: text("boleto_codigo"), // Código de barras do boleto
+  criadoEm: timestamp("criado_em").defaultNow(),
+  atualizadoEm: timestamp("atualizado_em").defaultNow(),
+});
+
+export type CheckoutPagamento = typeof checkoutPagamentos.$inferSelect;
+export const checkoutPagamentoInsertSchema = createInsertSchema(checkoutPagamentos).omit({ id: true, criadoEm: true, atualizadoEm: true });
+export type CheckoutPagamentoInsert = z.infer<typeof checkoutPagamentoInsertSchema>;
+
+// Checkout Configurations table - gateway credentials (encrypted)
+export const checkoutConfigs = pgTable("checkout_configs", {
+  id: text("id").primaryKey(),
+  chave: text("chave").notNull().unique(), // Nome da configuração
+  valor: text("valor").notNull(), // Valor criptografado
+  criadoEm: timestamp("criado_em").defaultNow(),
+  atualizadoEm: timestamp("atualizado_em").defaultNow(),
+});
+
+export type CheckoutConfig = typeof checkoutConfigs.$inferSelect;
+export const checkoutConfigInsertSchema = createInsertSchema(checkoutConfigs).omit({ id: true, criadoEm: true, atualizadoEm: true });
+export type CheckoutConfigInsert = z.infer<typeof checkoutConfigInsertSchema>;
+
+// Active Subscriptions table - for recurring plans
+export const checkoutAssinaturas = pgTable("checkout_assinaturas", {
+  id: text("id").primaryKey(),
+  adminId: text("admin_id").notNull(), // FK para admins
+  planoId: text("plano_id").notNull(), // FK para planos
+  gateway: text("gateway").notNull(), // 'mercadopago' ou 'stripe'
+  externalId: text("external_id"), // ID da assinatura no gateway
+  status: text("status").notNull().default("pending"), // 'active', 'paused', 'cancelled', 'pending'
+  proximoPagamento: timestamp("proximo_pagamento"),
+  criadoEm: timestamp("criado_em").defaultNow(),
+  atualizadoEm: timestamp("atualizado_em").defaultNow(),
+});
+
+export type CheckoutAssinatura = typeof checkoutAssinaturas.$inferSelect;
+export const checkoutAssinaturaInsertSchema = createInsertSchema(checkoutAssinaturas).omit({ id: true, criadoEm: true, atualizadoEm: true });
+export type CheckoutAssinaturaInsert = z.infer<typeof checkoutAssinaturaInsertSchema>;
+
+// ============================================
+// AI CHAT HISTORY
+// ============================================
+
+// AI Chat Conversations table - stores chat history for script generator
+export const aiChats = pgTable("ai_chats", {
+  id: text("id").primaryKey(),
+  ownerId: text("owner_id").notNull(), // FK para admins
+  webinarId: text("webinar_id"), // FK para webinar (opcional)
+  title: text("title").notNull().default("Nova conversa"),
+  messages: text("messages").notNull().default("[]"), // JSON array of messages
+  generatedScript: text("generated_script").default(""), // Last generated script
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type AiChat = typeof aiChats.$inferSelect;
+export const aiChatInsertSchema = createInsertSchema(aiChats).omit({ id: true, createdAt: true, updatedAt: true });
+export type AiChatInsert = z.infer<typeof aiChatInsertSchema>;
+
+// AI Message Chat Conversations table - stores chat history for message generator
+export const aiMessageChats = pgTable("ai_message_chats", {
+  id: text("id").primaryKey(),
+  ownerId: text("owner_id").notNull(),
+  webinarId: text("webinar_id"),
+  scriptId: text("script_id"),
+  title: text("title").notNull().default("Nova conversa"),
+  messages: text("messages").notNull().default("[]"),
+  generatedEmail: text("generated_email").default(""),
+  generatedWhatsapp: text("generated_whatsapp").default(""),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type AiMessageChat = typeof aiMessageChats.$inferSelect;
+export const aiMessageChatInsertSchema = createInsertSchema(aiMessageChats).omit({ id: true, createdAt: true, updatedAt: true });
+export type AiMessageChatInsert = z.infer<typeof aiMessageChatInsertSchema>;
+
+// Video Transcriptions table - stores video transcriptions
+export const videoTranscriptions = pgTable("video_transcriptions", {
+  id: text("id").primaryKey(),
+  webinarId: text("webinar_id"),
+  uploadedVideoId: text("uploaded_video_id").notNull(),
+  transcription: text("transcription"),
+  status: text("status").notNull().default("pending"), // 'pending', 'processing', 'completed', 'failed'
+  error: text("error"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type VideoTranscription = typeof videoTranscriptions.$inferSelect;
+export const videoTranscriptionInsertSchema = createInsertSchema(videoTranscriptions).omit({ id: true, createdAt: true, updatedAt: true });
+export type VideoTranscriptionInsert = z.infer<typeof videoTranscriptionInsertSchema>;
+
+// ============================================
+// PASSWORD RESET TOKENS
+// ============================================
+
+export const passwordResetTokens = pgTable("password_reset_tokens", {
+  id: text("id").primaryKey(),
+  email: text("email").notNull(),
+  token: text("token").notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  usedAt: timestamp("used_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
+export const passwordResetTokenInsertSchema = createInsertSchema(passwordResetTokens).omit({ id: true, createdAt: true });
+export type PasswordResetTokenInsert = z.infer<typeof passwordResetTokenInsertSchema>;
+
+// ============================================
+// EMAIL NOTIFICATIONS LOG
+// ============================================
+
+export const emailNotificationsLog = pgTable("email_notifications_log", {
+  id: text("id").primaryKey(),
+  adminId: text("admin_id").notNull(),
+  emailType: text("email_type").notNull(), // 'welcome', 'password_reset', 'plan_expired', 'payment_failed'
+  sentAt: timestamp("sent_at").defaultNow(),
+  success: boolean("success").notNull().default(true),
+  error: text("error"),
+});
+
+export type EmailNotificationLog = typeof emailNotificationsLog.$inferSelect;
+export const emailNotificationLogInsertSchema = createInsertSchema(emailNotificationsLog).omit({ id: true, sentAt: true });
+export type EmailNotificationLogInsert = z.infer<typeof emailNotificationLogInsertSchema>;
+
+// ============================================
+// EMAIL MARKETING SYSTEM
+// ============================================
+
+// Admin Email Credentials - Per-tenant Resend API keys (encrypted)
+export const adminEmailCredentials = pgTable("admin_email_credentials", {
+  id: text("id").primaryKey(),
+  adminId: text("admin_id").notNull().unique(), // FK para admins
+  provider: text("provider").notNull().default("resend"), // 'resend' por enquanto
+  encryptedApiKey: text("encrypted_api_key").notNull(), // Chave API criptografada
+  senderEmail: text("sender_email"), // Email do remetente configurado
+  senderName: text("sender_name"), // Nome do remetente
+  isValid: boolean("is_valid").notNull().default(false), // Validado com sucesso
+  lastValidatedAt: timestamp("last_validated_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type AdminEmailCredential = typeof adminEmailCredentials.$inferSelect;
+export const adminEmailCredentialInsertSchema = createInsertSchema(adminEmailCredentials).omit({ id: true, createdAt: true, updatedAt: true });
+export type AdminEmailCredentialInsert = z.infer<typeof adminEmailCredentialInsertSchema>;
+
+// Email Sequences - Configurable email sequences per webinar
+export const emailSequences = pgTable("email_sequences", {
+  id: text("id").primaryKey(),
+  adminId: text("admin_id").notNull(), // FK para admins
+  webinarId: text("webinar_id"), // FK para webinar (null = template global)
+  name: text("name").notNull(), // Nome da sequência
+  phase: text("phase").notNull(), // 'pre' (antes) ou 'post' (depois)
+  offsetMinutes: integer("offset_minutes").notNull(), // Minutos relativos ao webinar (negativo = antes, positivo = depois)
+  subject: text("subject").notNull(), // Assunto do email
+  preheader: text("preheader").default(""), // Preview text
+  designJson: text("design_json").notNull().default("{}"), // Design do Unlayer (JSON)
+  compiledHtml: text("compiled_html").default(""), // HTML compilado para envio
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type EmailSequence = typeof emailSequences.$inferSelect;
+export const emailSequenceInsertSchema = createInsertSchema(emailSequences).omit({ id: true, createdAt: true, updatedAt: true });
+export type EmailSequenceInsert = z.infer<typeof emailSequenceInsertSchema>;
+
+// Scheduled Emails - Queue of emails to be sent
+export const scheduledEmails = pgTable("scheduled_emails", {
+  id: text("id").primaryKey(),
+  adminId: text("admin_id").notNull(), // FK para admins
+  webinarId: text("webinar_id").notNull(), // FK para webinar
+  leadId: text("lead_id"), // FK para lead (null = broadcast)
+  sequenceId: text("sequence_id").notNull(), // FK para email_sequences
+  targetEmail: text("target_email").notNull(), // Email do destinatário
+  targetName: text("target_name"), // Nome do destinatário
+  sendAt: timestamp("send_at").notNull(), // Quando enviar
+  status: text("status").notNull().default("queued"), // 'queued', 'sending', 'sent', 'failed', 'cancelled'
+  lastError: text("last_error"), // Último erro se falhou
+  sentAt: timestamp("sent_at"), // Quando foi enviado
+  webinarSessionDate: text("webinar_session_date"), // Data da sessão do webinar para contexto
+  metadata: text("metadata").default("{}"), // Dados extras em JSON
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type ScheduledEmail = typeof scheduledEmails.$inferSelect;
+export const scheduledEmailInsertSchema = createInsertSchema(scheduledEmails).omit({ id: true, createdAt: true, updatedAt: true });
+export type ScheduledEmailInsert = z.infer<typeof scheduledEmailInsertSchema>;
+
+// Lead Form Configurations - Per-webinar form settings
+export const leadFormConfigs = pgTable("lead_form_configs", {
+  id: text("id").primaryKey(),
+  webinarId: text("webinar_id").notNull().unique(), // FK para webinar
+  title: text("title").default("Inscreva-se no Webinário"), // Título do formulário
+  subtitle: text("subtitle").default("Preencha seus dados para participar"), // Subtítulo
+  collectName: boolean("collect_name").notNull().default(true),
+  collectEmail: boolean("collect_email").notNull().default(true),
+  collectWhatsapp: boolean("collect_whatsapp").notNull().default(true),
+  collectCity: boolean("collect_city").notNull().default(false),
+  collectState: boolean("collect_state").notNull().default(false),
+  customFields: text("custom_fields").default("[]"), // JSON array de campos personalizados
+  requireConsent: boolean("require_consent").notNull().default(true), // LGPD checkbox
+  consentText: text("consent_text").default("Concordo em receber comunicações sobre este webinário"),
+  buttonText: text("button_text").default("Quero Participar"),
+  buttonColor: text("button_color").default("#22c55e"),
+  successMessage: text("success_message").default("Inscrição realizada com sucesso!"),
+  redirectUrl: text("redirect_url"), // URL para redirecionar após cadastro
+  backgroundColor: text("background_color").default("#ffffff"),
+  textColor: text("text_color").default("#000000"),
+  embedVersion: integer("embed_version").notNull().default(1), // Versão do embed code
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type LeadFormConfig = typeof leadFormConfigs.$inferSelect;
+export const leadFormConfigInsertSchema = createInsertSchema(leadFormConfigs).omit({ id: true, createdAt: true, updatedAt: true });
+export type LeadFormConfigInsert = z.infer<typeof leadFormConfigInsertSchema>;
+
+// ============================================
+// WHATSAPP MARKETING SYSTEM
+// ============================================
+
+// WhatsApp Sessions - Store Baileys auth data per admin
+export const whatsappSessions = pgTable("whatsapp_sessions", {
+  id: text("id").primaryKey(),
+  adminId: text("admin_id").notNull().unique(), // FK para admins
+  phoneNumber: text("phone_number"), // Número conectado
+  sessionData: text("session_data"), // JSON com dados de auth do Baileys
+  status: text("status").notNull().default("disconnected"), // 'disconnected', 'connecting', 'qr_ready', 'connected'
+  qrCode: text("qr_code"), // QR code atual para conexão
+  lastConnectedAt: timestamp("last_connected_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type WhatsappSession = typeof whatsappSessions.$inferSelect;
+export const whatsappSessionInsertSchema = createInsertSchema(whatsappSessions).omit({ id: true, createdAt: true, updatedAt: true });
+export type WhatsappSessionInsert = z.infer<typeof whatsappSessionInsertSchema>;
+
+// WhatsApp Sequences - Configurable message sequences per webinar
+export const whatsappSequences = pgTable("whatsapp_sequences", {
+  id: text("id").primaryKey(),
+  adminId: text("admin_id").notNull(), // FK para admins
+  webinarId: text("webinar_id"), // FK para webinar (null = template global)
+  name: text("name").notNull(), // Nome da sequência
+  phase: text("phase").notNull(), // 'pre' (antes) ou 'post' (depois)
+  offsetMinutes: integer("offset_minutes").notNull(), // Minutos relativos ao webinar
+  messageText: text("message_text").notNull(), // Texto da mensagem (suporta merge tags)
+  messageType: text("message_type").notNull().default("text"), // 'text', 'image', 'document'
+  mediaUrl: text("media_url"), // URL de mídia se houver
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type WhatsappSequence = typeof whatsappSequences.$inferSelect;
+export const whatsappSequenceInsertSchema = createInsertSchema(whatsappSequences).omit({ id: true, createdAt: true, updatedAt: true });
+export type WhatsappSequenceInsert = z.infer<typeof whatsappSequenceInsertSchema>;
+
+// Scheduled WhatsApp Messages - Queue of messages to be sent
+export const scheduledWhatsappMessages = pgTable("scheduled_whatsapp_messages", {
+  id: text("id").primaryKey(),
+  adminId: text("admin_id").notNull(), // FK para admins
+  webinarId: text("webinar_id").notNull(), // FK para webinar
+  leadId: text("lead_id"), // FK para lead
+  sequenceId: text("sequence_id").notNull(), // FK para whatsapp_sequences
+  targetPhone: text("target_phone").notNull(), // Telefone do destinatário
+  targetName: text("target_name"), // Nome do destinatário
+  sendAt: timestamp("send_at").notNull(), // Quando enviar
+  status: text("status").notNull().default("queued"), // 'queued', 'sending', 'sent', 'failed', 'cancelled'
+  lastError: text("last_error"), // Último erro se falhou
+  sentAt: timestamp("sent_at"), // Quando foi enviado
+  webinarSessionDate: text("webinar_session_date"), // Data da sessão do webinar
+  metadata: text("metadata").default("{}"), // Dados extras em JSON
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type ScheduledWhatsappMessage = typeof scheduledWhatsappMessages.$inferSelect;
+export const scheduledWhatsappMessageInsertSchema = createInsertSchema(scheduledWhatsappMessages).omit({ id: true, createdAt: true, updatedAt: true });
+export type ScheduledWhatsappMessageInsert = z.infer<typeof scheduledWhatsappMessageInsertSchema>;

@@ -1,0 +1,207 @@
+import { storage } from "./storage";
+import { db } from "./db";
+import { leads, emailSequences, whatsappSequences, scheduledEmails, scheduledWhatsappMessages } from "@shared/schema";
+import { eq, and } from "drizzle-orm";
+
+interface RescheduleResult {
+  emailsCancelled: number;
+  emailsRescheduled: number;
+  whatsappCancelled: number;
+  whatsappRescheduled: number;
+}
+
+interface LeadSessionInfo {
+  leadId: string;
+  adminId: string;
+  webinarSessionDate: string;
+  email: string | null;
+  phone: string | null;
+  name: string | null;
+}
+
+function calculateSendAt(sessionDate: string, startHour: number, startMinute: number, offsetMinutes: number): Date {
+  const [year, month, day] = sessionDate.split("-").map(Number);
+  const baseTime = new Date(year, month - 1, day, startHour, startMinute, 0, 0);
+  return new Date(baseTime.getTime() + offsetMinutes * 60 * 1000);
+}
+
+function extractSessionDateFromSessionId(sessionId: string | null, webinarId: string): string | null {
+  if (!sessionId) return null;
+  const prefix = `${webinarId}-`;
+  if (sessionId.startsWith(prefix)) {
+    return sessionId.substring(prefix.length);
+  }
+  return null;
+}
+
+function parseSessionDate(sessionDateStr: string): Date | null {
+  const parts = sessionDateStr.split("-").map(Number);
+  if (parts.length < 3 || parts.some(isNaN)) {
+    return null;
+  }
+  const [year, month, day] = parts;
+  return new Date(year, month - 1, day, 0, 0, 0, 0);
+}
+
+function normalizeSessionDate(sessionDateStr: string): string {
+  const parts = sessionDateStr.split("-").map(Number);
+  if (parts.length < 3 || parts.some(isNaN)) {
+    return sessionDateStr;
+  }
+  const [year, month, day] = parts;
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+async function getLeadsWithSessionsForWebinar(webinarId: string, adminId: string): Promise<LeadSessionInfo[]> {
+  const webinarLeads = await db.select().from(leads).where(eq(leads.webinarId, webinarId));
+  
+  const result: LeadSessionInfo[] = [];
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  
+  for (const lead of webinarLeads) {
+    const sessionDateStr = extractSessionDateFromSessionId(lead.sessionId, webinarId);
+    
+    if (!sessionDateStr) {
+      continue;
+    }
+    
+    const sessionDate = parseSessionDate(sessionDateStr);
+    if (!sessionDate) {
+      continue;
+    }
+    
+    if (sessionDate < now) {
+      continue;
+    }
+    
+    if (!lead.email && !lead.whatsapp) {
+      continue;
+    }
+    
+    const normalizedSessionDate = normalizeSessionDate(sessionDateStr);
+    
+    result.push({
+      leadId: lead.id,
+      adminId,
+      webinarSessionDate: normalizedSessionDate,
+      email: lead.email,
+      phone: lead.whatsapp,
+      name: lead.name,
+    });
+  }
+  
+  return result;
+}
+
+export async function rescheduleSequencesForWebinar(
+  webinarId: string,
+  adminId: string,
+  newStartHour: number,
+  newStartMinute: number
+): Promise<RescheduleResult> {
+  console.log(`[sequence-sync] Starting reschedule for webinar ${webinarId} (new time: ${newStartHour}:${newStartMinute})`);
+  
+  const result: RescheduleResult = {
+    emailsCancelled: 0,
+    emailsRescheduled: 0,
+    whatsappCancelled: 0,
+    whatsappRescheduled: 0,
+  };
+
+  try {
+    const cancelResult = await cancelAllSequencesForWebinar(webinarId);
+    result.emailsCancelled = cancelResult.emailsCancelled;
+    result.whatsappCancelled = cancelResult.whatsappCancelled;
+    
+    const leadsWithSessions = await getLeadsWithSessionsForWebinar(webinarId, adminId);
+    
+    if (leadsWithSessions.length === 0) {
+      console.log(`[sequence-sync] No leads with future sessions found for webinar ${webinarId}`);
+      return result;
+    }
+    
+    console.log(`[sequence-sync] Found ${leadsWithSessions.length} leads with future sessions to reschedule`);
+
+    const emailSequencesList = await storage.listEmailSequencesByWebinar(webinarId);
+    const whatsappSequencesList = await storage.listWhatsappSequencesByWebinar(webinarId);
+    
+    const activeEmailSequences = emailSequencesList.filter(s => s.isActive);
+    const activeWhatsappSequences = whatsappSequencesList.filter(s => s.isActive);
+    
+    const now = new Date();
+
+    for (const leadInfo of leadsWithSessions) {
+      if (leadInfo.email) {
+        for (const sequence of activeEmailSequences) {
+          const sendAt = calculateSendAt(
+            leadInfo.webinarSessionDate,
+            newStartHour,
+            newStartMinute,
+            sequence.offsetMinutes
+          );
+          
+          if (sendAt > now) {
+            await storage.createScheduledEmail({
+              adminId: leadInfo.adminId,
+              webinarId,
+              leadId: leadInfo.leadId,
+              sequenceId: sequence.id,
+              targetEmail: leadInfo.email,
+              targetName: leadInfo.name,
+              sendAt,
+              status: "queued",
+              webinarSessionDate: leadInfo.webinarSessionDate,
+            });
+            result.emailsRescheduled++;
+            console.log(`[sequence-sync] Created email schedule for lead ${leadInfo.leadId}, sequence ${sequence.id}, sendAt ${sendAt.toISOString()}`);
+          }
+        }
+      }
+      
+      if (leadInfo.phone) {
+        for (const sequence of activeWhatsappSequences) {
+          const sendAt = calculateSendAt(
+            leadInfo.webinarSessionDate,
+            newStartHour,
+            newStartMinute,
+            sequence.offsetMinutes
+          );
+          
+          if (sendAt > now) {
+            await storage.createScheduledWhatsappMessage({
+              adminId: leadInfo.adminId,
+              webinarId,
+              leadId: leadInfo.leadId,
+              sequenceId: sequence.id,
+              targetPhone: leadInfo.phone,
+              targetName: leadInfo.name,
+              sendAt,
+              status: "queued",
+              webinarSessionDate: leadInfo.webinarSessionDate,
+            });
+            result.whatsappRescheduled++;
+            console.log(`[sequence-sync] Created whatsapp schedule for lead ${leadInfo.leadId}, sequence ${sequence.id}, sendAt ${sendAt.toISOString()}`);
+          }
+        }
+      }
+    }
+
+    console.log(`[sequence-sync] Reschedule complete for webinar ${webinarId}:`, result);
+    return result;
+  } catch (error) {
+    console.error(`[sequence-sync] Error rescheduling sequences for webinar ${webinarId}:`, error);
+    return result;
+  }
+}
+
+export async function cancelAllSequencesForWebinar(webinarId: string): Promise<{ emailsCancelled: number; whatsappCancelled: number }> {
+  console.log(`[sequence-sync] Cancelling all sequences for webinar ${webinarId}`);
+  
+  const emailsCancelled = await storage.cancelScheduledEmailsByWebinar(webinarId);
+  const whatsappCancelled = await storage.cancelScheduledWhatsappMessagesByWebinar(webinarId);
+  
+  console.log(`[sequence-sync] Cancelled ${emailsCancelled} emails and ${whatsappCancelled} WhatsApp messages`);
+  
+  return { emailsCancelled, whatsappCancelled };
+}

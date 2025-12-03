@@ -1,0 +1,218 @@
+Crie um sistema de checkout completo para venda de planos/cursos online com as seguintes funcionalidades:
+
+## 1. BANCO DE DADOS (MySQL)
+
+Criar as seguintes tabelas:
+
+### Tabela `planos`:
+- id (INT AUTO_INCREMENT PRIMARY KEY)
+- nome (VARCHAR 255)
+- descricao (TEXT)
+- preco (DECIMAL 10,2)
+- prazo_dias (INT) - dias de acesso após pagamento
+- ativo (BOOLEAN DEFAULT TRUE)
+- gateway (ENUM: 'mercadopago', 'stripe') - qual gateway usar
+- tipo_cobranca (ENUM: 'unico', 'recorrente')
+- frequencia (INT) - para recorrente: a cada X períodos
+- frequencia_tipo (ENUM: 'days', 'months', 'years')
+- disponivel_renovacao (BOOLEAN DEFAULT FALSE)
+- criado_em, atualizado_em (DATETIME)
+
+### Tabela `pagamentos`:
+- id (INT AUTO_INCREMENT PRIMARY KEY)
+- email, nome, cpf, telefone (VARCHAR)
+- plano_id (FK para planos)
+- valor (DECIMAL 10,2)
+- status (ENUM: 'checkout_iniciado', 'pending', 'approved', 'rejected', 'cancelled', 'in_process')
+- status_detail (VARCHAR)
+- metodo_pagamento (VARCHAR) - 'pix', 'boleto', 'credit_card', etc
+- mercadopago_payment_id (VARCHAR)
+- stripe_payment_intent_id, stripe_subscription_id, stripe_customer_id (VARCHAR)
+- data_pagamento, data_aprovacao, data_expiracao (DATETIME)
+- aluno_id (FK para alunos, NULL até pagamento aprovado)
+- criado_em, atualizado_em (DATETIME)
+
+### Tabela `alunos`:
+- id (INT AUTO_INCREMENT PRIMARY KEY)
+- email (UNIQUE), nome
+- password_hash (VARCHAR)
+- status (ENUM: 'ativo', 'inativo', 'bloqueado')
+- data_expiracao (DATETIME)
+- metadata (JSON) - dados extras
+- criado_em, atualizado_em (DATETIME)
+
+### Tabela `configuracoes`:
+- id (INT AUTO_INCREMENT PRIMARY KEY)
+- chave (VARCHAR UNIQUE) - nome da configuração
+- valor (TEXT) - valor criptografado
+- criado_em, atualizado_em (DATETIME)
+
+Chaves de configuração necessárias:
+- MERCADOPAGO_PUBLIC_KEY
+- MERCADOPAGO_ACCESS_TOKEN
+- MERCADOPAGO_WEBHOOK_SECRET
+- STRIPE_PUBLIC_KEY
+- STRIPE_SECRET_KEY
+- STRIPE_WEBHOOK_SECRET
+- FACEBOOK_PIXEL_ID (opcional)
+- GOOGLE_ADS_CONVERSION_ID (opcional)
+
+### Tabela `assinaturas_ativas` (para planos recorrentes):
+- id (INT AUTO_INCREMENT PRIMARY KEY)
+- aluno_id (FK)
+- plano_id (FK)
+- gateway (ENUM: 'mercadopago', 'stripe')
+- external_id (VARCHAR) - ID da assinatura no gateway
+- status (ENUM: 'active', 'paused', 'cancelled', 'pending')
+- proximo_pagamento (DATETIME)
+- criado_em, atualizado_em (DATETIME)
+
+## 2. PAINEL ADMINISTRATIVO
+
+### Página de Configurações (/admin/configuracoes):
+- Formulário para salvar credenciais dos gateways (Mercado Pago e Stripe)
+- Campos para chaves públicas e secretas
+- Campos para webhook secrets
+- Indicador visual de qual gateway está configurado (badge verde/vermelho)
+- Opção para configurar Facebook Pixel e Google Ads
+- Todos os valores sensíveis devem ser criptografados no banco
+
+### Página de Planos (/admin/planos):
+- Listagem de todos os planos com status (ativo/inativo)
+- Criar novo plano com campos:
+  - Nome, descrição, preço
+  - Prazo de acesso em dias
+  - Gateway de pagamento (dropdown: Mercado Pago ou Stripe)
+  - Tipo de cobrança (único ou recorrente)
+  - Se recorrente: frequência e tipo (diário/mensal/anual)
+  - Opção de disponível para renovação
+- Editar/excluir planos
+- Gerar link de checkout para cada plano
+- Mostrar badge do gateway selecionado (azul para Mercado Pago, roxo para Stripe)
+
+### Página de Relatórios (/admin/relatorios):
+Duas abas:
+
+**Aba Vendas:**
+- Cards com estatísticas: Total de vendas, Receita total, Ticket médio, Taxa de conversão
+- Gráfico de vendas por período
+- Vendas por plano (tabela)
+- Vendas por método de pagamento (tabela com badges: PIX roxo, Boleto laranja, Cartão azul)
+- Tabela de vendas recentes com colunas: Data, Cliente, Plano, Status (badge), Método (badge), Valor
+
+**Aba Pagamentos:**
+- Tabela completa de todos os pagamentos do checkout
+- Filtros por status (Todos, Aprovados, Pendentes, Rejeitados)
+- Busca por nome, email, CPF
+- Colunas: Cliente, Contato, Plano, Valor, Método (badge), Gateway (badge), Status (badge), Data, Ações
+- Botão "Detalhes" para ver informações completas
+- Botão "Liberar" para pagamentos pendentes (criar acesso manualmente)
+- Paginação
+- Seleção múltipla para ações em lote
+
+## 3. CHECKOUT TRANSPARENTE
+
+### Página de Checkout (/checkout/:planoId):
+
+**Layout em duas colunas:**
+- Esquerda: Resumo do pedido (plano, preço, benefícios)
+- Direita: Formulário e pagamento
+
+**Formulário de dados pessoais:**
+- Nome completo
+- Email
+- CPF (com máscara)
+- Telefone (com máscara, opcional)
+
+**Fluxo de pagamento:**
+
+1. Usuário preenche dados pessoais
+2. Ao preencher, salva dados via API (endpoint /api/checkout/iniciar/:planoId)
+3. Carrega o componente de pagamento do gateway configurado no plano
+
+**Para Mercado Pago (pagamento único):**
+- Usar Payment Brick do MercadoPago SDK
+- Carregar script: https://sdk.mercadopago.com/js/v2
+- Inicializar com public key do admin
+- Container com id="paymentBrick_container"
+- Configurar callbacks de sucesso/erro
+
+**Para Mercado Pago (recorrente):**
+- Criar preferência de assinatura via API
+- Redirecionar para init_point do Mercado Pago
+
+**Para Stripe:**
+- Carregar Stripe.js dinamicamente
+- Criar PaymentIntent ou Subscription no backend
+- Montar Payment Element do Stripe
+- Processar pagamento com confirmação 3D Secure
+
+**Elementos visuais do checkout:**
+- Badges de segurança (SSL, Pagamento Seguro)
+- Ícones dos métodos de pagamento aceitos (Pix, Boleto, Cartões)
+- Timer de urgência (opcional)
+- Depoimentos/garantias
+
+## 4. WEBHOOKS
+
+### Webhook Mercado Pago (/webhook/mercadopago):
+- Receber notificações de pagamento
+- Validar assinatura HMAC com webhook secret
+- Buscar detalhes do pagamento via API Mercado Pago
+- Atualizar status do pagamento no banco
+- Se aprovado: criar aluno, definir data de expiração, enviar email
+
+### Webhook Stripe (/webhook/stripe):
+- Receber eventos do Stripe
+- Validar assinatura com Stripe SDK
+- Tratar eventos: payment_intent.succeeded, customer.subscription.created, etc
+- Atualizar status do pagamento
+- Se aprovado: criar aluno, definir data de expiração
+
+## 5. PÁGINAS DE RETORNO
+
+### Sucesso (/pagamento/sucesso):
+- Mensagem de confirmação
+- Detalhes do plano adquirido
+- Instruções de acesso
+- Botão para acessar área de membros
+
+### Pendente (/pagamento/pendente):
+- Mensagem informando que pagamento está em análise
+- Instruções (ex: para PIX mostrar código, para boleto mostrar link)
+- Timer de expiração se aplicável
+
+### Erro (/pagamento/erro):
+- Mensagem de erro amigável
+- Botão para tentar novamente
+
+## 6. FUNCIONALIDADES EXTRAS
+
+### Badges coloridos para status:
+- Método de pagamento: PIX (roxo), Boleto (laranja), Cartão (azul)
+- Gateway: Mercado Pago (azul claro), Stripe (índigo)
+- Status: Aprovado (verde), Pendente (amarelo), Rejeitado (vermelho)
+
+### Tracking:
+- Facebook Pixel: eventos InitiateCheckout e Purchase
+- Google Ads: conversões de checkout e compra
+
+### Segurança:
+- Criptografia de credenciais no banco (usar crypto do Node.js)
+- Validação de webhooks com HMAC
+- Tokens de sessão para área admin
+- Rate limiting em endpoints críticos
+
+## TECNOLOGIAS:
+- Backend: Express.js com TypeScript
+- Frontend: React com TanStack Query
+- UI: Shadcn/UI + Tailwind CSS
+- Banco: MySQL (ou PostgreSQL adaptando queries)
+- Gateways: SDKs oficiais do Mercado Pago e Stripe
+
+## VARIÁVEIS DE AMBIENTE NECESSÁRIAS:
+- DATABASE_URL ou credenciais MySQL separadas
+- CONFIG_CRYPTO_KEY (chave para criptografia)
+- NODE_ENV
+
+As credenciais dos gateways (Mercado Pago e Stripe) são salvas pelo admin via painel, não como variáveis de ambiente.
