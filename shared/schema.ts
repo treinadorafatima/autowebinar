@@ -681,3 +681,22 @@ export const scheduledWhatsappMessages = pgTable("scheduled_whatsapp_messages", 
 export type ScheduledWhatsappMessage = typeof scheduledWhatsappMessages.$inferSelect;
 export const scheduledWhatsappMessageInsertSchema = createInsertSchema(scheduledWhatsappMessages).omit({ id: true, createdAt: true, updatedAt: true });
 export type ScheduledWhatsappMessageInsert = z.infer<typeof scheduledWhatsappMessageInsertSchema>;
+
+// Media Files - User file repository for WhatsApp media
+// Each admin has their own isolated file storage
+export const mediaFiles = pgTable("media_files", {
+  id: text("id").primaryKey(),
+  adminId: text("admin_id").notNull(), // FK para admins - isolamento por usuário
+  fileName: text("file_name").notNull(), // Nome original do arquivo
+  mimeType: text("mime_type").notNull(), // MIME type (image/jpeg, audio/ogg, etc)
+  sizeBytes: integer("size_bytes").notNull(), // Tamanho em bytes
+  mediaType: text("media_type").notNull(), // 'image', 'audio', 'video', 'document'
+  storageProvider: text("storage_provider").notNull(), // 'supabase', 'r2', 'local'
+  storagePath: text("storage_path").notNull(), // Caminho/key no storage
+  publicUrl: text("public_url").notNull(), // URL pública para acesso
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type MediaFile = typeof mediaFiles.$inferSelect;
+export const mediaFileInsertSchema = createInsertSchema(mediaFiles).omit({ id: true, createdAt: true });
+export type MediaFileInsert = z.infer<typeof mediaFileInsertSchema>;

@@ -3130,24 +3130,97 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`[upload-file] Uploading ${mediaType}: ${req.file.originalname} (${(req.file.size / 1024).toFixed(2)} KB)`);
       
-      // Read file from disk and upload to R2
+      // Read file from disk and upload to storage
       const fileBuffer = readFileSync(req.file.path);
       const fileId = await storage.uploadMediaFile(fileBuffer, req.file.originalname, mimeType);
       const url = storage.getMediaFileUrl(fileId);
+      
+      // Determine storage provider based on what's configured
+      let storageProvider = 'local';
+      let storagePath = fileId;
+      if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY) {
+        storageProvider = 'supabase';
+        storagePath = `media/${fileId}`;
+      } else if (process.env.CLOUDFLARE_ACCOUNT_ID) {
+        storageProvider = 'r2';
+        storagePath = `media/${fileId}`;
+      }
+      
+      // Save to media_files table for user's file manager
+      const mediaFile = await storage.createMediaFile({
+        adminId: admin.id,
+        fileName: req.file.originalname,
+        mimeType: mimeType,
+        sizeBytes: req.file.size,
+        mediaType: mediaType,
+        storageProvider: storageProvider,
+        storagePath: storagePath,
+        publicUrl: url,
+      });
       
       // Clean up temp file
       if (req.file.path && existsSync(req.file.path)) {
         unlinkSync(req.file.path);
       }
       
-      console.log(`[upload-file] File uploaded: ${fileId} -> ${url}`);
-      res.json({ url, fileId, mediaType, mimeType });
+      console.log(`[upload-file] File uploaded: ${fileId} -> ${url} (id: ${mediaFile.id})`);
+      res.json({ url, fileId, mediaType, mimeType, mediaId: mediaFile.id });
     } catch (error: any) {
       console.error("[upload-file] Error:", error);
       // Clean up temp file on error
       if (req.file?.path && existsSync(req.file.path)) {
         unlinkSync(req.file.path);
       }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // List media files for current admin (file manager)
+  app.get("/api/media", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin) {
+        return res.status(401).json({ error: "Admin not found" });
+      }
+
+      const files = await storage.listMediaFilesByAdmin(admin.id);
+      res.json(files);
+    } catch (error: any) {
+      console.error("[media-list] Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Delete media file (file manager)
+  app.delete("/api/media/:id", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin) {
+        return res.status(401).json({ error: "Admin not found" });
+      }
+
+      const mediaId = req.params.id;
+      const deleted = await storage.deleteMediaFile(admin.id, mediaId);
+      
+      if (!deleted) {
+        return res.status(404).json({ error: "Arquivo não encontrado ou sem permissão" });
+      }
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[media-delete] Error:", error);
       res.status(500).json({ error: error.message });
     }
   });

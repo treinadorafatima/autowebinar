@@ -50,6 +50,17 @@ interface Webinar {
   slug: string;
 }
 
+interface MediaFile {
+  id: string;
+  adminId: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  mediaType: string;
+  publicUrl: string;
+  createdAt: string;
+}
+
 const PHASES = [
   { value: "pre", label: "Pré-Webinar", description: "Antes do evento começar" },
   { value: "during", label: "Durante", description: "Durante o webinar" },
@@ -149,6 +160,20 @@ export default function AdminWhatsAppMarketing() {
       return res.json();
     },
     enabled: activeTab === "sequences"
+  });
+
+  const { data: mediaFiles, isLoading: loadingMediaFiles } = useQuery<MediaFile[]>({
+    queryKey: ["/api/media"],
+    queryFn: async () => {
+      const res = await fetch("/api/media", {
+        headers: { Authorization: `Bearer ${localStorage.getItem("adminToken")}` }
+      });
+      if (!res.ok) {
+        throw new Error("Failed to load media files");
+      }
+      return res.json();
+    },
+    enabled: activeTab === "files"
   });
 
   useEffect(() => {
@@ -277,6 +302,36 @@ export default function AdminWhatsAppMarketing() {
     setNewDays(0);
     setNewHours(1);
     setNewMinutes(0);
+  };
+
+  const deleteMediaFileMutation = useMutation({
+    mutationFn: async (mediaId: string) => {
+      const res = await apiRequest("DELETE", `/api/media/${mediaId}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Arquivo excluído com sucesso" });
+      queryClient.invalidateQueries({ queryKey: ["/api/media"] });
+    },
+    onError: (error: any) => {
+      toast({ title: "Erro ao excluir", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+  };
+
+  const getMediaIcon = (mediaType: string) => {
+    switch (mediaType) {
+      case "image": return Image;
+      case "audio": return Mic;
+      case "video": return FileVideo;
+      case "document": return FileText;
+      default: return FileText;
+    }
   };
 
   const handleCreateSequence = () => {
@@ -492,7 +547,7 @@ export default function AdminWhatsAppMarketing() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid grid-cols-3 w-full max-w-md">
+          <TabsList className="grid grid-cols-4 w-full max-w-xl">
             <TabsTrigger value="connection" data-testid="tab-connection">
               <Smartphone className="w-4 h-4 mr-2" />
               Conexão
@@ -500,6 +555,10 @@ export default function AdminWhatsAppMarketing() {
             <TabsTrigger value="sequences" data-testid="tab-sequences">
               <Clock className="w-4 h-4 mr-2" />
               Sequências
+            </TabsTrigger>
+            <TabsTrigger value="files" data-testid="tab-files">
+              <Image className="w-4 h-4 mr-2" />
+              Meus Arquivos
             </TabsTrigger>
             <TabsTrigger value="test" data-testid="tab-test">
               <Send className="w-4 h-4 mr-2" />
@@ -743,6 +802,100 @@ export default function AdminWhatsAppMarketing() {
                 </CardContent>
               </Card>
             )}
+          </TabsContent>
+
+          <TabsContent value="files" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Image className="w-5 h-5" />
+                  Meus Arquivos
+                </CardTitle>
+                <CardDescription>
+                  Gerencie todos os arquivos de mídia que você enviou para usar nas sequências de WhatsApp
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {loadingMediaFiles ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+                  </div>
+                ) : mediaFiles && mediaFiles.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {mediaFiles.map((file) => {
+                      const MediaIcon = getMediaIcon(file.mediaType);
+                      return (
+                        <Card key={file.id} className="overflow-hidden" data-testid={`card-media-${file.id}`}>
+                          <div className="aspect-video bg-muted flex items-center justify-center relative">
+                            {file.mediaType === "image" ? (
+                              <img 
+                                src={file.publicUrl} 
+                                alt={file.fileName}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : file.mediaType === "video" ? (
+                              <video 
+                                src={file.publicUrl}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <MediaIcon className="w-16 h-16 text-muted-foreground" />
+                            )}
+                            <Badge className="absolute top-2 right-2" variant="secondary">
+                              {file.mediaType}
+                            </Badge>
+                          </div>
+                          <CardContent className="p-3 space-y-2">
+                            <p className="font-medium text-sm truncate" title={file.fileName}>
+                              {file.fileName}
+                            </p>
+                            <div className="flex items-center justify-between text-xs text-muted-foreground">
+                              <span>{formatFileSize(file.sizeBytes)}</span>
+                              <span>{new Date(file.createdAt).toLocaleDateString('pt-BR')}</span>
+                            </div>
+                          </CardContent>
+                          <CardFooter className="p-3 pt-0 gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="flex-1"
+                              onClick={() => {
+                                navigator.clipboard.writeText(file.publicUrl);
+                                toast({ title: "URL copiada!" });
+                              }}
+                              data-testid={`button-copy-url-${file.id}`}
+                            >
+                              Copiar URL
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => {
+                                if (confirm("Tem certeza que deseja excluir este arquivo? Sequências que usam este arquivo podem parar de funcionar.")) {
+                                  deleteMediaFileMutation.mutate(file.id);
+                                }
+                              }}
+                              disabled={deleteMediaFileMutation.isPending}
+                              data-testid={`button-delete-file-${file.id}`}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </CardFooter>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <Image className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-medium mb-2">Nenhum arquivo ainda</h3>
+                    <p className="text-muted-foreground text-sm">
+                      Os arquivos que você enviar nas sequências de WhatsApp aparecerão aqui
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="test" className="space-y-6">
@@ -1000,10 +1153,7 @@ export default function AdminWhatsAppMarketing() {
                         <div className="flex items-center justify-between bg-muted p-3 rounded-lg">
                           <div className="flex items-center gap-2">
                             <Check className="w-4 h-4 text-green-500" />
-                            <div className="flex flex-col">
-                              <span className="text-sm font-medium">{newSequence.mediaFileName}</span>
-                              <span className="text-xs text-muted-foreground">Hospedado no Supabase</span>
-                            </div>
+                            <span className="text-sm font-medium">{newSequence.mediaFileName}</span>
                           </div>
                           <Button
                             type="button"
@@ -1283,10 +1433,7 @@ export default function AdminWhatsAppMarketing() {
                           <div className="flex items-center justify-between bg-muted p-3 rounded-lg">
                             <div className="flex items-center gap-2">
                               <Check className="w-4 h-4 text-green-500" />
-                              <div className="flex flex-col">
-                                <span className="text-sm font-medium">{editingSequence.mediaFileName || "Arquivo enviado"}</span>
-                                <span className="text-xs text-muted-foreground">Hospedado no Supabase</span>
-                              </div>
+                              <span className="text-sm font-medium">{editingSequence.mediaFileName || "Arquivo enviado"}</span>
                             </div>
                             <Button
                               type="button"

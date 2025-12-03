@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type WebinarConfig, type WebinarConfigInsert, type Admin, type AdminInsert, type UploadedVideo, type UploadedVideoInsert, type Comment, type CommentInsert, type Webinar, type WebinarInsert, type Setting, type SettingInsert, type ViewerSession, type WebinarScript, type WebinarScriptInsert, type AiConfig, type AiConfigInsert, type AiMemory, type AiMemoryInsert, type CheckoutPlano, type CheckoutPlanoInsert, type CheckoutPagamento, type CheckoutPagamentoInsert, type CheckoutConfig, type CheckoutConfigInsert, type CheckoutAssinatura, type CheckoutAssinaturaInsert, type AiChat, type AiChatInsert, type AiMessageChat, type AiMessageChatInsert, type VideoTranscription, type VideoTranscriptionInsert, type AdminEmailCredential, type AdminEmailCredentialInsert, type EmailSequence, type EmailSequenceInsert, type ScheduledEmail, type ScheduledEmailInsert, type LeadFormConfig, type LeadFormConfigInsert, type WhatsappSession, type WhatsappSessionInsert, type WhatsappSequence, type WhatsappSequenceInsert, type ScheduledWhatsappMessage, type ScheduledWhatsappMessageInsert, admins, webinarConfigs, users, uploadedVideos, comments, webinars as webinarsTable, settings, viewerSessions, webinarScripts, aiConfigs, aiMemories, checkoutPlanos, checkoutPagamentos, checkoutConfigs, checkoutAssinaturas, aiChats, aiMessageChats, videoTranscriptions, adminEmailCredentials, emailSequences, scheduledEmails, leadFormConfigs, whatsappSessions, whatsappSequences, scheduledWhatsappMessages } from "@shared/schema";
+import { type User, type InsertUser, type WebinarConfig, type WebinarConfigInsert, type Admin, type AdminInsert, type UploadedVideo, type UploadedVideoInsert, type Comment, type CommentInsert, type Webinar, type WebinarInsert, type Setting, type SettingInsert, type ViewerSession, type WebinarScript, type WebinarScriptInsert, type AiConfig, type AiConfigInsert, type AiMemory, type AiMemoryInsert, type CheckoutPlano, type CheckoutPlanoInsert, type CheckoutPagamento, type CheckoutPagamentoInsert, type CheckoutConfig, type CheckoutConfigInsert, type CheckoutAssinatura, type CheckoutAssinaturaInsert, type AiChat, type AiChatInsert, type AiMessageChat, type AiMessageChatInsert, type VideoTranscription, type VideoTranscriptionInsert, type AdminEmailCredential, type AdminEmailCredentialInsert, type EmailSequence, type EmailSequenceInsert, type ScheduledEmail, type ScheduledEmailInsert, type LeadFormConfig, type LeadFormConfigInsert, type WhatsappSession, type WhatsappSessionInsert, type WhatsappSequence, type WhatsappSequenceInsert, type ScheduledWhatsappMessage, type ScheduledWhatsappMessageInsert, type MediaFile, type MediaFileInsert, admins, webinarConfigs, users, uploadedVideos, comments, webinars as webinarsTable, settings, viewerSessions, webinarScripts, aiConfigs, aiMemories, checkoutPlanos, checkoutPagamentos, checkoutConfigs, checkoutAssinaturas, aiChats, aiMessageChats, videoTranscriptions, adminEmailCredentials, emailSequences, scheduledEmails, leadFormConfigs, whatsappSessions, whatsappSequences, scheduledWhatsappMessages, mediaFiles } from "@shared/schema";
 import * as crypto from "crypto";
 import { randomUUID } from "crypto";
 import { db } from "./db";
@@ -259,6 +259,11 @@ export interface IStorage {
   updateScheduledWhatsappMessage(id: string, data: Partial<ScheduledWhatsappMessageInsert>): Promise<ScheduledWhatsappMessage | undefined>;
   cancelScheduledWhatsappMessagesByWebinar(webinarId: string): Promise<number>;
   listQueuedWhatsappMessagesByWebinar(webinarId: string): Promise<ScheduledWhatsappMessage[]>;
+  // Media Files - Per-user file repository
+  listMediaFilesByAdmin(adminId: string): Promise<MediaFile[]>;
+  getMediaFileById(id: string): Promise<MediaFile | undefined>;
+  createMediaFile(data: MediaFileInsert): Promise<MediaFile>;
+  deleteMediaFile(adminId: string, mediaId: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1848,7 +1853,7 @@ export class DatabaseStorage implements IStorage {
     if (r2Client) {
       try {
         const command = new PutObjectCommand({
-          Bucket: R2_BUCKET_NAME,
+          Bucket: 'webinar-videos',
           Key: `media/${fileId}`,
           Body: buffer,
           ContentType: mimeType,
@@ -3173,6 +3178,68 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
         eq(scheduledWhatsappMessages.webinarId, webinarId),
         eq(scheduledWhatsappMessages.status, 'queued')
       ));
+  }
+
+  // Media Files methods
+  async listMediaFilesByAdmin(adminId: string): Promise<MediaFile[]> {
+    return db.select().from(mediaFiles)
+      .where(eq(mediaFiles.adminId, adminId))
+      .orderBy(desc(mediaFiles.createdAt));
+  }
+
+  async getMediaFileById(id: string): Promise<MediaFile | undefined> {
+    const [result] = await db.select().from(mediaFiles)
+      .where(eq(mediaFiles.id, id))
+      .limit(1);
+    return result;
+  }
+
+  async createMediaFile(data: MediaFileInsert): Promise<MediaFile> {
+    const id = randomUUID();
+    const [result] = await db.insert(mediaFiles).values({
+      id,
+      ...data,
+      createdAt: new Date(),
+    }).returning();
+    return result;
+  }
+
+  async deleteMediaFile(adminId: string, mediaId: string): Promise<boolean> {
+    // First get the file to check ownership and get storage info
+    const file = await this.getMediaFileById(mediaId);
+    if (!file || file.adminId !== adminId) {
+      return false;
+    }
+
+    // Delete from storage provider
+    try {
+      if (file.storageProvider === 'supabase' && supabaseClient) {
+        const { error } = await supabaseClient.storage
+          .from('webinar-images')
+          .remove([file.storagePath]);
+        if (error) {
+          console.error(`[storage] Supabase delete error:`, error);
+        }
+      } else if (file.storageProvider === 'r2' && r2Client) {
+        const command = new DeleteObjectCommand({
+          Bucket: 'webinar-videos',
+          Key: file.storagePath,
+        });
+        await r2Client.send(command);
+      } else if (file.storageProvider === 'local') {
+        const localPath = path.join(process.cwd(), "uploads", "media", file.storagePath);
+        if (fs.existsSync(localPath)) {
+          fs.unlinkSync(localPath);
+        }
+      }
+    } catch (error) {
+      console.error(`[storage] Error deleting file from provider:`, error);
+    }
+
+    // Delete from database
+    await db.delete(mediaFiles).where(eq(mediaFiles.id, mediaId));
+    console.log(`[storage] Media file deleted: ${mediaId}`);
+    return true;
   }
 }
 
