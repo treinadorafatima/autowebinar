@@ -1,11 +1,12 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 export default function CarlosReplayPage() {
+  const [iframeHeight, setIframeHeight] = useState(540);
+
   useEffect(() => {
     const handleMessage = (e: MessageEvent) => {
-      const iframe = document.getElementById('webinar-compact-carlos-replay') as HTMLIFrameElement;
-      if (e.data && e.data.type === 'webinar-resize' && e.data.height && iframe) {
-        iframe.style.height = e.data.height + 'px';
+      if (e.data && e.data.type === 'webinar-resize' && e.data.height) {
+        setIframeHeight(e.data.height);
       }
     };
     
@@ -59,26 +60,22 @@ export default function CarlosReplayPage() {
           <div style={{ 
             borderRadius: "12px", 
             overflow: "hidden", 
-            boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
-            position: "relative",
-            paddingBottom: "56.25%",
-            height: 0
+            boxShadow: "0 4px 20px rgba(0,0,0,0.15)"
           }}>
             <iframe
               id="webinar-compact-carlos-replay"
-              src="https://autowebinar-znc5.onrender.com/w/carlos/replay?embed=1&compact=1"
+              src="https://autowebinar-znc5.onrender.com/w/carlos/replay?embed=1"
               frameBorder="0"
               scrolling="no"
               allow="autoplay; fullscreen"
               allowFullScreen
               loading="lazy"
               style={{ 
-                position: "absolute",
-                top: 0,
-                left: 0,
                 width: "100%", 
-                height: "100%", 
-                border: "none"
+                height: `${iframeHeight}px`, 
+                border: "none",
+                display: "block",
+                transition: "height 0.3s ease"
               }}
               data-testid="iframe-carlos-replay"
             />
