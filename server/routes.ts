@@ -2160,6 +2160,179 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Duplicate webinar
+  app.post("/api/webinars/:id/duplicate", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin) {
+        return res.status(401).json({ error: "Admin not found" });
+      }
+      
+      if (!isAdminPlanActive(admin)) {
+        return res.status(403).json({ error: "Plano expirado", reason: "plan_expired" });
+      }
+
+      const originalWebinar = await storage.getWebinarById(req.params.id);
+      if (!originalWebinar) {
+        return res.status(404).json({ error: "Webinar not found" });
+      }
+      
+      if (originalWebinar.ownerId !== admin.id && admin.role !== "superadmin") {
+        return res.status(403).json({ error: "Sem permissão para duplicar este webinar" });
+      }
+
+      const webinarLimit = admin.webinarLimit || 5;
+      const existingWebinars = await storage.listWebinarsByOwner(admin.id);
+      if (existingWebinars.length >= webinarLimit) {
+        return res.status(403).json({ 
+          error: `Limite de ${webinarLimit} webinars atingido`,
+          reason: "webinar_limit"
+        });
+      }
+
+      const newId = crypto.randomUUID();
+      const timestamp = Date.now();
+      const newSlug = `${originalWebinar.slug}-copia-${timestamp}`;
+      
+      const { id, createdAt, slug, customDomain, ...webinarData } = originalWebinar;
+      const newWebinar = await storage.createWebinar({
+        ...webinarData,
+        name: `${originalWebinar.name} (Cópia)`,
+        slug: newSlug,
+        ownerId: admin.id,
+        customDomain: undefined,
+      });
+
+      const emailSequences = await storage.listEmailSequencesByWebinar(originalWebinar.id);
+      for (const seq of emailSequences) {
+        const { id: seqId, createdAt: seqCreatedAt, updatedAt, webinarId, ...seqData } = seq;
+        await storage.createEmailSequence({
+          ...seqData,
+          adminId: admin.id,
+          webinarId: newWebinar.id,
+        });
+      }
+
+      const whatsappSequences = await storage.listWhatsappSequencesByWebinar(originalWebinar.id);
+      for (const seq of whatsappSequences) {
+        const { id: seqId, createdAt: seqCreatedAt, updatedAt, webinarId, ...seqData } = seq;
+        await storage.createWhatsappSequence({
+          ...seqData,
+          adminId: admin.id,
+          webinarId: newWebinar.id,
+        });
+      }
+
+      const originalComments = await storage.getCommentsByWebinar(originalWebinar.id);
+      const simulatedComments = originalComments.filter(c => c.isSimulated);
+      for (const comment of simulatedComments) {
+        const { id: commentId, createdAt: commentCreatedAt, ...commentData } = comment;
+        await storage.createComment({
+          ...commentData,
+          webinarId: newWebinar.id,
+        });
+      }
+
+      const leadFormConfig = await storage.getLeadFormConfigByWebinar(originalWebinar.id);
+      if (leadFormConfig) {
+        const { id: configId, webinarId, createdAt: configCreatedAt, updatedAt: configUpdatedAt, ...configData } = leadFormConfig;
+        await storage.createLeadFormConfig({
+          ...configData,
+          webinarId: newWebinar.id,
+        });
+      }
+
+      console.log(`[webinar] Duplicated webinar ${originalWebinar.id} to ${newWebinar.id} by admin ${admin.id}`);
+      
+      res.json({ 
+        success: true, 
+        webinar: newWebinar,
+        message: "Webinar duplicado com sucesso!"
+      });
+    } catch (error: any) {
+      console.error("[webinar] Duplicate error:", error);
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Transfer webinar to another account (superadmin only)
+  app.post("/api/webinars/:id/transfer", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin || admin.role !== "superadmin") {
+        return res.status(403).json({ error: "Apenas superadmin pode transferir webinars" });
+      }
+
+      const { targetAdminId } = req.body;
+      if (!targetAdminId) {
+        return res.status(400).json({ error: "ID da conta destino é obrigatório" });
+      }
+
+      const targetAdmin = await storage.getAdminById(targetAdminId);
+      if (!targetAdmin) {
+        return res.status(404).json({ error: "Conta destino não encontrada" });
+      }
+
+      const webinar = await storage.getWebinarById(req.params.id);
+      if (!webinar) {
+        return res.status(404).json({ error: "Webinar não encontrado" });
+      }
+
+      const sourceAdminId = webinar.ownerId;
+
+      await storage.updateWebinar(webinar.id, { ownerId: targetAdminId });
+
+      let videoTransferred = false;
+      if (webinar.uploadedVideoId) {
+        await storage.updateUploadedVideoOwner(webinar.uploadedVideoId, targetAdminId);
+        videoTransferred = true;
+      }
+
+      const emailSequences = await storage.listEmailSequencesByWebinar(webinar.id);
+      for (const seq of emailSequences) {
+        await storage.updateEmailSequence(seq.id, { adminId: targetAdminId });
+      }
+
+      const whatsappSequences = await storage.listWhatsappSequencesByWebinar(webinar.id);
+      for (const seq of whatsappSequences) {
+        await storage.updateWhatsappSequence(seq.id, { adminId: targetAdminId });
+      }
+
+      const scripts = await storage.getScriptsByWebinar(webinar.id);
+
+      console.log(`[webinar] Transferred webinar ${webinar.id} from ${sourceAdminId} to ${targetAdminId} by superadmin ${admin.id}`);
+
+      res.json({ 
+        success: true,
+        message: "Webinar transferido com sucesso!",
+        transferred: {
+          webinar: webinar.name,
+          from: sourceAdminId,
+          to: targetAdminId,
+          includedVideo: videoTransferred,
+          emailSequences: emailSequences.length,
+          whatsappSequences: whatsappSequences.length,
+          scripts: scripts.length,
+        }
+      });
+    } catch (error: any) {
+      console.error("[webinar] Transfer error:", error);
+      res.status(400).json({ error: error.message });
+    }
+  });
+
   // ========== WEBINAR-SPECIFIC COMMENTS ==========
   
   // Get all comments for a webinar (public for live page)

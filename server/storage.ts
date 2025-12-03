@@ -93,6 +93,7 @@ export interface IStorage {
   listVideosByOwner(ownerId: string): Promise<UploadedVideo[]>;
   countVideosByOwner(ownerId: string): Promise<number>;
   deleteVideo(videoId: string): Promise<void>;
+  updateUploadedVideoOwner(videoId: string, newOwnerId: string): Promise<void>;
   createComment(comment: CommentInsert): Promise<Comment>;
   getComments(): Promise<Comment[]>;
   getSimulatedComments(): Promise<Comment[]>;
@@ -982,6 +983,21 @@ export class DatabaseStorage implements IStorage {
     }
     
     console.log(`[deleteVideo] Exclusão concluída para: ${actualVideoId}`);
+  }
+
+  async updateUploadedVideoOwner(videoId: string, newOwnerId: string): Promise<void> {
+    let video = await db.select().from(uploadedVideos).where(eq(uploadedVideos.uploadedVideoId, videoId)).limit(1);
+    
+    if (video.length === 0) {
+      video = await db.select().from(uploadedVideos).where(eq(uploadedVideos.id, videoId)).limit(1);
+    }
+    
+    if (video.length > 0) {
+      await db.update(uploadedVideos)
+        .set({ ownerId: newOwnerId })
+        .where(eq(uploadedVideos.id, video[0].id));
+      console.log(`[updateUploadedVideoOwner] Vídeo ${videoId} transferido para owner ${newOwnerId}`);
+    }
   }
 
   async createComment(comment: CommentInsert): Promise<Comment> {

@@ -46,7 +46,8 @@ import {
   RefreshCw,
   Globe,
   Monitor,
-  Mic
+  Mic,
+  ArrowRightLeft
 } from "lucide-react";
 
 function DomainConfigSection({ domain, serverHost }: { domain: string; serverHost: string }) {
@@ -433,6 +434,13 @@ export default function AdminWebinarDetailPage() {
   const [replayBenefitsList, setReplayBenefitsList] = useState<string[]>([]);
   const [newReplayBenefit, setNewReplayBenefit] = useState("");
 
+  const [userRole, setUserRole] = useState<string>("user");
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [adminsList, setAdminsList] = useState<{ id: string; name: string; email: string }[]>([]);
+  const [selectedAdminId, setSelectedAdminId] = useState<string>("");
+  const [transferring, setTransferring] = useState(false);
+  const isSuperadmin = userRole === "superadmin";
+
   const [newComment, setNewComment] = useState({ author: "", text: "", hours: 0, minutes: 0, seconds: 0 });
   const [editingComment, setEditingComment] = useState<Comment | null>(null);
   const [editHours, setEditHours] = useState(0);
@@ -481,6 +489,7 @@ export default function AdminWebinarDetailPage() {
         if (res.ok) {
           const data = await res.json();
           setCurrentUser(data);
+          setUserRole(data.role || "user");
         }
       } catch (error) {
         console.error("Erro ao carregar usuário atual:", error);
@@ -930,6 +939,87 @@ export default function AdminWebinarDetailPage() {
     }
   }
 
+  async function handleDuplicate() {
+    if (!webinar) return;
+    if (!confirm("Deseja duplicar este webinário? Serão copiadas todas as configurações, comentários simulados e sequências de email/WhatsApp.")) return;
+    
+    try {
+      const res = await fetch(`/api/webinars/${webinar.id}/duplicate`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro ao duplicar");
+      toast({ title: "Webinário duplicado com sucesso!", description: `Novo webinário: ${data.webinar?.name}` });
+      setLocation(`/admin/webinars/${data.webinar?.id}`);
+    } catch (error: any) {
+      toast({ title: "Erro ao duplicar", description: error.message, variant: "destructive" });
+    }
+  }
+
+  async function fetchAdminsList() {
+    try {
+      const res = await fetch("/api/admins", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const filteredAdmins = data.filter((a: any) => a.id !== webinar?.ownerId);
+        setAdminsList(filteredAdmins);
+        if (filteredAdmins.length === 0) {
+          toast({ title: "Aviso", description: "Não há outras contas disponíveis para transferência" });
+        }
+      } else {
+        toast({ title: "Erro ao carregar contas", variant: "destructive" });
+        setAdminsList([]);
+      }
+    } catch (error) {
+      console.error("Erro ao carregar lista de admins:", error);
+      toast({ title: "Erro ao carregar lista de contas", variant: "destructive" });
+      setAdminsList([]);
+    }
+  }
+
+  async function handleOpenTransferModal() {
+    if (!isSuperadmin) {
+      toast({ title: "Acesso negado", description: "Apenas superadmin pode transferir webinários", variant: "destructive" });
+      return;
+    }
+    await fetchAdminsList();
+    setSelectedAdminId("");
+    setShowTransferModal(true);
+  }
+
+  async function handleTransfer() {
+    if (!webinar || !selectedAdminId) return;
+    setTransferring(true);
+    
+    try {
+      const res = await fetch(`/api/webinars/${webinar.id}/transfer`, {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}` 
+        },
+        body: JSON.stringify({ targetAdminId: selectedAdminId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro ao transferir");
+      
+      const t = data.transferred;
+      toast({ 
+        title: "Webinário transferido com sucesso!", 
+        description: `Vídeo: ${t?.includedVideo ? "Sim" : "Não"} | Emails: ${t?.emailSequences || 0} | WhatsApp: ${t?.whatsappSequences || 0} | Roteiros: ${t?.scripts || 0}`
+      });
+      setShowTransferModal(false);
+      setLocation("/admin/webinars");
+    } catch (error: any) {
+      toast({ title: "Erro ao transferir", description: error.message, variant: "destructive" });
+    } finally {
+      setTransferring(false);
+    }
+  }
+
   async function handleAddComment() {
     if (!webinar || !newComment.author.trim() || !newComment.text.trim()) {
       toast({ title: "Preencha autor e mensagem", variant: "destructive" });
@@ -1229,6 +1319,28 @@ export default function AdminWebinarDetailPage() {
             <ExternalLink className="h-4 w-4 sm:mr-2" />
             <span className="hidden sm:inline">Visualizar</span>
           </Button>
+          <Button 
+            variant="outline"
+            size="sm"
+            onClick={handleDuplicate}
+            title="Duplicar webinário com todas as configurações"
+            data-testid="button-duplicate-webinar"
+          >
+            <Copy className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Duplicar</span>
+          </Button>
+          {isSuperadmin && (
+            <Button 
+              variant="outline"
+              size="sm"
+              onClick={handleOpenTransferModal}
+              title="Transferir webinário para outra conta"
+              data-testid="button-transfer-webinar"
+            >
+              <ArrowRightLeft className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Transferir</span>
+            </Button>
+          )}
           <Button 
             variant="destructive" 
             size="sm"
@@ -4113,6 +4225,71 @@ Exemplo:
             >
               {pasteLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
               Importar Comentários
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal para transferir webinário (apenas superadmin) */}
+      <Dialog open={showTransferModal} onOpenChange={setShowTransferModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Transferir Webinário</DialogTitle>
+            <DialogDescription>
+              Selecione a conta de destino para transferir este webinário. Serão transferidos: configurações, vídeo, domínio, sequências de email/WhatsApp, formulários de leads e roteiros.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="target-admin">Conta de Destino</Label>
+              {adminsList.length === 0 ? (
+                <div className="p-3 bg-muted/50 rounded-lg text-sm text-muted-foreground">
+                  Nenhuma outra conta disponível para transferência.
+                </div>
+              ) : (
+                <Select value={selectedAdminId} onValueChange={setSelectedAdminId}>
+                  <SelectTrigger id="target-admin" data-testid="select-transfer-admin">
+                    <SelectValue placeholder="Selecione uma conta..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {adminsList.map((admin) => (
+                      <SelectItem key={admin.id} value={admin.id} data-testid={`option-admin-${admin.id}`}>
+                        {admin.name} ({admin.email})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+
+            {selectedAdminId && (
+              <div className="p-3 bg-muted/50 rounded-lg text-sm space-y-1">
+                <p className="font-medium text-foreground">O que será transferido:</p>
+                <ul className="text-muted-foreground space-y-0.5 pl-4 list-disc">
+                  <li>Todas as configurações do webinário</li>
+                  <li>Vídeo associado (se houver)</li>
+                  <li>Domínio personalizado (se houver)</li>
+                  <li>Sequências de email</li>
+                  <li>Sequências de WhatsApp</li>
+                  <li>Formulários de leads</li>
+                  <li>Roteiros salvos</li>
+                </ul>
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowTransferModal(false)}>
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleTransfer}
+              disabled={transferring || !selectedAdminId || adminsList.length === 0}
+              data-testid="button-confirm-transfer"
+            >
+              {transferring ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ArrowRightLeft className="h-4 w-4 mr-2" />}
+              Transferir Webinário
             </Button>
           </DialogFooter>
         </DialogContent>
