@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import WebinarPlayer from "@/components/webinar-player";
-import bibliaPlusLogo from "@assets/WhatsApp Image 2025-11-25 at 20.59.53_1764115207955.jpeg";
+import bibliaPlusLogo from "@assets/biblia-plus-logo.jpeg";
 import { WEBINAR_COMMENTS } from "@/data/webinar-comments";
 
 interface WebinarConfig {

@@ -1,6 +1,6 @@
 import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import bibliaPlusLogo from "@assets/WhatsApp Image 2025-11-25 at 20.59.53_1764115207955.jpeg";
+import bibliaPlusLogo from "@assets/biblia-plus-logo.jpeg";
 
 export default function ReplayPage() {
   const benefits = [

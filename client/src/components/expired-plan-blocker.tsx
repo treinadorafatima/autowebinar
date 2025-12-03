@@ -17,7 +17,7 @@ import {
   Mic,
   Check
 } from "lucide-react";
-import logoImage from "@assets/ChatGPT Image 30 de nov. de 2025, 00_00_41_1764471665393.png";
+import logoImage from "@assets/autowebinar-logo.png";
 
 interface ExpiredPlanBlockerProps {
   userName: string;

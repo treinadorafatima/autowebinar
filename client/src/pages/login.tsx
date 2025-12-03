@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Mail, Lock } from "lucide-react";
-import logoImage from "@assets/ChatGPT Image 30 de nov. de 2025, 00_00_41_1764471665393.png";
+import logoImage from "@assets/autowebinar-logo.png";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
