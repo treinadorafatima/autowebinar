@@ -8,6 +8,7 @@ import { webinarConfigInsertSchema, adminInsertSchema, webinarInsertSchema, sess
 import { registerEmailMarketingRoutes } from "./email-marketing";
 import { registerWhatsAppRoutes } from "./whatsapp-routes";
 import { rescheduleSequencesForWebinar, cancelAllSequencesForWebinar } from "./sequence-sync";
+import { renderDomainsService } from "./render-domains";
 import multer from "multer";
 import { db } from "./db";
 import { eq, and, or, desc } from "drizzle-orm";
@@ -1686,6 +1687,149 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ========== RENDER DOMAINS API (Superadmin only) ==========
+  
+  // Check if Render API is configured (any authenticated user)
+  app.get("/api/render-domains/status", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      const status = renderDomainsService.getConfigStatus();
+      res.json(status);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Add domain to Render (superadmin only)
+  app.post("/api/render-domains/add", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      // Only superadmin can manage Render domains directly
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin || admin.role !== "superadmin") {
+        return res.status(403).json({ error: "Apenas superadmin pode gerenciar domínios no Render" });
+      }
+      
+      const { domain } = req.body;
+      if (!domain) {
+        return res.status(400).json({ error: "Domínio é obrigatório" });
+      }
+
+      if (!renderDomainsService.isConfigured()) {
+        return res.status(503).json({ 
+          error: "Integração com Render não configurada",
+          message: "Configure RENDER_API_KEY e RENDER_SERVICE_ID"
+        });
+      }
+
+      const result = await renderDomainsService.addDomain(domain);
+      
+      if (result.success && !result.error) {
+        console.log(`[render-domains] Domain added successfully: ${domain}`);
+        res.json({
+          success: true,
+          message: "Domínio adicionado ao Render com sucesso!",
+          dnsInstructions: result.dnsInstructions,
+          domain: result.domain,
+        });
+      } else if (result.success && result.error) {
+        // Domain already exists - return as info, not error
+        res.json({
+          success: true,
+          message: result.error,
+          alreadyExists: true,
+        });
+      } else {
+        res.status(400).json({ 
+          success: false, 
+          error: result.error 
+        });
+      }
+    } catch (error: any) {
+      console.error("[render-domains] Error adding domain:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Remove domain from Render (superadmin only)
+  app.delete("/api/render-domains/:domain", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      // Only superadmin can manage Render domains directly
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin || admin.role !== "superadmin") {
+        return res.status(403).json({ error: "Apenas superadmin pode gerenciar domínios no Render" });
+      }
+      
+      const { domain } = req.params;
+      
+      if (!renderDomainsService.isConfigured()) {
+        return res.status(503).json({ 
+          error: "Integração com Render não configurada" 
+        });
+      }
+
+      const result = await renderDomainsService.removeDomain(domain);
+      
+      if (result.success) {
+        console.log(`[render-domains] Domain removed: ${domain}`);
+        res.json({ success: true, message: "Domínio removido do Render" });
+      } else {
+        res.status(400).json({ success: false, error: result.error });
+      }
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // List all domains from Render (superadmin only)
+  app.get("/api/render-domains/list", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      // Only superadmin can list all Render domains
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin || admin.role !== "superadmin") {
+        return res.status(403).json({ error: "Apenas superadmin pode listar domínios do Render" });
+      }
+      
+      if (!renderDomainsService.isConfigured()) {
+        return res.status(503).json({ 
+          error: "Integração com Render não configurada" 
+        });
+      }
+
+      const result = await renderDomainsService.listDomains();
+      
+      if (result.success) {
+        res.json({ success: true, domains: result.domains });
+      } else {
+        res.status(400).json({ success: false, error: result.error });
+      }
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // ========== WEBINARS API ==========
   
   // List public active webinars (no auth required)
@@ -1927,6 +2071,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const webinar = await storage.updateWebinar(req.params.id, updatedData);
       if (!webinar) {
         return res.status(404).json({ error: "Webinar not found" });
+      }
+      
+      // Auto-add custom domain to Render if changed
+      const customDomainChanged = updatedData.customDomain && 
+        updatedData.customDomain !== currentWebinar.customDomain;
+      
+      if (customDomainChanged && renderDomainsService.isConfigured()) {
+        const newDomain = updatedData.customDomain;
+        console.log(`[webinar] Custom domain changed to ${newDomain}, adding to Render...`);
+        
+        // Add new domain to Render (async, don't block response)
+        renderDomainsService.addDomain(newDomain)
+          .then(result => {
+            if (result.success) {
+              console.log(`[render-domains] Auto-added domain: ${newDomain}`);
+            } else {
+              console.log(`[render-domains] Domain add result: ${result.error}`);
+            }
+          })
+          .catch(err => {
+            console.error(`[render-domains] Error auto-adding domain:`, err);
+          });
+        
+        // Remove old domain if exists
+        if (currentWebinar.customDomain) {
+          renderDomainsService.removeDomain(currentWebinar.customDomain)
+            .then(result => {
+              if (result.success) {
+                console.log(`[render-domains] Removed old domain: ${currentWebinar.customDomain}`);
+              }
+            })
+            .catch(() => {});
+        }
       }
       
       const startHourChanged = updatedData.startHour !== undefined && updatedData.startHour !== currentWebinar.startHour;
