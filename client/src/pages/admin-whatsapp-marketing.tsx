@@ -969,24 +969,56 @@ export default function AdminWhatsAppMarketing() {
                   <Label>Upload de Mídia</Label>
                   <div className="border-2 border-dashed rounded-lg p-4">
                     {newSequence.mediaUrl ? (
-                      <div className="flex items-center justify-between bg-muted p-3 rounded-lg">
-                        <div className="flex items-center gap-2">
-                          <Check className="w-4 h-4 text-green-500" />
-                          <span className="text-sm">{newSequence.mediaFileName}</span>
+                      <div className="space-y-3">
+                        {newSequence.messageType === "image" && (
+                          <div className="flex justify-center">
+                            <img 
+                              src={newSequence.mediaUrl} 
+                              alt="Prévia" 
+                              className="max-h-48 rounded-lg object-contain border"
+                            />
+                          </div>
+                        )}
+                        {newSequence.messageType === "video" && (
+                          <div className="flex justify-center">
+                            <video 
+                              src={newSequence.mediaUrl}
+                              className="max-h-48 rounded-lg border"
+                              controls
+                            />
+                          </div>
+                        )}
+                        {newSequence.messageType === "audio" && (
+                          <div className="flex justify-center">
+                            <audio 
+                              src={newSequence.mediaUrl}
+                              controls
+                              className="w-full max-w-md"
+                            />
+                          </div>
+                        )}
+                        <div className="flex items-center justify-between bg-muted p-3 rounded-lg">
+                          <div className="flex items-center gap-2">
+                            <Check className="w-4 h-4 text-green-500" />
+                            <div className="flex flex-col">
+                              <span className="text-sm font-medium">{newSequence.mediaFileName}</span>
+                              <span className="text-xs text-muted-foreground">Hospedado no Supabase</span>
+                            </div>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setNewSequence({
+                              ...newSequence,
+                              mediaUrl: "",
+                              mediaFileName: "",
+                              mediaMimeType: ""
+                            })}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
                         </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setNewSequence({
-                            ...newSequence,
-                            mediaUrl: "",
-                            mediaFileName: "",
-                            mediaMimeType: ""
-                          })}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
                       </div>
                     ) : (
                       <label className="flex flex-col items-center gap-2 cursor-pointer">
@@ -1220,24 +1252,56 @@ export default function AdminWhatsAppMarketing() {
                     <Label>Upload de Mídia</Label>
                     <div className="border-2 border-dashed rounded-lg p-4">
                       {editingSequence.mediaUrl ? (
-                        <div className="flex items-center justify-between bg-muted p-3 rounded-lg">
-                          <div className="flex items-center gap-2">
-                            <Check className="w-4 h-4 text-green-500" />
-                            <span className="text-sm">{editingSequence.mediaFileName || "Arquivo enviado"}</span>
+                        <div className="space-y-3">
+                          {editingSequence.messageType === "image" && (
+                            <div className="flex justify-center">
+                              <img 
+                                src={editingSequence.mediaUrl} 
+                                alt="Prévia" 
+                                className="max-h-48 rounded-lg object-contain border"
+                              />
+                            </div>
+                          )}
+                          {editingSequence.messageType === "video" && (
+                            <div className="flex justify-center">
+                              <video 
+                                src={editingSequence.mediaUrl}
+                                className="max-h-48 rounded-lg border"
+                                controls
+                              />
+                            </div>
+                          )}
+                          {editingSequence.messageType === "audio" && (
+                            <div className="flex justify-center">
+                              <audio 
+                                src={editingSequence.mediaUrl}
+                                controls
+                                className="w-full max-w-md"
+                              />
+                            </div>
+                          )}
+                          <div className="flex items-center justify-between bg-muted p-3 rounded-lg">
+                            <div className="flex items-center gap-2">
+                              <Check className="w-4 h-4 text-green-500" />
+                              <div className="flex flex-col">
+                                <span className="text-sm font-medium">{editingSequence.mediaFileName || "Arquivo enviado"}</span>
+                                <span className="text-xs text-muted-foreground">Hospedado no Supabase</span>
+                              </div>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setEditingSequence({
+                                ...editingSequence,
+                                mediaUrl: null,
+                                mediaFileName: null,
+                                mediaMimeType: null
+                              })}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
                           </div>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setEditingSequence({
-                              ...editingSequence,
-                              mediaUrl: null,
-                              mediaFileName: null,
-                              mediaMimeType: null
-                            })}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
                         </div>
                       ) : (
                         <label className="flex flex-col items-center gap-2 cursor-pointer">
