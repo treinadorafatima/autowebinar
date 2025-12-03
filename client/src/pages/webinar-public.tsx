@@ -1136,10 +1136,20 @@ export default function WebinarPublicPage() {
     return (
       <div 
         ref={containerRef}
-        className={isEmbed ? "w-full flex items-center justify-center py-8" : "min-h-screen flex items-center justify-center"} 
+        className={isEmbed ? "w-full" : "min-h-screen"} 
         style={{ backgroundColor: isEmbed ? "transparent" : "#4A8BB5" }}
       >
-        <div className="text-white text-xl">Carregando...</div>
+        {/* Skeleton loader que simula o layout do vídeo */}
+        <div className={isEmbed ? "" : "container mx-auto py-4 md:py-8"}>
+          <div className={isEmbed ? "" : "mx-auto px-2 md:px-4"} style={{ maxWidth: isEmbed ? "100%" : "960px" }}>
+            <div className="relative w-full overflow-hidden rounded-xl" style={{ backgroundColor: "#1a1a2e" }}>
+              <div className="aspect-video flex flex-col items-center justify-center">
+                <div className="w-16 h-16 border-4 border-white/20 border-t-white rounded-full animate-spin mb-4" />
+                <div className="text-white/60 text-sm animate-pulse">Preparando transmissão...</div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }

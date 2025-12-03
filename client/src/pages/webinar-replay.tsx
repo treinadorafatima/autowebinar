@@ -289,8 +289,22 @@ export default function WebinarReplayPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-900">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+      <div 
+        ref={containerRef}
+        className={isEmbed ? "w-full" : "min-h-screen"} 
+        style={{ backgroundColor: isEmbed ? "transparent" : "#4A8BB5" }}
+      >
+        {/* Skeleton loader que simula o layout do vídeo */}
+        <div className={isEmbed ? "" : "container mx-auto py-4 md:py-8"}>
+          <div className={isEmbed ? "" : "mx-auto px-2 md:px-4"} style={{ maxWidth: isEmbed ? "100%" : "960px" }}>
+            <div className="relative w-full overflow-hidden rounded-xl" style={{ backgroundColor: "#1a1a2e" }}>
+              <div className="aspect-video flex flex-col items-center justify-center">
+                <div className="w-16 h-16 border-4 border-white/20 border-t-white rounded-full animate-spin mb-4" />
+                <div className="text-white/60 text-sm animate-pulse">Preparando replay...</div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
