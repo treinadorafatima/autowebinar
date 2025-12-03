@@ -20,8 +20,7 @@ export default function CarlosReplayPage() {
         <div className="mx-auto px-3 md:px-4" style={{ maxWidth: "960px" }}>
           <div style={{ 
             borderRadius: "12px", 
-            overflow: "hidden", 
-            boxShadow: "0 4px 20px rgba(0,0,0,0.15)"
+            overflow: "hidden"
           }}>
             <iframe
               id="webinar-compact-carlos-replay"
