@@ -589,9 +589,8 @@ export default function WebinarPublicPage() {
       const seconds = Math.floor((diff % (1000 * 60)) / 1000);
       setCountdown(`${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`);
     } else {
-      // Before today's start time - but yesterday's webinar has ended!
-      // Status should be "ended" (from yesterday's session), countdown to today's session
-      setStatus("ended");
+      // Before today's start time - show countdown
+      setStatus("waiting");
       const diff = todayStart.getTime() - now.getTime();
       const hours = Math.floor(diff / (1000 * 60 * 60));
       const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
