@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Check, Volume2, VolumeX, Maximize } from "lucide-react";
 import DOMPurify from "dompurify";
 import Hls from "hls.js";
+import { calculateWebinarStatusWithTimezone } from "@/lib/timezone";
 import {
   Dialog,
   DialogContent,
@@ -51,6 +52,7 @@ interface Webinar {
   videoDuration: number;
   startHour: number;
   startMinute: number;
+  timezone: string;
   recurrence: string;
   onceDate: string | null;
   dayOfWeek: number | null;

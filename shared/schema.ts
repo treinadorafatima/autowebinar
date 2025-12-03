@@ -47,6 +47,7 @@ export const webinars = pgTable("webinars", {
   videoDuration: integer("video_duration").notNull().default(3600),
   startHour: integer("start_hour").notNull().default(18),
   startMinute: integer("start_minute").notNull().default(0),
+  timezone: text("timezone").notNull().default("America/Sao_Paulo"), // Fuso horário IANA
   recurrence: text("recurrence").notNull().default("daily"),
   onceDate: text("once_date"),
   dayOfWeek: integer("day_of_week"),
