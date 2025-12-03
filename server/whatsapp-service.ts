@@ -597,6 +597,107 @@ export async function sendWhatsAppMessage(
   });
 }
 
+export interface MediaMessage {
+  type: "image" | "audio" | "video" | "document";
+  url: string;
+  caption?: string;
+  fileName?: string;
+  mimetype?: string;
+}
+
+export async function sendWhatsAppMediaMessage(
+  adminId: string,
+  phone: string,
+  media: MediaMessage
+): Promise<{ success: boolean; error?: string }> {
+  const conn = connections.get(adminId);
+  
+  if (!conn) {
+    return { success: false, error: "WhatsApp não inicializado" };
+  }
+  
+  if (conn.status === "banned") {
+    return { success: false, error: "Conta suspensa temporariamente. Aguarde antes de enviar mensagens." };
+  }
+  
+  if (conn.status !== "connected" || !conn.socket) {
+    return { success: false, error: "WhatsApp não conectado" };
+  }
+
+  try {
+    let formattedPhone = phone.replace(/\D/g, "");
+    if (!formattedPhone.startsWith("55")) {
+      formattedPhone = "55" + formattedPhone;
+    }
+    const jid = formattedPhone + "@s.whatsapp.net";
+
+    const response = await fetch(media.url);
+    if (!response.ok) {
+      return { success: false, error: "Erro ao baixar arquivo de mídia" };
+    }
+    const buffer = Buffer.from(await response.arrayBuffer());
+
+    let messageContent: any;
+    
+    switch (media.type) {
+      case "image":
+        messageContent = {
+          image: buffer,
+          caption: media.caption || undefined,
+          mimetype: media.mimetype || "image/jpeg",
+        };
+        break;
+        
+      case "audio":
+        messageContent = {
+          audio: buffer,
+          mimetype: media.mimetype || "audio/ogg; codecs=opus",
+          ptt: true,
+        };
+        break;
+        
+      case "video":
+        messageContent = {
+          video: buffer,
+          caption: media.caption || undefined,
+          mimetype: media.mimetype || "video/mp4",
+        };
+        break;
+        
+      case "document":
+        messageContent = {
+          document: buffer,
+          mimetype: media.mimetype || "application/pdf",
+          fileName: media.fileName || "documento.pdf",
+          caption: media.caption || undefined,
+        };
+        break;
+        
+      default:
+        return { success: false, error: "Tipo de mídia não suportado" };
+    }
+
+    await conn.socket.sendMessage(jid, messageContent);
+    conn.lastMessageSentAt = Date.now();
+    
+    console.log(`[whatsapp] Media (${media.type}) sent to ${phone} from admin ${adminId}`);
+    return { success: true };
+  } catch (error: any) {
+    console.error(`[whatsapp] Error sending media:`, error);
+    
+    if (isSpamOrBanError(error)) {
+      conn.status = "banned";
+      await storage.upsertWhatsappSession(adminId, {
+        status: "banned",
+        qrCode: null,
+      });
+      return { success: false, error: "Conta suspensa por spam. Aguarde antes de tentar novamente." };
+    }
+    
+    return { success: false, error: error.message || "Erro ao enviar mídia" };
+  }
+}
+
 export async function restoreWhatsAppSessions(): Promise<void> {
   try {
     const sessions = await storage.getActiveWhatsappSessions();

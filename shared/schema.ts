@@ -632,6 +632,12 @@ export const whatsappSessionInsertSchema = createInsertSchema(whatsappSessions).
 export type WhatsappSessionInsert = z.infer<typeof whatsappSessionInsertSchema>;
 
 // WhatsApp Sequences - Configurable message sequences per webinar
+// messageType: 'text', 'image', 'audio', 'video', 'document'
+// Limites de arquivo:
+// - Áudio: até 16MB (formatos: ogg, mp3, m4a, wav)
+// - Vídeo: até 16MB (formatos: mp4, 3gp)
+// - Documento/PDF: até 100MB
+// - Imagem: até 5MB (formatos: jpg, jpeg, png)
 export const whatsappSequences = pgTable("whatsapp_sequences", {
   id: text("id").primaryKey(),
   adminId: text("admin_id").notNull(), // FK para admins
@@ -639,9 +645,11 @@ export const whatsappSequences = pgTable("whatsapp_sequences", {
   name: text("name").notNull(), // Nome da sequência
   phase: text("phase").notNull(), // 'pre' (antes) ou 'post' (depois)
   offsetMinutes: integer("offset_minutes").notNull(), // Minutos relativos ao webinar
-  messageText: text("message_text").notNull(), // Texto da mensagem (suporta merge tags)
-  messageType: text("message_type").notNull().default("text"), // 'text', 'image', 'document'
+  messageText: text("message_text").notNull(), // Texto da mensagem (suporta merge tags e formatação: *negrito*, _itálico_, ~riscado~)
+  messageType: text("message_type").notNull().default("text"), // 'text', 'image', 'audio', 'video', 'document'
   mediaUrl: text("media_url"), // URL de mídia se houver
+  mediaFileName: text("media_file_name"), // Nome original do arquivo
+  mediaMimeType: text("media_mime_type"), // MIME type do arquivo
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

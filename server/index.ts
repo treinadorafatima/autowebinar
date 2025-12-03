@@ -3,6 +3,7 @@ import compression from "compression";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { startEmailScheduler } from "./email-scheduler";
+import { startWhatsappScheduler } from "./whatsapp-scheduler";
 
 const app = express();
 
@@ -119,5 +120,8 @@ app.use((req, res, next) => {
     
     // Start email scheduler for automated email sending
     startEmailScheduler();
+    
+    // Start WhatsApp scheduler for automated message sending
+    startWhatsappScheduler();
   });
 })();

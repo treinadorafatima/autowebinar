@@ -8,9 +8,11 @@ import {
   getWhatsAppStatus,
   disconnectWhatsApp,
   sendWhatsAppMessage,
+  sendWhatsAppMediaMessage,
   restoreWhatsAppSessions,
   clearBanStatus,
   startHealthCheckInterval,
+  MediaMessage,
 } from "./whatsapp-service";
 
 interface AuthResult {
@@ -128,6 +130,34 @@ export function registerWhatsAppRoutes(app: Express) {
       res.json(result);
     } catch (error: any) {
       console.error("[whatsapp-api] Error sending test:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/whatsapp/send-media-test", async (req: Request, res: Response) => {
+    try {
+      const { admin, error, errorCode } = await validateSessionAndGetAdmin(req);
+      if (!admin) {
+        return res.status(errorCode || 401).json({ error: error || "Não autenticado" });
+      }
+
+      const { phone, mediaType, mediaUrl, caption, fileName, mimetype } = req.body;
+      if (!phone || !mediaType || !mediaUrl) {
+        return res.status(400).json({ error: "Telefone, tipo de mídia e URL são obrigatórios" });
+      }
+
+      const media: MediaMessage = {
+        type: mediaType,
+        url: mediaUrl,
+        caption,
+        fileName,
+        mimetype,
+      };
+
+      const result = await sendWhatsAppMediaMessage(admin.id, phone, media);
+      res.json(result);
+    } catch (error: any) {
+      console.error("[whatsapp-api] Error sending media test:", error);
       res.status(500).json({ error: error.message });
     }
   });

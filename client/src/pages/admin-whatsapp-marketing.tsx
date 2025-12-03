@@ -14,7 +14,8 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { 
   CheckCircle, XCircle, Loader2, Send, Trash2, Plus, Edit, 
-  Clock, QrCode, Smartphone, Wifi, WifiOff, RefreshCcw, ArrowLeft
+  Clock, QrCode, Smartphone, Wifi, WifiOff, RefreshCcw, ArrowLeft,
+  Upload, FileAudio, FileVideo, FileText, Image, Mic, Info, Check
 } from "lucide-react";
 import { SiWhatsapp } from "react-icons/si";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -36,6 +37,8 @@ interface WhatsAppSequence {
   messageText: string;
   messageType: string;
   mediaUrl?: string | null;
+  mediaFileName?: string | null;
+  mediaMimeType?: string | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -53,6 +56,21 @@ const PHASES = [
   { value: "post", label: "Pós-Webinar", description: "Após o evento" },
   { value: "replay", label: "Replay", description: "Quando replay disponível" },
 ];
+
+const MESSAGE_TYPES = [
+  { value: "text", label: "Texto", icon: FileText, description: "Mensagem de texto simples" },
+  { value: "audio", label: "Audio", icon: Mic, description: "Audio gravado (max 16MB)" },
+  { value: "image", label: "Imagem", icon: Image, description: "Imagem (max 5MB)" },
+  { value: "video", label: "Video", icon: FileVideo, description: "Video curto (max 16MB)" },
+  { value: "document", label: "Documento", icon: FileText, description: "PDF ou documento (max 100MB)" },
+];
+
+const MEDIA_LIMITS = {
+  audio: { maxSize: 16 * 1024 * 1024, formats: ["audio/ogg", "audio/mpeg", "audio/mp4", "audio/wav", "audio/x-m4a"], label: "16MB", extensions: ".ogg, .mp3, .m4a, .wav" },
+  video: { maxSize: 16 * 1024 * 1024, formats: ["video/mp4", "video/3gpp"], label: "16MB", extensions: ".mp4, .3gp" },
+  image: { maxSize: 5 * 1024 * 1024, formats: ["image/jpeg", "image/png", "image/jpg"], label: "5MB", extensions: ".jpg, .jpeg, .png" },
+  document: { maxSize: 100 * 1024 * 1024, formats: ["application/pdf"], label: "100MB", extensions: ".pdf" },
+};
 
 const convertMinutesToDHM = (totalMinutes: number) => {
   const absMinutes = Math.abs(totalMinutes);
@@ -81,8 +99,12 @@ export default function AdminWhatsAppMarketing() {
     offsetMinutes: -60,
     messageText: "",
     messageType: "text",
-    webinarId: ""
+    webinarId: "",
+    mediaUrl: "",
+    mediaFileName: "",
+    mediaMimeType: ""
   });
+  const [uploadingMedia, setUploadingMedia] = useState(false);
   
   const [newTiming, setNewTiming] = useState<"before" | "after" | "at_start">("before");
   const [newDays, setNewDays] = useState(0);
@@ -246,7 +268,10 @@ export default function AdminWhatsAppMarketing() {
       offsetMinutes: -60,
       messageText: "",
       messageType: "text",
-      webinarId: selectedWebinarId
+      webinarId: selectedWebinarId,
+      mediaUrl: "",
+      mediaFileName: "",
+      mediaMimeType: ""
     });
     setNewTiming("before");
     setNewDays(0);
@@ -255,8 +280,16 @@ export default function AdminWhatsAppMarketing() {
   };
 
   const handleCreateSequence = () => {
-    if (!newSequence.name || !newSequence.messageText) {
-      toast({ title: "Preencha todos os campos", variant: "destructive" });
+    if (!newSequence.name) {
+      toast({ title: "Preencha o nome da sequência", variant: "destructive" });
+      return;
+    }
+    if (newSequence.messageType === "text" && !newSequence.messageText) {
+      toast({ title: "Preencha a mensagem", variant: "destructive" });
+      return;
+    }
+    if (newSequence.messageType !== "text" && !newSequence.mediaUrl) {
+      toast({ title: "Envie um arquivo de mídia", variant: "destructive" });
       return;
     }
     if (!newSequence.webinarId) {
@@ -281,13 +314,82 @@ export default function AdminWhatsAppMarketing() {
       offsetMinutes: -60,
       messageText: "",
       messageType: "text",
-      webinarId: selectedWebinarId
+      webinarId: selectedWebinarId,
+      mediaUrl: "",
+      mediaFileName: "",
+      mediaMimeType: ""
     });
     setNewTiming("before");
     setNewDays(0);
     setNewHours(1);
     setNewMinutes(0);
     setShowNewSequenceDialog(true);
+  };
+
+  const handleMediaUpload = async (file: File, isEditing: boolean = false) => {
+    const mediaType = newSequence.messageType as keyof typeof MEDIA_LIMITS;
+    if (mediaType === "text") return;
+    
+    const limits = MEDIA_LIMITS[mediaType];
+    if (!limits) {
+      toast({ title: "Tipo de mídia inválido", variant: "destructive" });
+      return;
+    }
+
+    if (file.size > limits.maxSize) {
+      toast({ 
+        title: "Arquivo muito grande", 
+        description: `O limite para ${mediaType} é ${limits.label}`,
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    if (!limits.formats.includes(file.type)) {
+      toast({ 
+        title: "Formato não suportado", 
+        description: `Formatos aceitos: ${limits.extensions}`,
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    setUploadingMedia(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("type", "whatsapp-media");
+
+      const res = await fetch("/api/upload-file", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${localStorage.getItem("adminToken")}` },
+        body: formData,
+      });
+
+      if (!res.ok) throw new Error("Erro no upload");
+      const data = await res.json();
+
+      if (isEditing && editingSequence) {
+        setEditingSequence({
+          ...editingSequence,
+          mediaUrl: data.url,
+          mediaFileName: file.name,
+          mediaMimeType: file.type,
+        });
+      } else {
+        setNewSequence({
+          ...newSequence,
+          mediaUrl: data.url,
+          mediaFileName: file.name,
+          mediaMimeType: file.type,
+        });
+      }
+      toast({ title: "Arquivo enviado com sucesso" });
+    } catch (error: any) {
+      toast({ title: "Erro no upload", description: error.message, variant: "destructive" });
+    } finally {
+      setUploadingMedia(false);
+    }
   };
 
   const getPhaseLabel = (phase: string) => {
@@ -596,10 +698,33 @@ export default function AdminWhatsAppMarketing() {
                           <Clock className="w-3 h-3" />
                           {formatOffset(sequence.offsetMinutes)}
                         </span>
+                        {sequence.messageType !== "text" && (
+                          <Badge variant="secondary" className="flex items-center gap-1">
+                            {sequence.messageType === "audio" && <Mic className="w-3 h-3" />}
+                            {sequence.messageType === "image" && <Image className="w-3 h-3" />}
+                            {sequence.messageType === "video" && <FileVideo className="w-3 h-3" />}
+                            {sequence.messageType === "document" && <FileText className="w-3 h-3" />}
+                            {MESSAGE_TYPES.find(t => t.value === sequence.messageType)?.label}
+                          </Badge>
+                        )}
                       </div>
-                      <div className="bg-muted/50 p-3 rounded-lg">
-                        <p className="text-sm whitespace-pre-wrap">{sequence.messageText}</p>
-                      </div>
+                      {sequence.messageType !== "text" && sequence.mediaUrl && (
+                        <div className="mb-3 p-3 bg-muted/30 rounded-lg border">
+                          <div className="flex items-center gap-2 text-sm">
+                            <Check className="w-4 h-4 text-green-500" />
+                            <span className="text-muted-foreground">
+                              {sequence.mediaFileName || "Arquivo de mídia anexado"}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                      {sequence.messageText && (
+                        <div className="bg-muted/50 p-3 rounded-lg">
+                          <p className="text-sm whitespace-pre-wrap">
+                            {sequence.messageType === "text" ? sequence.messageText : `Legenda: ${sequence.messageText}`}
+                          </p>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 ))}
@@ -812,8 +937,94 @@ export default function AdminWhatsAppMarketing() {
               )}
 
               <div className="space-y-2">
+                <Label>Tipo de Mensagem</Label>
+                <div className="grid grid-cols-5 gap-2">
+                  {MESSAGE_TYPES.map((type) => {
+                    const Icon = type.icon;
+                    return (
+                      <Button
+                        key={type.value}
+                        type="button"
+                        variant={newSequence.messageType === type.value ? "default" : "outline"}
+                        className="flex flex-col h-auto py-3 gap-1"
+                        onClick={() => setNewSequence({ 
+                          ...newSequence, 
+                          messageType: type.value,
+                          mediaUrl: "",
+                          mediaFileName: "",
+                          mediaMimeType: ""
+                        })}
+                        data-testid={`button-message-type-${type.value}`}
+                      >
+                        <Icon className="w-4 h-4" />
+                        <span className="text-xs">{type.label}</span>
+                      </Button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {newSequence.messageType !== "text" && (
+                <div className="space-y-2">
+                  <Label>Upload de Mídia</Label>
+                  <div className="border-2 border-dashed rounded-lg p-4">
+                    {newSequence.mediaUrl ? (
+                      <div className="flex items-center justify-between bg-muted p-3 rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <Check className="w-4 h-4 text-green-500" />
+                          <span className="text-sm">{newSequence.mediaFileName}</span>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setNewSequence({
+                            ...newSequence,
+                            mediaUrl: "",
+                            mediaFileName: "",
+                            mediaMimeType: ""
+                          })}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <label className="flex flex-col items-center gap-2 cursor-pointer">
+                        <Upload className="w-8 h-8 text-muted-foreground" />
+                        <span className="text-sm text-muted-foreground">
+                          Clique para enviar {MESSAGE_TYPES.find(t => t.value === newSequence.messageType)?.label.toLowerCase()}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {MEDIA_LIMITS[newSequence.messageType as keyof typeof MEDIA_LIMITS]?.extensions} (máx {MEDIA_LIMITS[newSequence.messageType as keyof typeof MEDIA_LIMITS]?.label})
+                        </span>
+                        <input
+                          type="file"
+                          className="hidden"
+                          accept={MEDIA_LIMITS[newSequence.messageType as keyof typeof MEDIA_LIMITS]?.formats.join(",")}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleMediaUpload(file, false);
+                          }}
+                          disabled={uploadingMedia}
+                          data-testid="input-media-upload"
+                        />
+                        {uploadingMedia && (
+                          <div className="flex items-center gap-2 mt-2">
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <span className="text-sm">Enviando...</span>
+                          </div>
+                        )}
+                      </label>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="seq-message">Mensagem</Label>
+                  <Label htmlFor="seq-message">
+                    {newSequence.messageType === "text" ? "Mensagem" : "Legenda (opcional)"}
+                  </Label>
                   <Button 
                     type="button" 
                     variant="ghost" 
@@ -825,10 +1036,13 @@ export default function AdminWhatsAppMarketing() {
                 </div>
                 <Textarea
                   id="seq-message"
-                  placeholder="Digite a mensagem que será enviada..."
+                  placeholder={newSequence.messageType === "text" 
+                    ? "Digite a mensagem que será enviada..." 
+                    : "Digite uma legenda para a mídia (opcional)..."
+                  }
                   value={newSequence.messageText}
                   onChange={(e) => setNewSequence({ ...newSequence, messageText: e.target.value })}
-                  rows={6}
+                  rows={newSequence.messageType === "text" ? 6 : 3}
                   data-testid="input-sequence-message"
                 />
                 {showMergeTagsInfo && (
@@ -841,6 +1055,17 @@ export default function AdminWhatsAppMarketing() {
                           <span className="text-muted-foreground">{tag.description}</span>
                         </div>
                       ))}
+                    </div>
+                  </div>
+                )}
+                {newSequence.messageType === "text" && (
+                  <div className="bg-muted/50 p-3 rounded-lg">
+                    <p className="text-xs font-medium mb-1">Formatação WhatsApp:</p>
+                    <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                      <span><code>*texto*</code> = <strong>negrito</strong></span>
+                      <span><code>_texto_</code> = <em>itálico</em></span>
+                      <span><code>~texto~</code> = <s>riscado</s></span>
+                      <span><code>```texto```</code> = <code>monoespaçado</code></span>
                     </div>
                   </div>
                 )}
@@ -963,14 +1188,115 @@ export default function AdminWhatsAppMarketing() {
                 )}
 
                 <div className="space-y-2">
-                  <Label htmlFor="edit-message">Mensagem</Label>
+                  <Label>Tipo de Mensagem</Label>
+                  <div className="grid grid-cols-5 gap-2">
+                    {MESSAGE_TYPES.map((type) => {
+                      const Icon = type.icon;
+                      return (
+                        <Button
+                          key={type.value}
+                          type="button"
+                          variant={editingSequence.messageType === type.value ? "default" : "outline"}
+                          className="flex flex-col h-auto py-3 gap-1"
+                          onClick={() => setEditingSequence({ 
+                            ...editingSequence, 
+                            messageType: type.value,
+                            mediaUrl: type.value === editingSequence.messageType ? editingSequence.mediaUrl : null,
+                            mediaFileName: type.value === editingSequence.messageType ? editingSequence.mediaFileName : null,
+                            mediaMimeType: type.value === editingSequence.messageType ? editingSequence.mediaMimeType : null
+                          })}
+                          data-testid={`button-edit-message-type-${type.value}`}
+                        >
+                          <Icon className="w-4 h-4" />
+                          <span className="text-xs">{type.label}</span>
+                        </Button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {editingSequence.messageType !== "text" && (
+                  <div className="space-y-2">
+                    <Label>Upload de Mídia</Label>
+                    <div className="border-2 border-dashed rounded-lg p-4">
+                      {editingSequence.mediaUrl ? (
+                        <div className="flex items-center justify-between bg-muted p-3 rounded-lg">
+                          <div className="flex items-center gap-2">
+                            <Check className="w-4 h-4 text-green-500" />
+                            <span className="text-sm">{editingSequence.mediaFileName || "Arquivo enviado"}</span>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setEditingSequence({
+                              ...editingSequence,
+                              mediaUrl: null,
+                              mediaFileName: null,
+                              mediaMimeType: null
+                            })}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <label className="flex flex-col items-center gap-2 cursor-pointer">
+                          <Upload className="w-8 h-8 text-muted-foreground" />
+                          <span className="text-sm text-muted-foreground">
+                            Clique para enviar {MESSAGE_TYPES.find(t => t.value === editingSequence.messageType)?.label.toLowerCase()}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {MEDIA_LIMITS[editingSequence.messageType as keyof typeof MEDIA_LIMITS]?.extensions} (máx {MEDIA_LIMITS[editingSequence.messageType as keyof typeof MEDIA_LIMITS]?.label})
+                          </span>
+                          <input
+                            type="file"
+                            className="hidden"
+                            accept={MEDIA_LIMITS[editingSequence.messageType as keyof typeof MEDIA_LIMITS]?.formats.join(",")}
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleMediaUpload(file, true);
+                            }}
+                            disabled={uploadingMedia}
+                            data-testid="input-edit-media-upload"
+                          />
+                          {uploadingMedia && (
+                            <div className="flex items-center gap-2 mt-2">
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              <span className="text-sm">Enviando...</span>
+                            </div>
+                          )}
+                        </label>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-message">
+                    {editingSequence.messageType === "text" ? "Mensagem" : "Legenda (opcional)"}
+                  </Label>
                   <Textarea
                     id="edit-message"
+                    placeholder={editingSequence.messageType === "text" 
+                      ? "Digite a mensagem que será enviada..." 
+                      : "Digite uma legenda para a mídia (opcional)..."
+                    }
                     value={editingSequence.messageText}
                     onChange={(e) => setEditingSequence({ ...editingSequence, messageText: e.target.value })}
-                    rows={6}
+                    rows={editingSequence.messageType === "text" ? 6 : 3}
                     data-testid="input-edit-message"
                   />
+                  {editingSequence.messageType === "text" && (
+                    <div className="bg-muted/50 p-3 rounded-lg">
+                      <p className="text-xs font-medium mb-1">Formatação WhatsApp:</p>
+                      <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                        <span><code>*texto*</code> = <strong>negrito</strong></span>
+                        <span><code>_texto_</code> = <em>itálico</em></span>
+                        <span><code>~texto~</code> = <s>riscado</s></span>
+                        <span><code>```texto```</code> = <code>monoespaçado</code></span>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -1001,6 +1327,10 @@ export default function AdminWhatsAppMarketing() {
                         phase: editingSequence.phase,
                         offsetMinutes: calculatedOffset,
                         messageText: editingSequence.messageText,
+                        messageType: editingSequence.messageType,
+                        mediaUrl: editingSequence.mediaUrl,
+                        mediaFileName: editingSequence.mediaFileName,
+                        mediaMimeType: editingSequence.mediaMimeType,
                         isActive: editingSequence.isActive,
                       }
                     });
