@@ -25,14 +25,27 @@ function generateTransmissaoHTML(webinar) {
   
   const benefits = webinar.offerBenefits ? JSON.parse(webinar.offerBenefits) : [];
   
+  // Título da página - usa seoPageTitle se disponível, senão pageTitle
+  const pageTitle = webinar.seoPageTitle || webinar.pageTitle || webinar.name;
+  // Usa Bíblia+ como siteName se não configurado ou se for igual ao título
+  let siteName = webinar.seoSiteName;
+  if (!siteName || siteName === webinar.pageTitle || siteName === webinar.seoPageTitle) {
+    siteName = 'Bíblia+';
+  }
+  const fullTitle = `${pageTitle} | ${siteName}`;
+  
+  // Favicon - usa o configurado ou o padrão do Bíblia+
+  const faviconUrl = webinar.seoFaviconUrl || 'https://erodfrfuuhxdaeqfjzsn.supabase.co/storage/v1/object/public/webinar-images/system/autowebinar-favicon.png';
+  
   return `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${webinar.pageTitle || webinar.name}</title>
+  <title>${fullTitle}</title>
   <meta name="description" content="${webinar.seoDescription || webinar.description || ''}">
-  ${webinar.seoFaviconUrl ? `<link rel="icon" href="${webinar.seoFaviconUrl}">` : ''}
+  <link rel="icon" href="${faviconUrl}">
+  <link rel="apple-touch-icon" href="${faviconUrl}">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { 
@@ -316,6 +329,11 @@ function generateTransmissaoHTML(webinar) {
 </html>`;
 }
 
+function stripHtml(html) {
+  if (!html) return '';
+  return html.replace(/<[^>]*>/g, '').trim();
+}
+
 function generateReplayHTML(webinar) {
   const bgColor = webinar.replayBackgroundColor || '#4A8BB5';
   const playerColor = webinar.replayPlayerColor || '#3b82f6';
@@ -324,14 +342,27 @@ function generateReplayHTML(webinar) {
   
   const benefits = webinar.replayBenefits ? JSON.parse(webinar.replayBenefits) : [];
   
+  // Título da página - remove HTML se houver
+  const replayTitleClean = stripHtml(webinar.replayTitle) || webinar.pageTitle || webinar.name;
+  // Usa Bíblia+ como siteName se não configurado ou se for igual ao título
+  let siteName = webinar.seoSiteName;
+  if (!siteName || siteName === webinar.pageTitle || siteName === webinar.seoPageTitle || siteName === replayTitleClean) {
+    siteName = 'Bíblia+';
+  }
+  const fullTitle = `Replay: ${replayTitleClean} | ${siteName}`;
+  
+  // Favicon - usa o configurado ou o padrão do Bíblia+
+  const faviconUrl = webinar.seoFaviconUrl || 'https://erodfrfuuhxdaeqfjzsn.supabase.co/storage/v1/object/public/webinar-images/system/autowebinar-favicon.png';
+  
   return `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${webinar.replayTitle || webinar.name} - Replay</title>
+  <title>${fullTitle}</title>
   <meta name="description" content="${webinar.seoDescription || webinar.description || ''}">
-  ${webinar.seoFaviconUrl ? `<link rel="icon" href="${webinar.seoFaviconUrl}">` : ''}
+  <link rel="icon" href="${faviconUrl}">
+  <link rel="apple-touch-icon" href="${faviconUrl}">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { 
