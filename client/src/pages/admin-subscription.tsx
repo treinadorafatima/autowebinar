@@ -50,7 +50,8 @@ import {
   Send,
   Bell,
   Globe,
-  Play
+  Play,
+  X
 } from "lucide-react";
 import { SiWhatsapp } from "react-icons/si";
 import { format } from "date-fns";
@@ -361,8 +362,9 @@ export default function AdminSubscription() {
                       <span className="text-muted-foreground">Domínio customizado</span>
                     </div>
                     <div className="flex items-center gap-2" data-testid="text-trial-replay">
-                      <Play className="w-3.5 h-3.5 text-purple-500" />
-                      <span className="text-muted-foreground">Replay automático</span>
+                      <X className="w-3.5 h-3.5 text-muted-foreground" />
+                      <span className="text-muted-foreground/50 line-through">Replay automático</span>
+                      <Badge variant="outline" className="text-xs bg-purple-500/10 text-purple-400 border-purple-500/30">Pro+</Badge>
                     </div>
                   </div>
                 </div>
@@ -473,10 +475,18 @@ export default function AdminSubscription() {
                       <Globe className="w-3.5 h-3.5 text-cyan-500" />
                       <span className="text-muted-foreground">Domínio customizado</span>
                     </div>
-                    <div className="flex items-center gap-2" data-testid="text-plan-replay">
-                      <Play className="w-3.5 h-3.5 text-purple-500" />
-                      <span className="text-muted-foreground">Replay automático</span>
-                    </div>
+                    {plano.webinarLimit > 5 ? (
+                      <div className="flex items-center gap-2" data-testid="text-plan-replay">
+                        <Play className="w-3.5 h-3.5 text-purple-500" />
+                        <span className="text-muted-foreground">Replay automático</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2" data-testid="text-plan-replay">
+                        <X className="w-3.5 h-3.5 text-muted-foreground" />
+                        <span className="text-muted-foreground/50 line-through">Replay automático</span>
+                        <Badge variant="outline" className="text-xs bg-purple-500/10 text-purple-400 border-purple-500/30">Pro+</Badge>
+                      </div>
+                    )}
                   </div>
                 </div>
 

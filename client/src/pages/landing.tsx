@@ -980,10 +980,18 @@ export default function LandingPage() {
                           <Globe className="w-5 h-5 text-cyan-400 flex-shrink-0" />
                           <span>Domínio customizado incluso</span>
                         </div>
-                        <div className="flex items-center gap-2 text-slate-200">
-                          <Play className="w-5 h-5 text-purple-400 flex-shrink-0" />
-                          <span>Replay automático</span>
-                        </div>
+                        {plano.webinarLimit > 5 ? (
+                          <div className="flex items-center gap-2 text-slate-200">
+                            <Play className="w-5 h-5 text-purple-400 flex-shrink-0" />
+                            <span>Replay automático</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 text-slate-400">
+                            <X className="w-5 h-5 text-slate-500 flex-shrink-0" />
+                            <span className="line-through">Replay automático</span>
+                            <Badge variant="outline" className="ml-1 text-xs bg-purple-500/10 text-purple-400 border-purple-500/30">Pro+</Badge>
+                          </div>
+                        )}
                         <div className="flex items-center gap-2 text-slate-200">
                           <Clock className="w-5 h-5 text-amber-400 flex-shrink-0" />
                           <span>Ofertas cronometradas</span>
