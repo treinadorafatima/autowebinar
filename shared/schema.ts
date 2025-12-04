@@ -151,6 +151,11 @@ export const webinars = pgTable("webinars", {
   seoDescription: text("seo_description").default(""), // Descrição para meta tags
   seoFaviconUrl: text("seo_favicon_url").default(""), // URL do favicon personalizado
   seoShareImageUrl: text("seo_share_image_url").default(""), // Imagem de compartilhamento (Open Graph)
+  // Configuração do formulário de chat (separado do formulário de leads)
+  chatFormTitle: text("chat_form_title").default("Participe do Chat"), // Título do modal
+  chatCollectName: boolean("chat_collect_name").notNull().default(true), // Coletar nome
+  chatCollectCity: boolean("chat_collect_city").notNull().default(true), // Coletar cidade
+  chatCollectState: boolean("chat_collect_state").notNull().default(true), // Coletar estado
 });
 
 export const webinarInsertSchema = createInsertSchema(webinars).omit({ id: true, createdAt: true });
