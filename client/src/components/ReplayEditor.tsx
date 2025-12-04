@@ -45,17 +45,9 @@ function SimpleTextEditor({
 }) {
   const editorRef = useRef<HTMLDivElement>(null);
 
-  const stripHtml = (html: string) => {
-    const tmp = document.createElement("div");
-    tmp.innerHTML = html;
-    return tmp.textContent || tmp.innerText || "";
-  };
-
-  const displayValue = stripHtml(value);
-
   const handleInput = useCallback(() => {
     if (editorRef.current) {
-      onChange(editorRef.current.textContent || "");
+      onChange(editorRef.current.innerHTML || "");
     }
   }, [onChange]);
 
@@ -71,7 +63,7 @@ function SimpleTextEditor({
         style={style}
         data-placeholder={placeholder}
         data-testid={testId}
-        dangerouslySetInnerHTML={{ __html: displayValue }}
+        dangerouslySetInnerHTML={{ __html: value }}
       />
       <style>{`
         [contenteditable]:empty:before {
