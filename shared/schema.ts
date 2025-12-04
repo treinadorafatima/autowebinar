@@ -724,3 +724,16 @@ export const mediaFiles = pgTable("media_files", {
 export type MediaFile = typeof mediaFiles.$inferSelect;
 export const mediaFileInsertSchema = createInsertSchema(mediaFiles).omit({ id: true, createdAt: true });
 export type MediaFileInsert = z.infer<typeof mediaFileInsertSchema>;
+
+// Webinar View Logs - Log de visualizações para histórico com filtro por data
+export const webinarViewLogs = pgTable("webinar_view_logs", {
+  id: text("id").primaryKey(),
+  webinarId: text("webinar_id").notNull(), // FK para webinars
+  ownerId: text("owner_id"), // FK para admins (dono do webinar)
+  source: text("source").notNull().default("live"), // 'live', 'replay', 'embed'
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type WebinarViewLog = typeof webinarViewLogs.$inferSelect;
+export const webinarViewLogInsertSchema = createInsertSchema(webinarViewLogs).omit({ id: true, createdAt: true });
+export type WebinarViewLogInsert = z.infer<typeof webinarViewLogInsertSchema>;

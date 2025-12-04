@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type WebinarConfig, type WebinarConfigInsert, type Admin, type AdminInsert, type UploadedVideo, type UploadedVideoInsert, type Comment, type CommentInsert, type Webinar, type WebinarInsert, type Setting, type SettingInsert, type ViewerSession, type WebinarScript, type WebinarScriptInsert, type AiConfig, type AiConfigInsert, type AiMemory, type AiMemoryInsert, type CheckoutPlano, type CheckoutPlanoInsert, type CheckoutPagamento, type CheckoutPagamentoInsert, type CheckoutConfig, type CheckoutConfigInsert, type CheckoutAssinatura, type CheckoutAssinaturaInsert, type AiChat, type AiChatInsert, type AiMessageChat, type AiMessageChatInsert, type VideoTranscription, type VideoTranscriptionInsert, type AdminEmailCredential, type AdminEmailCredentialInsert, type EmailSequence, type EmailSequenceInsert, type ScheduledEmail, type ScheduledEmailInsert, type LeadFormConfig, type LeadFormConfigInsert, type WhatsappSession, type WhatsappSessionInsert, type WhatsappSequence, type WhatsappSequenceInsert, type ScheduledWhatsappMessage, type ScheduledWhatsappMessageInsert, type MediaFile, type MediaFileInsert, admins, webinarConfigs, users, uploadedVideos, comments, webinars as webinarsTable, settings, viewerSessions, webinarScripts, aiConfigs, aiMemories, checkoutPlanos, checkoutPagamentos, checkoutConfigs, checkoutAssinaturas, aiChats, aiMessageChats, videoTranscriptions, adminEmailCredentials, emailSequences, scheduledEmails, leadFormConfigs, whatsappSessions, whatsappSequences, scheduledWhatsappMessages, mediaFiles } from "@shared/schema";
+import { type User, type InsertUser, type WebinarConfig, type WebinarConfigInsert, type Admin, type AdminInsert, type UploadedVideo, type UploadedVideoInsert, type Comment, type CommentInsert, type Webinar, type WebinarInsert, type Setting, type SettingInsert, type ViewerSession, type WebinarScript, type WebinarScriptInsert, type AiConfig, type AiConfigInsert, type AiMemory, type AiMemoryInsert, type CheckoutPlano, type CheckoutPlanoInsert, type CheckoutPagamento, type CheckoutPagamentoInsert, type CheckoutConfig, type CheckoutConfigInsert, type CheckoutAssinatura, type CheckoutAssinaturaInsert, type AiChat, type AiChatInsert, type AiMessageChat, type AiMessageChatInsert, type VideoTranscription, type VideoTranscriptionInsert, type AdminEmailCredential, type AdminEmailCredentialInsert, type EmailSequence, type EmailSequenceInsert, type ScheduledEmail, type ScheduledEmailInsert, type LeadFormConfig, type LeadFormConfigInsert, type WhatsappSession, type WhatsappSessionInsert, type WhatsappSequence, type WhatsappSequenceInsert, type ScheduledWhatsappMessage, type ScheduledWhatsappMessageInsert, type MediaFile, type MediaFileInsert, admins, webinarConfigs, users, uploadedVideos, comments, webinars as webinarsTable, settings, viewerSessions, webinarScripts, aiConfigs, aiMemories, checkoutPlanos, checkoutPagamentos, checkoutConfigs, checkoutAssinaturas, aiChats, aiMessageChats, videoTranscriptions, adminEmailCredentials, emailSequences, scheduledEmails, leadFormConfigs, whatsappSessions, whatsappSequences, scheduledWhatsappMessages, mediaFiles, webinarViewLogs } from "@shared/schema";
 import * as crypto from "crypto";
 import { randomUUID } from "crypto";
 import { db } from "./db";
@@ -264,6 +264,10 @@ export interface IStorage {
   getMediaFileById(id: string): Promise<MediaFile | undefined>;
   createMediaFile(data: MediaFileInsert): Promise<MediaFile>;
   deleteMediaFile(adminId: string, mediaId: string): Promise<boolean>;
+  // Webinar View Logs - Histórico de visualizações
+  logWebinarView(webinarId: string, ownerId: string | null, source: 'live' | 'replay' | 'embed'): Promise<void>;
+  countViewsByOwnerAndRange(ownerId: string, from: Date, to: Date): Promise<number>;
+  getViewsByOwnerGroupedByDay(ownerId: string, from: Date, to: Date): Promise<{ date: string; count: number }[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3240,6 +3244,49 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
     await db.delete(mediaFiles).where(eq(mediaFiles.id, mediaId));
     console.log(`[storage] Media file deleted: ${mediaId}`);
     return true;
+  }
+
+  // Webinar View Logs methods
+  async logWebinarView(webinarId: string, ownerId: string | null, source: 'live' | 'replay' | 'embed'): Promise<void> {
+    const id = randomUUID();
+    await db.insert(webinarViewLogs).values({
+      id,
+      webinarId,
+      ownerId,
+      source,
+      createdAt: new Date(),
+    });
+  }
+
+  async countViewsByOwnerAndRange(ownerId: string, from: Date, to: Date): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)` })
+      .from(webinarViewLogs)
+      .where(and(
+        eq(webinarViewLogs.ownerId, ownerId),
+        sql`${webinarViewLogs.createdAt} >= ${from}`,
+        sql`${webinarViewLogs.createdAt} <= ${to}`
+      ));
+    return Number(result[0]?.count || 0);
+  }
+
+  async getViewsByOwnerGroupedByDay(ownerId: string, from: Date, to: Date): Promise<{ date: string; count: number }[]> {
+    const result = await db.select({
+      date: sql<string>`DATE(${webinarViewLogs.createdAt})`,
+      count: sql<number>`count(*)`
+    })
+      .from(webinarViewLogs)
+      .where(and(
+        eq(webinarViewLogs.ownerId, ownerId),
+        sql`${webinarViewLogs.createdAt} >= ${from}`,
+        sql`${webinarViewLogs.createdAt} <= ${to}`
+      ))
+      .groupBy(sql`DATE(${webinarViewLogs.createdAt})`)
+      .orderBy(sql`DATE(${webinarViewLogs.createdAt})`);
+    
+    return result.map(r => ({
+      date: String(r.date),
+      count: Number(r.count)
+    }));
   }
 }
 
