@@ -3431,26 +3431,132 @@ export default function AdminWebinarDetailPage() {
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label>Código Embed (iframe)</Label>
+                <Separator className="my-4" />
+
+                <div className="space-y-4">
+                  <h4 className="font-medium text-sm flex items-center gap-2">
+                    <Code className="h-4 w-4" />
+                    Código Embed
+                  </h4>
+                  
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Largura Máxima</Label>
+                      <Select
+                        value={(formData as any).embedMaxWidth || "500"}
+                        onValueChange={(v) => setFormData({ ...formData, embedMaxWidth: v })}
+                      >
+                        <SelectTrigger data-testid="select-embed-width">
+                          <SelectValue placeholder="500px" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="400">400px</SelectItem>
+                          <SelectItem value="500">500px</SelectItem>
+                          <SelectItem value="600">600px</SelectItem>
+                          <SelectItem value="100%">100% (responsivo)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Altura</Label>
+                      <Select
+                        value={(formData as any).embedHeight || "700"}
+                        onValueChange={(v) => setFormData({ ...formData, embedHeight: v })}
+                      >
+                        <SelectTrigger data-testid="select-embed-height">
+                          <SelectValue placeholder="700px" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="500">500px</SelectItem>
+                          <SelectItem value="600">600px</SelectItem>
+                          <SelectItem value="700">700px</SelectItem>
+                          <SelectItem value="800">800px</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Fundo</Label>
+                      <Select
+                        value={(formData as any).embedBackground || "normal"}
+                        onValueChange={(v) => setFormData({ ...formData, embedBackground: v })}
+                      >
+                        <SelectTrigger data-testid="select-embed-background">
+                          <SelectValue placeholder="Normal" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="normal">Com fundo</SelectItem>
+                          <SelectItem value="transparent">Transparente</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Alinhamento</Label>
+                      <Select
+                        value={(formData as any).embedAlign || "center"}
+                        onValueChange={(v) => setFormData({ ...formData, embedAlign: v })}
+                      >
+                        <SelectTrigger data-testid="select-embed-align">
+                          <SelectValue placeholder="Centro" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="left">Esquerda</SelectItem>
+                          <SelectItem value="center">Centro</SelectItem>
+                          <SelectItem value="right">Direita</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
                   <Textarea
                     readOnly
-                    value={`<iframe src="${window.location.origin}/w/${webinar?.slug}/register?embed=true" width="100%" height="700" frameborder="0" style="border: none; max-width: 500px; margin: 0 auto; display: block;"></iframe>`}
-                    className="font-mono text-xs h-20"
+                    value={(() => {
+                      const maxWidth = (formData as any).embedMaxWidth || "500";
+                      const height = (formData as any).embedHeight || "700";
+                      const bg = (formData as any).embedBackground || "normal";
+                      const align = (formData as any).embedAlign || "center";
+                      const bgParam = bg === "transparent" ? "&bg=transparent" : "";
+                      const marginStyle = align === "center" ? "margin: 0 auto;" : align === "right" ? "margin-left: auto;" : "";
+                      const widthStyle = maxWidth === "100%" ? "width: 100%;" : `max-width: ${maxWidth}px; width: 100%;`;
+                      return `<iframe src="${window.location.origin}/w/${webinar?.slug}/register?embed=true${bgParam}" width="100%" height="${height}" frameborder="0" style="border: none; ${widthStyle} ${marginStyle} display: block;"></iframe>`;
+                    })()}
+                    className="font-mono text-xs h-24"
                     data-testid="input-embed-code"
                   />
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      navigator.clipboard.writeText(`<iframe src="${window.location.origin}/w/${webinar?.slug}/register?embed=true" width="100%" height="700" frameborder="0" style="border: none; max-width: 500px; margin: 0 auto; display: block;"></iframe>`);
-                      toast({ title: "Código embed copiado!" });
-                    }}
-                    data-testid="button-copy-embed-code"
-                  >
-                    <Copy className="h-4 w-4 mr-1" />
-                    Copiar Código Embed
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        const maxWidth = (formData as any).embedMaxWidth || "500";
+                        const height = (formData as any).embedHeight || "700";
+                        const bg = (formData as any).embedBackground || "normal";
+                        const align = (formData as any).embedAlign || "center";
+                        const bgParam = bg === "transparent" ? "&bg=transparent" : "";
+                        const marginStyle = align === "center" ? "margin: 0 auto;" : align === "right" ? "margin-left: auto;" : "";
+                        const widthStyle = maxWidth === "100%" ? "width: 100%;" : `max-width: ${maxWidth}px; width: 100%;`;
+                        const code = `<iframe src="${window.location.origin}/w/${webinar?.slug}/register?embed=true${bgParam}" width="100%" height="${height}" frameborder="0" style="border: none; ${widthStyle} ${marginStyle} display: block;"></iframe>`;
+                        navigator.clipboard.writeText(code);
+                        toast({ title: "Código embed copiado!" });
+                      }}
+                      data-testid="button-copy-embed-code"
+                    >
+                      <Copy className="h-4 w-4 mr-1" />
+                      Copiar Código Embed
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        const bg = (formData as any).embedBackground || "normal";
+                        const bgParam = bg === "transparent" ? "&bg=transparent" : "";
+                        window.open(`/w/${webinar?.slug}/register?embed=true${bgParam}`, "_blank");
+                      }}
+                      data-testid="button-preview-embed"
+                    >
+                      <ExternalLink className="h-4 w-4 mr-1" />
+                      Preview Embed
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -3766,6 +3872,271 @@ export default function AdminWebinarDetailPage() {
                   </div>
                 </div>
 
+                {/* Preview ao Vivo */}
+                <div className="p-4 border rounded-lg space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium text-sm flex items-center gap-2">
+                      <Monitor className="h-4 w-4" />
+                      Preview ao Vivo
+                    </h4>
+                    <div className="flex gap-2">
+                      <Badge 
+                        variant="outline" 
+                        className="cursor-pointer"
+                        onClick={() => setFormData({ ...formData, previewMode: "form" })}
+                        style={{ 
+                          backgroundColor: (formData as any).previewMode !== "success" ? formData.leadFormButtonColor || "#22c55e" : "transparent",
+                          color: (formData as any).previewMode !== "success" ? formData.leadFormButtonTextColor || "#ffffff" : undefined,
+                          borderColor: formData.leadFormButtonColor || "#22c55e"
+                        }}
+                      >
+                        Formulário
+                      </Badge>
+                      <Badge 
+                        variant="outline"
+                        className="cursor-pointer"
+                        onClick={() => setFormData({ ...formData, previewMode: "success" })}
+                        style={{ 
+                          backgroundColor: (formData as any).previewMode === "success" ? formData.leadFormButtonColor || "#22c55e" : "transparent",
+                          color: (formData as any).previewMode === "success" ? formData.leadFormButtonTextColor || "#ffffff" : undefined,
+                          borderColor: formData.leadFormButtonColor || "#22c55e"
+                        }}
+                      >
+                        Sucesso
+                      </Badge>
+                    </div>
+                  </div>
+                  <div 
+                    className="p-6 rounded-lg"
+                    style={{ 
+                      backgroundColor: formData.leadFormBgColor || "#1a1a2e",
+                      fontFamily: formData.leadFormFontFamily || "Inter, system-ui, sans-serif"
+                    }}
+                  >
+                    <div 
+                      className="p-6 rounded-lg max-w-md mx-auto"
+                      style={{ 
+                        backgroundColor: formData.leadFormCardColor || "#16213e",
+                        borderRadius: `${formData.leadFormBorderRadius || "8"}px`
+                      }}
+                    >
+                      {/* Estado de Sucesso */}
+                      {(formData as any).previewMode === "success" ? (
+                        <div className="text-center py-8">
+                          <div 
+                            className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center"
+                            style={{ backgroundColor: formData.leadFormButtonColor || "#22c55e" }}
+                          >
+                            <Check className="w-8 h-8" style={{ color: formData.leadFormButtonTextColor || "#ffffff" }} />
+                          </div>
+                          <h2 
+                            className="text-xl font-bold mb-2"
+                            style={{ color: formData.leadFormTextColor || "#ffffff" }}
+                          >
+                            {formData.leadFormSuccessMessage || "Inscrição realizada com sucesso!"}
+                          </h2>
+                          {formData.leadFormRedirectUrl ? (
+                            <p 
+                              className="text-sm opacity-70"
+                              style={{ color: formData.leadFormTextColor || "#ffffff" }}
+                            >
+                              Redirecionando para: <span className="underline">{formData.leadFormRedirectUrl.substring(0, 30)}...</span>
+                            </p>
+                          ) : (
+                            <p 
+                              className="text-sm opacity-70"
+                              style={{ color: formData.leadFormTextColor || "#ffffff" }}
+                            >
+                              Você será redirecionado para a sala do webinário...
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <>
+                          {/* Título */}
+                          <h2 
+                            className="text-xl font-bold text-center mb-2"
+                            style={{ color: formData.leadFormTextColor || "#ffffff" }}
+                          >
+                            {formData.leadFormTitle || "Inscreva-se no Webinário"}
+                          </h2>
+                          {formData.leadFormSubtitle && (
+                            <p 
+                              className="text-sm text-center mb-4 opacity-80"
+                              style={{ color: formData.leadFormTextColor || "#ffffff" }}
+                            >
+                              {formData.leadFormSubtitle}
+                            </p>
+                          )}
+
+                          {/* Próxima Sessão Preview */}
+                          {formData.leadFormShowNextSession !== false && (
+                            <div 
+                              className="p-3 rounded-lg mb-4 text-center text-sm"
+                              style={{ 
+                                backgroundColor: formData.leadFormInputColor || "#0f0f23",
+                                color: formData.leadFormTextColor || "#ffffff",
+                                borderRadius: `${formData.leadFormBorderRadius || "8"}px`
+                              }}
+                            >
+                              <span className="opacity-70">Próxima sessão:</span>
+                              <span className="ml-2 font-medium">Amanhã às 18:00</span>
+                            </div>
+                          )}
+
+                          {/* Campo Nome */}
+                          <div className="space-y-1 mb-3">
+                            <label 
+                              className="block text-xs flex items-center gap-1"
+                              style={{ color: formData.leadFormLabelColor || "#9ca3af" }}
+                            >
+                              Nome completo <span className="text-red-400">*</span>
+                            </label>
+                            <div 
+                              className="w-full px-3 py-2 border text-sm"
+                              style={{ 
+                                backgroundColor: formData.leadFormInputColor || "#0f0f23",
+                                borderColor: formData.leadFormInputBorderColor || "#374151",
+                                color: formData.leadFormTextColor || "#ffffff",
+                                borderRadius: `${formData.leadFormBorderRadius || "8"}px`
+                              }}
+                            >
+                              <span className="opacity-50">Digite seu nome...</span>
+                            </div>
+                          </div>
+
+                          {/* Campo Email */}
+                          {leadsCollectEmail && (
+                            <div className="space-y-1 mb-3">
+                              <label 
+                                className="block text-xs flex items-center gap-1"
+                                style={{ color: formData.leadFormLabelColor || "#9ca3af" }}
+                              >
+                                E-mail <span className="text-red-400">*</span>
+                              </label>
+                              <div 
+                                className="w-full px-3 py-2 border text-sm"
+                                style={{ 
+                                  backgroundColor: formData.leadFormInputColor || "#0f0f23",
+                                  borderColor: formData.leadFormInputBorderColor || "#374151",
+                                  color: formData.leadFormTextColor || "#ffffff",
+                                  borderRadius: `${formData.leadFormBorderRadius || "8"}px`
+                                }}
+                              >
+                                <span className="opacity-50">seu@email.com</span>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Campo WhatsApp */}
+                          {leadsCollectWhatsapp && (
+                            <div className="space-y-1 mb-3">
+                              <label 
+                                className="block text-xs flex items-center gap-1"
+                                style={{ color: formData.leadFormLabelColor || "#9ca3af" }}
+                              >
+                                WhatsApp <span className="text-red-400">*</span>
+                              </label>
+                              <div 
+                                className="w-full px-3 py-2 border text-sm flex items-center gap-2"
+                                style={{ 
+                                  backgroundColor: formData.leadFormInputColor || "#0f0f23",
+                                  borderColor: formData.leadFormInputBorderColor || "#374151",
+                                  color: formData.leadFormTextColor || "#ffffff",
+                                  borderRadius: `${formData.leadFormBorderRadius || "8"}px`
+                                }}
+                              >
+                                <span className="opacity-70">+55</span>
+                                <span className="opacity-50">(11) 99999-9999</span>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Campos Cidade/Estado */}
+                          {(formData.leadFormCollectCity || formData.leadFormCollectState) && (
+                            <div className="grid grid-cols-2 gap-2 mb-3">
+                              {formData.leadFormCollectCity && (
+                                <div className="space-y-1">
+                                  <label 
+                                    className="block text-xs"
+                                    style={{ color: formData.leadFormLabelColor || "#9ca3af" }}
+                                  >
+                                    Cidade
+                                  </label>
+                                  <div 
+                                    className="w-full px-3 py-2 border text-sm"
+                                    style={{ 
+                                      backgroundColor: formData.leadFormInputColor || "#0f0f23",
+                                      borderColor: formData.leadFormInputBorderColor || "#374151",
+                                      color: formData.leadFormTextColor || "#ffffff",
+                                      borderRadius: `${formData.leadFormBorderRadius || "8"}px`
+                                    }}
+                                  >
+                                    <span className="opacity-50">São Paulo</span>
+                                  </div>
+                                </div>
+                              )}
+                              {formData.leadFormCollectState && (
+                                <div className="space-y-1">
+                                  <label 
+                                    className="block text-xs"
+                                    style={{ color: formData.leadFormLabelColor || "#9ca3af" }}
+                                  >
+                                    Estado
+                                  </label>
+                                  <div 
+                                    className="w-full px-3 py-2 border text-sm"
+                                    style={{ 
+                                      backgroundColor: formData.leadFormInputColor || "#0f0f23",
+                                      borderColor: formData.leadFormInputBorderColor || "#374151",
+                                      color: formData.leadFormTextColor || "#ffffff",
+                                      borderRadius: `${formData.leadFormBorderRadius || "8"}px`
+                                    }}
+                                  >
+                                    <span className="opacity-50">SP</span>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Checkbox de Consentimento */}
+                          {formData.leadFormRequireConsent !== false && (
+                            <div className="flex items-start gap-2 mb-4 text-xs">
+                              <div 
+                                className="w-4 h-4 rounded border flex-shrink-0 mt-0.5"
+                                style={{ 
+                                  borderColor: formData.leadFormInputBorderColor || "#374151",
+                                  backgroundColor: formData.leadFormInputColor || "#0f0f23"
+                                }}
+                              />
+                              <span style={{ color: formData.leadFormLabelColor || "#9ca3af" }}>
+                                {formData.leadFormConsentText || "Concordo em receber comunicações sobre este webinário"} <span className="text-red-400">*</span>
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Botão */}
+                          <button 
+                            className="w-full py-3 font-semibold text-sm transition-all hover:opacity-90"
+                            style={{ 
+                              backgroundColor: formData.leadFormButtonColor || "#22c55e",
+                              color: formData.leadFormButtonTextColor || "#ffffff",
+                              borderRadius: `${formData.leadFormBorderRadius || "8"}px`
+                            }}
+                            onClick={() => setFormData({ ...formData, previewMode: "success" })}
+                          >
+                            {formData.leadFormButtonText || "Quero Participar"}
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground text-center">
+                    As alterações são refletidas em tempo real. Clique no botão para ver a tela de sucesso.
+                  </p>
+                </div>
+
                 <Button
                   onClick={async () => {
                     try {
@@ -3849,39 +4220,124 @@ export default function AdminWebinarDetailPage() {
                   </div>
                 </div>
 
+                {/* Search and Filter */}
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <div className="flex-1">
+                    <Input
+                      placeholder="Buscar por nome, email ou WhatsApp..."
+                      value={(formData as any).leadSearch || ""}
+                      onChange={(e) => setFormData({ ...formData, leadSearch: e.target.value })}
+                      className="w-full"
+                      data-testid="input-lead-search"
+                    />
+                  </div>
+                  <Select
+                    value={(formData as any).leadFilter || "all"}
+                    onValueChange={(v) => setFormData({ ...formData, leadFilter: v })}
+                  >
+                    <SelectTrigger className="w-full sm:w-40" data-testid="select-lead-filter">
+                      <SelectValue placeholder="Filtrar" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos</SelectItem>
+                      <SelectItem value="registered">Inscritos</SelectItem>
+                      <SelectItem value="watched">Assistiram</SelectItem>
+                      <SelectItem value="room">Entrou na Sala</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 {/* Export/Delete buttons */}
                 {leads.length > 0 && (
-                  <div className="flex items-center justify-end gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        const headers = ["Nome", "Email", "WhatsApp", "Cidade", "Estado", "Tipo", "Status", "Data Inscrição", "Data Assistiu"];
-                        const rows = leads.map(l => [
-                          l.name || "",
-                          l.email || "",
-                          l.whatsapp || "",
-                          l.city || "",
-                          l.state || "",
-                          l.source === "registration" ? "Inscrição" : "Sala",
-                          l.status === "watched" ? "Assistiu" : "Inscrito",
-                          l.capturedAt ? new Date(l.capturedAt).toLocaleString("pt-BR") : "",
-                          l.joinedAt ? new Date(l.joinedAt).toLocaleString("pt-BR") : ""
-                        ]);
-                        const csv = [headers.join(","), ...rows.map(r => r.map(c => `"${c}"`).join(","))].join("\n");
-                        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement("a");
-                        a.href = url;
-                        a.download = `leads-${webinar?.slug || "webinar"}-${new Date().toISOString().split("T")[0]}.csv`;
-                        a.click();
-                        URL.revokeObjectURL(url);
-                      }}
-                      data-testid="button-export-leads"
-                    >
-                      <Download className="h-4 w-4 mr-1" />
-                      Exportar CSV
-                    </Button>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          const registeredLeads = leads.filter(l => l.source === "registration" || l.status === "registered");
+                          const headers = ["Nome", "Email", "WhatsApp", "Cidade", "Estado", "Data Inscrição"];
+                          const rows = registeredLeads.map(l => [
+                            l.name || "",
+                            l.email || "",
+                            l.whatsapp || "",
+                            l.city || "",
+                            l.state || "",
+                            l.capturedAt ? new Date(l.capturedAt).toLocaleString("pt-BR") : ""
+                          ]);
+                          const csv = [headers.join(","), ...rows.map(r => r.map(c => `"${c}"`).join(","))].join("\n");
+                          const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement("a");
+                          a.href = url;
+                          a.download = `inscritos-${webinar?.slug || "webinar"}-${new Date().toISOString().split("T")[0]}.csv`;
+                          a.click();
+                          URL.revokeObjectURL(url);
+                        }}
+                        data-testid="button-export-registered"
+                      >
+                        <Download className="h-4 w-4 mr-1" />
+                        Inscritos
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          const watchedLeads = leads.filter(l => l.status === "watched");
+                          const headers = ["Nome", "Email", "WhatsApp", "Cidade", "Estado", "Data Assistiu"];
+                          const rows = watchedLeads.map(l => [
+                            l.name || "",
+                            l.email || "",
+                            l.whatsapp || "",
+                            l.city || "",
+                            l.state || "",
+                            l.joinedAt ? new Date(l.joinedAt).toLocaleString("pt-BR") : ""
+                          ]);
+                          const csv = [headers.join(","), ...rows.map(r => r.map(c => `"${c}"`).join(","))].join("\n");
+                          const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement("a");
+                          a.href = url;
+                          a.download = `assistiram-${webinar?.slug || "webinar"}-${new Date().toISOString().split("T")[0]}.csv`;
+                          a.click();
+                          URL.revokeObjectURL(url);
+                        }}
+                        data-testid="button-export-watched"
+                      >
+                        <Download className="h-4 w-4 mr-1" />
+                        Assistiram
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          const headers = ["Nome", "Email", "WhatsApp", "Cidade", "Estado", "Tipo", "Status", "Data Inscrição", "Data Assistiu"];
+                          const rows = leads.map(l => [
+                            l.name || "",
+                            l.email || "",
+                            l.whatsapp || "",
+                            l.city || "",
+                            l.state || "",
+                            l.source === "registration" ? "Inscrição" : "Sala",
+                            l.status === "watched" ? "Assistiu" : "Inscrito",
+                            l.capturedAt ? new Date(l.capturedAt).toLocaleString("pt-BR") : "",
+                            l.joinedAt ? new Date(l.joinedAt).toLocaleString("pt-BR") : ""
+                          ]);
+                          const csv = [headers.join(","), ...rows.map(r => r.map(c => `"${c}"`).join(","))].join("\n");
+                          const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement("a");
+                          a.href = url;
+                          a.download = `leads-${webinar?.slug || "webinar"}-${new Date().toISOString().split("T")[0]}.csv`;
+                          a.click();
+                          URL.revokeObjectURL(url);
+                        }}
+                        data-testid="button-export-leads"
+                      >
+                        <Download className="h-4 w-4 mr-1" />
+                        Todos
+                      </Button>
+                    </div>
                     <Button
                       size="sm"
                       variant="destructive"
@@ -3906,76 +4362,117 @@ export default function AdminWebinarDetailPage() {
                       data-testid="button-clear-leads"
                     >
                       <Trash2 className="h-4 w-4 mr-1" />
-                      Limpar Todos
+                      Limpar
                     </Button>
                   </div>
                 )}
 
-                {/* Inscritos (Registered) */}
-                <div className="p-4 bg-green-500/5 border border-green-500/20 rounded-lg">
-                  <h4 className="font-medium text-sm mb-3 flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-green-600" />
-                    Inscritos ({leads.filter(l => l.source === "registration" || l.status === "registered").length})
-                    <span className="text-xs text-muted-foreground ml-2">Cadastrados na página de inscrição</span>
-                  </h4>
-                  {leads.filter(l => l.source === "registration" || l.status === "registered").length === 0 ? (
-                    <p className="text-sm text-muted-foreground">Nenhum lead inscrito ainda. Compartilhe a página de inscrição: <code className="bg-muted px-1 rounded">/w/{webinar?.slug}/register</code></p>
-                  ) : (
-                    <div className="space-y-2 max-h-48 overflow-y-auto">
-                      {leads.filter(l => l.source === "registration" || l.status === "registered").map((lead) => (
-                        <div key={lead.id} className="text-sm p-2 bg-background rounded flex items-center justify-between">
-                          <div>
-                            <p className="font-medium">{lead.name}</p>
-                            <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                              {lead.email && <span>{lead.email}</span>}
-                              {lead.whatsapp && <span>{lead.whatsapp}</span>}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {lead.status === "watched" && (
-                              <Badge variant="secondary" className="text-xs bg-blue-500/10 text-blue-600">Assistiu</Badge>
-                            )}
-                            {lead.sequenceTriggered && (
-                              <Badge variant="outline" className="text-xs">Sequência ativada</Badge>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                {/* Leads List - with filters applied */}
+                {(() => {
+                  const searchTerm = ((formData as any).leadSearch || "").toLowerCase();
+                  const filterType = (formData as any).leadFilter || "all";
+                  
+                  const filteredLeads = leads.filter(l => {
+                    const matchesSearch = !searchTerm || 
+                      (l.name?.toLowerCase().includes(searchTerm)) ||
+                      (l.email?.toLowerCase().includes(searchTerm)) ||
+                      (l.whatsapp?.includes(searchTerm));
+                    
+                    if (!matchesSearch) return false;
+                    
+                    if (filterType === "registered") return l.source === "registration" || l.status === "registered";
+                    if (filterType === "watched") return l.status === "watched";
+                    if (filterType === "room") return l.source === "room";
+                    return true;
+                  });
 
-                {/* Assistiram direto (Entered room without registration) */}
-                <div className="p-4 bg-blue-500/5 border border-blue-500/20 rounded-lg">
-                  <h4 className="font-medium text-sm mb-3 flex items-center gap-2">
-                    <Video className="h-4 w-4 text-blue-600" />
-                    Entraram na Sala ({leads.filter(l => l.source === "room" && l.status !== "registered").length})
-                    <span className="text-xs text-muted-foreground ml-2">Entraram direto sem inscrição prévia</span>
-                  </h4>
-                  {leads.filter(l => l.source === "room" && l.status !== "registered").length === 0 ? (
-                    <p className="text-sm text-muted-foreground">Nenhum lead entrou diretamente na sala</p>
-                  ) : (
-                    <div className="space-y-2 max-h-48 overflow-y-auto">
-                      {leads.filter(l => l.source === "room" && l.status !== "registered").map((lead) => (
-                        <div key={lead.id} className="text-sm p-2 bg-background rounded flex items-center justify-between">
-                          <div>
-                            <p className="font-medium">{lead.name}</p>
-                            <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                              {lead.email && <span>{lead.email}</span>}
-                              {lead.whatsapp && <span>{lead.whatsapp}</span>}
-                              {lead.city && lead.state && <span>{lead.city}/{lead.state}</span>}
+                  const registeredLeads = filteredLeads.filter(l => l.source === "registration" || l.status === "registered");
+                  const roomLeads = filteredLeads.filter(l => l.source === "room" && l.status !== "registered");
+                  
+                  return (
+                    <>
+                      {/* Inscritos (Registered) */}
+                      {(filterType === "all" || filterType === "registered" || filterType === "watched") && (
+                        <div className="p-4 bg-green-500/5 border border-green-500/20 rounded-lg">
+                          <h4 className="font-medium text-sm mb-3 flex items-center gap-2">
+                            <CheckCircle2 className="h-4 w-4 text-green-600" />
+                            Inscritos ({registeredLeads.length})
+                            <span className="text-xs text-muted-foreground ml-2">Cadastrados na página de inscrição</span>
+                          </h4>
+                          {registeredLeads.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">
+                              {searchTerm ? "Nenhum resultado encontrado" : `Nenhum lead inscrito ainda. Compartilhe a página de inscrição: /w/${webinar?.slug}/register`}
+                            </p>
+                          ) : (
+                            <div className="space-y-2 max-h-64 overflow-y-auto">
+                              {registeredLeads.map((lead) => (
+                                <div key={lead.id} className="text-sm p-2 bg-background rounded flex items-center justify-between">
+                                  <div>
+                                    <p className="font-medium">{lead.name}</p>
+                                    <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                                      {lead.email && <span>{lead.email}</span>}
+                                      {lead.whatsapp && <span>{lead.whatsapp}</span>}
+                                      {lead.city && lead.state && <span>{lead.city}/{lead.state}</span>}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    {lead.status === "watched" && (
+                                      <Badge variant="secondary" className="text-xs bg-blue-500/10 text-blue-600">Assistiu</Badge>
+                                    )}
+                                    {lead.sequenceTriggered && (
+                                      <Badge variant="outline" className="text-xs">Sequência</Badge>
+                                    )}
+                                    {lead.capturedAt && (
+                                      <span className="text-xs text-muted-foreground hidden sm:inline">
+                                        {new Date(lead.capturedAt).toLocaleDateString("pt-BR")}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
                             </div>
-                          </div>
-                          {lead.joinedAt && (
-                            <span className="text-xs text-muted-foreground">
-                              {new Date(lead.joinedAt).toLocaleString("pt-BR")}
-                            </span>
                           )}
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                      )}
+
+                      {/* Entraram na Sala */}
+                      {(filterType === "all" || filterType === "room") && (
+                        <div className="p-4 bg-blue-500/5 border border-blue-500/20 rounded-lg">
+                          <h4 className="font-medium text-sm mb-3 flex items-center gap-2">
+                            <Video className="h-4 w-4 text-blue-600" />
+                            Entraram na Sala ({roomLeads.length})
+                            <span className="text-xs text-muted-foreground ml-2">Entraram direto sem inscrição prévia</span>
+                          </h4>
+                          {roomLeads.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">
+                              {searchTerm ? "Nenhum resultado encontrado" : "Nenhum lead entrou diretamente na sala"}
+                            </p>
+                          ) : (
+                            <div className="space-y-2 max-h-64 overflow-y-auto">
+                              {roomLeads.map((lead) => (
+                                <div key={lead.id} className="text-sm p-2 bg-background rounded flex items-center justify-between">
+                                  <div>
+                                    <p className="font-medium">{lead.name}</p>
+                                    <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                                      {lead.email && <span>{lead.email}</span>}
+                                      {lead.whatsapp && <span>{lead.whatsapp}</span>}
+                                      {lead.city && lead.state && <span>{lead.city}/{lead.state}</span>}
+                                    </div>
+                                  </div>
+                                  {lead.joinedAt && (
+                                    <span className="text-xs text-muted-foreground">
+                                      {new Date(lead.joinedAt).toLocaleString("pt-BR")}
+                                    </span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             </CardContent>
           </Card>

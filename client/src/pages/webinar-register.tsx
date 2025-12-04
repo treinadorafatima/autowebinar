@@ -62,6 +62,7 @@ export default function WebinarRegister() {
   const [webinar, setWebinar] = useState<Webinar | null>(null);
   const [formConfig, setFormConfig] = useState<Partial<LeadFormConfig> | null>(null);
   const [isEmbed, setIsEmbed] = useState(false);
+  const [transparentBg, setTransparentBg] = useState(false);
   
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -73,6 +74,7 @@ export default function WebinarRegister() {
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     setIsEmbed(urlParams.get("embed") === "true");
+    setTransparentBg(urlParams.get("bg") === "transparent");
     
     if (params.slug) {
       loadWebinarAndForm();
@@ -196,7 +198,7 @@ export default function WebinarRegister() {
   }
 
   const styles = {
-    backgroundColor: formConfig?.backgroundColor || "#1a1a2e",
+    backgroundColor: transparentBg ? "transparent" : (formConfig?.backgroundColor || "#1a1a2e"),
     cardBackgroundColor: formConfig?.cardBackgroundColor || "#16213e",
     textColor: formConfig?.textColor || "#ffffff",
     inputBackgroundColor: formConfig?.inputBackgroundColor || "#0f0f23",
