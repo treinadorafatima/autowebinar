@@ -472,3 +472,353 @@ ${APP_NAME}
     return false;
   }
 }
+
+export async function sendPaymentConfirmedEmail(to: string, name: string, planName: string, expirationDate: Date): Promise<boolean> {
+  try {
+    const { client, fromEmail } = getResendClient();
+    const formattedDate = expirationDate.toLocaleDateString('pt-BR');
+    
+    const text = `
+Ola ${name},
+
+Otima noticia! Seu pagamento foi confirmado com sucesso.
+
+Detalhes da sua assinatura:
+- Plano: ${planName}
+- Valido ate: ${formattedDate}
+
+Seu acesso esta liberado! Voce ja pode aproveitar todos os recursos da plataforma.
+
+Acesse sua conta: ${APP_URL}/admin
+
+Obrigado por confiar no ${APP_NAME}!
+
+---
+${APP_NAME}
+    `.trim();
+    
+    const html = `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pagamento Confirmado - ${APP_NAME}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background-color: #f4f4f5;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f5;">
+    <tr>
+      <td style="padding: 40px 20px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden;">
+          <tr>
+            <td style="background-color: #10b981; padding: 30px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 600;">Pagamento Confirmado!</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 40px 30px;">
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Ola <strong>${name}</strong>,
+              </p>
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Otima noticia! Seu pagamento foi confirmado com sucesso.
+              </p>
+              
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 25px 0; background-color: #ecfdf5; border-radius: 6px;">
+                <tr>
+                  <td style="padding: 20px;">
+                    <p style="margin: 0 0 12px; color: #047857; font-weight: 600; font-size: 14px;">Detalhes da sua assinatura:</p>
+                    <p style="margin: 0; color: #047857; font-size: 14px; line-height: 1.8;">
+                      <strong>Plano:</strong> ${planName}<br>
+                      <strong>Valido ate:</strong> ${formattedDate}
+                    </p>
+                  </td>
+                </tr>
+              </table>
+              
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                <strong>Seu acesso esta liberado!</strong> Voce ja pode aproveitar todos os recursos da plataforma.
+              </p>
+              
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                <tr>
+                  <td style="text-align: center; padding: 20px 0;">
+                    <a href="${APP_URL}/admin" style="display: inline-block; background-color: #10b981; color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 6px; font-weight: 600; font-size: 16px;">
+                      Acessar Minha Conta
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              
+              <p style="margin: 30px 0 0; color: #6b7280; font-size: 14px; line-height: 1.6;">
+                Obrigado por confiar no ${APP_NAME}!
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color: #f8fafc; padding: 20px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0; color: #9ca3af; font-size: 12px;">
+                ${APP_NAME} - Webinarios Automatizados
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `;
+
+    const result = await client.emails.send({
+      from: fromEmail,
+      replyTo: REPLY_TO_EMAIL,
+      to: [to],
+      subject: `Pagamento confirmado - ${APP_NAME}`,
+      html,
+      text,
+    });
+
+    console.log(`[email] Email de pagamento confirmado enviado para ${to}`, result);
+    return true;
+  } catch (error) {
+    console.error(`[email] Erro ao enviar email de pagamento confirmado para ${to}:`, error);
+    return false;
+  }
+}
+
+export async function sendExpirationReminderEmail(to: string, name: string, planName: string, daysUntilExpiration: number, expirationDate: Date): Promise<boolean> {
+  try {
+    const { client, fromEmail } = getResendClient();
+    const formattedDate = expirationDate.toLocaleDateString('pt-BR');
+    const renewUrl = `${APP_URL}/checkout?email=${encodeURIComponent(to)}`;
+    
+    const urgencyText = daysUntilExpiration === 1 ? "amanha" : `em ${daysUntilExpiration} dias`;
+    const subjectUrgency = daysUntilExpiration === 1 ? "Seu plano vence amanha!" : `Seu plano vence em ${daysUntilExpiration} dias`;
+    
+    const text = `
+Ola ${name},
+
+Seu plano ${planName} vence ${urgencyText} (${formattedDate}).
+
+Para continuar aproveitando todos os recursos do ${APP_NAME}, renove sua assinatura antes do vencimento:
+- Webinarios automatizados 24/7
+- Ferramentas de IA para roteiros e mensagens
+- Captura automatica de leads
+- Suporte prioritario
+
+Renovar agora: ${renewUrl}
+
+Nao deixe seus webinarios pararem! Renove ja e continue vendendo no automatico.
+
+---
+${APP_NAME}
+    `.trim();
+    
+    const html = `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lembrete de Renovacao - ${APP_NAME}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background-color: #f4f4f5;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f5;">
+    <tr>
+      <td style="padding: 40px 20px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden;">
+          <tr>
+            <td style="background-color: ${daysUntilExpiration === 1 ? '#f59e0b' : '#3b82f6'}; padding: 30px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 600;">${subjectUrgency}</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 40px 30px;">
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Ola <strong>${name}</strong>,
+              </p>
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Seu plano <strong>${planName}</strong> vence <strong>${urgencyText}</strong> (${formattedDate}).
+              </p>
+              
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 25px 0; background-color: #f0f9ff; border-radius: 6px;">
+                <tr>
+                  <td style="padding: 20px;">
+                    <p style="margin: 0 0 12px; color: #0369a1; font-weight: 600; font-size: 14px;">Continue aproveitando:</p>
+                    <p style="margin: 0; color: #0369a1; font-size: 14px; line-height: 1.8;">
+                      - Webinarios automatizados 24/7<br>
+                      - Ferramentas de IA para roteiros e mensagens<br>
+                      - Captura automatica de leads<br>
+                      - Suporte prioritario
+                    </p>
+                  </td>
+                </tr>
+              </table>
+              
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                <tr>
+                  <td style="text-align: center; padding: 25px 0;">
+                    <a href="${renewUrl}" style="display: inline-block; background-color: ${daysUntilExpiration === 1 ? '#f59e0b' : '#3b82f6'}; color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 6px; font-weight: 600; font-size: 16px;">
+                      Renovar Meu Plano
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              
+              <p style="margin: 30px 0 0; color: #6b7280; font-size: 14px; line-height: 1.6;">
+                Nao deixe seus webinarios pararem! Renove ja e continue vendendo no automatico.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color: #f8fafc; padding: 20px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0; color: #9ca3af; font-size: 12px;">
+                ${APP_NAME} - Webinarios Automatizados
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `;
+
+    const result = await client.emails.send({
+      from: fromEmail,
+      replyTo: REPLY_TO_EMAIL,
+      to: [to],
+      subject: `${subjectUrgency} - ${APP_NAME}`,
+      html,
+      text,
+    });
+
+    console.log(`[email] Email de lembrete de vencimento (${daysUntilExpiration} dias) enviado para ${to}`, result);
+    return true;
+  } catch (error) {
+    console.error(`[email] Erro ao enviar email de lembrete para ${to}:`, error);
+    return false;
+  }
+}
+
+export async function sendExpiredRenewalEmail(to: string, name: string, planName: string): Promise<boolean> {
+  try {
+    const { client, fromEmail } = getResendClient();
+    const renewUrl = `${APP_URL}/checkout?email=${encodeURIComponent(to)}`;
+    
+    const text = `
+Ola ${name},
+
+Seu plano ${planName} venceu ontem e seu acesso foi suspenso.
+
+Mas nao se preocupe! Seus dados estao seguros e voce pode recuperar o acesso agora mesmo.
+
+O que acontece enquanto seu plano esta vencido:
+- Seus webinarios foram pausados
+- Novos leads nao estao sendo capturados
+- Ferramentas de IA indisponiveis
+
+Renove agora com apenas um clique (seu email ja esta preenchido):
+${renewUrl}
+
+Nao perca mais vendas! Renove seu plano e volte a vender no automatico.
+
+---
+${APP_NAME}
+    `.trim();
+    
+    const html = `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Renove Seu Plano - ${APP_NAME}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background-color: #f4f4f5;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f5;">
+    <tr>
+      <td style="padding: 40px 20px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden;">
+          <tr>
+            <td style="background-color: #dc2626; padding: 30px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 600;">Seu Plano Venceu</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 40px 30px;">
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Ola <strong>${name}</strong>,
+              </p>
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Seu plano <strong>${planName}</strong> venceu ontem e seu acesso foi suspenso.
+              </p>
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                <strong>Mas nao se preocupe!</strong> Seus dados estao seguros e voce pode recuperar o acesso agora mesmo.
+              </p>
+              
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 25px 0; background-color: #fef2f2; border-radius: 6px;">
+                <tr>
+                  <td style="padding: 20px;">
+                    <p style="margin: 0 0 12px; color: #991b1b; font-weight: 600; font-size: 14px;">O que esta acontecendo:</p>
+                    <p style="margin: 0; color: #991b1b; font-size: 14px; line-height: 1.8;">
+                      - Seus webinarios foram pausados<br>
+                      - Novos leads nao estao sendo capturados<br>
+                      - Ferramentas de IA indisponiveis
+                    </p>
+                  </td>
+                </tr>
+              </table>
+              
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Renove agora com apenas um clique (seu email ja esta preenchido):
+              </p>
+              
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                <tr>
+                  <td style="text-align: center; padding: 25px 0;">
+                    <a href="${renewUrl}" style="display: inline-block; background-color: #3b82f6; color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 6px; font-weight: 600; font-size: 16px;">
+                      Renovar Agora
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              
+              <p style="margin: 30px 0 0; color: #6b7280; font-size: 14px; line-height: 1.6;">
+                Nao perca mais vendas! Renove seu plano e volte a vender no automatico.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color: #f8fafc; padding: 20px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0; color: #9ca3af; font-size: 12px;">
+                ${APP_NAME} - Webinarios Automatizados
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `;
+
+    const result = await client.emails.send({
+      from: fromEmail,
+      replyTo: REPLY_TO_EMAIL,
+      to: [to],
+      subject: `Seu plano venceu - Renove agora - ${APP_NAME}`,
+      html,
+      text,
+    });
+
+    console.log(`[email] Email de renovacao pos-vencimento enviado para ${to}`, result);
+    return true;
+  } catch (error) {
+    console.error(`[email] Erro ao enviar email de renovacao para ${to}:`, error);
+    return false;
+  }
+}

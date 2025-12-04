@@ -4,6 +4,7 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { startEmailScheduler } from "./email-scheduler";
 import { startWhatsappScheduler } from "./whatsapp-scheduler";
+import { startSubscriptionScheduler } from "./subscription-scheduler";
 
 const app = express();
 
@@ -127,5 +128,8 @@ app.use((req, res, next) => {
     
     // Start WhatsApp scheduler for automated message sending
     startWhatsappScheduler();
+    
+    // Start subscription scheduler for expiration reminders
+    startSubscriptionScheduler();
   });
 })();

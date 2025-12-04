@@ -7108,6 +7108,13 @@ Seja conversacional e objetivo.`;
                   });
                   updateData.adminId = admin.id;
                   console.log(`[MP Webhook] Updated admin ${pagamento.email} for subscription`);
+                  
+                  // Send payment confirmation email
+                  import("./email").then(({ sendPaymentConfirmedEmail }) => {
+                    sendPaymentConfirmedEmail(pagamento.email, pagamento.nome, plano.nome, expirationDate).catch(err => {
+                      console.error(`[MP Webhook] Error sending confirmation email:`, err);
+                    });
+                  });
                 } else {
                   const tempPassword = Math.random().toString(36).slice(-8);
                   const bcrypt = await import('bcryptjs');
@@ -7127,6 +7134,13 @@ Seja conversacional e objetivo.`;
                   updateData.adminId = admin.id;
                   
                   console.log(`[MP Webhook] Created admin for subscription: ${pagamento.email}, temp password: ${tempPassword}`);
+                  
+                  // Send payment confirmation email for new users
+                  import("./email").then(({ sendPaymentConfirmedEmail }) => {
+                    sendPaymentConfirmedEmail(pagamento.email, pagamento.nome, plano.nome, expirationDate).catch(err => {
+                      console.error(`[MP Webhook] Error sending confirmation email:`, err);
+                    });
+                  });
                 }
               }
 
@@ -7223,6 +7237,13 @@ Seja conversacional e objetivo.`;
                     planoId: plano.id,
                   });
                   updateData.adminId = admin.id;
+                  
+                  // Send payment confirmation email
+                  import("./email").then(({ sendPaymentConfirmedEmail }) => {
+                    sendPaymentConfirmedEmail(pagamento.email, pagamento.nome, plano.nome, expirationDate).catch(err => {
+                      console.error(`[MP Webhook] Error sending confirmation email:`, err);
+                    });
+                  });
                 } else {
                   // Create new admin
                   const tempPassword = Math.random().toString(36).slice(-8);
@@ -7243,6 +7264,13 @@ Seja conversacional e objetivo.`;
                   updateData.adminId = admin.id;
                   
                   console.log(`[MP Webhook] Created admin: ${pagamento.email}, temp password: ${tempPassword}`);
+                  
+                  // Send payment confirmation email for new users
+                  import("./email").then(({ sendPaymentConfirmedEmail }) => {
+                    sendPaymentConfirmedEmail(pagamento.email, pagamento.nome, plano.nome, expirationDate).catch(err => {
+                      console.error(`[MP Webhook] Error sending confirmation email:`, err);
+                    });
+                  });
                 }
               }
             }
@@ -7495,6 +7523,13 @@ Seja conversacional e objetivo.`;
                   planoId: plano.id,
                 });
                 console.log(`[Stripe Webhook] Renewed subscription for ${pagamento.email}, expires: ${expirationDate}`);
+                
+                // Send payment confirmation email
+                import("./email").then(({ sendPaymentConfirmedEmail }) => {
+                  sendPaymentConfirmedEmail(pagamento.email, pagamento.nome, plano.nome, expirationDate).catch(err => {
+                    console.error(`[Stripe Webhook] Error sending confirmation email:`, err);
+                  });
+                });
               } else {
                 const tempPassword = Math.random().toString(36).slice(-8);
                 const bcrypt = await import('bcryptjs');
@@ -7512,6 +7547,13 @@ Seja conversacional e objetivo.`;
                   planoId: plano.id,
                 });
                 console.log(`[Stripe Webhook] Created admin via subscription: ${pagamento.email}, temp password: ${tempPassword}`);
+                
+                // Send payment confirmation email for new users
+                import("./email").then(({ sendPaymentConfirmedEmail }) => {
+                  sendPaymentConfirmedEmail(pagamento.email, pagamento.nome, plano.nome, expirationDate).catch(err => {
+                    console.error(`[Stripe Webhook] Error sending confirmation email:`, err);
+                  });
+                });
               }
 
               await storage.updateCheckoutPagamento(pagamentoId, {

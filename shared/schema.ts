@@ -28,6 +28,7 @@ export const admins = pgTable("admins", {
   accountDomain: text("account_domain"), // Domínio customizado da conta (ex: minhaempresa.com)
   landingPageTitle: text("landing_page_title").default("Meus Webinários"), // Título da página inicial
   landingPageDescription: text("landing_page_description").default(""), // Descrição da página inicial
+  lastExpirationEmailSent: timestamp("last_expiration_email_sent"), // Último email de vencimento enviado
   createdAt: timestamp("created_at").defaultNow(),
 });
 
