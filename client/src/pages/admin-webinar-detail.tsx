@@ -214,6 +214,7 @@ function DomainConfigSection({ domain, serverHost }: { domain: string; serverHos
 
 interface Webinar {
   id: string;
+  ownerId: string | null;
   name: string;
   slug: string;
   description: string;

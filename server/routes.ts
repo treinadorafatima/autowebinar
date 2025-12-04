@@ -5418,6 +5418,7 @@ Seja conversacional e objetivo.`;
         });
       }
     } catch (error: any) {
+      console.error("[lead-form-config GET] Error:", error);
       res.status(400).json({ error: error.message });
     }
   });
@@ -5436,6 +5437,8 @@ Seja conversacional e objetivo.`;
         return res.status(404).json({ error: "Webinar not found" });
       }
 
+      console.log("[lead-form-config POST] Body:", JSON.stringify(req.body, null, 2));
+
       const existingConfig = await storage.getLeadFormConfigByWebinar(req.params.id);
       
       if (existingConfig) {
@@ -5450,6 +5453,7 @@ Seja conversacional e objetivo.`;
         res.json({ success: true, message: "Configuração criada", config: created });
       }
     } catch (error: any) {
+      console.error("[lead-form-config POST] Error:", error);
       res.status(400).json({ error: error.message });
     }
   });
