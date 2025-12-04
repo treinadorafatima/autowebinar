@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useLocation, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { 
   Upload, 
   Trash2, 
@@ -26,7 +37,9 @@ import {
   Clock,
   Plus,
   FileVideo,
-  User
+  User,
+  CalendarIcon,
+  Eye
 } from "lucide-react";
 
 interface UploadedVideo {
@@ -79,6 +92,15 @@ function StatCard({
   );
 }
 
+type ViewPeriod = 'today' | 'yesterday' | 'last7days' | 'custom';
+
+interface ViewsData {
+  total: number;
+  byDay: { date: string; count: number }[];
+  from: string;
+  to: string;
+}
+
 export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -91,6 +113,11 @@ export default function AdminPage() {
   const [profileData, setProfileData] = useState({ name: "", email: "" });
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileFormData, setProfileFormData] = useState({ name: "", newEmail: "", currentPassword: "", newPassword: "", confirmPassword: "" });
+  const [viewPeriod, setViewPeriod] = useState<ViewPeriod>('last7days');
+  const [customDateFrom, setCustomDateFrom] = useState<Date | undefined>(undefined);
+  const [customDateTo, setCustomDateTo] = useState<Date | undefined>(undefined);
+  const [viewsData, setViewsData] = useState<ViewsData | null>(null);
+  const [viewsLoading, setViewsLoading] = useState(false);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
@@ -207,6 +234,62 @@ export default function AdminPage() {
       console.error("Erro ao carregar webinários:", error);
     }
   }
+
+  const getDateRange = useMemo(() => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    switch (viewPeriod) {
+      case 'today':
+        return { from: today, to: now };
+      case 'yesterday':
+        const endOfYesterday = new Date(yesterday);
+        endOfYesterday.setHours(23, 59, 59, 999);
+        return { from: yesterday, to: endOfYesterday };
+      case 'last7days':
+        const sevenDaysAgo = new Date(today);
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        return { from: sevenDaysAgo, to: now };
+      case 'custom':
+        return { 
+          from: customDateFrom || today, 
+          to: customDateTo ? new Date(customDateTo.setHours(23, 59, 59, 999)) : now 
+        };
+      default:
+        return { from: today, to: now };
+    }
+  }, [viewPeriod, customDateFrom, customDateTo]);
+
+  async function fetchViews() {
+    if (!token) return;
+    setViewsLoading(true);
+    try {
+      const { from, to } = getDateRange;
+      const params = new URLSearchParams({
+        from: from.toISOString(),
+        to: to.toISOString()
+      });
+      const res = await fetch(`/api/admin/views?${params}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setViewsData(data);
+      }
+    } catch (error) {
+      console.error("Erro ao carregar visualizações:", error);
+    } finally {
+      setViewsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (token && !loading) {
+      fetchViews();
+    }
+  }, [viewPeriod, customDateFrom, customDateTo, loading]);
 
   const [uploadStatus, setUploadStatus] = useState<string>("Enviando...");
 
@@ -426,6 +509,125 @@ export default function AdminPage() {
         <StatCard icon={FileVideo} value={videos.length} label="Vídeos na Biblioteca" color="purple" />
         <StatCard icon={BarChart3} value={totalViews.toLocaleString()} label="Visualizações Totais" color="orange" />
       </div>
+
+      {/* View History Card */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0 pb-2">
+          <div>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Eye className="w-5 h-5" />
+              Histórico de Visualizações
+            </CardTitle>
+            <CardDescription>Visualizações por período</CardDescription>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Select 
+              value={viewPeriod} 
+              onValueChange={(v) => setViewPeriod(v as ViewPeriod)}
+              data-testid="select-period-views"
+            >
+              <SelectTrigger className="w-[160px]" data-testid="select-trigger-period">
+                <SelectValue placeholder="Período" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="today">Hoje</SelectItem>
+                <SelectItem value="yesterday">Ontem</SelectItem>
+                <SelectItem value="last7days">Últimos 7 dias</SelectItem>
+                <SelectItem value="custom">Intervalo</SelectItem>
+              </SelectContent>
+            </Select>
+            
+            {viewPeriod === 'custom' && (
+              <div className="flex items-center gap-2">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="gap-1" data-testid="button-date-from">
+                      <CalendarIcon className="w-4 h-4" />
+                      {customDateFrom ? format(customDateFrom, "dd/MM/yy", { locale: ptBR }) : "De"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={customDateFrom}
+                      onSelect={setCustomDateFrom}
+                      locale={ptBR}
+                      disabled={(date) => date > new Date()}
+                    />
+                  </PopoverContent>
+                </Popover>
+                <span className="text-muted-foreground">até</span>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="gap-1" data-testid="button-date-to">
+                      <CalendarIcon className="w-4 h-4" />
+                      {customDateTo ? format(customDateTo, "dd/MM/yy", { locale: ptBR }) : "Até"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={customDateTo}
+                      onSelect={setCustomDateTo}
+                      locale={ptBR}
+                      disabled={(date) => date > new Date() || (customDateFrom ? date < customDateFrom : false)}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {viewsLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-center justify-center py-4">
+                <div className="text-center">
+                  <p className="text-4xl font-bold text-primary" data-testid="text-views-total">
+                    {(viewsData?.total || 0).toLocaleString()}
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {viewPeriod === 'today' && 'visualizações hoje'}
+                    {viewPeriod === 'yesterday' && 'visualizações ontem'}
+                    {viewPeriod === 'last7days' && 'visualizações nos últimos 7 dias'}
+                    {viewPeriod === 'custom' && 'visualizações no período'}
+                  </p>
+                </div>
+              </div>
+              
+              {viewsData?.byDay && viewsData.byDay.length > 0 && (
+                <div className="border-t pt-4">
+                  <p className="text-sm font-medium mb-3">Por dia:</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2">
+                    {viewsData.byDay.map((day) => (
+                      <div 
+                        key={day.date} 
+                        className="text-center p-2 rounded-md bg-secondary/50"
+                        data-testid={`views-day-${day.date}`}
+                      >
+                        <p className="text-lg font-semibold">{day.count}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {format(new Date(day.date + 'T12:00:00'), "dd/MM", { locale: ptBR })}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {(!viewsData?.byDay || viewsData.byDay.length === 0) && viewsData?.total === 0 && (
+                <p className="text-center text-sm text-muted-foreground py-4">
+                  Nenhuma visualização registrada neste período
+                </p>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
