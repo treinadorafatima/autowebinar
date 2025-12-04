@@ -1094,11 +1094,18 @@ export default function WebinarPublicPage() {
     const needsName = webinar.chatCollectName !== false;
     const needsCity = webinar.chatCollectCity !== false;
     const needsState = webinar.chatCollectState !== false;
+    const needsEmail = webinar.chatCollectEmail === true;
+    const needsWhatsapp = webinar.chatCollectWhatsapp === true;
     
     // Verifica se os campos configurados estão preenchidos
-    if ((needsName && !chatName.trim()) || 
-        (needsCity && !chatCity.trim()) || 
-        (needsState && (!chatState.trim() || chatState.length !== 2))) {
+    const missingFields = 
+      (needsName && !chatName.trim()) || 
+      (needsCity && !chatCity.trim()) || 
+      (needsState && (!chatState.trim() || chatState.length !== 2)) ||
+      (needsEmail && !chatEmail.trim()) ||
+      (needsWhatsapp && !chatWhatsapp.trim());
+    
+    if (missingFields) {
       toast({ 
         title: "Complete seu cadastro no chat", 
         description: "Preencha os campos para comentar",
