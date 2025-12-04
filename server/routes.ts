@@ -6265,7 +6265,7 @@ Seja conversacional e objetivo.`;
   app.post("/api/checkout/iniciar/:planoId", async (req, res) => {
     try {
       const { planoId } = req.params;
-      const { nome, email, cpf, telefone } = req.body;
+      const { nome, email, cpf, documento, tipoDocumento, telefone } = req.body;
 
       if (!nome || !email) {
         return res.status(400).json({ error: "Nome e email são obrigatórios" });
@@ -6276,11 +6276,14 @@ Seja conversacional e objetivo.`;
         return res.status(404).json({ error: "Plano não encontrado ou inativo" });
       }
 
+      // Support both legacy cpf field and new documento/tipoDocumento fields
+      const documentoValue = documento || cpf || null;
+
       // Create payment record
       const pagamento = await storage.createCheckoutPagamento({
         email,
         nome,
-        cpf: cpf || null,
+        cpf: documentoValue,
         telefone: telefone || null,
         planoId,
         valor: plano.preco,
