@@ -579,6 +579,12 @@ export default function AdminWebinarDetailPage() {
   const [leadsCollectWhatsapp, setLeadsCollectWhatsapp] = useState(true);
   const [leads, setLeads] = useState<any[]>([]);
   
+  // Chat form configuration (separado do formulário de leads)
+  const [chatFormTitle, setChatFormTitle] = useState("Participe do Chat");
+  const [chatCollectName, setChatCollectName] = useState(true);
+  const [chatCollectCity, setChatCollectCity] = useState(true);
+  const [chatCollectState, setChatCollectState] = useState(true);
+  
   // Real comments states
   const [realComments, setRealComments] = useState<Comment[]>([]);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -764,6 +770,11 @@ export default function AdminWebinarDetailPage() {
       setLeadsEnabled(data.leadsEnabled || false);
       setLeadsCollectEmail(data.leadsCollectEmail !== false);
       setLeadsCollectWhatsapp(data.leadsCollectWhatsapp !== false);
+      // Chat form config
+      setChatFormTitle(data.chatFormTitle || "Participe do Chat");
+      setChatCollectName(data.chatCollectName !== false);
+      setChatCollectCity(data.chatCollectCity !== false);
+      setChatCollectState(data.chatCollectState !== false);
       try {
         const parsedBenefits = JSON.parse(data.offerBenefits || "[]");
         setBenefitsList(Array.isArray(parsedBenefits) ? parsedBenefits : []);
@@ -1184,6 +1195,10 @@ export default function AdminWebinarDetailPage() {
           leadsEnabled,
           leadsCollectEmail,
           leadsCollectWhatsapp,
+          chatFormTitle,
+          chatCollectName,
+          chatCollectCity,
+          chatCollectState,
         }),
       });
       if (!res.ok) throw new Error("Erro ao salvar");
@@ -3747,6 +3762,58 @@ export default function AdminWebinarDetailPage() {
                         data-testid="checkbox-form-show-next-session"
                       />
                       <Label htmlFor="form-show-next-session" className="text-sm cursor-pointer">Próxima Sessão</Label>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Formulário de Chat (separado do Lead) */}
+                <div className="p-4 border rounded-lg space-y-4 bg-muted/30">
+                  <div className="flex items-center gap-2">
+                    <MessageCircle className="h-5 w-5 text-blue-500" />
+                    <h4 className="font-medium text-sm">Formulário de Chat</h4>
+                    <span className="text-xs text-muted-foreground">(separado do formulário de inscrição)</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Configure quais campos solicitar quando o usuário quiser participar do chat ao vivo.
+                  </p>
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      <Label>Título do Modal</Label>
+                      <Input
+                        value={chatFormTitle}
+                        onChange={(e) => setChatFormTitle(e.target.value)}
+                        placeholder="Participe do Chat"
+                        data-testid="input-chat-form-title"
+                      />
+                    </div>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          id="chat-collect-name"
+                          checked={chatCollectName}
+                          onCheckedChange={(c: boolean) => setChatCollectName(c === true)}
+                          data-testid="checkbox-chat-collect-name"
+                        />
+                        <Label htmlFor="chat-collect-name" className="text-sm cursor-pointer">Nome</Label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          id="chat-collect-city"
+                          checked={chatCollectCity}
+                          onCheckedChange={(c: boolean) => setChatCollectCity(c === true)}
+                          data-testid="checkbox-chat-collect-city"
+                        />
+                        <Label htmlFor="chat-collect-city" className="text-sm cursor-pointer">Cidade</Label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          id="chat-collect-state"
+                          checked={chatCollectState}
+                          onCheckedChange={(c: boolean) => setChatCollectState(c === true)}
+                          data-testid="checkbox-chat-collect-state"
+                        />
+                        <Label htmlFor="chat-collect-state" className="text-sm cursor-pointer">Estado</Label>
+                      </div>
                     </div>
                   </div>
                 </div>
