@@ -35,7 +35,7 @@ export default function WebinarRegister() {
 
   async function loadWebinarAndForm() {
     try {
-      const webinarRes = await fetch(`/api/webinars/public/${params.slug}`);
+      const webinarRes = await fetch(`/api/webinars/${params.slug}`);
       if (webinarRes.ok) {
         const webinarData = await webinarRes.json();
         setWebinar(webinarData);
