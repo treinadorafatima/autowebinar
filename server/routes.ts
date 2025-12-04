@@ -1992,7 +1992,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         id: webinar.id,
         replayEnabled: webinar.replayEnabled,
         replayButtonText: webinar.replayButtonText,
-        replayButtonUrl: webinar.replayButtonUrl,
+        replayBackgroundColor: webinar.replayBackgroundColor,
+        replayPlayerColor: webinar.replayPlayerColor,
+        replayButtonColor: webinar.replayButtonColor,
       });
       
       // Verificar se o plano do dono está ativo (apenas para acesso público)
@@ -2087,7 +2089,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         replayEnabled: updatedData.replayEnabled,
         replayButtonText: updatedData.replayButtonText,
         replayButtonUrl: updatedData.replayButtonUrl,
-        replayTitle: updatedData.replayTitle,
+        replayBackgroundColor: updatedData.replayBackgroundColor,
+        replayPlayerColor: updatedData.replayPlayerColor,
+        replayButtonColor: updatedData.replayButtonColor,
         webinarLimit,
       });
       
