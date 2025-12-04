@@ -169,6 +169,7 @@ export default function WebinarPublicPage() {
   const [showOfferAfterEnd, setShowOfferAfterEnd] = useState(false);
   const [offerExpiredAfterEnd, setOfferExpiredAfterEnd] = useState(false);
   
+  // Estados para formulário de LEAD (inscrição)
   const [userName, setUserName] = useState(() => {
     return localStorage.getItem(`webinar-${params.slug}-userName`) || "";
   });
@@ -180,10 +181,25 @@ export default function WebinarPublicPage() {
   });
   const [userEmail, setUserEmail] = useState("");
   const [userWhatsapp, setUserWhatsapp] = useState("");
-  const [userComment, setUserComment] = useState("");
   const [isRegistered, setIsRegistered] = useState(() => {
     return localStorage.getItem(`webinar-${params.slug}-registered`) === "true";
   });
+  
+  // Estados separados para formulário de CHAT (comentários)
+  const [chatName, setChatName] = useState(() => {
+    return localStorage.getItem(`webinar-${params.slug}-chatName`) || "";
+  });
+  const [chatCity, setChatCity] = useState(() => {
+    return localStorage.getItem(`webinar-${params.slug}-chatCity`) || "";
+  });
+  const [chatState, setChatState] = useState(() => {
+    return localStorage.getItem(`webinar-${params.slug}-chatState`) || "";
+  });
+  const [isChatRegistered, setIsChatRegistered] = useState(() => {
+    return localStorage.getItem(`webinar-${params.slug}-chatRegistered`) === "true";
+  });
+  
+  const [userComment, setUserComment] = useState("");
   const [showParticipationModal, setShowParticipationModal] = useState(false);
   const [volume, setVolume] = useState(100);
   const [isMuted, setIsMuted] = useState(false);
@@ -1068,18 +1084,39 @@ export default function WebinarPublicPage() {
   async function handleSendComment() {
     if (!userComment.trim() || !webinar) return;
     
-    // Verifica se os campos obrigatórios para comentar estão preenchidos
-    if (!userName.trim() || !userCity.trim() || !userState.trim() || userState.length !== 2) {
+    // Verifica campos obrigatórios baseado na configuração do webinar
+    const needsName = webinar.chatCollectName !== false;
+    const needsCity = webinar.chatCollectCity !== false;
+    const needsState = webinar.chatCollectState !== false;
+    
+    // Verifica se os campos configurados estão preenchidos
+    if ((needsName && !chatName.trim()) || 
+        (needsCity && !chatCity.trim()) || 
+        (needsState && (!chatState.trim() || chatState.length !== 2))) {
       toast({ 
-        title: "Complete seu cadastro", 
-        description: "Preencha nome, cidade e estado para comentar",
+        title: "Complete seu cadastro no chat", 
+        description: "Preencha os campos para comentar",
         variant: "destructive" 
       });
       setShowParticipationModal(true);
       return;
     }
     
-    const author = `${userName} – ${userCity} (${userState.toUpperCase()})`;
+    // Monta o author baseado nos campos configurados
+    let author = chatName || "Anônimo";
+    if (needsCity && chatCity) {
+      author += ` – ${chatCity}`;
+      if (needsState && chatState) {
+        author += ` (${chatState.toUpperCase()})`;
+      }
+    } else if (needsState && chatState) {
+      author += ` – (${chatState.toUpperCase()})`;
+    }
+    
+    // Se cidade e estado são obrigatórios, usa o formato completo
+    if (needsCity && needsState) {
+      author = `${chatName || "Anônimo"} – ${chatCity} (${chatState.toUpperCase()})`;
+    }
     
     try {
       const res = await fetch(`/api/webinars/${webinar.id}/live-comment`, {
@@ -1113,6 +1150,46 @@ export default function WebinarPublicPage() {
     }
   }
 
+  // Função para registrar no chat (separada do lead)
+  function handleChatRegister() {
+    if (!webinar) return;
+    
+    const needsName = webinar.chatCollectName !== false;
+    const needsCity = webinar.chatCollectCity !== false;
+    const needsState = webinar.chatCollectState !== false;
+    
+    // Validação baseada nos campos configurados
+    if (needsName && !chatName.trim()) {
+      toast({ title: "Preencha seu nome", variant: "destructive" });
+      return;
+    }
+    if (needsCity && !chatCity.trim()) {
+      toast({ title: "Preencha sua cidade", variant: "destructive" });
+      return;
+    }
+    if (needsState) {
+      if (!chatState.trim()) {
+        toast({ title: "Preencha seu estado", variant: "destructive" });
+        return;
+      }
+      if (chatState.length !== 2) {
+        toast({ title: "Estado deve ter 2 letras (ex: SP)", variant: "destructive" });
+        return;
+      }
+    }
+    
+    // Persist chat registration in localStorage
+    localStorage.setItem(`webinar-${params.slug}-chatRegistered`, "true");
+    if (chatName) localStorage.setItem(`webinar-${params.slug}-chatName`, chatName);
+    if (chatCity) localStorage.setItem(`webinar-${params.slug}-chatCity`, chatCity);
+    if (chatState) localStorage.setItem(`webinar-${params.slug}-chatState`, chatState.toUpperCase());
+    
+    setIsChatRegistered(true);
+    setShowParticipationModal(false);
+    toast({ title: "Cadastro no chat realizado!" });
+  }
+  
+  // Função para registrar lead (inscrição no webinar) - NÃO usada no modal de chat
   function handleRegister() {
     if (!userName.trim() || !userCity.trim() || !userState.trim()) {
       toast({ title: "Preencha todos os campos", variant: "destructive" });
@@ -1139,7 +1216,7 @@ export default function WebinarPublicPage() {
       }).catch(() => {});
     }
     
-    // Persist registration in localStorage
+    // Persist lead registration in localStorage
     localStorage.setItem(`webinar-${params.slug}-registered`, "true");
     localStorage.setItem(`webinar-${params.slug}-userName`, userName);
     localStorage.setItem(`webinar-${params.slug}-userCity`, userCity);
@@ -1211,55 +1288,40 @@ export default function WebinarPublicPage() {
       <Dialog open={showParticipationModal} onOpenChange={setShowParticipationModal}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Participar do Chat</DialogTitle>
+            <DialogTitle>{webinar?.chatFormTitle || "Participe do Chat"}</DialogTitle>
             <DialogDescription>
-              Preencha seus dados para participar da transmissão ao vivo
+              Preencha seus dados para comentar na transmissão
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <div>
-              <Input
-                placeholder="Seu nome"
-                value={userName}
-                onChange={(e) => setUserName(e.target.value)}
-                data-testid="input-modal-user-name"
-              />
-            </div>
-            <div>
-              <Input
-                placeholder="Cidade"
-                value={userCity}
-                onChange={(e) => setUserCity(e.target.value)}
-                data-testid="input-modal-user-city"
-              />
-            </div>
-            <div>
-              <Input
-                placeholder="UF (ex: SP)"
-                value={userState}
-                onChange={(e) => setUserState(e.target.value.toUpperCase())}
-                maxLength={2}
-                data-testid="input-modal-user-state"
-              />
-            </div>
-            {webinar?.leadsEnabled && webinar?.leadsCollectEmail && (
+            {(webinar?.chatCollectName !== false) && (
               <div>
                 <Input
-                  type="email"
-                  placeholder="Email"
-                  value={userEmail}
-                  onChange={(e) => setUserEmail(e.target.value)}
-                  data-testid="input-modal-user-email"
+                  placeholder="Seu nome"
+                  value={chatName}
+                  onChange={(e) => setChatName(e.target.value)}
+                  data-testid="input-modal-chat-name"
                 />
               </div>
             )}
-            {webinar?.leadsEnabled && webinar?.leadsCollectWhatsapp && (
+            {(webinar?.chatCollectCity !== false) && (
               <div>
                 <Input
-                  placeholder="WhatsApp (ex: 11999999999)"
-                  value={userWhatsapp}
-                  onChange={(e) => setUserWhatsapp(e.target.value.replace(/\D/g, ''))}
-                  data-testid="input-modal-user-whatsapp"
+                  placeholder="Cidade"
+                  value={chatCity}
+                  onChange={(e) => setChatCity(e.target.value)}
+                  data-testid="input-modal-chat-city"
+                />
+              </div>
+            )}
+            {(webinar?.chatCollectState !== false) && (
+              <div>
+                <Input
+                  placeholder="UF (ex: SP)"
+                  value={chatState}
+                  onChange={(e) => setChatState(e.target.value.toUpperCase())}
+                  maxLength={2}
+                  data-testid="input-modal-chat-state"
                 />
               </div>
             )}
@@ -1273,10 +1335,10 @@ export default function WebinarPublicPage() {
                 Agora não
               </Button>
               <Button 
-                onClick={handleRegister}
+                onClick={handleChatRegister}
                 className="flex-1"
                 style={{ backgroundColor: "#22c55e" }}
-                data-testid="button-modal-register"
+                data-testid="button-modal-chat-register"
               >
                 Participar
               </Button>
