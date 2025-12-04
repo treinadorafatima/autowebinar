@@ -1087,8 +1087,17 @@ export default function WebinarPublicPage() {
         setComments(prev => [...prev, newComment]);
         setUserComment("");
         toast({ title: "Comentário enviado!" });
+      } else {
+        const errorData = await res.json().catch(() => ({}));
+        console.error("Erro ao enviar comentário:", errorData);
+        toast({ 
+          title: "Erro ao enviar comentário", 
+          description: errorData.error || "Tente novamente",
+          variant: "destructive" 
+        });
       }
     } catch (err) {
+      console.error("Erro de rede ao enviar comentário:", err);
       toast({ title: "Erro ao enviar comentário", variant: "destructive" });
     }
   }
