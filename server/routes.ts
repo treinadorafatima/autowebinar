@@ -2010,6 +2010,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/webinars/:id/increment-view", async (req, res) => {
     try {
       const { id } = req.params;
+      const source = (req.body?.source as 'live' | 'replay' | 'embed') || 'live';
       const webinar = await storage.getWebinarById(id);
       if (!webinar) {
         const webinarBySlug = await storage.getWebinarBySlug(id);
@@ -2023,6 +2024,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         await storage.incrementWebinarViews(webinarBySlug.id);
+        await storage.logWebinarView(webinarBySlug.id, webinarBySlug.ownerId, source);
       } else {
         // Verificar se o plano do dono está ativo
         if (webinar.ownerId && !(await isWebinarOwnerPlanActive(webinar.ownerId))) {
@@ -2030,6 +2032,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         await storage.incrementWebinarViews(id);
+        await storage.logWebinarView(webinar.id, webinar.ownerId, source);
       }
       res.json({ success: true });
     } catch (error: any) {
@@ -5795,6 +5798,45 @@ Seja conversacional e objetivo.`;
       res.send(fileData.content);
     } catch (error: any) {
       console.error("[hls] Error serving file:", error);
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // ========== VIEW HISTORY API ==========
+  
+  // Get views by period (for admin dashboard)
+  app.get("/api/admin/views", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin) {
+        return res.status(404).json({ error: "Admin not found" });
+      }
+
+      // Parse query params
+      const { from, to } = req.query;
+      
+      // Default to last 7 days if no range provided
+      const now = new Date();
+      const toDate = to ? new Date(to as string) : new Date(now.setHours(23, 59, 59, 999));
+      const fromDate = from ? new Date(from as string) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      fromDate.setHours(0, 0, 0, 0);
+
+      const count = await storage.countViewsByOwnerAndRange(admin.id, fromDate, toDate);
+      const byDay = await storage.getViewsByOwnerGroupedByDay(admin.id, fromDate, toDate);
+
+      res.json({
+        total: count,
+        byDay,
+        from: fromDate.toISOString(),
+        to: toDate.toISOString()
+      });
+    } catch (error: any) {
       res.status(400).json({ error: error.message });
     }
   });
