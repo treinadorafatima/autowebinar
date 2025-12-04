@@ -3295,9 +3295,9 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
   }
 
   async resetWebinarViewsByOwner(ownerId: string): Promise<void> {
-    await db.update(webinars2)
+    await db.update(webinarsTable)
       .set({ views: 0 })
-      .where(eq(webinars2.ownerId, ownerId));
+      .where(eq(webinarsTable.ownerId, ownerId));
   }
 }
 
