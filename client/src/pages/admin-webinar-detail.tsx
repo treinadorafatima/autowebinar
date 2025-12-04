@@ -13,6 +13,8 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import OfferEditor from "@/components/OfferEditor";
 import ReplayEditor from "@/components/ReplayEditor";
 import WebinarAnalytics from "@/components/WebinarAnalytics";
@@ -47,7 +49,8 @@ import {
   Globe,
   Monitor,
   Mic,
-  ArrowRightLeft
+  ArrowRightLeft,
+  Calendar as CalendarIcon
 } from "lucide-react";
 
 function DomainConfigSection({ domain, serverHost }: { domain: string; serverHost: string }) {
@@ -461,6 +464,19 @@ export default function AdminWebinarDetailPage() {
   const [realComments, setRealComments] = useState<Comment[]>([]);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [sessionDates, setSessionDates] = useState<string[]>([]);
+  
+  // Advanced date filter states for real comments
+  const [dateFilterType, setDateFilterType] = useState<'all' | 'today' | 'yesterday' | 'week' | 'month' | 'custom'>('all');
+  const [customDateFrom, setCustomDateFrom] = useState<Date | undefined>(undefined);
+  const [customDateTo, setCustomDateTo] = useState<Date | undefined>(undefined);
+  const [selectedCommentIds, setSelectedCommentIds] = useState<Set<string>>(new Set());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  
+  // Clear selection when date filter changes
+  function handleDateFilterChange(filterType: 'all' | 'today' | 'yesterday' | 'week' | 'month' | 'custom') {
+    setSelectedCommentIds(new Set());
+    setDateFilterType(filterType);
+  }
 
   // AI Designer states
   const [aiMessage, setAiMessage] = useState("");
@@ -861,6 +877,103 @@ export default function AdminWebinarDetailPage() {
       }
     } catch (error) {
       toast({ title: "Erro ao rejeitar comentário", variant: "destructive" });
+    }
+  }
+
+  // Filter comments by date range
+  function getFilteredComments(): Comment[] {
+    if (!realComments.length) return [];
+    
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const weekAgo = new Date(today);
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    const monthAgo = new Date(today);
+    monthAgo.setMonth(monthAgo.getMonth() - 1);
+    
+    return realComments.filter(comment => {
+      if (!comment.createdAt) return true;
+      const commentDate = new Date(comment.createdAt);
+      
+      switch (dateFilterType) {
+        case 'today':
+          return commentDate >= today;
+        case 'yesterday':
+          return commentDate >= yesterday && commentDate < today;
+        case 'week':
+          return commentDate >= weekAgo;
+        case 'month':
+          return commentDate >= monthAgo;
+        case 'custom':
+          if (customDateFrom && customDateTo) {
+            const from = new Date(customDateFrom);
+            from.setHours(0, 0, 0, 0);
+            const to = new Date(customDateTo);
+            to.setHours(23, 59, 59, 999);
+            return commentDate >= from && commentDate <= to;
+          }
+          return true;
+        default:
+          return true;
+      }
+    });
+  }
+
+  // Approve selected comments to simulated chat
+  async function handleApproveToSimulated() {
+    if (!webinar || selectedCommentIds.size === 0) return;
+    
+    const selectedComments = realComments.filter(c => selectedCommentIds.has(c.id));
+    let successCount = 0;
+    
+    for (const comment of selectedComments) {
+      try {
+        const res = await fetch(`/api/webinars/${webinar.id}/comments/${comment.id}/release`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          successCount++;
+        }
+      } catch (error) {
+        console.error("Erro ao aprovar comentário:", error);
+      }
+    }
+    
+    if (successCount > 0) {
+      toast({ 
+        title: `${successCount} comentário(s) aprovado(s)!`, 
+        description: "Os comentários foram adicionados ao chat simulado." 
+      });
+      setSelectedCommentIds(new Set());
+      await fetchRealComments(webinar.id, selectedDate);
+      await fetchComments(webinar.id);
+    } else {
+      toast({ title: "Erro ao aprovar comentários", variant: "destructive" });
+    }
+  }
+
+  // Toggle comment selection
+  function toggleCommentSelection(commentId: string) {
+    const newSelected = new Set(selectedCommentIds);
+    if (newSelected.has(commentId)) {
+      newSelected.delete(commentId);
+    } else {
+      newSelected.add(commentId);
+    }
+    setSelectedCommentIds(newSelected);
+  }
+
+  // Select all filtered comments
+  function selectAllFilteredComments() {
+    const filtered = getFilteredComments();
+    const allSelected = filtered.every(c => selectedCommentIds.has(c.id));
+    if (allSelected) {
+      setSelectedCommentIds(new Set());
+    } else {
+      setSelectedCommentIds(new Set(filtered.map(c => c.id)));
     }
   }
 
@@ -2929,103 +3042,261 @@ export default function AdminWebinarDetailPage() {
                 </code>
               </div>
 
-              {sessionDates.length > 0 && (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label>Filtrar por Data</Label>
-                    {realComments.length > 0 && (
-                      <div className="flex gap-2">
+              {/* Advanced Date Filters */}
+              <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <Label className="text-sm font-medium">Filtrar por Período</Label>
+                  <div className="flex gap-2 flex-wrap">
+                    <Button 
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        const filtered = getFilteredComments();
+                        const headers = ["Autor", "Mensagem", "Data/Hora"];
+                        const rows = filtered.map(c => [
+                          c.author || "",
+                          c.text || "",
+                          c.createdAt ? new Date(c.createdAt).toLocaleString("pt-BR") : ""
+                        ]);
+                        const csv = [headers.join(","), ...rows.map(r => r.map(c => `"${c}"`).join(","))].join("\n");
+                        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = `comentarios-reais-${webinar?.slug || "webinar"}-${new Date().toISOString().split("T")[0]}.csv`;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                      }}
+                      data-testid="button-download-real-comments"
+                    >
+                      <Download className="h-4 w-4 mr-1" />
+                      Baixar
+                    </Button>
+                    <Button 
+                      size="sm"
+                      variant="destructive"
+                      onClick={async () => {
+                        if (!confirm(`Tem certeza que deseja excluir todos os ${realComments.length} comentários? Esta ação não pode ser desfeita.`)) return;
+                        try {
+                          const token = localStorage.getItem("adminToken");
+                          const res = await fetch(`/api/webinars/${webinar?.id}/real-comments`, {
+                            method: "DELETE",
+                            headers: { Authorization: `Bearer ${token}` }
+                          });
+                          if (res.ok) {
+                            setRealComments([]);
+                            toast({ title: "Comentários excluídos", description: "Todos os comentários reais foram removidos com sucesso." });
+                          } else {
+                            throw new Error("Erro ao excluir");
+                          }
+                        } catch (e) {
+                          toast({ title: "Erro", description: "Não foi possível excluir os comentários.", variant: "destructive" });
+                        }
+                      }}
+                      data-testid="button-clear-real-comments"
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Limpar Todos
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Quick Date Filters */}
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant={dateFilterType === 'all' ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => handleDateFilterChange('all')}
+                    data-testid="button-filter-all"
+                  >
+                    Todos
+                  </Button>
+                  <Button
+                    variant={dateFilterType === 'today' ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => handleDateFilterChange('today')}
+                    data-testid="button-filter-today"
+                  >
+                    Hoje
+                  </Button>
+                  <Button
+                    variant={dateFilterType === 'yesterday' ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => handleDateFilterChange('yesterday')}
+                    data-testid="button-filter-yesterday"
+                  >
+                    Ontem
+                  </Button>
+                  <Button
+                    variant={dateFilterType === 'week' ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => handleDateFilterChange('week')}
+                    data-testid="button-filter-week"
+                  >
+                    Últimos 7 dias
+                  </Button>
+                  <Button
+                    variant={dateFilterType === 'month' ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => handleDateFilterChange('month')}
+                    data-testid="button-filter-month"
+                  >
+                    Último mês
+                  </Button>
+                  <Popover open={showDatePicker} onOpenChange={setShowDatePicker}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant={dateFilterType === 'custom' ? "default" : "outline"}
+                        size="sm"
+                        data-testid="button-filter-custom"
+                      >
+                        <CalendarIcon className="h-4 w-4 mr-1" />
+                        Personalizado
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-4" align="start">
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label className="text-sm">Data inicial</Label>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button variant="outline" className="w-full justify-start text-left font-normal">
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {customDateFrom ? customDateFrom.toLocaleDateString('pt-BR') : 'Selecionar'}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0">
+                              <Calendar
+                                mode="single"
+                                selected={customDateFrom}
+                                onSelect={setCustomDateFrom}
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-sm">Data final</Label>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button variant="outline" className="w-full justify-start text-left font-normal">
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {customDateTo ? customDateTo.toLocaleDateString('pt-BR') : 'Selecionar'}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0">
+                              <Calendar
+                                mode="single"
+                                selected={customDateTo}
+                                onSelect={setCustomDateTo}
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
                         <Button 
-                          size="sm"
-                          variant="outline"
+                          className="w-full" 
                           onClick={() => {
-                            const headers = ["Autor", "Mensagem", "Data/Hora"];
-                            const rows = realComments.map(c => [
-                              c.author || "",
-                              c.text || "",
-                              c.createdAt ? new Date(c.createdAt).toLocaleString("pt-BR") : ""
-                            ]);
-                            const csv = [headers.join(","), ...rows.map(r => r.map(c => `"${c}"`).join(","))].join("\n");
-                            const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-                            const url = URL.createObjectURL(blob);
-                            const a = document.createElement("a");
-                            a.href = url;
-                            a.download = `comentarios-reais-${webinar?.slug || "webinar"}-${new Date().toISOString().split("T")[0]}.csv`;
-                            a.click();
-                            URL.revokeObjectURL(url);
-                          }}
-                          data-testid="button-download-real-comments"
-                        >
-                          <Download className="h-4 w-4 mr-1" />
-                          Baixar
-                        </Button>
-                        <Button 
-                          size="sm"
-                          variant="destructive"
-                          onClick={async () => {
-                            if (!confirm(`Tem certeza que deseja excluir todos os ${realComments.length} comentários? Esta ação não pode ser desfeita.`)) return;
-                            try {
-                              const token = localStorage.getItem("adminToken");
-                              const res = await fetch(`/api/webinars/${webinar?.id}/real-comments`, {
-                                method: "DELETE",
-                                headers: { Authorization: `Bearer ${token}` }
-                              });
-                              if (res.ok) {
-                                setRealComments([]);
-                                toast({ title: "Comentários excluídos", description: "Todos os comentários reais foram removidos com sucesso." });
-                              } else {
-                                throw new Error("Erro ao excluir");
-                              }
-                            } catch (e) {
-                              toast({ title: "Erro", description: "Não foi possível excluir os comentários.", variant: "destructive" });
+                            if (customDateFrom && customDateTo) {
+                              handleDateFilterChange('custom');
+                              setShowDatePicker(false);
+                            } else {
+                              toast({ title: "Selecione ambas as datas", variant: "destructive" });
                             }
                           }}
-                          data-testid="button-clear-real-comments"
+                          data-testid="button-apply-custom-date"
                         >
-                          <Trash2 className="h-4 w-4 mr-1" />
-                          Limpar
+                          Aplicar
                         </Button>
                       </div>
-                    )}
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                {/* Session dates (original filter) */}
+                {sessionDates.length > 0 && (
+                  <div className="pt-2 border-t">
+                    <Label className="text-xs text-muted-foreground mb-2 block">Por sessão:</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {sessionDates.map((date) => (
+                        <Button
+                          key={date}
+                          variant={selectedDate === date ? "secondary" : "ghost"}
+                          size="sm"
+                          onClick={() => setSelectedDate(date)}
+                          data-testid={`button-date-${date}`}
+                          className="text-xs"
+                        >
+                          {new Date(date + 'T00:00:00').toLocaleDateString('pt-BR')}
+                        </Button>
+                      ))}
+                    </div>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    {sessionDates.map((date) => (
-                      <Button
-                        key={date}
-                        variant={selectedDate === date ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setSelectedDate(date)}
-                        data-testid={`button-date-${date}`}
-                      >
-                        {new Date(date + 'T00:00:00').toLocaleDateString('pt-BR')}
-                      </Button>
-                    ))}
+                )}
+              </div>
+
+              {/* Selection Actions */}
+              {getFilteredComments().length > 0 && (
+                <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      checked={getFilteredComments().length > 0 && getFilteredComments().every(c => selectedCommentIds.has(c.id))}
+                      onChange={selectAllFilteredComments}
+                      className="h-4 w-4 rounded"
+                      data-testid="checkbox-select-all-comments"
+                    />
+                    <span className="text-sm text-muted-foreground">
+                      {selectedCommentIds.size > 0 
+                        ? `${selectedCommentIds.size} selecionado(s)` 
+                        : `${getFilteredComments().length} comentário(s)`}
+                    </span>
                   </div>
+                  {selectedCommentIds.size > 0 && (
+                    <Button
+                      size="sm"
+                      onClick={handleApproveToSimulated}
+                      className="bg-green-600 hover:bg-green-700"
+                      data-testid="button-approve-selected"
+                    >
+                      <MessageSquare className="h-4 w-4 mr-1" />
+                      Aprovar para Chat Simulado ({selectedCommentIds.size})
+                    </Button>
+                  )}
                 </div>
               )}
               
-              {realComments.length === 0 ? (
+              {getFilteredComments().length === 0 ? (
                 <div className="p-4 text-center text-muted-foreground">
-                  Nenhum comentário real nesta data
+                  Nenhum comentário real encontrado para este período
                 </div>
               ) : (
                 <ScrollArea className="h-96 border rounded-lg p-3 space-y-2">
-                  {realComments.map((comment) => (
+                  {getFilteredComments().map((comment) => (
                     <div 
                       key={comment.id}
-                      className="p-3 border rounded-lg bg-muted/50 space-y-2"
+                      className={`p-3 border rounded-lg space-y-2 ${selectedCommentIds.has(comment.id) ? 'bg-primary/10 border-primary/30' : 'bg-muted/50'}`}
                       data-testid={`real-comment-${comment.id}`}
                     >
                       <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium">{comment.author}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {new Date(comment.createdAt || '').toLocaleTimeString('pt-BR')}
-                          </p>
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="checkbox"
+                            checked={selectedCommentIds.has(comment.id)}
+                            onChange={() => toggleCommentSelection(comment.id)}
+                            className="h-4 w-4 rounded"
+                            data-testid={`checkbox-comment-${comment.id}`}
+                          />
+                          <div>
+                            <p className="text-sm font-medium">{comment.author}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(comment.createdAt || '').toLocaleDateString('pt-BR')} às {new Date(comment.createdAt || '').toLocaleTimeString('pt-BR')}
+                            </p>
+                          </div>
                         </div>
                       </div>
-                      <p className="text-sm text-foreground break-words">{comment.text}</p>
-                      <div className="flex gap-2">
+                      <p className="text-sm text-foreground break-words pl-7">{comment.text}</p>
+                      <div className="flex gap-2 pl-7">
                         <Button
                           size="sm"
                           onClick={() => handleReleaseComment(comment.id)}
