@@ -216,6 +216,7 @@ interface Webinar {
   videoDuration: number;
   startHour: number;
   startMinute: number;
+  timezone: string;
   recurrence: string;
   countdownText: string;
   nextWebinarText: string;
@@ -344,6 +345,7 @@ export default function AdminWebinarDetailPage() {
     videoDuration: 3600,
     startHour: 18,
     startMinute: 0,
+    timezone: "America/Sao_Paulo",
     recurrence: "daily",
     countdownText: "O webinário começa em:",
     nextWebinarText: "Próximo webinário em:",
@@ -539,6 +541,7 @@ export default function AdminWebinarDetailPage() {
         videoDuration: data.videoDuration || 3600,
         startHour: data.startHour ?? 18,
         startMinute: data.startMinute ?? 0,
+        timezone: data.timezone || "America/Sao_Paulo",
         recurrence: data.recurrence || "daily",
         countdownText: data.countdownText || "O webinário começa em:",
         nextWebinarText: data.nextWebinarText || "Próximo webinário em:",
@@ -1561,7 +1564,7 @@ export default function AdminWebinarDetailPage() {
 
               <Separator />
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="space-y-2">
                   <Label>Hora de Início</Label>
                   <Input
@@ -1583,6 +1586,33 @@ export default function AdminWebinarDetailPage() {
                     onChange={(e) => setFormData({ ...formData, startMinute: parseInt(e.target.value) || 0 })}
                     data-testid="input-start-minute"
                   />
+                </div>
+                <div className="space-y-2">
+                  <Label>Fuso Horário</Label>
+                  <Select 
+                    value={formData.timezone || "America/Sao_Paulo"} 
+                    onValueChange={(v) => setFormData({ ...formData, timezone: v })}
+                  >
+                    <SelectTrigger data-testid="select-timezone">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="America/Sao_Paulo">São Paulo (GMT-3)</SelectItem>
+                      <SelectItem value="America/Manaus">Manaus (GMT-4)</SelectItem>
+                      <SelectItem value="America/Cuiaba">Cuiabá (GMT-4)</SelectItem>
+                      <SelectItem value="America/Rio_Branco">Rio Branco (GMT-5)</SelectItem>
+                      <SelectItem value="America/Noronha">Fernando de Noronha (GMT-2)</SelectItem>
+                      <SelectItem value="America/New_York">New York (EST)</SelectItem>
+                      <SelectItem value="America/Los_Angeles">Los Angeles (PST)</SelectItem>
+                      <SelectItem value="Europe/Lisbon">Lisboa (WET)</SelectItem>
+                      <SelectItem value="Europe/London">Londres (GMT)</SelectItem>
+                      <SelectItem value="Europe/Paris">Paris (CET)</SelectItem>
+                      <SelectItem value="UTC">UTC</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    O horário será calculado neste fuso
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label>Frequência</Label>

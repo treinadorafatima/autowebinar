@@ -1,4 +1,4 @@
-import { toZonedTime, format } from 'date-fns-tz';
+import { toZonedTime, format, fromZonedTime } from 'date-fns-tz';
 
 export const TIMEZONES = [
   { value: "America/Sao_Paulo", label: "Brasil (São Paulo) - GMT-3" },
@@ -8,6 +8,7 @@ export const TIMEZONES = [
   { value: "America/Belem", label: "Brasil (Belém) - GMT-3" },
   { value: "America/Cuiaba", label: "Brasil (Cuiabá) - GMT-4" },
   { value: "America/Rio_Branco", label: "Brasil (Rio Branco) - GMT-5" },
+  { value: "America/Noronha", label: "Brasil (Fernando de Noronha) - GMT-2" },
   { value: "America/New_York", label: "EUA (Nova York) - GMT-5" },
   { value: "America/Los_Angeles", label: "EUA (Los Angeles) - GMT-8" },
   { value: "America/Chicago", label: "EUA (Chicago) - GMT-6" },
@@ -39,49 +40,42 @@ export function getNowInTimezone(timezone: string): Date {
   return toZonedTime(now, timezone);
 }
 
-export function getWebinarStartTimeToday(
-  startHour: number,
-  startMinute: number,
-  timezone: string
-): Date {
-  const nowInTz = toZonedTime(new Date(), timezone);
-  const todayStart = new Date(nowInTz);
-  todayStart.setHours(startHour, startMinute, 0, 0);
-  return todayStart;
-}
-
 export function calculateWebinarStatusWithTimezone(
   startHour: number,
   startMinute: number,
   videoDuration: number,
   timezone: string
 ): { status: "waiting" | "live" | "ended"; currentTime: number; countdown: string } {
-  const nowInTz = toZonedTime(new Date(), timezone);
+  const nowUtc = new Date();
+  const nowInTz = toZonedTime(nowUtc, timezone);
   
-  const todayStart = new Date(nowInTz);
-  todayStart.setHours(startHour, startMinute, 0, 0);
+  const year = nowInTz.getFullYear();
+  const month = nowInTz.getMonth();
+  const day = nowInTz.getDate();
   
-  const todayEnd = new Date(todayStart.getTime() + videoDuration * 1000);
+  const todayStartInTz = new Date(year, month, day, startHour, startMinute, 0, 0);
+  const todayStartUtc = fromZonedTime(todayStartInTz, timezone);
+  const todayEndUtc = new Date(todayStartUtc.getTime() + videoDuration * 1000);
   
   let status: "waiting" | "live" | "ended" = "waiting";
   let currentTime = 0;
   let countdown = "00:00:00";
   
-  if (nowInTz >= todayStart && nowInTz < todayEnd) {
+  if (nowUtc >= todayStartUtc && nowUtc < todayEndUtc) {
     status = "live";
-    currentTime = Math.floor((nowInTz.getTime() - todayStart.getTime()) / 1000);
+    currentTime = Math.floor((nowUtc.getTime() - todayStartUtc.getTime()) / 1000);
     
-    const remainingMs = todayEnd.getTime() - nowInTz.getTime();
+    const remainingMs = todayEndUtc.getTime() - nowUtc.getTime();
     const remainingSecs = Math.max(0, Math.floor(remainingMs / 1000));
     const rh = Math.floor(remainingSecs / 3600);
     const rm = Math.floor((remainingSecs % 3600) / 60);
     const rs = remainingSecs % 60;
     countdown = `${rh}:${rm.toString().padStart(2, "0")}:${rs.toString().padStart(2, "0")}`;
-  } else if (nowInTz >= todayEnd) {
+  } else if (nowUtc >= todayEndUtc) {
     status = "ended";
-    const tomorrowStart = new Date(todayStart);
-    tomorrowStart.setDate(tomorrowStart.getDate() + 1);
-    const diff = tomorrowStart.getTime() - nowInTz.getTime();
+    const tomorrowStartInTz = new Date(year, month, day + 1, startHour, startMinute, 0, 0);
+    const tomorrowStartUtc = fromZonedTime(tomorrowStartInTz, timezone);
+    const diff = tomorrowStartUtc.getTime() - nowUtc.getTime();
     const secs = Math.floor(diff / 1000);
     const h = Math.floor(secs / 3600);
     const m = Math.floor((secs % 3600) / 60);
@@ -89,7 +83,7 @@ export function calculateWebinarStatusWithTimezone(
     countdown = `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
   } else {
     status = "waiting";
-    const diff = todayStart.getTime() - nowInTz.getTime();
+    const diff = todayStartUtc.getTime() - nowUtc.getTime();
     const secs = Math.floor(diff / 1000);
     const h = Math.floor(secs / 3600);
     const m = Math.floor((secs % 3600) / 60);

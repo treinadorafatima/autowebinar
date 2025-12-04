@@ -569,27 +569,21 @@ export default function WebinarPublicPage() {
       return;
     }
 
-    const now = new Date();
-    const todayStart = new Date();
-    todayStart.setHours(webinar.startHour, webinar.startMinute, 0, 0);
-    
-    const todayEnd = new Date(todayStart.getTime() + webinar.videoDuration * 1000);
-    
-    if (now >= todayStart && now < todayEnd) {
-      // Currently live
+    // Use timezone-aware calculation
+    const timezone = webinar.timezone || "America/Sao_Paulo";
+    const result = calculateWebinarStatusWithTimezone(
+      webinar.startHour,
+      webinar.startMinute,
+      webinar.videoDuration,
+      timezone
+    );
+
+    if (result.status === "live") {
       setStatus("live");
-      const elapsed = Math.floor((now.getTime() - todayStart.getTime()) / 1000);
-      setCurrentTime(elapsed);
-    } else if (now >= todayEnd) {
-      // Today's webinar has ended
+      setCurrentTime(result.currentTime);
+    } else if (result.status === "ended") {
       setStatus("ended");
-      const tomorrowStart = new Date(todayStart);
-      tomorrowStart.setDate(tomorrowStart.getDate() + 1);
-      const diff = tomorrowStart.getTime() - now.getTime();
-      const hours = Math.floor(diff / (1000 * 60 * 60));
-      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-      setCountdown(`${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`);
+      setCountdown(result.countdown);
     } else {
       // Before today's start time - respect showNextCountdown setting
       if (webinar.showNextCountdown) {
@@ -597,11 +591,7 @@ export default function WebinarPublicPage() {
       } else {
         setStatus("ended");
       }
-      const diff = todayStart.getTime() - now.getTime();
-      const hours = Math.floor(diff / (1000 * 60 * 60));
-      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-      setCountdown(`${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`);
+      setCountdown(result.countdown);
     }
   }, [webinar, previewMode]);
 

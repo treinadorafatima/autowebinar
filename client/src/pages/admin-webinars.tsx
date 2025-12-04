@@ -17,6 +17,7 @@ import {
   X,
   Radio
 } from "lucide-react";
+import { calculateWebinarStatusWithTimezone } from "@/lib/timezone";
 
 interface Webinar {
   id: string;
@@ -26,6 +27,7 @@ interface Webinar {
   videoDuration: number;
   startHour: number;
   startMinute: number;
+  timezone: string;
   recurrence: string;
   backgroundColor: string;
   isActive: boolean;
@@ -151,37 +153,24 @@ export default function AdminWebinarsPage() {
   }
 
   function calculateWebinarStatus(webinar: Webinar): WebinarStatus {
-    const now = new Date();
-    const todayStart = new Date();
-    todayStart.setHours(webinar.startHour, webinar.startMinute, 0, 0);
-    const todayEnd = new Date(todayStart.getTime() + webinar.videoDuration * 1000);
+    const timezone = webinar.timezone || "America/Sao_Paulo";
+    const result = calculateWebinarStatusWithTimezone(
+      webinar.startHour,
+      webinar.startMinute,
+      webinar.videoDuration,
+      timezone
+    );
 
-    const isLive = now >= todayStart && now < todayEnd;
-    
+    const isLive = result.status === "live";
     let elapsed = "0:00:00";
-    let remaining = "0:00:00";
+    let remaining = result.countdown;
 
     if (isLive) {
-      const elapsedMs = now.getTime() - todayStart.getTime();
-      const elapsedSecs = Math.floor(elapsedMs / 1000);
+      const elapsedSecs = result.currentTime;
       const h = Math.floor(elapsedSecs / 3600);
       const m = Math.floor((elapsedSecs % 3600) / 60);
       const s = elapsedSecs % 60;
       elapsed = `${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
-
-      const remainingMs = todayEnd.getTime() - now.getTime();
-      const remainingSecs = Math.max(0, Math.floor(remainingMs / 1000));
-      const rh = Math.floor(remainingSecs / 3600);
-      const rm = Math.floor((remainingSecs % 3600) / 60);
-      const rs = remainingSecs % 60;
-      remaining = `${rh}:${rm.toString().padStart(2, "0")}:${rs.toString().padStart(2, "0")}`;
-    } else if (now < todayStart) {
-      const diff = todayStart.getTime() - now.getTime();
-      const secs = Math.floor(diff / 1000);
-      const h = Math.floor(secs / 3600);
-      const m = Math.floor((secs % 3600) / 60);
-      const s = secs % 60;
-      remaining = `${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
     }
 
     return { id: webinar.id, isLive, elapsed, remaining };
