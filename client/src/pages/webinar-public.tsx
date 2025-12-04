@@ -1148,11 +1148,11 @@ export default function WebinarPublicPage() {
       <div 
         ref={containerRef}
         className={isEmbed ? "w-full" : "min-h-screen"} 
-        style={{ backgroundColor: isEmbed ? "transparent" : "#4A8BB5" }}
+        style={{ backgroundColor: isCompact ? "transparent" : "#4A8BB5" }}
       >
         {/* Skeleton loader que simula o layout do vídeo */}
-        <div className={isEmbed ? "" : "container mx-auto py-4 md:py-8"}>
-          <div className={isEmbed ? "" : "mx-auto px-2 md:px-4"} style={{ maxWidth: isEmbed ? "100%" : "960px" }}>
+        <div className={isCompact ? "" : "container mx-auto py-4 md:py-8"}>
+          <div className={isCompact ? "" : "mx-auto px-2 md:px-4"} style={{ maxWidth: isCompact ? "100%" : "960px" }}>
             <div className="relative w-full overflow-hidden rounded-xl" style={{ backgroundColor: "#1a1a2e" }}>
               <div className="aspect-video flex flex-col items-center justify-center">
                 <div className="w-16 h-16 border-4 border-white/20 border-t-white rounded-full animate-spin mb-4" />
@@ -1170,7 +1170,7 @@ export default function WebinarPublicPage() {
       <div 
         ref={containerRef}
         className={isEmbed ? "w-full flex items-center justify-center py-8" : "min-h-screen flex items-center justify-center"} 
-        style={{ backgroundColor: isEmbed ? "transparent" : "#4A8BB5" }}
+        style={{ backgroundColor: isCompact ? "transparent" : "#4A8BB5" }}
       >
         <div className="text-white text-xl">{error || "Webinário não encontrado"}</div>
       </div>
@@ -1182,7 +1182,9 @@ export default function WebinarPublicPage() {
       ref={containerRef}
       className={isEmbed ? "w-full" : "min-h-screen"}
       style={{ 
-        backgroundColor: isEmbed ? "transparent" : (webinar.pageBackgroundColor || "#4A8BB5"),
+        // Página Completa (embed=1): mostra cor de fundo
+        // Só Transmissão (embed=1&compact=1): fundo transparente
+        backgroundColor: isCompact ? "transparent" : (webinar.pageBackgroundColor || "#4A8BB5"),
         overflow: isEmbed ? "hidden" : undefined
       }}
     >
@@ -1263,9 +1265,16 @@ export default function WebinarPublicPage() {
         </DialogContent>
       </Dialog>
 
-      <section className={isEmbed ? "" : (isCompact ? "py-2" : "container mx-auto py-4 md:py-8")}>
-        <div className={isEmbed ? "" : (isCompact ? "px-0" : "mx-auto px-2 md:px-4")} style={{ maxWidth: isEmbed ? "100%" : (isCompact ? "100%" : "960px") }}>
-          {!isCompact && !isEmbed && webinar.pageTitle && (
+      {/* 
+        Layout:
+        - Página Completa (embed=1): container com padding, max-width 960px
+        - Só Transmissão (embed=1&compact=1): sem container/padding, 100% width
+        - Página Normal: container com padding, max-width 960px
+      */}
+      <section className={isCompact ? "" : "container mx-auto py-4 md:py-8"}>
+        <div className={isCompact ? "" : "mx-auto px-2 md:px-4"} style={{ maxWidth: isCompact ? "100%" : "960px" }}>
+          {/* Título: mostra em Página Completa (embed=1), esconde em Só Transmissão (compact=1) */}
+          {!isCompact && webinar.pageTitle && (
             <div className="text-center mb-6">
               <div 
                 className="inline-block px-6 md:px-10 py-4 md:py-6 rounded-2xl"
@@ -1307,8 +1316,8 @@ export default function WebinarPublicPage() {
             </div>
           )}
 
-          <div className={isEmbed ? "" : "mb-8"}>
-            <div className={`relative w-full overflow-hidden ${isEmbed ? "" : "rounded-xl"}`} style={{ backgroundColor: "#000" }}>
+          <div className={isCompact ? "" : "mb-8"}>
+            <div className={`relative w-full overflow-hidden ${isCompact ? "" : "rounded-xl"}`} style={{ backgroundColor: "#000" }}>
               <div className="relative">
                 {status === "waiting" && (
                   <div 
