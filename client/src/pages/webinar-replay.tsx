@@ -80,25 +80,15 @@ export default function WebinarReplayPage() {
   useEffect(() => {
     if (!isEmbed) return;
     
-    // Remove margens do body/html quando em modo embed e esconde overflow
+    // Remove margens do body/html quando em modo embed
     document.body.style.margin = '0';
     document.body.style.padding = '0';
-    document.body.style.overflow = 'hidden';
+    document.body.style.overflow = 'auto';
     document.body.style.background = 'transparent';
-    document.body.style.height = 'auto';
     document.documentElement.style.margin = '0';
     document.documentElement.style.padding = '0';
-    document.documentElement.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'auto';
     document.documentElement.style.background = 'transparent';
-    document.documentElement.style.height = 'auto';
-    
-    // Bloqueia eventos de scroll
-    const preventScroll = (e: Event) => {
-      e.preventDefault();
-    };
-    
-    document.addEventListener('wheel', preventScroll, { passive: false });
-    document.addEventListener('touchmove', preventScroll, { passive: false });
     
     let lastHeight = 0;
     
@@ -142,8 +132,6 @@ export default function WebinarReplayPage() {
       resizeObserver.disconnect();
       mutationObserver.disconnect();
       clearInterval(interval);
-      document.removeEventListener('wheel', preventScroll);
-      document.removeEventListener('touchmove', preventScroll);
     };
   }, [isEmbed]);
 
@@ -343,8 +331,7 @@ export default function WebinarReplayPage() {
       ref={containerRef}
       className={isEmbed ? "w-full" : "min-h-screen"} 
       style={{ 
-        backgroundColor: bgColor,
-        overflow: isEmbed ? "hidden" : undefined
+        backgroundColor: bgColor
       }}
     >
       <section className={isEmbed ? "py-4" : "container mx-auto py-3 md:py-16"}>
