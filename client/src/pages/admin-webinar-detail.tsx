@@ -665,6 +665,7 @@ export default function AdminWebinarDetailPage() {
       await fetchLeads(data.id);
       await fetchEmbedCode(data.slug);
       await fetchTranscription(data.id);
+      await fetchLeadFormConfig(data.id);
       if (data.uploadedVideoId) {
         await checkHlsStatus(data.uploadedVideoId);
       }
@@ -673,6 +674,42 @@ export default function AdminWebinarDetailPage() {
       setLocation("/admin/webinars");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function fetchLeadFormConfig(webinarId: string) {
+    try {
+      const res = await fetch(`/api/webinars/${webinarId}/lead-form-config`);
+      if (res.ok) {
+        const config = await res.json();
+        setLeadsCollectEmail(config.collectEmail !== false);
+        setLeadsCollectWhatsapp(config.collectWhatsapp !== false);
+        setFormData((prev: any) => ({
+          ...prev,
+          leadFormTitle: config.title || "Inscreva-se no Webinário",
+          leadFormSubtitle: config.subtitle || "",
+          leadFormButtonText: config.buttonText || "Quero Participar",
+          leadFormSuccessMessage: config.successMessage || "Inscrição realizada com sucesso!",
+          leadFormConsentText: config.consentText || "Concordo em receber comunicações sobre este webinário",
+          leadFormRedirectUrl: config.redirectUrl || "",
+          leadFormBgColor: config.backgroundColor || "#1a1a2e",
+          leadFormCardColor: config.cardBackgroundColor || "#16213e",
+          leadFormButtonColor: config.buttonColor || "#22c55e",
+          leadFormButtonTextColor: config.buttonTextColor || "#ffffff",
+          leadFormTextColor: config.textColor || "#ffffff",
+          leadFormInputColor: config.inputBackgroundColor || "#0f0f23",
+          leadFormInputBorderColor: config.inputBorderColor || "#374151",
+          leadFormLabelColor: config.labelColor || "#9ca3af",
+          leadFormFontFamily: config.fontFamily || "Inter, system-ui, sans-serif",
+          leadFormBorderRadius: config.borderRadius || "8",
+          leadFormCollectCity: config.collectCity || false,
+          leadFormCollectState: config.collectState || false,
+          leadFormRequireConsent: config.requireConsent !== false,
+          leadFormShowNextSession: config.showNextSession !== false,
+        }));
+      }
+    } catch (error) {
+      console.error("Erro ao carregar config do formulário:", error);
     }
   }
 

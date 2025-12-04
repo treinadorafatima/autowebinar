@@ -5439,14 +5439,15 @@ Seja conversacional e objetivo.`;
       const existingConfig = await storage.getLeadFormConfigByWebinar(req.params.id);
       
       if (existingConfig) {
-        await storage.updateLeadFormConfig(existingConfig.id, req.body);
-        res.json({ success: true, message: "Configuração atualizada" });
+        await storage.updateLeadFormConfig(req.params.id, req.body);
+        const updated = await storage.getLeadFormConfigByWebinar(req.params.id);
+        res.json({ success: true, message: "Configuração atualizada", config: updated });
       } else {
-        await storage.createLeadFormConfig({
+        const created = await storage.createLeadFormConfig({
           webinarId: req.params.id,
           ...req.body,
         });
-        res.json({ success: true, message: "Configuração criada" });
+        res.json({ success: true, message: "Configuração criada", config: created });
       }
     } catch (error: any) {
       res.status(400).json({ error: error.message });
