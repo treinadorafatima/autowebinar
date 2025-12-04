@@ -672,18 +672,19 @@ export default function WebinarPublicPage() {
     hlsInitializingRef.current = true;
     const video = videoRef.current;
     
-    // Calculate elapsed time directly here to ensure accuracy
+    // Calculate elapsed time using timezone-aware calculation
     const calculateElapsedTime = (): number => {
       if (!webinar) return 0;
       
-      const now = new Date();
-      const todayStart = new Date();
-      todayStart.setHours(webinar.startHour, webinar.startMinute, 0, 0);
+      const timezone = webinar.timezone || "America/Sao_Paulo";
+      const result = calculateWebinarStatusWithTimezone(
+        webinar.startHour,
+        webinar.startMinute,
+        webinar.videoDuration,
+        timezone
+      );
       
-      if (now >= todayStart) {
-        return Math.floor((now.getTime() - todayStart.getTime()) / 1000);
-      }
-      return 0;
+      return result.currentTime;
     };
     
     const elapsedSeconds = calculateElapsedTime();
