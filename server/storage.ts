@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type WebinarConfig, type WebinarConfigInsert, type Admin, type AdminInsert, type UploadedVideo, type UploadedVideoInsert, type Comment, type CommentInsert, type Webinar, type WebinarInsert, type Setting, type SettingInsert, type ViewerSession, type WebinarScript, type WebinarScriptInsert, type AiConfig, type AiConfigInsert, type AiMemory, type AiMemoryInsert, type CheckoutPlano, type CheckoutPlanoInsert, type CheckoutPagamento, type CheckoutPagamentoInsert, type CheckoutConfig, type CheckoutConfigInsert, type CheckoutAssinatura, type CheckoutAssinaturaInsert, type AiChat, type AiChatInsert, type AiMessageChat, type AiMessageChatInsert, type VideoTranscription, type VideoTranscriptionInsert, type AdminEmailCredential, type AdminEmailCredentialInsert, type EmailSequence, type EmailSequenceInsert, type ScheduledEmail, type ScheduledEmailInsert, type LeadFormConfig, type LeadFormConfigInsert, type WhatsappSession, type WhatsappSessionInsert, type WhatsappSequence, type WhatsappSequenceInsert, type ScheduledWhatsappMessage, type ScheduledWhatsappMessageInsert, type MediaFile, type MediaFileInsert, admins, webinarConfigs, users, uploadedVideos, comments, webinars as webinarsTable, settings, viewerSessions, webinarScripts, aiConfigs, aiMemories, checkoutPlanos, checkoutPagamentos, checkoutConfigs, checkoutAssinaturas, aiChats, aiMessageChats, videoTranscriptions, adminEmailCredentials, emailSequences, scheduledEmails, leadFormConfigs, whatsappSessions, whatsappSequences, scheduledWhatsappMessages, mediaFiles, webinarViewLogs } from "@shared/schema";
+import { type User, type InsertUser, type WebinarConfig, type WebinarConfigInsert, type Admin, type AdminInsert, type UploadedVideo, type UploadedVideoInsert, type Comment, type CommentInsert, type Webinar, type WebinarInsert, type Setting, type SettingInsert, type ViewerSession, type WebinarScript, type WebinarScriptInsert, type AiConfig, type AiConfigInsert, type AiMemory, type AiMemoryInsert, type CheckoutPlano, type CheckoutPlanoInsert, type CheckoutPagamento, type CheckoutPagamentoInsert, type CheckoutConfig, type CheckoutConfigInsert, type CheckoutAssinatura, type CheckoutAssinaturaInsert, type AiChat, type AiChatInsert, type AiMessageChat, type AiMessageChatInsert, type VideoTranscription, type VideoTranscriptionInsert, type AdminEmailCredential, type AdminEmailCredentialInsert, type EmailSequence, type EmailSequenceInsert, type ScheduledEmail, type ScheduledEmailInsert, type LeadFormConfig, type LeadFormConfigInsert, type WhatsappSession, type WhatsappSessionInsert, type WhatsappSequence, type WhatsappSequenceInsert, type ScheduledWhatsappMessage, type ScheduledWhatsappMessageInsert, type MediaFile, type MediaFileInsert, admins, webinarConfigs, users, uploadedVideos, comments, webinars as webinarsTable, settings, viewerSessions, webinarScripts, aiConfigs, aiMemories, checkoutPlanos, checkoutPagamentos, checkoutConfigs, checkoutAssinaturas, aiChats, aiMessageChats, videoTranscriptions, adminEmailCredentials, emailSequences, scheduledEmails, leadFormConfigs, whatsappSessions, whatsappSequences, scheduledWhatsappMessages, mediaFiles, webinarViewLogs, leads } from "@shared/schema";
 import * as crypto from "crypto";
 import { randomUUID } from "crypto";
 import { db } from "./db";
@@ -269,6 +269,10 @@ export interface IStorage {
   countViewsByOwnerAndRange(ownerId: string, from: Date, to: Date): Promise<number>;
   resetWebinarViewsByOwner(ownerId: string): Promise<void>;
   getViewsByOwnerGroupedByDay(ownerId: string, from: Date, to: Date): Promise<{ date: string; count: number }[]>;
+  // Stats - Estatísticas do admin
+  countLeadsByOwner(ownerId: string): Promise<number>;
+  countEmailsByOwner(ownerId: string): Promise<number>;
+  countWhatsappMessagesByOwner(ownerId: string): Promise<number>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3298,6 +3302,35 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
     await db.update(webinarsTable)
       .set({ views: 0 })
       .where(eq(webinarsTable.ownerId, ownerId));
+  }
+
+  async countLeadsByOwner(ownerId: string): Promise<number> {
+    const ownerWebinars = await db.select({ id: webinarsTable.id })
+      .from(webinarsTable)
+      .where(eq(webinarsTable.ownerId, ownerId));
+    
+    if (ownerWebinars.length === 0) return 0;
+    
+    const webinarIds = ownerWebinars.map(w => w.id);
+    const result = await db.select({ count: sql<number>`count(*)` })
+      .from(leads)
+      .where(sql`${leads.webinarId} = ANY(ARRAY[${sql.join(webinarIds.map(id => sql`${id}`), sql`, `)}]::text[])`);
+    
+    return Number(result[0]?.count || 0);
+  }
+
+  async countEmailsByOwner(ownerId: string): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)` })
+      .from(scheduledEmails)
+      .where(eq(scheduledEmails.adminId, ownerId));
+    return Number(result[0]?.count || 0);
+  }
+
+  async countWhatsappMessagesByOwner(ownerId: string): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)` })
+      .from(scheduledWhatsappMessages)
+      .where(eq(scheduledWhatsappMessages.adminId, ownerId));
+    return Number(result[0]?.count || 0);
   }
 }
 

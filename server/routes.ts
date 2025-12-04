@@ -5862,6 +5862,36 @@ Seja conversacional e objetivo.`;
     }
   });
 
+  // Get admin stats (leads, emails, whatsapp messages)
+  app.get("/api/admin/stats", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin) {
+        return res.status(404).json({ error: "Admin not found" });
+      }
+
+      const [leadsCount, emailsCount, whatsappCount] = await Promise.all([
+        storage.countLeadsByOwner(admin.id),
+        storage.countEmailsByOwner(admin.id),
+        storage.countWhatsappMessagesByOwner(admin.id)
+      ]);
+
+      res.json({
+        leads: leadsCount,
+        emails: emailsCount,
+        whatsappMessages: whatsappCount
+      });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
   // ========== ACCOUNT DOMAIN API ==========
   
   // Get account info by domain

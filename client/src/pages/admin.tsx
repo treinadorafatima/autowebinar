@@ -39,7 +39,10 @@ import {
   FileVideo,
   User,
   CalendarIcon,
-  Eye
+  Eye,
+  Users,
+  Mail,
+  MessageSquare
 } from "lucide-react";
 
 interface UploadedVideo {
@@ -119,6 +122,7 @@ export default function AdminPage() {
   const [viewsData, setViewsData] = useState<ViewsData | null>(null);
   const [viewsLoading, setViewsLoading] = useState(false);
   const [resettingViews, setResettingViews] = useState(false);
+  const [stats, setStats] = useState({ leads: 0, emails: 0, whatsappMessages: 0 });
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
@@ -131,7 +135,23 @@ export default function AdminPage() {
     }
     fetchData();
     fetchProfile();
+    fetchStats();
   }, []);
+
+  async function fetchStats() {
+    if (!token) return;
+    try {
+      const res = await fetch("/api/admin/stats", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setStats(data);
+      }
+    } catch (error) {
+      console.error("Erro ao carregar estatísticas:", error);
+    }
+  }
 
   async function fetchProfile() {
     try {
@@ -534,10 +554,13 @@ export default function AdminPage() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
         <StatCard icon={Play} value={webinars.length} label="Webinários Ativos" color="blue" />
         <StatCard icon={FileVideo} value={videos.length} label="Vídeos na Biblioteca" color="purple" />
         <StatCard icon={BarChart3} value={totalViews.toLocaleString()} label="Visualizações Totais" color="orange" />
+        <StatCard icon={Users} value={stats.leads.toLocaleString()} label="Leads Capturados" color="blue" />
+        <StatCard icon={Mail} value={stats.emails.toLocaleString()} label="Emails Criados" color="purple" />
+        <StatCard icon={MessageSquare} value={stats.whatsappMessages.toLocaleString()} label="Mensagens WhatsApp" color="orange" />
       </div>
 
       {/* View History Card */}
