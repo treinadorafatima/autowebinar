@@ -984,6 +984,10 @@ export default function LandingPage() {
                           <Play className="w-5 h-5 text-purple-400 flex-shrink-0" />
                           <span>Replay automático</span>
                         </div>
+                        <div className="flex items-center gap-2 text-slate-200">
+                          <Clock className="w-5 h-5 text-amber-400 flex-shrink-0" />
+                          <span>Ofertas cronometradas</span>
+                        </div>
                         
                         {/* Automation Features Highlight */}
                         <div className="pt-2 pb-1">
