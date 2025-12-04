@@ -581,6 +581,8 @@ export default function WebinarPublicPage() {
     if (result.status === "live") {
       setStatus("live");
       setCurrentTime(result.currentTime);
+      // Update ref immediately to avoid race condition with video loading
+      scheduledTimeRef.current = result.currentTime;
     } else if (result.status === "ended") {
       setStatus("ended");
       setCountdown(result.countdown);
@@ -595,16 +597,16 @@ export default function WebinarPublicPage() {
     }
   }, [webinar, previewMode]);
 
+  // Ref to store the current scheduled time for video initialization
+  const scheduledTimeRef = useRef<number>(0);
+
   useEffect(() => {
     calculateStatus();
     const interval = setInterval(calculateStatus, 1000);
     return () => clearInterval(interval);
   }, [calculateStatus]);
-
-  // Ref to store the current scheduled time for video initialization
-  const scheduledTimeRef = useRef<number>(0);
   
-  // Update scheduledTimeRef whenever currentTime changes
+  // Also sync scheduledTimeRef via effect as backup
   useEffect(() => {
     scheduledTimeRef.current = currentTime;
   }, [currentTime]);
@@ -780,11 +782,20 @@ export default function WebinarPublicPage() {
 
   // Handle video can play - seek to correct position
   const handleVideoCanPlay = useCallback(() => {
-    if (videoRef.current && !videoInitializedRef.current && status === "live") {
+    if (videoRef.current && !videoInitializedRef.current && status === "live" && webinar) {
       const video = videoRef.current;
-      const targetTime = Math.min(scheduledTimeRef.current, video.duration - 1);
       
-      console.log(`Video ready, seeking to ${targetTime}s`);
+      // Calculate elapsed time directly using timezone-aware calculation
+      const timezone = webinar.timezone || "America/Sao_Paulo";
+      const result = calculateWebinarStatusWithTimezone(
+        webinar.startHour,
+        webinar.startMinute,
+        webinar.videoDuration,
+        timezone
+      );
+      const targetTime = Math.min(result.currentTime, video.duration - 1);
+      
+      console.log(`Video ready, seeking to ${targetTime}s (timezone: ${timezone})`);
       videoInitializedRef.current = true;
       
       // Seek after video is ready to play
@@ -793,7 +804,7 @@ export default function WebinarPublicPage() {
         console.log("Play failed:", err.message);
       });
     }
-  }, [status]);
+  }, [status, webinar]);
 
   // Handle video metadata loaded
   const handleVideoLoadedMetadata = useCallback(() => {
