@@ -17,7 +17,8 @@ import {
   Package,
   TrendingUp,
   Shield,
-  Zap
+  Zap,
+  UserCheck
 } from "lucide-react";
 import { SiWhatsapp } from "react-icons/si";
 import logoUrl from "@assets/logo-autowebinar-preto.png";
@@ -81,6 +82,12 @@ const mainMenuItems = [
     title: "WhatsApp Marketing",
     url: "/admin/whatsapp-marketing",
     icon: SiWhatsapp,
+    superadminOnly: false,
+  },
+  {
+    title: "Leads",
+    url: "/admin/leads",
+    icon: UserCheck,
     superadminOnly: false,
   },
 ];

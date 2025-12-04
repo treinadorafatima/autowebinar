@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type WebinarConfig, type WebinarConfigInsert, type Admin, type AdminInsert, type UploadedVideo, type UploadedVideoInsert, type Comment, type CommentInsert, type Webinar, type WebinarInsert, type Setting, type SettingInsert, type ViewerSession, type WebinarScript, type WebinarScriptInsert, type AiConfig, type AiConfigInsert, type AiMemory, type AiMemoryInsert, type CheckoutPlano, type CheckoutPlanoInsert, type CheckoutPagamento, type CheckoutPagamentoInsert, type CheckoutConfig, type CheckoutConfigInsert, type CheckoutAssinatura, type CheckoutAssinaturaInsert, type AiChat, type AiChatInsert, type AiMessageChat, type AiMessageChatInsert, type VideoTranscription, type VideoTranscriptionInsert, type AdminEmailCredential, type AdminEmailCredentialInsert, type EmailSequence, type EmailSequenceInsert, type ScheduledEmail, type ScheduledEmailInsert, type LeadFormConfig, type LeadFormConfigInsert, type WhatsappSession, type WhatsappSessionInsert, type WhatsappSequence, type WhatsappSequenceInsert, type ScheduledWhatsappMessage, type ScheduledWhatsappMessageInsert, type MediaFile, type MediaFileInsert, admins, webinarConfigs, users, uploadedVideos, comments, webinars as webinarsTable, settings, viewerSessions, webinarScripts, aiConfigs, aiMemories, checkoutPlanos, checkoutPagamentos, checkoutConfigs, checkoutAssinaturas, aiChats, aiMessageChats, videoTranscriptions, adminEmailCredentials, emailSequences, scheduledEmails, leadFormConfigs, whatsappSessions, whatsappSequences, scheduledWhatsappMessages, mediaFiles, webinarViewLogs, leads } from "@shared/schema";
+import { type User, type InsertUser, type WebinarConfig, type WebinarConfigInsert, type Admin, type AdminInsert, type UploadedVideo, type UploadedVideoInsert, type Comment, type CommentInsert, type Webinar, type WebinarInsert, type Setting, type SettingInsert, type ViewerSession, type WebinarScript, type WebinarScriptInsert, type AiConfig, type AiConfigInsert, type AiMemory, type AiMemoryInsert, type CheckoutPlano, type CheckoutPlanoInsert, type CheckoutPagamento, type CheckoutPagamentoInsert, type CheckoutConfig, type CheckoutConfigInsert, type CheckoutAssinatura, type CheckoutAssinaturaInsert, type AiChat, type AiChatInsert, type AiMessageChat, type AiMessageChatInsert, type VideoTranscription, type VideoTranscriptionInsert, type AdminEmailCredential, type AdminEmailCredentialInsert, type EmailSequence, type EmailSequenceInsert, type ScheduledEmail, type ScheduledEmailInsert, type LeadFormConfig, type LeadFormConfigInsert, type WhatsappSession, type WhatsappSessionInsert, type WhatsappSequence, type WhatsappSequenceInsert, type ScheduledWhatsappMessage, type ScheduledWhatsappMessageInsert, type MediaFile, type MediaFileInsert, type LeadMessage, type LeadMessageInsert, type Lead, admins, webinarConfigs, users, uploadedVideos, comments, webinars as webinarsTable, settings, viewerSessions, webinarScripts, aiConfigs, aiMemories, checkoutPlanos, checkoutPagamentos, checkoutConfigs, checkoutAssinaturas, aiChats, aiMessageChats, videoTranscriptions, adminEmailCredentials, emailSequences, scheduledEmails, leadFormConfigs, whatsappSessions, whatsappSequences, scheduledWhatsappMessages, mediaFiles, webinarViewLogs, leads, leadMessages } from "@shared/schema";
 import * as crypto from "crypto";
 import { randomUUID } from "crypto";
 import { db } from "./db";
@@ -273,6 +273,19 @@ export interface IStorage {
   countLeadsByOwner(ownerId: string): Promise<number>;
   countEmailsByOwner(ownerId: string): Promise<number>;
   countWhatsappMessagesByOwner(ownerId: string): Promise<number>;
+  // Leads Management
+  listLeadsByAdmin(adminId: string): Promise<Lead[]>;
+  listLeadsByWebinar(webinarId: string): Promise<Lead[]>;
+  getLeadById(id: string): Promise<Lead | undefined>;
+  getLeadByEmail(email: string, webinarId: string): Promise<Lead | undefined>;
+  // Lead Messages Tracking
+  createLeadMessage(data: LeadMessageInsert): Promise<LeadMessage>;
+  updateLeadMessage(id: string, data: Partial<LeadMessageInsert>): Promise<LeadMessage | undefined>;
+  listLeadMessagesByLead(leadId: string): Promise<LeadMessage[]>;
+  listLeadMessagesByAdmin(adminId: string): Promise<LeadMessage[]>;
+  getLeadMessageByTrackingId(trackingId: string): Promise<LeadMessage | undefined>;
+  markMessageAsOpened(trackingId: string): Promise<void>;
+  markMessageAsClicked(trackingId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3331,6 +3344,95 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
       .from(scheduledWhatsappMessages)
       .where(eq(scheduledWhatsappMessages.adminId, ownerId));
     return Number(result[0]?.count || 0);
+  }
+
+  // Leads Management
+  async listLeadsByAdmin(adminId: string): Promise<Lead[]> {
+    const ownerWebinars = await db.select({ id: webinarsTable.id })
+      .from(webinarsTable)
+      .where(eq(webinarsTable.ownerId, adminId));
+    
+    if (ownerWebinars.length === 0) return [];
+    
+    const webinarIds = ownerWebinars.map(w => w.id);
+    return db.select()
+      .from(leads)
+      .where(sql`${leads.webinarId} = ANY(ARRAY[${sql.join(webinarIds.map(id => sql`${id}`), sql`, `)}]::text[])`)
+      .orderBy(desc(leads.capturedAt));
+  }
+
+  async listLeadsByWebinar(webinarId: string): Promise<Lead[]> {
+    return db.select()
+      .from(leads)
+      .where(eq(leads.webinarId, webinarId))
+      .orderBy(desc(leads.capturedAt));
+  }
+
+  async getLeadById(id: string): Promise<Lead | undefined> {
+    const result = await db.select().from(leads).where(eq(leads.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getLeadByEmail(email: string, webinarId: string): Promise<Lead | undefined> {
+    const result = await db.select()
+      .from(leads)
+      .where(and(eq(leads.email, email), eq(leads.webinarId, webinarId)))
+      .limit(1);
+    return result[0];
+  }
+
+  // Lead Messages Tracking
+  async createLeadMessage(data: LeadMessageInsert): Promise<LeadMessage> {
+    const id = randomUUID();
+    const trackingId = randomUUID();
+    const message = { ...data, id, trackingId };
+    await db.insert(leadMessages).values(message);
+    return { ...message, sentAt: new Date(), deliveredAt: null, openedAt: null, clickedAt: null } as LeadMessage;
+  }
+
+  async updateLeadMessage(id: string, data: Partial<LeadMessageInsert>): Promise<LeadMessage | undefined> {
+    const result = await db.update(leadMessages)
+      .set(data)
+      .where(eq(leadMessages.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async listLeadMessagesByLead(leadId: string): Promise<LeadMessage[]> {
+    return db.select()
+      .from(leadMessages)
+      .where(eq(leadMessages.leadId, leadId))
+      .orderBy(desc(leadMessages.sentAt));
+  }
+
+  async listLeadMessagesByAdmin(adminId: string): Promise<LeadMessage[]> {
+    return db.select()
+      .from(leadMessages)
+      .where(eq(leadMessages.adminId, adminId))
+      .orderBy(desc(leadMessages.sentAt));
+  }
+
+  async getLeadMessageByTrackingId(trackingId: string): Promise<LeadMessage | undefined> {
+    const result = await db.select()
+      .from(leadMessages)
+      .where(eq(leadMessages.trackingId, trackingId))
+      .limit(1);
+    return result[0];
+  }
+
+  async markMessageAsOpened(trackingId: string): Promise<void> {
+    await db.update(leadMessages)
+      .set({ status: 'opened', openedAt: new Date() })
+      .where(and(
+        eq(leadMessages.trackingId, trackingId),
+        isNull(leadMessages.openedAt)
+      ));
+  }
+
+  async markMessageAsClicked(trackingId: string): Promise<void> {
+    await db.update(leadMessages)
+      .set({ status: 'clicked', clickedAt: new Date() })
+      .where(eq(leadMessages.trackingId, trackingId));
   }
 }
 

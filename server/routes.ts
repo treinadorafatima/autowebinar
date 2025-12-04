@@ -8046,6 +8046,166 @@ Seja conversacional e objetivo.`;
     }
   });
 
+  // ============================
+  // LEADS MANAGEMENT ROUTES
+  // ============================
+  
+  // List all leads for the admin
+  app.get("/api/admin/leads", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.replace("Bearer ", "");
+      if (!token) return res.status(401).json({ error: "Token não fornecido" });
+      
+      const email = await validateSession(token);
+      if (!email) return res.status(401).json({ error: "Sessão inválida" });
+      
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin) return res.status(404).json({ error: "Admin não encontrado" });
+
+      // Get all leads for admin's webinars
+      const leads = await storage.listLeadsByAdmin(admin.id);
+      
+      // Get webinar names for display
+      const webinars = await storage.listWebinarsByOwner(admin.id);
+      const webinarMap = new Map(webinars.map(w => [w.id, w.name]));
+      
+      // Get message counts for each lead
+      const leadsWithStats = await Promise.all(leads.map(async (lead) => {
+        const messages = await storage.listLeadMessagesByLead(lead.id);
+        const emailMessages = messages.filter(m => m.channel === 'email');
+        const whatsappMessages = messages.filter(m => m.channel === 'whatsapp');
+        
+        return {
+          ...lead,
+          webinarName: webinarMap.get(lead.webinarId) || 'Webinar não encontrado',
+          stats: {
+            emailsSent: emailMessages.length,
+            emailsOpened: emailMessages.filter(m => m.openedAt).length,
+            emailsClicked: emailMessages.filter(m => m.clickedAt).length,
+            whatsappSent: whatsappMessages.length,
+            whatsappDelivered: whatsappMessages.filter(m => m.deliveredAt).length,
+          }
+        };
+      }));
+      
+      res.json(leadsWithStats);
+    } catch (error: any) {
+      console.error("Erro ao listar leads:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get lead details with messages
+  app.get("/api/admin/leads/:id", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.replace("Bearer ", "");
+      if (!token) return res.status(401).json({ error: "Token não fornecido" });
+      
+      const email = await validateSession(token);
+      if (!email) return res.status(401).json({ error: "Sessão inválida" });
+      
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin) return res.status(404).json({ error: "Admin não encontrado" });
+
+      const lead = await storage.getLeadById(req.params.id);
+      if (!lead) return res.status(404).json({ error: "Lead não encontrado" });
+      
+      // Verify lead belongs to admin's webinar
+      const webinar = await storage.getWebinarById(lead.webinarId);
+      if (!webinar || webinar.ownerId !== admin.id) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+      
+      const messages = await storage.listLeadMessagesByLead(lead.id);
+      
+      res.json({
+        ...lead,
+        webinarName: webinar.name,
+        messages,
+      });
+    } catch (error: any) {
+      console.error("Erro ao obter lead:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get webinars for lead filter
+  app.get("/api/admin/leads/filters/webinars", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.replace("Bearer ", "");
+      if (!token) return res.status(401).json({ error: "Token não fornecido" });
+      
+      const email = await validateSession(token);
+      if (!email) return res.status(401).json({ error: "Sessão inválida" });
+      
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin) return res.status(404).json({ error: "Admin não encontrado" });
+
+      const webinars = await storage.listWebinarsByOwner(admin.id);
+      res.json(webinars.map(w => ({ id: w.id, name: w.name })));
+    } catch (error: any) {
+      console.error("Erro ao listar webinars para filtro:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ============================
+  // EMAIL TRACKING ROUTES
+  // ============================
+  
+  // Track email open (1x1 transparent pixel)
+  app.get("/api/track/open/:trackingId", async (req, res) => {
+    try {
+      const { trackingId } = req.params;
+      
+      // Mark message as opened
+      await storage.markMessageAsOpened(trackingId);
+      
+      // Return 1x1 transparent GIF
+      const pixel = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');
+      res.set({
+        'Content-Type': 'image/gif',
+        'Content-Length': pixel.length,
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      });
+      res.send(pixel);
+    } catch (error: any) {
+      console.error("Erro ao rastrear abertura de email:", error);
+      // Still return pixel even on error
+      const pixel = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');
+      res.set('Content-Type', 'image/gif');
+      res.send(pixel);
+    }
+  });
+
+  // Track email click and redirect
+  app.get("/api/track/click/:trackingId", async (req, res) => {
+    try {
+      const { trackingId } = req.params;
+      const { url } = req.query;
+      
+      // Mark message as clicked
+      await storage.markMessageAsClicked(trackingId);
+      
+      // Redirect to original URL
+      if (url && typeof url === 'string') {
+        res.redirect(url);
+      } else {
+        res.status(400).send("URL não fornecida");
+      }
+    } catch (error: any) {
+      console.error("Erro ao rastrear click:", error);
+      // Still redirect if URL provided
+      if (req.query.url && typeof req.query.url === 'string') {
+        res.redirect(req.query.url);
+      } else {
+        res.status(500).send("Erro ao processar redirecionamento");
+      }
+    }
+  });
+
   // Moderator routes
   app.post("/api/webinars/:slug/moderator/auth", async (req, res) => {
     try {

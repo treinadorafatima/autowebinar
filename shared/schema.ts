@@ -300,6 +300,30 @@ export type Lead = typeof leads.$inferSelect;
 export const leadInsertSchema = createInsertSchema(leads).omit({ id: true, capturedAt: true, joinedAt: true });
 export type LeadInsert = z.infer<typeof leadInsertSchema>;
 
+// Lead Messages table for tracking emails and WhatsApp messages sent to leads
+export const leadMessages = pgTable("lead_messages", {
+  id: text("id").primaryKey(),
+  leadId: text("lead_id").notNull(),
+  webinarId: text("webinar_id").notNull(),
+  adminId: text("admin_id").notNull(),
+  channel: text("channel").notNull(), // 'email' or 'whatsapp'
+  messageType: text("message_type").notNull(), // 'campaign', 'sequence', 'manual', 'reminder'
+  campaignId: text("campaign_id"), // Reference to email/whatsapp campaign if applicable
+  subject: text("subject"), // For emails
+  content: text("content"), // Message content preview
+  status: text("status").notNull().default("sent"), // 'pending', 'sent', 'delivered', 'opened', 'clicked', 'failed'
+  sentAt: timestamp("sent_at").defaultNow(),
+  deliveredAt: timestamp("delivered_at"),
+  openedAt: timestamp("opened_at"),
+  clickedAt: timestamp("clicked_at"),
+  trackingId: text("tracking_id"), // Unique ID for tracking opens/clicks
+  errorMessage: text("error_message"),
+});
+
+export type LeadMessage = typeof leadMessages.$inferSelect;
+export const leadMessageInsertSchema = createInsertSchema(leadMessages).omit({ id: true, sentAt: true });
+export type LeadMessageInsert = z.infer<typeof leadMessageInsertSchema>;
+
 // Scripts table for webinar scripts and message generation
 export const webinarScripts = pgTable("webinar_scripts", {
   id: text("id").primaryKey(),
