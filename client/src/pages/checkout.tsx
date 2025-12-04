@@ -1123,8 +1123,8 @@ export default function Checkout() {
                       <Sparkles className="w-4 h-4 text-emerald-400" />
                     </div>
                     <div>
-                      <p className="font-medium">Conteúdo Exclusivo</p>
-                      <p className="text-xs text-slate-400">Acesso completo ao curso</p>
+                      <p className="font-medium">Recursos Completos</p>
+                      <p className="text-xs text-slate-400">Acesso total à plataforma de webinars</p>
                     </div>
                   </div>
                 </div>
@@ -1142,14 +1142,6 @@ export default function Checkout() {
                 </div>
               </CardContent>
             </Card>
-
-            <Button
-              variant="ghost"
-              className="w-full text-slate-400 hover:text-white"
-              onClick={() => setLocation("/checkout")}
-            >
-              Escolher outro plano
-            </Button>
           </div>
         </div>
       </div>
