@@ -34,7 +34,8 @@ function SimpleTextEditor({
   placeholder = "Digite aqui...", 
   className = "",
   style = {},
-  testId
+  testId,
+  preserveHtml = false
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -42,6 +43,7 @@ function SimpleTextEditor({
   className?: string;
   style?: React.CSSProperties;
   testId?: string;
+  preserveHtml?: boolean;
 }) {
   const editorRef = useRef<HTMLDivElement>(null);
 
@@ -51,13 +53,17 @@ function SimpleTextEditor({
     return tmp.textContent || tmp.innerText || "";
   };
 
-  const displayValue = stripHtml(value);
+  const displayValue = preserveHtml ? value : stripHtml(value);
 
   const handleInput = useCallback(() => {
     if (editorRef.current) {
-      onChange(editorRef.current.textContent || "");
+      if (preserveHtml) {
+        onChange(editorRef.current.innerHTML || "");
+      } else {
+        onChange(editorRef.current.textContent || "");
+      }
     }
-  }, [onChange]);
+  }, [onChange, preserveHtml]);
 
   return (
     <div className="relative">
@@ -322,6 +328,7 @@ export default function ReplayEditor({ formData, benefitsList, onChange, onBenef
                 backgroundClip: "text"
               }}
               testId="replay-title"
+              preserveHtml={true}
             />
           </div>
         </div>
