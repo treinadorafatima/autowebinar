@@ -3708,9 +3708,15 @@ export default function AdminWebinarDetailPage() {
                 <CardDescription>Configure cores, textos e campos do formulário de captura</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                {/* Campos a Coletar */}
-                <div className="p-4 border rounded-lg space-y-4">
-                  <h4 className="font-medium text-sm">Campos do Formulário</h4>
+                {/* Campos a Coletar - Formulário de Captura de Leads */}
+                <div className="p-4 border rounded-lg space-y-4 bg-green-500/5">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-5 w-5 text-green-500" />
+                    <h4 className="font-medium text-sm">Formulário de Captura de Leads</h4>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Configure quais campos coletar quando o visitante se inscrever no webinário. Esses dados serão salvos como leads.
+                  </p>
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                     <div className="flex items-center gap-2">
                       <Checkbox checked disabled className="opacity-50" />
