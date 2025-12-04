@@ -1074,7 +1074,7 @@ export default function Checkout() {
                         <SiMastercard className="w-6 h-6" />
                       </div>
                     </div>
-                    {isMercadoPago && (
+                    {isMercadoPago && !isRecorrente && (
                       <>
                         <div className="flex items-center gap-3 p-3 bg-white/5 rounded-lg">
                           <QrCode className="w-5 h-5 text-yellow-400" />
@@ -1113,8 +1113,8 @@ export default function Checkout() {
                       <Sparkles className="w-4 h-4 text-emerald-400" />
                     </div>
                     <div>
-                      <p className="font-medium">Recursos Completos</p>
-                      <p className="text-xs text-slate-400">Acesso total à plataforma de webinars</p>
+                      <p className="font-medium">Recursos do Plano</p>
+                      <p className="text-xs text-slate-400">Conforme benefícios do {selectedPlano.nome}</p>
                     </div>
                   </div>
                 </div>
