@@ -1728,7 +1728,7 @@ export default function WebinarPublicPage() {
                     className="p-3 border-t flex gap-2" 
                     style={{ borderColor: webinar.commentTheme === "light" ? "#e0e0e0" : "#2d2d44" }}
                   >
-                    {!isRegistered ? (
+                    {!isChatRegistered ? (
                       <Button 
                         onClick={handleOpenParticipationModal} 
                         className="w-full rounded-full"
