@@ -6773,6 +6773,187 @@ Seja conversacional e objetivo.`;
     }
   });
 
+  // Checkout - Processar assinatura recorrente Mercado Pago (checkout transparente)
+  app.post("/api/checkout/mercadopago/assinatura", async (req, res) => {
+    try {
+      const { pagamentoId, cardToken, payerEmail, paymentMethodId, issuerId } = req.body;
+      
+      const pagamento = await storage.getCheckoutPagamentoById(pagamentoId);
+      if (!pagamento) {
+        return res.status(404).json({ error: "Pagamento não encontrado" });
+      }
+
+      const plano = await storage.getCheckoutPlanoById(pagamento.planoId);
+      if (!plano) {
+        return res.status(404).json({ error: "Plano não encontrado" });
+      }
+
+      const accessToken = await storage.getCheckoutConfig('MERCADOPAGO_ACCESS_TOKEN');
+      if (!accessToken) {
+        return res.status(500).json({ error: "Mercado Pago não configurado" });
+      }
+
+      // Get base URL for webhooks
+      const protocol = req.headers['x-forwarded-proto'] || 'https';
+      const host = req.headers['x-forwarded-host'] || req.headers.host;
+      const baseUrl = `${protocol}://${host}`;
+
+      // Calculate frequency for preapproval
+      const frequencyType = plano.frequenciaTipo === 'days' ? 'days' : 
+                            plano.frequenciaTipo === 'years' ? 'months' : 'months';
+      const frequencyValue = plano.frequenciaTipo === 'years' ? 
+                            (plano.frequencia || 1) * 12 : (plano.frequencia || 1);
+
+      // Create preapproval with card_token for transparent checkout
+      const preapprovalRequest: any = {
+        reason: plano.nome,
+        external_reference: pagamentoId,
+        payer_email: payerEmail || pagamento.email,
+        card_token_id: cardToken,
+        auto_recurring: {
+          frequency: frequencyValue,
+          frequency_type: frequencyType,
+          transaction_amount: plano.preco / 100,
+          currency_id: 'BRL',
+        },
+        back_url: `${baseUrl}/pagamento/sucesso?id=${pagamentoId}&tipo=assinatura`,
+        notification_url: `${baseUrl}/webhook/mercadopago`,
+      };
+
+      // Add payment method and issuer if provided
+      if (paymentMethodId) {
+        preapprovalRequest.payment_method_id = paymentMethodId;
+      }
+      if (issuerId) {
+        preapprovalRequest.issuer_id = issuerId;
+      }
+
+      console.log('[MP Subscription] Creating preapproval:', JSON.stringify(preapprovalRequest, null, 2));
+
+      const mpResponse = await fetch('https://api.mercadopago.com/preapproval', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(preapprovalRequest),
+      });
+
+      const mpData = await mpResponse.json();
+      console.log('[MP Subscription] Response:', JSON.stringify(mpData, null, 2));
+
+      if (!mpResponse.ok) {
+        console.error('[MP Subscription] Error:', mpData);
+        return res.status(400).json({ 
+          error: mpData.message || 'Erro ao criar assinatura',
+          cause: mpData.cause,
+          statusDetail: mpData.message,
+        });
+      }
+
+      // Update payment record
+      const updateData: any = {
+        status: mpData.status === 'authorized' ? 'approved' : mpData.status,
+        statusDetail: mpData.status,
+        metodoPagamento: 'credit_card',
+        mercadopagoPaymentId: mpData.id?.toString(),
+        dataPagamento: new Date(),
+        tipoAssinatura: 'recorrente',
+      };
+
+      // If authorized, create/update admin account
+      if (mpData.status === 'authorized' || mpData.status === 'pending') {
+        updateData.dataAprovacao = new Date();
+        
+        // Calculate expiration date based on frequency
+        const expirationDate = new Date();
+        if (frequencyType === 'days') {
+          expirationDate.setDate(expirationDate.getDate() + frequencyValue);
+        } else {
+          expirationDate.setMonth(expirationDate.getMonth() + frequencyValue);
+        }
+        updateData.dataExpiracao = expirationDate;
+
+        // Check if admin exists
+        let admin = await storage.getAdminByEmail(pagamento.email);
+        
+        if (admin) {
+          // Update existing admin
+          await storage.updateAdmin(admin.id, {
+            accessExpiresAt: expirationDate,
+            webinarLimit: plano.webinarLimit,
+            uploadLimit: plano.uploadLimit || plano.webinarLimit,
+            isActive: true,
+            planoId: plano.id,
+          });
+          updateData.adminId = admin.id;
+          
+          // Create or update subscription record
+          const existingSubscription = await storage.getCheckoutAssinaturaByAdminId(admin.id);
+          if (existingSubscription) {
+            await storage.updateCheckoutAssinatura(existingSubscription.id, {
+              status: 'active',
+              planoId: plano.id,
+              gateway: 'mercadopago',
+              externalId: mpData.id?.toString(),
+              proximoPagamento: expirationDate,
+            });
+          } else {
+            await storage.createCheckoutAssinatura({
+              adminId: admin.id,
+              planoId: plano.id,
+              status: 'active',
+              gateway: 'mercadopago',
+              externalId: mpData.id?.toString(),
+              proximoPagamento: expirationDate,
+            });
+          }
+        } else {
+          // Create new admin with temporary password
+          const tempPassword = Math.random().toString(36).slice(-8);
+          const bcrypt = await import('bcryptjs');
+          const hashedPassword = await bcrypt.hash(tempPassword, 10);
+          
+          admin = await storage.createAdmin({
+            name: pagamento.nome,
+            email: pagamento.email,
+            password: hashedPassword,
+            role: 'user',
+            webinarLimit: plano.webinarLimit,
+            uploadLimit: plano.uploadLimit || plano.webinarLimit,
+            isActive: true,
+            accessExpiresAt: expirationDate,
+            planoId: plano.id,
+          });
+          updateData.adminId = admin.id;
+          
+          // Create subscription record
+          await storage.createCheckoutAssinatura({
+            adminId: admin.id,
+            planoId: plano.id,
+            status: 'active',
+            gateway: 'mercadopago',
+            externalId: mpData.id?.toString(),
+            proximoPagamento: expirationDate,
+          });
+          
+          console.log(`[MP Subscription] Created admin: ${pagamento.email}, temp password: ${tempPassword}`);
+        }
+      }
+
+      await storage.updateCheckoutPagamento(pagamentoId, updateData);
+
+      res.json({
+        status: mpData.status,
+        statusDetail: mpData.status,
+        subscriptionId: mpData.id,
+      });
+    } catch (error: any) {
+      console.error('[MP Subscription] Error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Checkout - Criar Payment Intent/Subscription Stripe (para Stripe Elements - transparente)
   app.post("/api/checkout/stripe/criar-payment-intent-elements", async (req, res) => {
     try {

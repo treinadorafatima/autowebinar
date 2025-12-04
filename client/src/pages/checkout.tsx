@@ -12,7 +12,7 @@ import { Loader2, Check, Star, Lock, ArrowRight, Zap, Video, Upload, Shield, Clo
 import { SiMercadopago, SiStripe, SiVisa, SiMastercard, SiWhatsapp } from "react-icons/si";
 import { usePixel } from "@/hooks/use-pixel";
 import logoImage from "@assets/logo-autowebinar_1764484003666.png";
-import { initMercadoPago, Payment } from '@mercadopago/sdk-react';
+import { initMercadoPago, Payment, CardPayment } from '@mercadopago/sdk-react';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 
@@ -298,6 +298,44 @@ export default function Checkout() {
     },
   });
 
+  const processarAssinaturaRecorrenteMutation = useMutation({
+    mutationFn: async (cardData: any) => {
+      const res = await apiRequest("POST", "/api/checkout/mercadopago/assinatura", {
+        pagamentoId,
+        cardToken: cardData.token,
+        payerEmail: formData.email,
+        paymentMethodId: cardData.payment_method_id,
+        issuerId: cardData.issuer_id,
+      });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      if (data.status === 'authorized' || data.status === 'pending') {
+        if (selectedPlano) {
+          trackPurchase({
+            value: selectedPlano.preco,
+            currency: "BRL",
+            content_name: selectedPlano.nome,
+          });
+        }
+        setLocation('/pagamento/sucesso?gateway=mercadopago&tipo=assinatura');
+      } else {
+        toast({
+          title: "Assinatura não autorizada",
+          description: data.statusDetail || "Tente novamente com outro cartão.",
+          variant: "destructive",
+        });
+      }
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro ao processar assinatura",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleMpSubmit = useCallback(async (formData: any) => {
     setIsProcessingPayment(true);
     try {
@@ -306,6 +344,15 @@ export default function Checkout() {
       setIsProcessingPayment(false);
     }
   }, [processarPagamentoMpMutation]);
+
+  const handleCardPaymentSubmit = useCallback(async (cardData: any) => {
+    setIsProcessingPayment(true);
+    try {
+      await processarAssinaturaRecorrenteMutation.mutateAsync(cardData);
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  }, [processarAssinaturaRecorrenteMutation]);
 
   const handleMpReady = useCallback(() => {
     console.log('[MercadoPago] Payment Brick ready');
@@ -836,22 +883,46 @@ export default function Checkout() {
                   )}
 
                   {isMercadoPago && pagamentoId ? (
-                    isRecurring && mpInitPoint ? (
-                      <div className="space-y-4">
-                        <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
-                          <p className="text-amber-800 text-sm">
-                            Para assinaturas recorrentes, você será redirecionado para a página segura do Mercado Pago para concluir sua assinatura.
-                          </p>
+                    isRecurring ? (
+                      mpInitialized ? (
+                        <div className="mercadopago-container">
+                          <CardPayment
+                            initialization={{
+                              amount: selectedPlano.preco / 100,
+                              payer: {
+                                email: formData.email,
+                                ...(formData.cpf && formData.cpf.replace(/\D/g, '').length >= 11 ? {
+                                  identification: {
+                                    type: 'CPF',
+                                    number: formData.cpf.replace(/\D/g, ''),
+                                  },
+                                } : {}),
+                              },
+                            }}
+                            customization={{
+                              visual: {
+                                style: {
+                                  theme: 'default',
+                                },
+                                texts: {
+                                  formTitle: 'Dados do Cartão',
+                                  formSubmit: isProcessingPayment ? 'Processando...' : 'Assinar Agora',
+                                },
+                              },
+                              paymentMethods: {
+                                maxInstallments: 1,
+                              },
+                            }}
+                            onSubmit={handleCardPaymentSubmit}
+                            onReady={handleMpReady}
+                            onError={handleMpError}
+                          />
                         </div>
-                        <Button
-                          onClick={() => window.location.href = mpInitPoint}
-                          className="w-full bg-[#00b1ea] hover:bg-[#009dd3] text-white py-6 text-lg font-semibold"
-                          data-testid="button-mp-subscribe"
-                        >
-                          <SiMercadopago className="w-5 h-5 mr-2" />
-                          Assinar com Mercado Pago
-                        </Button>
-                      </div>
+                      ) : (
+                        <div className="flex items-center justify-center py-12">
+                          <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+                        </div>
+                      )
                     ) : mpInitialized ? (
                       <div className="mercadopago-container">
                         <Payment
