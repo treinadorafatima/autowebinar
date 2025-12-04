@@ -57,7 +57,67 @@ import {
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 
-function DomainConfigSection({ domain, serverHost }: { domain: string; serverHost: string }) {
+// Função para validar domínio
+function validateDomain(domain: string): { valid: boolean; error: string | null } {
+  if (!domain || domain.trim() === "") {
+    return { valid: false, error: null }; // Campo vazio não é erro, apenas não está preenchido
+  }
+
+  const trimmedDomain = domain.trim().toLowerCase();
+
+  // Verificar se começa com www.
+  if (trimmedDomain.startsWith("www.")) {
+    return { valid: false, error: "Remova o 'www.' do início. Use apenas o domínio (ex: webinar.seusite.com)" };
+  }
+
+  // Verificar se começa com http:// ou https://
+  if (trimmedDomain.startsWith("http://") || trimmedDomain.startsWith("https://")) {
+    return { valid: false, error: "Remova o 'http://' ou 'https://'. Use apenas o domínio (ex: webinar.seusite.com)" };
+  }
+
+  // Verificar se tem espaços
+  if (trimmedDomain.includes(" ")) {
+    return { valid: false, error: "O domínio não pode conter espaços" };
+  }
+
+  // Lista de sufixos de domínio válidos
+  const validSuffixes = [
+    ".com", ".com.br", ".net", ".net.br", ".org", ".org.br", ".io", ".co",
+    ".app", ".dev", ".me", ".info", ".biz", ".online", ".site", ".tech",
+    ".store", ".shop", ".blog", ".cloud", ".digital", ".pro", ".tv",
+    ".edu", ".edu.br", ".gov", ".gov.br", ".mil", ".br", ".pt", ".uk",
+    ".us", ".eu", ".de", ".fr", ".es", ".it", ".nl", ".be", ".at", ".ch",
+    ".in", ".au", ".nz", ".jp", ".cn", ".kr", ".mx", ".ar", ".cl", ".co.uk",
+    ".xyz", ".ai", ".gg", ".cc", ".ws", ".la", ".vc", ".fm", ".am", ".pm"
+  ];
+
+  // Verificar se tem um sufixo válido
+  const hasSuffix = validSuffixes.some(suffix => trimmedDomain.endsWith(suffix));
+  if (!hasSuffix) {
+    return { valid: false, error: "Domínio inválido. Verifique se termina com uma extensão válida (ex: .com, .com.br, .net)" };
+  }
+
+  // Verificar formato geral do domínio (mínimo: algo.extensão)
+  const parts = trimmedDomain.split(".");
+  if (parts.length < 2 || parts.some(part => part.length === 0)) {
+    return { valid: false, error: "Formato de domínio inválido. Use o formato: subdominio.seusite.com ou seusite.com" };
+  }
+
+  // Verificar caracteres válidos
+  const validChars = /^[a-z0-9.-]+$/;
+  if (!validChars.test(trimmedDomain)) {
+    return { valid: false, error: "O domínio contém caracteres inválidos. Use apenas letras, números, pontos e hífens" };
+  }
+
+  return { valid: true, error: null };
+}
+
+function DomainConfigSection({ domain, serverHost, originalUrl, onDisconnect }: { 
+  domain: string; 
+  serverHost: string; 
+  originalUrl: string;
+  onDisconnect: () => void;
+}) {
   const [verifying, setVerifying] = useState(false);
   const [status, setStatus] = useState<{
     configured: boolean;
@@ -209,6 +269,43 @@ function DomainConfigSection({ domain, serverHost }: { domain: string; serverHos
           </p>
         </div>
       </div>
+
+      {/* URL Original sempre funciona */}
+      <div className="bg-muted/50 p-3 rounded-lg border">
+        <p className="text-sm font-medium mb-2 flex items-center gap-2">
+          <Link2 className="w-4 h-4" />
+          URL Original (sempre funciona):
+        </p>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+          <code className="text-xs bg-background px-2 py-1.5 rounded break-all flex-1">
+            {originalUrl}
+          </code>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              navigator.clipboard.writeText(originalUrl);
+              toast({ title: "Link copiado!" });
+            }}
+            className="w-full sm:w-auto flex-shrink-0"
+          >
+            <Copy className="w-3 h-3 mr-1" />
+            <span>Copiar</span>
+          </Button>
+        </div>
+      </div>
+
+      {/* Botão para desconectar */}
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={onDisconnect}
+        className="w-full text-destructive hover:text-destructive border-destructive/30 hover:border-destructive/50 hover:bg-destructive/10"
+        data-testid="button-disconnect-domain"
+      >
+        <X className="w-3 h-3 mr-1" />
+        Desconectar Domínio
+      </Button>
     </div>
   );
 }
@@ -558,6 +655,10 @@ export default function AdminWebinarDetailPage() {
   
   const [replayBenefitsList, setReplayBenefitsList] = useState<string[]>([]);
   const [newReplayBenefit, setNewReplayBenefit] = useState("");
+
+  // Estado para input de domínio customizado com validação
+  const [domainInput, setDomainInput] = useState<string>("");
+  const domainValidation = validateDomain(domainInput);
 
   const [userRole, setUserRole] = useState<string>("user");
   const [showTransferModal, setShowTransferModal] = useState(false);
@@ -1800,55 +1901,94 @@ export default function AdminWebinarDetailPage() {
               </div>
 
               <div className="space-y-4 border rounded-lg p-4 bg-gradient-to-br from-primary/5 to-secondary/5">
-                <Label className="text-base font-semibold block">Conectar Domínio do Webinário</Label>
-
-                <div className="space-y-2">
-                  <Label className="text-sm">Domínio Customizado <span className="text-muted-foreground">(opcional)</span></Label>
-                  <div className="flex flex-col sm:flex-row gap-2">
-                    <Input
-                      value={formData.customDomain || ""}
-                      onChange={(e) => setFormData({ ...formData, customDomain: e.target.value || undefined })}
-                      placeholder="ex: webinar.seusite.com"
-                      data-testid="input-custom-domain"
-                      className="flex-1"
-                    />
-                    <Button
-                      onClick={handleSave}
-                      disabled={saving}
-                      data-testid="button-save-domain"
-                      className="w-full sm:w-auto"
-                    >
-                      {saving ? "Salvando..." : "Salvar"}
-                    </Button>
-                  </div>
-                </div>
+                <Label className="text-base font-semibold block flex items-center gap-2">
+                  <Globe className="w-5 h-5" />
+                  Conectar Domínio do Webinário
+                </Label>
 
                 {!formData.customDomain ? (
-                  <div className="bg-muted/50 p-3 rounded-lg">
-                    <p className="text-sm font-medium mb-1">URL atual do webinário:</p>
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                      <code className="text-xs bg-background px-2 py-1.5 rounded break-all">
-                        {window.location.protocol}//{window.location.hostname}/w/{formData.slug}
-                      </code>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          navigator.clipboard.writeText(`${window.location.protocol}//${window.location.hostname}/w/${formData.slug}`);
-                          toast({ title: "Link copiado!" });
-                        }}
-                        data-testid="copy-webinar-url"
-                        className="w-full sm:w-auto flex-shrink-0"
-                      >
-                        <Copy className="w-3 h-3 mr-1" />
-                        <span>Copiar</span>
-                      </Button>
+                  <>
+                    {/* Input para digitar o domínio */}
+                    <div className="space-y-2">
+                      <Label className="text-sm">Domínio Customizado <span className="text-muted-foreground">(opcional)</span></Label>
+                      <div className="flex flex-col gap-2">
+                        <Input
+                          value={domainInput}
+                          onChange={(e) => setDomainInput(e.target.value.trim().toLowerCase())}
+                          placeholder="webinar.seusite.com"
+                          data-testid="input-custom-domain"
+                          className={domainValidation.error ? "border-destructive" : ""}
+                        />
+                        
+                        {/* Mensagem de erro */}
+                        {domainValidation.error && (
+                          <div className="flex items-start gap-2 text-destructive text-sm bg-destructive/10 p-2 rounded-md">
+                            <XCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                            <span>{domainValidation.error}</span>
+                          </div>
+                        )}
+
+                        {/* Botão Conectar - só aparece quando tem texto digitado */}
+                        {domainInput && (
+                          <Button
+                            onClick={() => {
+                              if (domainValidation.valid) {
+                                setFormData({ ...formData, customDomain: domainInput });
+                                handleSave();
+                              }
+                            }}
+                            disabled={!domainValidation.valid || saving}
+                            data-testid="button-connect-domain"
+                            className="w-full sm:w-auto"
+                          >
+                            {saving ? (
+                              <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Conectando...</>
+                            ) : domainValidation.valid ? (
+                              <><Link2 className="w-4 h-4 mr-2" /> Conectar Domínio</>
+                            ) : (
+                              <><X className="w-4 h-4 mr-2" /> Corrija o domínio</>
+                            )}
+                          </Button>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Digite apenas o domínio, sem "www." ou "https://". Exemplo: webinar.seusite.com ou meusite.com.br
+                      </p>
                     </div>
-                  </div>
+
+                    {/* URL atual do webinário */}
+                    <div className="bg-muted/50 p-3 rounded-lg">
+                      <p className="text-sm font-medium mb-1">URL atual do webinário:</p>
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                        <code className="text-xs bg-background px-2 py-1.5 rounded break-all">
+                          {window.location.protocol}//{window.location.hostname}/w/{formData.slug}
+                        </code>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            navigator.clipboard.writeText(`${window.location.protocol}//${window.location.hostname}/w/${formData.slug}`);
+                            toast({ title: "Link copiado!" });
+                          }}
+                          data-testid="copy-webinar-url"
+                          className="w-full sm:w-auto flex-shrink-0"
+                        >
+                          <Copy className="w-3 h-3 mr-1" />
+                          <span>Copiar</span>
+                        </Button>
+                      </div>
+                    </div>
+                  </>
                 ) : (
                   <DomainConfigSection 
                     domain={formData.customDomain} 
                     serverHost={window.location.hostname}
+                    originalUrl={`${window.location.protocol}//${window.location.hostname}/w/${formData.slug}`}
+                    onDisconnect={() => {
+                      setFormData({ ...formData, customDomain: undefined });
+                      setDomainInput("");
+                      handleSave();
+                    }}
                   />
                 )}
               </div>
