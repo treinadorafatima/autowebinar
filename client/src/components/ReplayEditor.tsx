@@ -34,8 +34,7 @@ function SimpleTextEditor({
   placeholder = "Digite aqui...", 
   className = "",
   style = {},
-  testId,
-  preserveHtml = false
+  testId
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -43,7 +42,6 @@ function SimpleTextEditor({
   className?: string;
   style?: React.CSSProperties;
   testId?: string;
-  preserveHtml?: boolean;
 }) {
   const editorRef = useRef<HTMLDivElement>(null);
 
@@ -53,17 +51,13 @@ function SimpleTextEditor({
     return tmp.textContent || tmp.innerText || "";
   };
 
-  const displayValue = preserveHtml ? value : stripHtml(value);
+  const displayValue = stripHtml(value);
 
   const handleInput = useCallback(() => {
     if (editorRef.current) {
-      if (preserveHtml) {
-        onChange(editorRef.current.innerHTML || "");
-      } else {
-        onChange(editorRef.current.textContent || "");
-      }
+      onChange(editorRef.current.textContent || "");
     }
-  }, [onChange, preserveHtml]);
+  }, [onChange]);
 
   return (
     <div className="relative">
@@ -186,6 +180,11 @@ function ColorPicker({ value, onChange, colors, label }: {
   colors: string[];
   label: string;
 }) {
+  const handleChange = (newValue: string) => {
+    console.log(`[ColorPicker] ${label} changed from ${value} to ${newValue}`);
+    onChange(newValue);
+  };
+  
   return (
     <div className="space-y-2">
       <Label className="text-white text-xs font-medium">{label}</Label>
@@ -193,12 +192,12 @@ function ColorPicker({ value, onChange, colors, label }: {
         <input
           type="color"
           value={value}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => handleChange(e.target.value)}
           className="w-8 h-8 rounded cursor-pointer border border-gray-600 flex-shrink-0"
         />
         <Input
           value={value}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => handleChange(e.target.value)}
           className="flex-1 h-8 text-xs"
         />
       </div>
@@ -207,7 +206,7 @@ function ColorPicker({ value, onChange, colors, label }: {
           <button
             key={c}
             type="button"
-            onClick={() => onChange(c)}
+            onClick={() => handleChange(c)}
             className={`w-6 h-6 rounded transition-transform hover:scale-110 ${value === c ? "ring-2 ring-white" : ""}`}
             style={{ backgroundColor: c }}
           />
@@ -328,7 +327,6 @@ export default function ReplayEditor({ formData, benefitsList, onChange, onBenef
                 backgroundClip: "text"
               }}
               testId="replay-title"
-              preserveHtml={true}
             />
           </div>
         </div>
