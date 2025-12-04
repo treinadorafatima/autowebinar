@@ -180,11 +180,6 @@ function ColorPicker({ value, onChange, colors, label }: {
   colors: string[];
   label: string;
 }) {
-  const handleChange = (newValue: string) => {
-    console.log(`[ColorPicker] ${label} changed from ${value} to ${newValue}`);
-    onChange(newValue);
-  };
-  
   return (
     <div className="space-y-2">
       <Label className="text-white text-xs font-medium">{label}</Label>
@@ -192,12 +187,12 @@ function ColorPicker({ value, onChange, colors, label }: {
         <input
           type="color"
           value={value}
-          onChange={(e) => handleChange(e.target.value)}
+          onChange={(e) => onChange(e.target.value)}
           className="w-8 h-8 rounded cursor-pointer border border-gray-600 flex-shrink-0"
         />
         <Input
           value={value}
-          onChange={(e) => handleChange(e.target.value)}
+          onChange={(e) => onChange(e.target.value)}
           className="flex-1 h-8 text-xs"
         />
       </div>
@@ -206,7 +201,7 @@ function ColorPicker({ value, onChange, colors, label }: {
           <button
             key={c}
             type="button"
-            onClick={() => handleChange(c)}
+            onClick={() => onChange(c)}
             className={`w-6 h-6 rounded transition-transform hover:scale-110 ${value === c ? "ring-2 ring-white" : ""}`}
             style={{ backgroundColor: c }}
           />

@@ -1987,16 +1987,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Webinar not found" });
       }
       
-      // Log replay fields for debugging
-      console.log('[webinar-get] Replay fields from DB:', {
-        id: webinar.id,
-        replayEnabled: webinar.replayEnabled,
-        replayButtonText: webinar.replayButtonText,
-        replayBackgroundColor: webinar.replayBackgroundColor,
-        replayPlayerColor: webinar.replayPlayerColor,
-        replayButtonColor: webinar.replayButtonColor,
-      });
-      
       // Verificar se o plano do dono está ativo (apenas para acesso público)
       // Não bloquear se a requisição vier do painel admin (tem token de autenticação)
       const token = req.headers.authorization?.split(" ")[1];
@@ -2084,31 +2074,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const updatedData = { ...req.body };
       
-      // Log replay fields for debugging
-      console.log('[webinar-update] Replay fields received:', {
-        replayEnabled: updatedData.replayEnabled,
-        replayButtonText: updatedData.replayButtonText,
-        replayButtonUrl: updatedData.replayButtonUrl,
-        replayBackgroundColor: updatedData.replayBackgroundColor,
-        replayPlayerColor: updatedData.replayPlayerColor,
-        replayButtonColor: updatedData.replayButtonColor,
-        webinarLimit,
-      });
-      
       if (webinarLimit <= 5) {
         updatedData.replayEnabled = false;
         updatedData.replayAutoplay = false;
       }
       
       const webinar = await storage.updateWebinar(req.params.id, updatedData);
-      
-      // Log what was saved
-      console.log('[webinar-update] Saved replay fields:', {
-        replayEnabled: webinar?.replayEnabled,
-        replayButtonText: webinar?.replayButtonText,
-        replayButtonUrl: webinar?.replayButtonUrl,
-        replayTitle: webinar?.replayTitle,
-      });
       if (!webinar) {
         return res.status(404).json({ error: "Webinar not found" });
       }

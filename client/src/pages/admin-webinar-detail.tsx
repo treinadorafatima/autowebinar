@@ -5781,10 +5781,10 @@ export default function AdminWebinarDetailPage() {
                       replayPlayerBorderColor: formData.replayPlayerBorderColor,
                     }}
                     benefitsList={replayBenefitsList}
-                    onChange={(field, value) => setFormData({ ...formData, [field]: value })}
+                    onChange={(field, value) => setFormData(prev => ({ ...prev, [field]: value }))}
                     onBenefitsChange={(benefits) => {
                       setReplayBenefitsList(benefits);
-                      setFormData({ ...formData, replayBenefits: JSON.stringify(benefits) });
+                      setFormData(prev => ({ ...prev, replayBenefits: JSON.stringify(benefits) }));
                     }}
                     onImageUpload={async (file) => {
                       const formDataUpload = new FormData();
