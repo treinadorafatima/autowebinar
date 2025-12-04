@@ -195,6 +195,12 @@ export default function WebinarPublicPage() {
   const [chatState, setChatState] = useState(() => {
     return localStorage.getItem(`webinar-${params.slug}-chatState`) || "";
   });
+  const [chatEmail, setChatEmail] = useState(() => {
+    return localStorage.getItem(`webinar-${params.slug}-chatEmail`) || "";
+  });
+  const [chatWhatsapp, setChatWhatsapp] = useState(() => {
+    return localStorage.getItem(`webinar-${params.slug}-chatWhatsapp`) || "";
+  });
   const [isChatRegistered, setIsChatRegistered] = useState(() => {
     return localStorage.getItem(`webinar-${params.slug}-chatRegistered`) === "true";
   });
@@ -1157,10 +1163,24 @@ export default function WebinarPublicPage() {
     const needsName = webinar.chatCollectName !== false;
     const needsCity = webinar.chatCollectCity !== false;
     const needsState = webinar.chatCollectState !== false;
+    const needsEmail = webinar.chatCollectEmail === true;
+    const needsWhatsapp = webinar.chatCollectWhatsapp === true;
     
     // Validação baseada nos campos configurados
     if (needsName && !chatName.trim()) {
       toast({ title: "Preencha seu nome", variant: "destructive" });
+      return;
+    }
+    if (needsEmail && !chatEmail.trim()) {
+      toast({ title: "Preencha seu e-mail", variant: "destructive" });
+      return;
+    }
+    if (needsEmail && chatEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(chatEmail)) {
+      toast({ title: "E-mail inválido", variant: "destructive" });
+      return;
+    }
+    if (needsWhatsapp && !chatWhatsapp.trim()) {
+      toast({ title: "Preencha seu WhatsApp", variant: "destructive" });
       return;
     }
     if (needsCity && !chatCity.trim()) {
@@ -1181,6 +1201,8 @@ export default function WebinarPublicPage() {
     // Persist chat registration in localStorage
     localStorage.setItem(`webinar-${params.slug}-chatRegistered`, "true");
     if (chatName) localStorage.setItem(`webinar-${params.slug}-chatName`, chatName);
+    if (chatEmail) localStorage.setItem(`webinar-${params.slug}-chatEmail`, chatEmail);
+    if (chatWhatsapp) localStorage.setItem(`webinar-${params.slug}-chatWhatsapp`, chatWhatsapp);
     if (chatCity) localStorage.setItem(`webinar-${params.slug}-chatCity`, chatCity);
     if (chatState) localStorage.setItem(`webinar-${params.slug}-chatState`, chatState.toUpperCase());
     
@@ -1301,6 +1323,28 @@ export default function WebinarPublicPage() {
                   value={chatName}
                   onChange={(e) => setChatName(e.target.value)}
                   data-testid="input-modal-chat-name"
+                />
+              </div>
+            )}
+            {(webinar?.chatCollectEmail === true) && (
+              <div>
+                <Input
+                  type="email"
+                  placeholder="Seu e-mail"
+                  value={chatEmail}
+                  onChange={(e) => setChatEmail(e.target.value)}
+                  data-testid="input-modal-chat-email"
+                />
+              </div>
+            )}
+            {(webinar?.chatCollectWhatsapp === true) && (
+              <div>
+                <Input
+                  type="tel"
+                  placeholder="WhatsApp (com DDD)"
+                  value={chatWhatsapp}
+                  onChange={(e) => setChatWhatsapp(e.target.value)}
+                  data-testid="input-modal-chat-whatsapp"
                 />
               </div>
             )}

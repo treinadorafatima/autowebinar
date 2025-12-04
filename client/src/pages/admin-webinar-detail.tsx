@@ -585,6 +585,8 @@ export default function AdminWebinarDetailPage() {
   const [chatCollectName, setChatCollectName] = useState(true);
   const [chatCollectCity, setChatCollectCity] = useState(true);
   const [chatCollectState, setChatCollectState] = useState(true);
+  const [chatCollectEmail, setChatCollectEmail] = useState(false);
+  const [chatCollectWhatsapp, setChatCollectWhatsapp] = useState(false);
   
   // Real comments states
   const [realComments, setRealComments] = useState<Comment[]>([]);
@@ -776,6 +778,8 @@ export default function AdminWebinarDetailPage() {
       setChatCollectName(data.chatCollectName !== false);
       setChatCollectCity(data.chatCollectCity !== false);
       setChatCollectState(data.chatCollectState !== false);
+      setChatCollectEmail(data.chatCollectEmail === true);
+      setChatCollectWhatsapp(data.chatCollectWhatsapp === true);
       try {
         const parsedBenefits = JSON.parse(data.offerBenefits || "[]");
         setBenefitsList(Array.isArray(parsedBenefits) ? parsedBenefits : []);
@@ -1200,6 +1204,8 @@ export default function AdminWebinarDetailPage() {
           chatCollectName,
           chatCollectCity,
           chatCollectState,
+          chatCollectEmail,
+          chatCollectWhatsapp,
         }),
       });
       if (!res.ok) throw new Error("Erro ao salvar");
@@ -3787,7 +3793,7 @@ export default function AdminWebinarDetailPage() {
                         data-testid="input-chat-form-title"
                       />
                     </div>
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
                       <div className="flex items-center gap-2">
                         <Checkbox
                           id="chat-collect-name"
@@ -3796,6 +3802,24 @@ export default function AdminWebinarDetailPage() {
                           data-testid="checkbox-chat-collect-name"
                         />
                         <Label htmlFor="chat-collect-name" className="text-sm cursor-pointer">Nome</Label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          id="chat-collect-email"
+                          checked={chatCollectEmail}
+                          onCheckedChange={(c: boolean) => setChatCollectEmail(c === true)}
+                          data-testid="checkbox-chat-collect-email"
+                        />
+                        <Label htmlFor="chat-collect-email" className="text-sm cursor-pointer">Email</Label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          id="chat-collect-whatsapp"
+                          checked={chatCollectWhatsapp}
+                          onCheckedChange={(c: boolean) => setChatCollectWhatsapp(c === true)}
+                          data-testid="checkbox-chat-collect-whatsapp"
+                        />
+                        <Label htmlFor="chat-collect-whatsapp" className="text-sm cursor-pointer">WhatsApp</Label>
                       </div>
                       <div className="flex items-center gap-2">
                         <Checkbox

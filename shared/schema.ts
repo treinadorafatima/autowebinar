@@ -156,6 +156,8 @@ export const webinars = pgTable("webinars", {
   chatCollectName: boolean("chat_collect_name").notNull().default(true), // Coletar nome
   chatCollectCity: boolean("chat_collect_city").notNull().default(true), // Coletar cidade
   chatCollectState: boolean("chat_collect_state").notNull().default(true), // Coletar estado
+  chatCollectEmail: boolean("chat_collect_email").notNull().default(false), // Coletar email
+  chatCollectWhatsapp: boolean("chat_collect_whatsapp").notNull().default(false), // Coletar WhatsApp
 });
 
 export const webinarInsertSchema = createInsertSchema(webinars).omit({ id: true, createdAt: true });
