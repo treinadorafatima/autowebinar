@@ -41,9 +41,9 @@ import {
   CalendarIcon,
   Eye,
   Users,
-  Mail,
-  MessageSquare
+  Mail
 } from "lucide-react";
+import { SiWhatsapp } from "react-icons/si";
 
 interface UploadedVideo {
   id: string;
@@ -560,7 +560,7 @@ export default function AdminPage() {
         <StatCard icon={BarChart3} value={totalViews.toLocaleString()} label="Visualizações Totais" color="orange" />
         <StatCard icon={Users} value={stats.leads.toLocaleString()} label="Leads Capturados" color="blue" />
         <StatCard icon={Mail} value={stats.emails.toLocaleString()} label="Emails Criados" color="purple" />
-        <StatCard icon={MessageSquare} value={stats.whatsappMessages.toLocaleString()} label="Mensagens WhatsApp" color="orange" />
+        <StatCard icon={SiWhatsapp} value={stats.whatsappMessages.toLocaleString()} label="Mensagens WhatsApp" color="orange" />
       </div>
 
       {/* View History Card */}
