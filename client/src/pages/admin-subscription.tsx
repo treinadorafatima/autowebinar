@@ -557,7 +557,7 @@ export default function AdminSubscription() {
                 <Button 
                   variant="default"
                   className="flex-1 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600"
-                  onClick={() => window.location.href = "/checkout"}
+                  onClick={() => window.location.href = `/checkout?renovacao=true&email=${encodeURIComponent(admin.email)}&nome=${encodeURIComponent(admin.name)}`}
                   data-testid="button-upgrade"
                 >
                   <ArrowUpCircle className="w-4 h-4 mr-2" />

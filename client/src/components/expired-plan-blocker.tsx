@@ -21,6 +21,7 @@ import logoImage from "@assets/autowebinar-logo.png";
 
 interface ExpiredPlanBlockerProps {
   userName: string;
+  userEmail: string;
   expirationDate: string;
   isTrial: boolean;
   onLogout: () => void;
@@ -28,6 +29,7 @@ interface ExpiredPlanBlockerProps {
 
 export function ExpiredPlanBlocker({ 
   userName, 
+  userEmail,
   expirationDate, 
   isTrial,
   onLogout 
@@ -169,7 +171,7 @@ export function ExpiredPlanBlocker({
               <Button 
                 size="lg"
                 className="w-full h-12 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 font-semibold"
-                onClick={() => setLocation("/checkout")}
+                onClick={() => setLocation(`/checkout?renovacao=true&email=${encodeURIComponent(userEmail)}&nome=${encodeURIComponent(userName)}`)}
                 data-testid="button-upgrade-plan"
               >
                 <Crown className="w-5 h-5 mr-2" />

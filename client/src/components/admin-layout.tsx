@@ -99,6 +99,7 @@ export function AdminLayout({ children, token, onLogout }: AdminLayoutProps) {
     return (
       <ExpiredPlanBlocker 
         userName={user.name}
+        userEmail={user.email}
         expirationDate={user.accessExpiresAt!}
         isTrial={isTrial}
         onLogout={() => {
