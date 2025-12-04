@@ -8,8 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Loader2, Check, Star, Lock, ArrowRight, Zap, Video, Upload, Shield, Clock, Sparkles, CreditCard, QrCode, Barcode, RefreshCw, CheckCircle2, ShieldCheck, Bolt } from "lucide-react";
-import { SiMercadopago, SiStripe, SiVisa, SiMastercard } from "react-icons/si";
+import { Loader2, Check, Star, Lock, ArrowRight, Zap, Video, Upload, Shield, Clock, Sparkles, CreditCard, QrCode, Barcode, RefreshCw, CheckCircle2, ShieldCheck, Bolt, Mail, Bell, Globe, Send, Mic, Bot } from "lucide-react";
+import { SiMercadopago, SiStripe, SiVisa, SiMastercard, SiWhatsapp } from "react-icons/si";
 import { usePixel } from "@/hooks/use-pixel";
 import logoImage from "@assets/logo-autowebinar_1764484003666.png";
 import { initMercadoPago, Payment } from '@mercadopago/sdk-react';
@@ -489,7 +489,39 @@ export default function Checkout() {
                             </div>
                             <span className="text-slate-300">Leads capturados ilimitados</span>
                           </div>
-                          {beneficios.map((beneficio, index) => (
+                          <div className="flex items-center gap-3 text-sm">
+                            <div className="w-5 h-5 rounded-full bg-cyan-500/20 flex items-center justify-center">
+                              <Globe className="w-3 h-3 text-cyan-400" />
+                            </div>
+                            <span className="text-slate-300">Domínio customizado incluso</span>
+                          </div>
+                          <div className="flex items-center gap-3 text-sm">
+                            <div className="w-5 h-5 rounded-full bg-blue-500/20 flex items-center justify-center">
+                              <Mail className="w-3 h-3 text-blue-400" />
+                            </div>
+                            <span className="text-slate-300">Sequência de Emails</span>
+                          </div>
+                          <div className="flex items-center gap-3 text-sm">
+                            <div className="w-5 h-5 rounded-full bg-green-500/20 flex items-center justify-center">
+                              <SiWhatsapp className="w-3 h-3 text-green-400" />
+                            </div>
+                            <span className="text-slate-300">WhatsApp Marketing</span>
+                          </div>
+                          <div className="flex items-center gap-3 text-sm">
+                            <div className="w-5 h-5 rounded-full bg-orange-500/20 flex items-center justify-center">
+                              <Bell className="w-3 h-3 text-orange-400" />
+                            </div>
+                            <span className="text-slate-300">Lembretes automáticos</span>
+                          </div>
+                          {beneficios
+                            .filter((b: string) => 
+                              !b.toLowerCase().includes('suporte por email') &&
+                              !b.toLowerCase().includes('suporte prioritário') &&
+                              !b.toLowerCase().includes('api de integração') &&
+                              !b.toLowerCase().includes('gerente de conta') &&
+                              !b.toLowerCase().includes('domínio')
+                            )
+                            .map((beneficio: string, index: number) => (
                             <div key={index} className="flex items-center gap-3 text-sm">
                               <div className="w-5 h-5 rounded-full bg-green-500/20 flex items-center justify-center">
                                 <Check className="w-3 h-3 text-green-400" />

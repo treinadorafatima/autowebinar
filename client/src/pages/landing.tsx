@@ -32,7 +32,10 @@ import {
   X,
   Mic,
   Bot,
+  Send,
+  Bell,
 } from "lucide-react";
+import { SiWhatsapp } from "react-icons/si";
 
 import carlosSilvaImg from "@assets/generated_images/carlos_silva_headshot_portrait.png";
 import anaPaulaImg from "@assets/generated_images/ana_paula_headshot_portrait.png";
@@ -482,6 +485,63 @@ export default function LandingPage() {
                 <p className="text-slate-300 text-sm leading-relaxed">IA transcreve seus vídeos automaticamente. Base para roteiros e mensagens inteligentes.</p>
               </CardContent>
             </Card>
+
+            {/* Feature 10 - Email Marketing Automation - NEW */}
+            <Card className="bg-slate-800/40 border-slate-700/50 hover:border-blue-500/50 hover:bg-slate-800/60 transition-all duration-300 group backdrop-blur-sm relative overflow-hidden" data-testid="card-feature-email-automation">
+              <div className="absolute top-2 right-2">
+                <Badge className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-xs border-0" data-testid="badge-automation-email">
+                  <Send className="w-3 h-3 mr-1" />
+                  Automação
+                </Badge>
+              </div>
+              <CardHeader>
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500/20 to-indigo-600/10 flex items-center justify-center mb-4 group-hover:scale-110 group-hover:shadow-lg group-hover:shadow-blue-500/20 transition-all">
+                  <Mail className="w-7 h-7 text-blue-400" />
+                </div>
+                <CardTitle className="text-white text-lg" data-testid="text-feature-email-automation">Sequência de Emails</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-slate-300 text-sm leading-relaxed">Lembretes automáticos antes, durante e depois do webinar. Editor drag-and-drop profissional.</p>
+              </CardContent>
+            </Card>
+
+            {/* Feature 11 - WhatsApp Marketing Automation - NEW */}
+            <Card className="bg-slate-800/40 border-slate-700/50 hover:border-green-500/50 hover:bg-slate-800/60 transition-all duration-300 group backdrop-blur-sm relative overflow-hidden" data-testid="card-feature-whatsapp-automation">
+              <div className="absolute top-2 right-2">
+                <Badge className="bg-gradient-to-r from-green-500 to-emerald-500 text-white text-xs border-0" data-testid="badge-automation-whatsapp">
+                  <SiWhatsapp className="w-3 h-3 mr-1" />
+                  Automação
+                </Badge>
+              </div>
+              <CardHeader>
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-green-500/20 to-emerald-600/10 flex items-center justify-center mb-4 group-hover:scale-110 group-hover:shadow-lg group-hover:shadow-green-500/20 transition-all">
+                  <SiWhatsapp className="w-7 h-7 text-green-400" />
+                </div>
+                <CardTitle className="text-white text-lg" data-testid="text-feature-whatsapp-automation">WhatsApp Marketing</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-slate-300 text-sm leading-relaxed">Envie mensagens, imagens e vídeos automáticos. Lembretes sincronizados com o webinar.</p>
+              </CardContent>
+            </Card>
+
+            {/* Feature 12 - Reminder Sequences - NEW */}
+            <Card className="bg-slate-800/40 border-slate-700/50 hover:border-orange-500/50 hover:bg-slate-800/60 transition-all duration-300 group backdrop-blur-sm relative overflow-hidden" data-testid="card-feature-reminders">
+              <div className="absolute top-2 right-2">
+                <Badge className="bg-gradient-to-r from-orange-500 to-amber-500 text-white text-xs border-0" data-testid="badge-reminders">
+                  <Bell className="w-3 h-3 mr-1" />
+                  Lembretes
+                </Badge>
+              </div>
+              <CardHeader>
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-orange-500/20 to-amber-600/10 flex items-center justify-center mb-4 group-hover:scale-110 group-hover:shadow-lg group-hover:shadow-orange-500/20 transition-all">
+                  <Bell className="w-7 h-7 text-orange-400" />
+                </div>
+                <CardTitle className="text-white text-lg" data-testid="text-feature-reminders">Lembretes Inteligentes</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-slate-300 text-sm leading-relaxed">Sequências antes, durante e depois do webinar. Email + WhatsApp sincronizados automaticamente.</p>
+              </CardContent>
+            </Card>
           </div>
 
           {/* AI Differentiator Highlight */}
@@ -761,26 +821,64 @@ export default function LandingPage() {
                       <td className="p-4 text-center"><Check className="w-5 h-5 text-green-400 mx-auto" /></td>
                       <td className="p-4 text-center"><X className="w-5 h-5 text-red-400 mx-auto" /></td>
                     </tr>
+                    <tr className="bg-blue-500/10 hover:bg-blue-500/15 transition-colors">
+                      <td className="p-4">
+                        <div className="flex items-center gap-2">
+                          <Mail className="w-5 h-5 text-blue-400" />
+                          <span className="text-white font-medium">Automação de Email Marketing</span>
+                          <Badge className="bg-blue-500/20 text-blue-300 border-blue-500/30 text-xs">Exclusivo</Badge>
+                        </div>
+                      </td>
+                      <td className="p-4 text-center"><Check className="w-5 h-5 text-green-400 mx-auto" /></td>
+                      <td className="p-4 text-center"><X className="w-5 h-5 text-red-400 mx-auto" /></td>
+                    </tr>
+                    <tr className="bg-green-500/10 hover:bg-green-500/15 transition-colors">
+                      <td className="p-4">
+                        <div className="flex items-center gap-2">
+                          <SiWhatsapp className="w-5 h-5 text-green-400" />
+                          <span className="text-white font-medium">WhatsApp Marketing Integrado</span>
+                          <Badge className="bg-green-500/20 text-green-300 border-green-500/30 text-xs">Exclusivo</Badge>
+                        </div>
+                      </td>
+                      <td className="p-4 text-center"><Check className="w-5 h-5 text-green-400 mx-auto" /></td>
+                      <td className="p-4 text-center"><X className="w-5 h-5 text-red-400 mx-auto" /></td>
+                    </tr>
+                    <tr className="bg-orange-500/10 hover:bg-orange-500/15 transition-colors">
+                      <td className="p-4">
+                        <div className="flex items-center gap-2">
+                          <Bell className="w-5 h-5 text-orange-400" />
+                          <span className="text-white font-medium">Lembretes Automáticos (Antes/Durante/Depois)</span>
+                          <Badge className="bg-orange-500/20 text-orange-300 border-orange-500/30 text-xs">Exclusivo</Badge>
+                        </div>
+                      </td>
+                      <td className="p-4 text-center"><Check className="w-5 h-5 text-green-400 mx-auto" /></td>
+                      <td className="p-4 text-center"><X className="w-5 h-5 text-red-400 mx-auto" /></td>
+                    </tr>
+                    <tr className="hover:bg-white/5 transition-colors">
+                      <td className="p-4 text-slate-200">Domínio Customizado Incluso</td>
+                      <td className="p-4 text-center"><Check className="w-5 h-5 text-green-400 mx-auto" /></td>
+                      <td className="p-4 text-center"><X className="w-5 h-5 text-red-400 mx-auto" /></td>
+                    </tr>
                   </tbody>
                 </table>
               </div>
             </Card>
 
-            {/* AI Summary */}
+            {/* AI & Automation Summary */}
             <div className="mt-8 text-center">
-              <div className="inline-flex flex-col sm:flex-row items-center gap-4 px-8 py-5 rounded-2xl bg-gradient-to-r from-violet-500/10 via-purple-500/10 to-emerald-500/10 border border-violet-500/20 backdrop-blur-sm">
+              <div className="inline-flex flex-col sm:flex-row items-center gap-4 px-8 py-5 rounded-2xl bg-gradient-to-r from-violet-500/10 via-green-500/10 to-blue-500/10 border border-violet-500/20 backdrop-blur-sm">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg shadow-violet-500/30">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-green-600 flex items-center justify-center shadow-lg shadow-violet-500/30">
                     <Bot className="w-6 h-6 text-white" />
                   </div>
                   <div className="text-left">
-                    <div className="text-white font-semibold">3 Ferramentas IA Exclusivas</div>
-                    <div className="text-slate-400 text-sm">que nenhum concorrente oferece</div>
+                    <div className="text-white font-semibold">IA + Automação Completa</div>
+                    <div className="text-slate-400 text-sm">Email, WhatsApp e lembretes integrados</div>
                   </div>
                 </div>
                 <div className="hidden sm:block w-px h-10 bg-white/10" />
                 <div className="text-slate-300 text-sm max-w-xs">
-                  Economize <strong className="text-white">horas de trabalho</strong> com roteiros e mensagens gerados automaticamente
+                  <strong className="text-white">Venda no piloto automático</strong> com comunicação multicanal sincronizada
                 </div>
               </div>
             </div>
@@ -878,20 +976,40 @@ export default function LandingPage() {
                           <Check className="w-5 h-5 text-green-400 flex-shrink-0" />
                           <span>Leads capturados ilimitados</span>
                         </div>
+                        <div className="flex items-center gap-2 text-slate-200">
+                          <Globe className="w-5 h-5 text-cyan-400 flex-shrink-0" />
+                          <span>Domínio customizado incluso</span>
+                        </div>
+                        
+                        {/* Automation Features Highlight */}
+                        <div className="pt-2 pb-1">
+                          <div className="flex items-center gap-1.5 mb-2">
+                            <Send className="w-4 h-4 text-blue-400" />
+                            <span className="text-xs font-semibold text-blue-400 uppercase tracking-wide">Automação Completa</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-slate-200">
+                            <Mail className="w-5 h-5 text-blue-400 flex-shrink-0" />
+                            <span>Sequência de Emails</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-slate-200 mt-2">
+                            <SiWhatsapp className="w-5 h-5 text-green-400 flex-shrink-0" />
+                            <span>WhatsApp Marketing</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-slate-200 mt-2">
+                            <Bell className="w-5 h-5 text-orange-400 flex-shrink-0" />
+                            <span>Lembretes automáticos</span>
+                          </div>
+                        </div>
                         
                         {/* AI Features Highlight */}
                         <div className="pt-2 pb-1">
                           <div className="flex items-center gap-1.5 mb-2">
                             <Bot className="w-4 h-4 text-violet-400" />
-                            <span className="text-xs font-semibold text-violet-400 uppercase tracking-wide">Ferramentas IA Exclusivas</span>
+                            <span className="text-xs font-semibold text-violet-400 uppercase tracking-wide">Ferramentas IA</span>
                           </div>
                           <div className="flex items-center gap-2 text-slate-200">
                             <Sparkles className="w-5 h-5 text-violet-400 flex-shrink-0" />
                             <span>Gerador de Roteiro IA</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-slate-200 mt-2">
-                            <Mail className="w-5 h-5 text-emerald-400 flex-shrink-0" />
-                            <span>Gerador de Mensagens IA</span>
                           </div>
                           <div className="flex items-center gap-2 text-slate-200 mt-2">
                             <Mic className="w-5 h-5 text-rose-400 flex-shrink-0" />
@@ -899,7 +1017,15 @@ export default function LandingPage() {
                           </div>
                         </div>
                         
-                        {beneficios.map((beneficio, idx) => (
+                        {beneficios
+                          .filter((b: string) => 
+                            !b.toLowerCase().includes('suporte por email') &&
+                            !b.toLowerCase().includes('suporte prioritário') &&
+                            !b.toLowerCase().includes('api de integração') &&
+                            !b.toLowerCase().includes('gerente de conta') &&
+                            !b.toLowerCase().includes('domínio')
+                          )
+                          .map((beneficio: string, idx: number) => (
                           <div key={idx} className="flex items-center gap-2 text-slate-200">
                             <Check className="w-5 h-5 text-green-400 flex-shrink-0" />
                             <span>{beneficio}</span>

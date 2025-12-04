@@ -46,8 +46,12 @@ import {
   Bot,
   FileText,
   Mail,
-  Mic
+  Mic,
+  Send,
+  Bell,
+  Globe
 } from "lucide-react";
+import { SiWhatsapp } from "react-icons/si";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -330,20 +334,42 @@ export default function AdminSubscription() {
                   </div>
                 </div>
 
+                {/* Automation Features included in Trial */}
+                <div className="p-3 rounded-lg bg-gradient-to-r from-blue-500/10 via-green-500/10 to-orange-500/10 border border-blue-500/20" data-testid="section-automation-features-trial">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Send className="w-4 h-4 text-blue-500" />
+                    <span className="text-sm font-medium" data-testid="text-automation-features-trial-title">Automação Completa</span>
+                  </div>
+                  <div className="grid gap-1.5 text-sm">
+                    <div className="flex items-center gap-2" data-testid="text-trial-email-sequence">
+                      <Mail className="w-3.5 h-3.5 text-blue-500" />
+                      <span className="text-muted-foreground">Sequência de Emails</span>
+                    </div>
+                    <div className="flex items-center gap-2" data-testid="text-trial-whatsapp">
+                      <SiWhatsapp className="w-3.5 h-3.5 text-green-500" />
+                      <span className="text-muted-foreground">WhatsApp Marketing</span>
+                    </div>
+                    <div className="flex items-center gap-2" data-testid="text-trial-reminders">
+                      <Bell className="w-3.5 h-3.5 text-orange-500" />
+                      <span className="text-muted-foreground">Lembretes automáticos</span>
+                    </div>
+                    <div className="flex items-center gap-2" data-testid="text-trial-custom-domain">
+                      <Globe className="w-3.5 h-3.5 text-cyan-500" />
+                      <span className="text-muted-foreground">Domínio customizado</span>
+                    </div>
+                  </div>
+                </div>
+
                 {/* AI Features included in Trial */}
                 <div className="p-3 rounded-lg bg-gradient-to-r from-violet-500/10 via-purple-500/10 to-emerald-500/10 border border-violet-500/20" data-testid="section-ai-features-trial">
                   <div className="flex items-center gap-2 mb-2">
                     <Bot className="w-4 h-4 text-violet-500" />
-                    <span className="text-sm font-medium" data-testid="text-ai-features-trial-title">Ferramentas IA Exclusivas</span>
+                    <span className="text-sm font-medium" data-testid="text-ai-features-trial-title">Ferramentas IA</span>
                   </div>
                   <div className="grid gap-1.5 text-sm">
                     <div className="flex items-center gap-2" data-testid="text-trial-script-generator">
                       <FileText className="w-3.5 h-3.5 text-violet-500" />
                       <span className="text-muted-foreground">Gerador de Roteiro IA</span>
-                    </div>
-                    <div className="flex items-center gap-2" data-testid="text-trial-message-generator">
-                      <Mail className="w-3.5 h-3.5 text-emerald-500" />
-                      <span className="text-muted-foreground">Gerador de Mensagens IA</span>
                     </div>
                     <div className="flex items-center gap-2" data-testid="text-trial-transcription">
                       <Mic className="w-3.5 h-3.5 text-rose-500" />
@@ -417,20 +443,42 @@ export default function AdminSubscription() {
                   </div>
                 </div>
 
+                {/* Automation Features included */}
+                <div className="p-3 rounded-lg bg-gradient-to-r from-blue-500/10 via-green-500/10 to-orange-500/10 border border-blue-500/20" data-testid="section-automation-features-plan">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Send className="w-4 h-4 text-blue-500" />
+                    <span className="text-sm font-medium" data-testid="text-automation-features-plan-title">Automação Completa</span>
+                  </div>
+                  <div className="grid gap-1.5 text-sm">
+                    <div className="flex items-center gap-2" data-testid="text-plan-email-sequence">
+                      <Mail className="w-3.5 h-3.5 text-blue-500" />
+                      <span className="text-muted-foreground">Sequência de Emails</span>
+                    </div>
+                    <div className="flex items-center gap-2" data-testid="text-plan-whatsapp">
+                      <SiWhatsapp className="w-3.5 h-3.5 text-green-500" />
+                      <span className="text-muted-foreground">WhatsApp Marketing</span>
+                    </div>
+                    <div className="flex items-center gap-2" data-testid="text-plan-reminders">
+                      <Bell className="w-3.5 h-3.5 text-orange-500" />
+                      <span className="text-muted-foreground">Lembretes automáticos</span>
+                    </div>
+                    <div className="flex items-center gap-2" data-testid="text-plan-custom-domain">
+                      <Globe className="w-3.5 h-3.5 text-cyan-500" />
+                      <span className="text-muted-foreground">Domínio customizado</span>
+                    </div>
+                  </div>
+                </div>
+
                 {/* AI Features included */}
                 <div className="p-3 rounded-lg bg-gradient-to-r from-violet-500/10 via-purple-500/10 to-emerald-500/10 border border-violet-500/20" data-testid="section-ai-features-plan">
                   <div className="flex items-center gap-2 mb-2">
                     <Bot className="w-4 h-4 text-violet-500" />
-                    <span className="text-sm font-medium" data-testid="text-ai-features-plan-title">Ferramentas IA Exclusivas</span>
+                    <span className="text-sm font-medium" data-testid="text-ai-features-plan-title">Ferramentas IA</span>
                   </div>
                   <div className="grid gap-1.5 text-sm">
                     <div className="flex items-center gap-2" data-testid="text-plan-script-generator">
                       <FileText className="w-3.5 h-3.5 text-violet-500" />
                       <span className="text-muted-foreground">Gerador de Roteiro IA</span>
-                    </div>
-                    <div className="flex items-center gap-2" data-testid="text-plan-message-generator">
-                      <Mail className="w-3.5 h-3.5 text-emerald-500" />
-                      <span className="text-muted-foreground">Gerador de Mensagens IA</span>
                     </div>
                     <div className="flex items-center gap-2" data-testid="text-plan-transcription">
                       <Mic className="w-3.5 h-3.5 text-rose-500" />
