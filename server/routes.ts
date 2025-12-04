@@ -2516,12 +2516,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const { text, author, timestamp, sessionId } = req.body;
       
+      console.log("[live-comment] Received:", { text, author, timestamp, sessionId });
+      
       if (!text || !author) {
         return res.status(400).json({ error: "Text and author are required" });
       }
       
-      const authorPattern = /^.+ – .+ \([A-Z]{2}\)$/;
+      // Padrão mais flexível: Nome - Cidade (UF) ou Nome – Cidade (UF)
+      // Aceita tanto traço simples (-) quanto en-dash (–)
+      const authorPattern = /^.+\s[–-]\s.+\s\([A-Z]{2}\)$/;
       if (!authorPattern.test(author)) {
+        console.log("[live-comment] Author pattern failed for:", JSON.stringify(author));
         return res.status(400).json({ error: "Invalid author format. Use: Name – City (State)" });
       }
       
