@@ -2,6 +2,8 @@ import { storage } from "./storage";
 import { db } from "./db";
 import { leads, emailSequences, whatsappSequences, scheduledEmails, scheduledWhatsappMessages } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
+import { calculateNextSession } from "./session-calculator";
+import { fromZonedTime } from "date-fns-tz";
 
 interface RescheduleResult {
   emailsCancelled: number;
@@ -19,10 +21,27 @@ interface LeadSessionInfo {
   name: string | null;
 }
 
-function calculateSendAt(sessionDate: string, startHour: number, startMinute: number, offsetMinutes: number): Date {
+interface WebinarScheduleConfig {
+  startHour: number;
+  startMinute: number;
+  timezone: string;
+  recurrence: string;
+  onceDate?: string | null;
+  dayOfWeek?: number | null;
+  dayOfMonth?: number | null;
+}
+
+function calculateSendAtWithTimezone(
+  sessionDate: string,
+  startHour: number,
+  startMinute: number,
+  offsetMinutes: number,
+  timezone: string
+): Date {
   const [year, month, day] = sessionDate.split("-").map(Number);
-  const baseTime = new Date(year, month - 1, day, startHour, startMinute, 0, 0);
-  return new Date(baseTime.getTime() + offsetMinutes * 60 * 1000);
+  const sessionInTz = new Date(year, month - 1, day, startHour, startMinute, 0, 0);
+  const sessionUtc = fromZonedTime(sessionInTz, timezone);
+  return new Date(sessionUtc.getTime() + offsetMinutes * 60 * 1000);
 }
 
 function extractSessionDateFromSessionId(sessionId: string | null, webinarId: string): string | null {
@@ -97,10 +116,12 @@ async function getLeadsWithSessionsForWebinar(webinarId: string, adminId: string
 export async function rescheduleSequencesForWebinar(
   webinarId: string,
   adminId: string,
-  newStartHour: number,
-  newStartMinute: number
+  config: WebinarScheduleConfig
 ): Promise<RescheduleResult> {
-  console.log(`[sequence-sync] Starting reschedule for webinar ${webinarId} (new time: ${newStartHour}:${newStartMinute})`);
+  const { startHour, startMinute, timezone, recurrence, onceDate, dayOfWeek, dayOfMonth } = config;
+  
+  console.log(`[sequence-sync] Starting reschedule for webinar ${webinarId}`);
+  console.log(`[sequence-sync] New config: ${startHour}:${startMinute} ${timezone}, recurrence=${recurrence}`);
   
   const result: RescheduleResult = {
     emailsCancelled: 0,
@@ -114,6 +135,23 @@ export async function rescheduleSequencesForWebinar(
     result.emailsCancelled = cancelResult.emailsCancelled;
     result.whatsappCancelled = cancelResult.whatsappCancelled;
     
+    const nextSession = calculateNextSession({
+      startHour,
+      startMinute,
+      timezone,
+      recurrence,
+      onceDate,
+      dayOfWeek,
+      dayOfMonth,
+    });
+    
+    if (!nextSession) {
+      console.log(`[sequence-sync] No upcoming session found for webinar ${webinarId}, no sequences to reschedule`);
+      return result;
+    }
+    
+    console.log(`[sequence-sync] Next session: ${nextSession.sessionDate} at ${startHour}:${startMinute} ${timezone}`);
+    
     const leadsWithSessions = await getLeadsWithSessionsForWebinar(webinarId, adminId);
     
     if (leadsWithSessions.length === 0) {
@@ -121,7 +159,7 @@ export async function rescheduleSequencesForWebinar(
       return result;
     }
     
-    console.log(`[sequence-sync] Found ${leadsWithSessions.length} leads with future sessions to reschedule`);
+    console.log(`[sequence-sync] Found ${leadsWithSessions.length} leads with sessions to reschedule`);
 
     const emailSequencesList = await storage.listEmailSequencesByWebinar(webinarId);
     const whatsappSequencesList = await storage.listWhatsappSequencesByWebinar(webinarId);
@@ -132,13 +170,16 @@ export async function rescheduleSequencesForWebinar(
     const now = new Date();
 
     for (const leadInfo of leadsWithSessions) {
+      const sessionDateToUse = leadInfo.webinarSessionDate;
+      
       if (leadInfo.email) {
         for (const sequence of activeEmailSequences) {
-          const sendAt = calculateSendAt(
-            leadInfo.webinarSessionDate,
-            newStartHour,
-            newStartMinute,
-            sequence.offsetMinutes
+          const sendAt = calculateSendAtWithTimezone(
+            sessionDateToUse,
+            startHour,
+            startMinute,
+            sequence.offsetMinutes,
+            timezone
           );
           
           if (sendAt > now) {
@@ -151,7 +192,7 @@ export async function rescheduleSequencesForWebinar(
               targetName: leadInfo.name,
               sendAt,
               status: "queued",
-              webinarSessionDate: leadInfo.webinarSessionDate,
+              webinarSessionDate: sessionDateToUse,
             });
             result.emailsRescheduled++;
             console.log(`[sequence-sync] Created email schedule for lead ${leadInfo.leadId}, sequence ${sequence.id}, sendAt ${sendAt.toISOString()}`);
@@ -161,11 +202,12 @@ export async function rescheduleSequencesForWebinar(
       
       if (leadInfo.phone) {
         for (const sequence of activeWhatsappSequences) {
-          const sendAt = calculateSendAt(
-            leadInfo.webinarSessionDate,
-            newStartHour,
-            newStartMinute,
-            sequence.offsetMinutes
+          const sendAt = calculateSendAtWithTimezone(
+            sessionDateToUse,
+            startHour,
+            startMinute,
+            sequence.offsetMinutes,
+            timezone
           );
           
           if (sendAt > now) {
@@ -178,7 +220,7 @@ export async function rescheduleSequencesForWebinar(
               targetName: leadInfo.name,
               sendAt,
               status: "queued",
-              webinarSessionDate: leadInfo.webinarSessionDate,
+              webinarSessionDate: sessionDateToUse,
             });
             result.whatsappRescheduled++;
             console.log(`[sequence-sync] Created whatsapp schedule for lead ${leadInfo.leadId}, sequence ${sequence.id}, sendAt ${sendAt.toISOString()}`);

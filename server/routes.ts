@@ -2108,14 +2108,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const startHourChanged = updatedData.startHour !== undefined && updatedData.startHour !== currentWebinar.startHour;
       const startMinuteChanged = updatedData.startMinute !== undefined && updatedData.startMinute !== currentWebinar.startMinute;
+      const onceDateChanged = updatedData.onceDate !== undefined && updatedData.onceDate !== currentWebinar.onceDate;
+      const dayOfWeekChanged = updatedData.dayOfWeek !== undefined && updatedData.dayOfWeek !== currentWebinar.dayOfWeek;
+      const dayOfMonthChanged = updatedData.dayOfMonth !== undefined && updatedData.dayOfMonth !== currentWebinar.dayOfMonth;
+      const recurrenceChanged = updatedData.recurrence !== undefined && updatedData.recurrence !== currentWebinar.recurrence;
+      const timezoneChanged = updatedData.timezone !== undefined && updatedData.timezone !== currentWebinar.timezone;
       
-      if (startHourChanged || startMinuteChanged) {
+      const scheduleChanged = startHourChanged || startMinuteChanged || onceDateChanged || 
+                              dayOfWeekChanged || dayOfMonthChanged || recurrenceChanged || timezoneChanged;
+      
+      if (scheduleChanged) {
         const newStartHour = updatedData.startHour ?? currentWebinar.startHour ?? 19;
         const newStartMinute = updatedData.startMinute ?? currentWebinar.startMinute ?? 0;
+        const newTimezone = updatedData.timezone ?? currentWebinar.timezone ?? "America/Sao_Paulo";
+        const newRecurrence = updatedData.recurrence ?? currentWebinar.recurrence ?? "daily";
+        const newOnceDate = updatedData.onceDate ?? currentWebinar.onceDate;
+        const newDayOfWeek = updatedData.dayOfWeek ?? currentWebinar.dayOfWeek;
+        const newDayOfMonth = updatedData.dayOfMonth ?? currentWebinar.dayOfMonth;
         
-        console.log(`[webinar] Start time changed for webinar ${req.params.id}, rescheduling sequences`);
+        console.log(`[webinar] Schedule changed for webinar ${req.params.id}, rescheduling sequences`);
+        console.log(`[webinar] Changes: hour=${startHourChanged}, minute=${startMinuteChanged}, date=${onceDateChanged}, dayOfWeek=${dayOfWeekChanged}, dayOfMonth=${dayOfMonthChanged}, recurrence=${recurrenceChanged}, timezone=${timezoneChanged}`);
         
-        rescheduleSequencesForWebinar(req.params.id, admin.id, newStartHour, newStartMinute)
+        rescheduleSequencesForWebinar(req.params.id, admin.id, {
+          startHour: newStartHour,
+          startMinute: newStartMinute,
+          timezone: newTimezone,
+          recurrence: newRecurrence,
+          onceDate: newOnceDate,
+          dayOfWeek: newDayOfWeek,
+          dayOfMonth: newDayOfMonth,
+        })
           .then(result => {
             console.log(`[webinar] Reschedule complete:`, result);
           })
