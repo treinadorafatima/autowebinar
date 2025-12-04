@@ -5995,11 +5995,13 @@ Seja conversacional e objetivo.`;
 
   app.get("/api/checkout/planos/ativos", async (req, res) => {
     try {
-      const { renovacao } = req.query;
+      const { renovacao, incluirTodos } = req.query;
       let planos = await storage.listCheckoutPlanosAtivos();
       
-      // Filter for renewal-only plans if renovacao=true is passed
-      if (renovacao === 'true') {
+      // By default, only show plans available for renewal (hide test/internal plans)
+      // Plans with disponivelRenovacao=false are considered internal/test plans
+      // Use incluirTodos=true to show all active plans (for admin purposes)
+      if (incluirTodos !== 'true') {
         planos = planos.filter(p => p.disponivelRenovacao === true);
       }
       

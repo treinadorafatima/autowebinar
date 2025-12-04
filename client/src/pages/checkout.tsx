@@ -152,15 +152,7 @@ export default function Checkout() {
   const [mpInitPoint, setMpInitPoint] = useState<string | null>(null);
 
   const { data: planos, isLoading: loadingPlanos } = useQuery<Plano[]>({
-    queryKey: ["/api/checkout/planos/ativos", isRenovacao ? "renovacao" : "todos"],
-    queryFn: async () => {
-      const url = isRenovacao 
-        ? "/api/checkout/planos/ativos?renovacao=true" 
-        : "/api/checkout/planos/ativos";
-      const res = await fetch(url);
-      if (!res.ok) throw new Error("Erro ao carregar planos");
-      return res.json();
-    },
+    queryKey: ["/api/checkout/planos/ativos"],
   });
 
   const { data: gatewayConfig } = useQuery<GatewayConfig>({
@@ -524,9 +516,7 @@ export default function Checkout() {
                 </div>
               )}
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-12">
-                {planos
-                  ?.filter((plano) => !isRenovacao || plano.disponivelRenovacao)
-                  .map((plano) => {
+                {planos?.map((plano) => {
                   const beneficios = getBeneficios(plano.beneficios);
                   return (
                     <Card
