@@ -2522,12 +2522,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Text and author are required" });
       }
       
-      // Padrão mais flexível: Nome - Cidade (UF) ou Nome – Cidade (UF)
+      // Formatos aceitos (dependendo das configurações do chat):
+      // 1. "Nome – Cidade (UF)" - formato completo
+      // 2. "Nome – Cidade" - sem estado
+      // 3. "Nome – (UF)" - sem cidade
+      // 4. "Nome" - apenas nome (quando cidade e estado não são obrigatórios)
       // Aceita tanto traço simples (-) quanto en-dash (–)
-      const authorPattern = /^.+\s[–-]\s.+\s\([A-Z]{2}\)$/;
-      if (!authorPattern.test(author)) {
+      const fullPattern = /^.+\s[–-]\s.+\s\([A-Z]{2}\)$/; // Nome – Cidade (UF)
+      const cityOnlyPattern = /^.+\s[–-]\s[^()]+$/; // Nome – Cidade
+      const stateOnlyPattern = /^.+\s[–-]\s\([A-Z]{2}\)$/; // Nome – (UF)
+      const nameOnlyPattern = /^.+$/; // Nome (qualquer texto)
+      
+      // Aceita qualquer formato válido
+      const isValidFormat = fullPattern.test(author) || 
+                           cityOnlyPattern.test(author) || 
+                           stateOnlyPattern.test(author) || 
+                           nameOnlyPattern.test(author);
+      
+      if (!isValidFormat || author.trim().length === 0) {
         console.log("[live-comment] Author pattern failed for:", JSON.stringify(author));
-        return res.status(400).json({ error: "Invalid author format. Use: Name – City (State)" });
+        return res.status(400).json({ error: "Invalid author format" });
       }
       
       const today = new Date();

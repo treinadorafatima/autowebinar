@@ -31,6 +31,7 @@ import {
   Settings,
   Palette,
   MessageSquare,
+  MessageCircle,
   Code,
   Clock,
   Edit,
