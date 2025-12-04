@@ -52,6 +52,8 @@ interface Plano {
   beneficios: string;
   destaque: boolean;
   ordem: number;
+  criadoEm?: string;
+  atualizadoEm?: string;
 }
 
 const defaultPlano: Partial<Plano> = {
@@ -165,8 +167,9 @@ export default function AdminCheckoutPlanos() {
       .map((b) => b.trim())
       .filter((b) => b.length > 0);
 
+    const { criadoEm, atualizadoEm, ...planoWithoutDates } = editingPlano as Plano;
     const planoData = {
-      ...editingPlano,
+      ...planoWithoutDates,
       beneficios: JSON.stringify(beneficiosArray),
     };
 
