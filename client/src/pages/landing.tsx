@@ -1023,6 +1023,18 @@ export default function LandingPage() {
                             <Mic className="w-5 h-5 text-rose-400 flex-shrink-0" />
                             <span>Transcrição Automática</span>
                           </div>
+                          <div className="flex items-center gap-2 text-slate-200 mt-2">
+                            <Check className="w-5 h-5 text-green-400 flex-shrink-0" />
+                            <span>Chat simulado inteligente</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-slate-200 mt-2">
+                            <Check className="w-5 h-5 text-green-400 flex-shrink-0" />
+                            <span>Agendamento automático</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-slate-200 mt-2">
+                            <Check className="w-5 h-5 text-green-400 flex-shrink-0" />
+                            <span>Designer IA</span>
+                          </div>
                         </div>
                         
                         {beneficios
@@ -1031,7 +1043,17 @@ export default function LandingPage() {
                             !b.toLowerCase().includes('suporte prioritário') &&
                             !b.toLowerCase().includes('api de integração') &&
                             !b.toLowerCase().includes('gerente de conta') &&
-                            !b.toLowerCase().includes('domínio')
+                            !b.toLowerCase().includes('domínio') &&
+                            !b.toLowerCase().includes('replay automático') &&
+                            !b.toLowerCase().includes('ofertas cronometradas') &&
+                            !b.toLowerCase().includes('gerador de roteiro') &&
+                            !b.toLowerCase().includes('transcrição automática') &&
+                            !b.toLowerCase().includes('chat simulado') &&
+                            !b.toLowerCase().includes('agendamento automático') &&
+                            !b.toLowerCase().includes('designer ia') &&
+                            !b.toLowerCase().includes('sequência de emails') &&
+                            !b.toLowerCase().includes('whatsapp') &&
+                            !b.toLowerCase().includes('lembretes automáticos')
                           )
                           .map((beneficio: string, idx: number) => (
                           <div key={idx} className="flex items-center gap-2 text-slate-200">
