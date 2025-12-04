@@ -90,12 +90,13 @@ interface SubscriptionInfo {
   consumo: {
     webinarsUsados: number;
     webinarsLimite: number;
-    storageUsadoMB: number;
-    storageLimiteMB: number;
+    storageUsadoGB: number;
+    storageLimiteGB: number;
     uploadsUsados: number;
     uploadsLimite: number;
     visualizacoes?: number;
     leadsCapturados?: number;
+    isSuperadmin?: boolean;
   };
   faturas: Array<{
     id: string;
@@ -246,12 +247,13 @@ export default function AdminSubscription() {
   const isActive = assinatura?.status === "active";
   const needsRenewal = !isActive || isExpired || assinatura?.status === "paused";
 
-  const webinarPercent = consumo.webinarsLimite > 0 
+  const isUnlimited = consumo.isSuperadmin || consumo.webinarsLimite === -1;
+  const webinarPercent = isUnlimited ? 0 : (consumo.webinarsLimite > 0 
     ? Math.min((consumo.webinarsUsados / consumo.webinarsLimite) * 100, 100) 
-    : 0;
-  const storagePercent = consumo.storageLimiteMB > 0 
-    ? Math.min((consumo.storageUsadoMB / consumo.storageLimiteMB) * 100, 100) 
-    : 0;
+    : 0);
+  const storagePercent = isUnlimited ? 0 : (consumo.storageLimiteGB > 0 
+    ? Math.min((consumo.storageUsadoGB / consumo.storageLimiteGB) * 100, 100) 
+    : 0);
 
   // Check if there are higher tier plans available for upgrade
   const hasUpgradeOption = plano && planosDisponiveis?.some(p => p.preco > plano.preco);
@@ -582,15 +584,16 @@ export default function AdminSubscription() {
               <div className="relative h-6 rounded bg-gray-200 dark:bg-gray-700 overflow-hidden">
                 <div 
                   className="absolute inset-y-0 left-0 bg-purple-500 transition-all duration-300 rounded-l"
-                  style={{ width: `${consumo.webinarsLimite >= 999 ? 0 : webinarPercent}%` }}
+                  style={{ width: `${isUnlimited ? 0 : webinarPercent}%` }}
                 />
                 <div className="absolute inset-0 flex items-center justify-between px-2">
                   <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                    {consumo.webinarsUsados} de {consumo.webinarsLimite >= 999 ? "∞" : consumo.webinarsLimite}
+                    {consumo.webinarsUsados} de {isUnlimited ? "∞" : consumo.webinarsLimite}
                   </span>
+                  {isUnlimited && <span className="text-xs font-medium text-green-600">Ilimitado</span>}
                 </div>
               </div>
-              {webinarPercent >= 90 && consumo.webinarsLimite < 999 && (
+              {!isUnlimited && webinarPercent >= 90 && (
                 <p className="text-xs text-orange-500">Você está próximo do limite de webinários</p>
               )}
             </div>
@@ -603,15 +606,16 @@ export default function AdminSubscription() {
               <div className="relative h-6 rounded bg-gray-200 dark:bg-gray-700 overflow-hidden">
                 <div 
                   className="absolute inset-y-0 left-0 bg-purple-500 transition-all duration-300 rounded-l"
-                  style={{ width: `${storagePercent}%` }}
+                  style={{ width: `${isUnlimited ? 0 : storagePercent}%` }}
                 />
                 <div className="absolute inset-0 flex items-center justify-between px-2">
                   <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                    {(consumo.storageUsadoMB / 1024).toFixed(2)}GB de {(consumo.storageLimiteMB / 1024).toFixed(0)}GB
+                    {consumo.storageUsadoGB.toFixed(2)}GB de {isUnlimited ? "∞" : `${consumo.storageLimiteGB}GB`}
                   </span>
+                  {isUnlimited && <span className="text-xs font-medium text-green-600">Ilimitado</span>}
                 </div>
               </div>
-              {storagePercent >= 90 && (
+              {!isUnlimited && storagePercent >= 90 && (
                 <p className="text-xs text-orange-500">Você está próximo do limite de armazenamento</p>
               )}
             </div>

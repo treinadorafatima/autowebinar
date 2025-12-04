@@ -1142,51 +1142,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Verificar limites para TODOS os usuários (incluindo superadmin)
-      // Buscar plano do usuário para verificar limites
-      let storageLimitGB = 5; // Padrão 5GB
-      let uploadLimit = admin.uploadLimit || 5;
+      // Superadmin tem limites ilimitados
+      const isSuperadmin = admin.role === "superadmin";
       
-      if (admin.planoId) {
-        const plano = await storage.getCheckoutPlanoById(admin.planoId);
-        if (plano) {
-          storageLimitGB = plano.storageLimit || 5;
-          uploadLimit = plano.uploadLimit || uploadLimit;
+      if (!isSuperadmin) {
+        // Buscar plano do usuário para verificar limites
+        let storageLimitGB = 5; // Padrão 5GB
+        let uploadLimit = admin.uploadLimit || 5;
+        
+        if (admin.planoId) {
+          const plano = await storage.getCheckoutPlanoById(admin.planoId);
+          if (plano) {
+            storageLimitGB = plano.storageLimit || 5;
+            uploadLimit = plano.uploadLimit || uploadLimit;
+          }
         }
-      }
-      
-      // Calcular storage usado
-      const videos = await storage.listVideosByOwner(admin.id);
-      let storageUsedBytes = 0;
-      for (const video of videos) {
-        if (video.fileSize) {
-          storageUsedBytes += video.fileSize;
+        
+        // Calcular storage usado
+        const videos = await storage.listVideosByOwner(admin.id);
+        let storageUsedBytes = 0;
+        for (const video of videos) {
+          if (video.fileSize) {
+            storageUsedBytes += video.fileSize;
+          }
         }
-      }
-      
-      // Converter para MB e GB
-      const storageUsedMB = storageUsedBytes / (1024 * 1024);
-      const storageLimitMB = storageLimitGB * 1024;
-      const fileSizeMB = req.file.size / (1024 * 1024);
-      
-      // Verificar se o upload vai exceder o limite
-      if (storageUsedMB + fileSizeMB > storageLimitMB) {
-        if (req.file?.path && existsSync(req.file.path)) {
-          unlinkSync(req.file.path);
+        
+        // Converter para MB e GB
+        const storageUsedMB = storageUsedBytes / (1024 * 1024);
+        const storageLimitMB = storageLimitGB * 1024;
+        const fileSizeMB = req.file.size / (1024 * 1024);
+        
+        // Verificar se o upload vai exceder o limite
+        if (storageUsedMB + fileSizeMB > storageLimitMB) {
+          if (req.file?.path && existsSync(req.file.path)) {
+            unlinkSync(req.file.path);
+          }
+          return res.status(403).json({ 
+            error: `Limite de armazenamento atingido. Você está usando ${storageUsedMB.toFixed(1)}MB de ${storageLimitGB}GB. Este arquivo tem ${fileSizeMB.toFixed(1)}MB. Faça upgrade do seu plano para mais espaço.` 
+          });
         }
-        return res.status(403).json({ 
-          error: `Limite de armazenamento atingido. Você está usando ${storageUsedMB.toFixed(1)}MB de ${storageLimitGB}GB. Este arquivo tem ${fileSizeMB.toFixed(1)}MB. Faça upgrade do seu plano para mais espaço.` 
-        });
-      }
-      
-      // Verificar limite de uploads (número de vídeos)
-      if (videos.length >= uploadLimit) {
-        if (req.file?.path && existsSync(req.file.path)) {
-          unlinkSync(req.file.path);
+        
+        // Verificar limite de uploads (número de vídeos)
+        if (videos.length >= uploadLimit) {
+          if (req.file?.path && existsSync(req.file.path)) {
+            unlinkSync(req.file.path);
+          }
+          return res.status(403).json({ 
+            error: `Limite de uploads atingido (${videos.length}/${uploadLimit}). Faça upgrade do seu plano para mais uploads.` 
+          });
         }
-        return res.status(403).json({ 
-          error: `Limite de uploads atingido (${videos.length}/${uploadLimit}). Faça upgrade do seu plano para mais uploads.` 
-        });
       }
       
       console.log("[upload] Salvando no storage...");
@@ -1883,34 +1887,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Unauthorized" });
       }
       
-      // Verificar limite de webinars para TODOS os usuários (incluindo superadmin)
       const admin = await storage.getAdminByEmail(email);
       if (!admin) {
         return res.status(401).json({ error: "Admin not found" });
       }
       
-      // Verificar se o plano está ativo (não expirado)
-      if (!isAdminPlanActive(admin)) {
+      // Superadmin tem limites ilimitados
+      const isSuperadmin = admin.role === "superadmin";
+      
+      // Verificar se o plano está ativo (não expirado) - superadmin sempre ativo
+      if (!isSuperadmin && !isAdminPlanActive(admin)) {
         return res.status(403).json({ 
           error: "Plano expirado. Renove seu plano para criar novos webinars.",
           reason: "plan_expired"
         });
       }
       
-      // Buscar limite do plano se existir
-      let webinarLimit = admin.webinarLimit || 5;
-      if (admin.planoId) {
-        const plano = await storage.getCheckoutPlanoById(admin.planoId);
-        if (plano) {
-          webinarLimit = plano.webinarLimit || webinarLimit;
+      // Verificar limite de webinars apenas para usuários normais
+      if (!isSuperadmin) {
+        let webinarLimit = admin.webinarLimit || 5;
+        if (admin.planoId) {
+          const plano = await storage.getCheckoutPlanoById(admin.planoId);
+          if (plano) {
+            webinarLimit = plano.webinarLimit || webinarLimit;
+          }
         }
-      }
-      
-      const currentCount = await storage.countWebinarsByOwner(admin.id);
-      if (currentCount >= webinarLimit) {
-        return res.status(403).json({ 
-          error: `Limite de webinars atingido (${currentCount}/${webinarLimit}). Faça upgrade do seu plano para criar mais webinars.` 
-        });
+        
+        const currentCount = await storage.countWebinarsByOwner(admin.id);
+        if (currentCount >= webinarLimit) {
+          return res.status(403).json({ 
+            error: `Limite de webinars atingido (${currentCount}/${webinarLimit}). Faça upgrade do seu plano para criar mais webinars.` 
+          });
+        }
       }
       
       // Generate slug from name if not provided
@@ -7658,21 +7666,29 @@ Seja conversacional e objetivo.`;
       const webinars = await storage.listWebinarsByOwner(admin.id);
       const videos = await storage.listVideosByOwner(admin.id);
       
-      // Calculate storage used (in MB)
-      let storageUsedMB = 0;
+      // Calculate storage used (in bytes then convert to GB for display)
+      let storageUsedBytes = 0;
       for (const video of videos) {
         if (video.fileSize) {
-          storageUsedMB += video.fileSize / (1024 * 1024);
+          storageUsedBytes += video.fileSize;
         }
       }
+      const storageUsedGB = storageUsedBytes / (1024 * 1024 * 1024);
+      
+      // Superadmin tem limites ilimitados
+      const isSuperadmin = admin.role === "superadmin";
+      const webinarsLimite = isSuperadmin ? -1 : (plano?.webinarLimit || admin.webinarLimit || 5);
+      const storageLimiteGB = isSuperadmin ? -1 : (plano?.storageLimit || 5);
+      const uploadsLimite = isSuperadmin ? -1 : (plano?.uploadLimit || admin.uploadLimit || 5);
 
       const consumo = {
         webinarsUsados: webinars.length,
-        webinarsLimite: plano?.webinarLimit || admin.webinarLimit || 5,
-        storageUsadoMB: Math.round(storageUsedMB),
-        storageLimiteMB: (plano?.storageLimit || 5) * 1024,
+        webinarsLimite: webinarsLimite,
+        storageUsadoGB: parseFloat(storageUsedGB.toFixed(2)),
+        storageLimiteGB: storageLimiteGB,
         uploadsUsados: videos.length,
-        uploadsLimite: plano?.uploadLimit || admin.uploadLimit || 5,
+        uploadsLimite: uploadsLimite,
+        isSuperadmin: isSuperadmin,
       };
 
       // Get payment history for this user
