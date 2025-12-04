@@ -49,7 +49,7 @@ function SimpleTextEditor({
     const tmp = document.createElement("div");
     tmp.innerHTML = html;
     
-    const allowedTags = ["span", "b", "i", "u", "strong", "em", "br"];
+    const allowedTags = ["span", "b", "i", "u", "strong", "em", "br", "font"];
     
     const clean = (node: Node): string => {
       if (node.nodeType === Node.TEXT_NODE) {
@@ -63,20 +63,27 @@ function SimpleTextEditor({
           return Array.from(el.childNodes).map(clean).join("");
         }
         
-        let styleAttr = "";
+        const styles: string[] = [];
+        
+        if (tag === "font") {
+          const colorAttr = el.getAttribute("color");
+          if (colorAttr) styles.push(`color: ${colorAttr}`);
+        }
+        
         const inlineStyle = el.getAttribute("style");
         if (inlineStyle) {
           const colorMatch = inlineStyle.match(/color:\s*([^;]+)/i);
           const bgMatch = inlineStyle.match(/background(?:-color)?:\s*([^;]+)/i);
-          const styles: string[] = [];
           if (colorMatch) styles.push(`color: ${colorMatch[1]}`);
           if (bgMatch) styles.push(`background: ${bgMatch[1]}`);
-          if (styles.length) styleAttr = ` style="${styles.join("; ")}"`;
         }
         
         const children = Array.from(el.childNodes).map(clean).join("");
         if (tag === "br") return "<br>";
-        return `<${tag}${styleAttr}>${children}</${tag}>`;
+        
+        const styleAttr = styles.length ? ` style="${styles.join("; ")}"` : "";
+        const outputTag = tag === "font" ? "span" : tag;
+        return `<${outputTag}${styleAttr}>${children}</${outputTag}>`;
       }
       return "";
     };
