@@ -336,7 +336,7 @@ export default function WebinarReplayPage() {
       }}
     >
       <section className={isEmbed ? "py-4" : "container mx-auto py-3 md:py-16"}>
-        <div className={isEmbed ? "px-4" : "mx-auto px-3 md:px-4"} style={{ maxWidth: isEmbed ? "100%" : "960px" }}>
+        <div className={isEmbed ? "mx-auto px-4" : "mx-auto px-3 md:px-4"} style={{ maxWidth: "960px" }}>
           {(webinar.replayBadgeText || webinar.replayTitle) && (
             <div className="text-center mb-4 md:mb-10">
               <div
