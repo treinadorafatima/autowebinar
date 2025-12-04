@@ -1068,7 +1068,18 @@ export default function WebinarPublicPage() {
   async function handleSendComment() {
     if (!userComment.trim() || !webinar) return;
     
-    const author = `${userName} – ${userCity} (${userState})`;
+    // Verifica se os campos obrigatórios para comentar estão preenchidos
+    if (!userName.trim() || !userCity.trim() || !userState.trim() || userState.length !== 2) {
+      toast({ 
+        title: "Complete seu cadastro", 
+        description: "Preencha nome, cidade e estado para comentar",
+        variant: "destructive" 
+      });
+      setShowParticipationModal(true);
+      return;
+    }
+    
+    const author = `${userName} – ${userCity} (${userState.toUpperCase()})`;
     
     try {
       const res = await fetch(`/api/webinars/${webinar.id}/live-comment`, {
