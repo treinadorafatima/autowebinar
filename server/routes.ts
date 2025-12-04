@@ -2074,12 +2074,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const updatedData = { ...req.body };
       
+      // Log replay fields for debugging
+      console.log('[webinar-update] Replay fields received:', {
+        replayEnabled: updatedData.replayEnabled,
+        replayButtonText: updatedData.replayButtonText,
+        replayButtonUrl: updatedData.replayButtonUrl,
+        replayTitle: updatedData.replayTitle,
+        webinarLimit,
+      });
+      
       if (webinarLimit <= 5) {
         updatedData.replayEnabled = false;
         updatedData.replayAutoplay = false;
       }
       
       const webinar = await storage.updateWebinar(req.params.id, updatedData);
+      
+      // Log what was saved
+      console.log('[webinar-update] Saved replay fields:', {
+        replayEnabled: webinar?.replayEnabled,
+        replayButtonText: webinar?.replayButtonText,
+        replayButtonUrl: webinar?.replayButtonUrl,
+        replayTitle: webinar?.replayTitle,
+      });
       if (!webinar) {
         return res.status(404).json({ error: "Webinar not found" });
       }
