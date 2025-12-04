@@ -155,6 +155,12 @@ export default function Checkout() {
     queryKey: ["/api/checkout/planos/ativos"],
   });
 
+  // Buscar plano específico diretamente quando acessado via link (para planos avulsos/teste)
+  const { data: directPlano, isLoading: loadingDirectPlano } = useQuery<Plano>({
+    queryKey: ["/api/checkout/planos", planoId],
+    enabled: !!planoId,
+  });
+
   const { data: gatewayConfig } = useQuery<GatewayConfig>({
     queryKey: ["/api/checkout/public-config"],
   });
@@ -176,7 +182,10 @@ export default function Checkout() {
   const currentUserPlano = userSubscription?.plano ?? userSubscription?.assinatura?.plan ?? null;
   const isUserLoggedIn = !!currentUser;
 
-  const selectedPlano = planoId ? planos?.find((p) => p.id === planoId) : null;
+  // Usar plano buscado diretamente (funciona para planos avulsos) ou da lista
+  const selectedPlano = planoId 
+    ? (directPlano || planos?.find((p) => p.id === planoId)) 
+    : null;
 
   useEffect(() => {
     if (gatewayConfig?.mercadopagoPublicKey && !mpInitialized) {
@@ -426,7 +435,7 @@ export default function Checkout() {
     return value;
   };
 
-  if (loadingPlanos) {
+  if (loadingPlanos || (planoId && loadingDirectPlano)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
         <Loader2 className="w-8 h-8 animate-spin text-cyan-400" />
