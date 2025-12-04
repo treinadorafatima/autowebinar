@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Loader2, Check, Star, Lock, ArrowRight, Zap, Video, Upload, Shield, Clock, Sparkles, CreditCard, QrCode, Barcode, RefreshCw, CheckCircle2, ShieldCheck, Bolt, Mail, Bell, Globe, Send, Mic, Bot } from "lucide-react";
+import { Loader2, Check, Star, Lock, ArrowRight, Zap, Video, Upload, Shield, Clock, Sparkles, CreditCard, QrCode, Barcode, RefreshCw, CheckCircle2, ShieldCheck, Bolt, Mail, Bell, Globe, Send, Mic, Bot, Play } from "lucide-react";
 import { SiMercadopago, SiStripe, SiVisa, SiMastercard, SiWhatsapp } from "react-icons/si";
 import { usePixel } from "@/hooks/use-pixel";
 import logoImage from "@assets/logo-autowebinar_1764484003666.png";
@@ -512,6 +512,24 @@ export default function Checkout() {
                               <Bell className="w-3 h-3 text-orange-400" />
                             </div>
                             <span className="text-slate-300">Lembretes automáticos</span>
+                          </div>
+                          <div className="flex items-center gap-3 text-sm">
+                            <div className="w-5 h-5 rounded-full bg-purple-500/20 flex items-center justify-center">
+                              <Play className="w-3 h-3 text-purple-400" />
+                            </div>
+                            <span className="text-slate-300">Replay automático</span>
+                          </div>
+                          <div className="flex items-center gap-3 text-sm">
+                            <div className="w-5 h-5 rounded-full bg-violet-500/20 flex items-center justify-center">
+                              <Sparkles className="w-3 h-3 text-violet-400" />
+                            </div>
+                            <span className="text-slate-300">Gerador de Roteiro IA</span>
+                          </div>
+                          <div className="flex items-center gap-3 text-sm">
+                            <div className="w-5 h-5 rounded-full bg-rose-500/20 flex items-center justify-center">
+                              <Mic className="w-3 h-3 text-rose-400" />
+                            </div>
+                            <span className="text-slate-300">Transcrição Automática</span>
                           </div>
                           {beneficios
                             .filter((b: string) => 

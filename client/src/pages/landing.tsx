@@ -980,6 +980,10 @@ export default function LandingPage() {
                           <Globe className="w-5 h-5 text-cyan-400 flex-shrink-0" />
                           <span>Domínio customizado incluso</span>
                         </div>
+                        <div className="flex items-center gap-2 text-slate-200">
+                          <Play className="w-5 h-5 text-purple-400 flex-shrink-0" />
+                          <span>Replay automático</span>
+                        </div>
                         
                         {/* Automation Features Highlight */}
                         <div className="pt-2 pb-1">

@@ -49,7 +49,8 @@ import {
   Mic,
   Send,
   Bell,
-  Globe
+  Globe,
+  Play
 } from "lucide-react";
 import { SiWhatsapp } from "react-icons/si";
 import { format } from "date-fns";
@@ -357,6 +358,10 @@ export default function AdminSubscription() {
                       <Globe className="w-3.5 h-3.5 text-cyan-500" />
                       <span className="text-muted-foreground">Domínio customizado</span>
                     </div>
+                    <div className="flex items-center gap-2" data-testid="text-trial-replay">
+                      <Play className="w-3.5 h-3.5 text-purple-500" />
+                      <span className="text-muted-foreground">Replay automático</span>
+                    </div>
                   </div>
                 </div>
 
@@ -465,6 +470,10 @@ export default function AdminSubscription() {
                     <div className="flex items-center gap-2" data-testid="text-plan-custom-domain">
                       <Globe className="w-3.5 h-3.5 text-cyan-500" />
                       <span className="text-muted-foreground">Domínio customizado</span>
+                    </div>
+                    <div className="flex items-center gap-2" data-testid="text-plan-replay">
+                      <Play className="w-3.5 h-3.5 text-purple-500" />
+                      <span className="text-muted-foreground">Replay automático</span>
                     </div>
                   </div>
                 </div>
