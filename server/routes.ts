@@ -5995,7 +5995,14 @@ Seja conversacional e objetivo.`;
 
   app.get("/api/checkout/planos/ativos", async (req, res) => {
     try {
-      const planos = await storage.listCheckoutPlanosAtivos();
+      const { renovacao } = req.query;
+      let planos = await storage.listCheckoutPlanosAtivos();
+      
+      // Filter for renewal-only plans if renovacao=true is passed
+      if (renovacao === 'true') {
+        planos = planos.filter(p => p.disponivelRenovacao === true);
+      }
+      
       res.json(planos);
     } catch (error: any) {
       res.status(500).json({ error: error.message });

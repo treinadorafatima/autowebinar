@@ -152,7 +152,15 @@ export default function Checkout() {
   const [mpInitPoint, setMpInitPoint] = useState<string | null>(null);
 
   const { data: planos, isLoading: loadingPlanos } = useQuery<Plano[]>({
-    queryKey: ["/api/checkout/planos/ativos"],
+    queryKey: ["/api/checkout/planos/ativos", isRenovacao ? "renovacao" : "todos"],
+    queryFn: async () => {
+      const url = isRenovacao 
+        ? "/api/checkout/planos/ativos?renovacao=true" 
+        : "/api/checkout/planos/ativos";
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Erro ao carregar planos");
+      return res.json();
+    },
   });
 
   const { data: gatewayConfig } = useQuery<GatewayConfig>({
