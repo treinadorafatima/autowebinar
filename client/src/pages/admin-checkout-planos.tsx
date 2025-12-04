@@ -572,39 +572,50 @@ export default function AdminCheckoutPlanos() {
                 />
               </div>
 
-              <div className="flex flex-wrap gap-6">
-                <div className="flex items-center gap-2">
-                  <Switch
-                    id="ativo"
-                    checked={editingPlano.ativo ?? true}
-                    onCheckedChange={(checked) =>
-                      setEditingPlano({ ...editingPlano, ativo: checked })
-                    }
-                    data-testid="switch-plano-ativo"
-                  />
-                  <Label htmlFor="ativo">Ativo</Label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Switch
-                    id="destaque"
-                    checked={editingPlano.destaque ?? false}
-                    onCheckedChange={(checked) =>
-                      setEditingPlano({ ...editingPlano, destaque: checked })
-                    }
-                    data-testid="switch-plano-destaque"
-                  />
-                  <Label htmlFor="destaque">Destacar</Label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Switch
-                    id="disponivelRenovacao"
-                    checked={editingPlano.disponivelRenovacao ?? false}
-                    onCheckedChange={(checked) =>
-                      setEditingPlano({ ...editingPlano, disponivelRenovacao: checked })
-                    }
-                    data-testid="switch-plano-renovacao"
-                  />
-                  <Label htmlFor="disponivelRenovacao">Renovação</Label>
+              <div className="space-y-4">
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        id="ativo"
+                        checked={editingPlano.ativo ?? true}
+                        onCheckedChange={(checked) =>
+                          setEditingPlano({ ...editingPlano, ativo: checked })
+                        }
+                        data-testid="switch-plano-ativo"
+                      />
+                      <Label htmlFor="ativo">Ativo</Label>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Aparece para novos clientes</p>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        id="destaque"
+                        checked={editingPlano.destaque ?? false}
+                        onCheckedChange={(checked) =>
+                          setEditingPlano({ ...editingPlano, destaque: checked })
+                        }
+                        data-testid="switch-plano-destaque"
+                      />
+                      <Label htmlFor="destaque">Destacar</Label>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Exibe como "Mais Escolhido"</p>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        id="disponivelRenovacao"
+                        checked={editingPlano.disponivelRenovacao ?? false}
+                        onCheckedChange={(checked) =>
+                          setEditingPlano({ ...editingPlano, disponivelRenovacao: checked })
+                        }
+                        data-testid="switch-plano-renovacao"
+                      />
+                      <Label htmlFor="disponivelRenovacao">Renovação</Label>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Aparece para quem renova</p>
+                  </div>
                 </div>
               </div>
             </div>

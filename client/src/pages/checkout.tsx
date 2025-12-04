@@ -29,6 +29,7 @@ interface Plano {
   beneficios: string;
   destaque: boolean;
   tipoCobranca?: string;
+  disponivelRenovacao?: boolean;
 }
 
 interface GatewayConfig {
@@ -426,10 +427,36 @@ export default function Checkout() {
                 </p>
               </CardContent>
             </Card>
+          ) : isRenovacao && !planos?.some((p) => p.disponivelRenovacao) ? (
+            <Card className="max-w-md mx-auto bg-slate-800/50 border-slate-700">
+              <CardContent className="py-12 text-center">
+                <RefreshCw className="w-12 h-12 text-cyan-400 mx-auto mb-4" />
+                <p className="text-slate-300 mb-4">
+                  No momento não há planos disponíveis para renovação.
+                </p>
+                <Button
+                  variant="outline"
+                  onClick={() => setLocation("/checkout")}
+                  className="border-cyan-500 text-cyan-400 hover:bg-cyan-500/10"
+                >
+                  Ver todos os planos
+                </Button>
+              </CardContent>
+            </Card>
           ) : (
             <>
+              {isRenovacao && (
+                <div className="mb-6 p-4 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-center">
+                  <RefreshCw className="w-5 h-5 text-cyan-400 mx-auto mb-2" />
+                  <p className="text-cyan-300 text-sm">
+                    Você está renovando sua assinatura. Veja os planos disponíveis para renovação.
+                  </p>
+                </div>
+              )}
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-12">
-                {planos?.map((plano) => {
+                {planos
+                  ?.filter((plano) => !isRenovacao || plano.disponivelRenovacao)
+                  .map((plano) => {
                   const beneficios = getBeneficios(plano.beneficios);
                   return (
                     <Card
