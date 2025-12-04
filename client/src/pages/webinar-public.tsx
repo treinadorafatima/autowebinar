@@ -458,8 +458,9 @@ export default function WebinarPublicPage() {
     }
   }
 
-  const handleVideoTimeUpdate = (currentTime: number) => {
-    maxVideoPositionRef.current = Math.max(maxVideoPositionRef.current, Math.floor(currentTime));
+  const handleVideoTimeUpdate = (videoTime: number) => {
+    maxVideoPositionRef.current = Math.max(maxVideoPositionRef.current, Math.floor(videoTime));
+    setCurrentTime(videoTime);
   }
 
   const handleVolumeChange = (newVolume: number) => {
