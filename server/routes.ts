@@ -1444,7 +1444,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const comment = await storage.createComment({ 
         text: text.trim(), 
         author: author.trim(), 
-        timestamp: timestamp || 0,
+        timestamp: Math.round(timestamp || 0),
         isSimulated: false,
         persistForFutureSessions: false,
         sessionDate: sessionDate,
@@ -2551,7 +2551,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         webinarId: req.params.id,
         text: text.trim(),
         author: author.trim(),
-        timestamp: timestamp || 0,
+        timestamp: Math.round(timestamp || 0),
         isSimulated: false,
         persistForFutureSessions: false,
         sessionDate,
