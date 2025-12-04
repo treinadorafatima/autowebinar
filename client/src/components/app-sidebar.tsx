@@ -1,25 +1,23 @@
 import { Link, useLocation } from "wouter";
 import { useState, useEffect } from "react";
 import { 
-  LayoutDashboard, 
-  Video, 
-  Zap, 
+  Gauge, 
+  Radio, 
+  Film, 
+  ScrollText, 
+  MessageSquareText, 
+  AudioLines,
+  Send,
   LogOut,
-  Plus,
-  Play,
+  Sparkles,
   Settings,
   Users,
-  BookOpen,
-  Mail,
-  MailCheck,
   Brain,
-  CreditCard,
+  Wallet,
   Package,
-  BarChart3,
-  UserCircle,
-  KeyRound,
-  User,
-  Mic
+  TrendingUp,
+  Shield,
+  Zap
 } from "lucide-react";
 import { SiWhatsapp } from "react-icons/si";
 import logoUrl from "@assets/logo-autowebinar-preto.png";
@@ -44,45 +42,45 @@ interface AppSidebarProps {
 
 const mainMenuItems = [
   {
-    title: "Dashboard",
+    title: "Painel",
     url: "/admin",
-    icon: LayoutDashboard,
+    icon: Gauge,
     superadminOnly: false,
   },
   {
-    title: "Webinários",
+    title: "Transmissões",
     url: "/admin/webinars",
-    icon: Play,
+    icon: Radio,
     superadminOnly: false,
   },
   {
-    title: "Vídeos",
+    title: "Biblioteca",
     url: "/admin/videos",
-    icon: Video,
+    icon: Film,
     superadminOnly: false,
   },
   {
-    title: "Roteiros",
+    title: "Scripts",
     url: "/admin/scripts",
-    icon: BookOpen,
+    icon: ScrollText,
     superadminOnly: false,
   },
   {
-    title: "Mensagens",
+    title: "Chat Simulado",
     url: "/admin/messages",
-    icon: Mail,
+    icon: MessageSquareText,
     superadminOnly: false,
   },
   {
-    title: "Transcrição",
+    title: "Transcrever",
     url: "/admin/transcription",
-    icon: Mic,
+    icon: AudioLines,
     superadminOnly: false,
   },
   {
-    title: "Email Marketing",
+    title: "Campanhas",
     url: "/admin/email-marketing",
-    icon: MailCheck,
+    icon: Send,
     superadminOnly: false,
   },
   {
@@ -95,15 +93,15 @@ const mainMenuItems = [
 
 const accountMenuItems = [
   {
-    title: "Minha Assinatura",
+    title: "Plano & Cobrança",
     url: "/admin/subscription",
-    icon: CreditCard,
+    icon: Wallet,
     superadminOnly: false,
   },
   {
-    title: "Trocar Senha",
+    title: "Segurança",
     url: "/admin/change-password",
-    icon: KeyRound,
+    icon: Shield,
     superadminOnly: false,
   },
 ];
@@ -130,7 +128,7 @@ const adminMenuItems = [
   {
     title: "Gateways",
     url: "/admin/checkout/config",
-    icon: CreditCard,
+    icon: Wallet,
     superadminOnly: true,
   },
   {
@@ -142,7 +140,7 @@ const adminMenuItems = [
   {
     title: "Vendas",
     url: "/admin/checkout/relatorios",
-    icon: BarChart3,
+    icon: TrendingUp,
     superadminOnly: true,
   },
 ];
@@ -187,7 +185,7 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
 
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Menu Principal</SidebarGroupLabel>
+          <SidebarGroupLabel>Navegação</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {mainMenuItems.map((item) => (
@@ -210,7 +208,7 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
         <SidebarSeparator />
 
         <SidebarGroup>
-          <SidebarGroupLabel>Minha Conta</SidebarGroupLabel>
+          <SidebarGroupLabel>Conta</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {accountMenuItems.map((item) => (
@@ -260,14 +258,14 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
         <SidebarSeparator />
 
         <SidebarGroup>
-          <SidebarGroupLabel>Ações Rápidas</SidebarGroupLabel>
+          <SidebarGroupLabel>Criar</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>
                   <Link href="/admin/webinars?new=1" data-testid="link-sidebar-new-webinar">
-                    <Plus className="w-4 h-4" />
-                    <span>Novo Webinário</span>
+                    <Sparkles className="w-4 h-4" />
+                    <span>Criar Transmissão</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
