@@ -55,6 +55,46 @@ function stripHtml(html: string): string {
   return tmp.textContent || tmp.innerText || "";
 }
 
+function sanitizeInlineHtml(html: string): string {
+  if (!html) return "";
+  const tmp = document.createElement("div");
+  tmp.innerHTML = html;
+  
+  const allowedTags = ["span", "b", "i", "u", "strong", "em", "br"];
+  
+  const clean = (node: Node): string => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      return node.textContent || "";
+    }
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      const el = node as Element;
+      const tag = el.tagName.toLowerCase();
+      
+      if (!allowedTags.includes(tag)) {
+        return Array.from(el.childNodes).map(clean).join("");
+      }
+      
+      let styleAttr = "";
+      const inlineStyle = el.getAttribute("style");
+      if (inlineStyle) {
+        const colorMatch = inlineStyle.match(/color:\s*([^;]+)/i);
+        const bgMatch = inlineStyle.match(/background(?:-color)?:\s*([^;]+)/i);
+        const styles: string[] = [];
+        if (colorMatch) styles.push(`color: ${colorMatch[1]}`);
+        if (bgMatch) styles.push(`background: ${bgMatch[1]}`);
+        if (styles.length) styleAttr = ` style="${styles.join("; ")}"`;
+      }
+      
+      const children = Array.from(el.childNodes).map(clean).join("");
+      if (tag === "br") return "<br>";
+      return `<${tag}${styleAttr}>${children}</${tag}>`;
+    }
+    return "";
+  };
+  
+  return Array.from(tmp.childNodes).map(clean).join("");
+}
+
 export default function WebinarReplayPage() {
   const [, params] = useRoute("/w/:slug/replay");
   const slug = params?.slug;
@@ -355,21 +395,22 @@ export default function WebinarReplayPage() {
                       color: "#000000",
                       boxShadow: "0 4px 15px rgba(255, 215, 0, 0.5)",
                     }}
-                    dangerouslySetInnerHTML={{ __html: webinar.replayBadgeText }}
+                    dangerouslySetInnerHTML={{ __html: sanitizeInlineHtml(webinar.replayBadgeText) }}
                   />
                 )}
                 {webinar.replayTitle && (
-                  <div
+                  <h1
                     className="text-2xl md:text-5xl lg:text-6xl font-extrabold leading-tight px-2"
                     style={{
                       background: "linear-gradient(180deg, #FFFFFF 0%, #FFD700 100%)",
                       WebkitBackgroundClip: "text",
                       WebkitTextFillColor: "transparent",
                       backgroundClip: "text",
+                      textShadow: "0 4px 20px rgba(255, 215, 0, 0.3)",
                       filter: "drop-shadow(0 4px 8px rgba(0, 0, 0, 0.8))",
                     }}
                     data-testid="text-replay-title"
-                    dangerouslySetInnerHTML={{ __html: webinar.replayTitle }}
+                    dangerouslySetInnerHTML={{ __html: sanitizeInlineHtml(webinar.replayTitle) }}
                   />
                 )}
               </div>
@@ -531,7 +572,7 @@ export default function WebinarReplayPage() {
                     boxShadow: "0 4px 15px rgba(255, 215, 0, 0.4)",
                   }}
                   data-testid="badge-offer"
-                  dangerouslySetInnerHTML={{ __html: webinar.replayOfferBadgeText }}
+                  dangerouslySetInnerHTML={{ __html: sanitizeInlineHtml(webinar.replayOfferBadgeText) }}
                 />
               )}
 
@@ -540,16 +581,16 @@ export default function WebinarReplayPage() {
                   className="text-2xl md:text-4xl font-bold mb-4"
                   style={{ color: "#ffffff", textShadow: "3px 3px 6px rgba(0,0,0,0.8)" }}
                   data-testid="text-offer-title"
-                  dangerouslySetInnerHTML={{ __html: webinar.replayOfferTitle }}
+                  dangerouslySetInnerHTML={{ __html: sanitizeInlineHtml(webinar.replayOfferTitle) }}
                 />
               )}
 
               {webinar.replayOfferSubtitle && (
-                <div
+                <p
                   className="text-base md:text-lg mb-6 font-medium"
                   style={{ color: "#ffffff", textShadow: "2px 2px 4px rgba(0,0,0,0.8)" }}
                   data-testid="text-offer-subtitle"
-                  dangerouslySetInnerHTML={{ __html: webinar.replayOfferSubtitle }}
+                  dangerouslySetInnerHTML={{ __html: sanitizeInlineHtml(webinar.replayOfferSubtitle) }}
                 />
               )}
 
@@ -585,7 +626,7 @@ export default function WebinarReplayPage() {
                       <span
                         className="text-base md:text-lg font-semibold"
                         style={{ color: "#ffffff", textShadow: "1px 1px 3px rgba(0,0,0,0.8)" }}
-                        dangerouslySetInnerHTML={{ __html: benefit }}
+                        dangerouslySetInnerHTML={{ __html: sanitizeInlineHtml(benefit) }}
                       />
                     </div>
                   ))}
@@ -601,11 +642,11 @@ export default function WebinarReplayPage() {
                     boxShadow: "0 15px 40px rgba(255, 215, 0, 0.4), inset 0 1px 0 rgba(255,255,255,0.2)",
                   }}
                 >
-                  <div
+                  <p
                     className="text-lg md:text-2xl font-bold leading-relaxed"
                     style={{ color: "#ffffff", textShadow: "2px 2px 6px rgba(0,0,0,0.9)" }}
                     data-testid="text-pricing"
-                    dangerouslySetInnerHTML={{ __html: webinar.replayPriceText }}
+                    dangerouslySetInnerHTML={{ __html: sanitizeInlineHtml(webinar.replayPriceText) }}
                   />
                 </div>
               )}
