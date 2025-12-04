@@ -553,8 +553,8 @@ export default function AdminPage() {
         </Button>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+      {/* Stats Grid - 2 rows x 3 columns */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
         <StatCard icon={Play} value={webinars.length} label="Webinários Ativos" color="blue" />
         <StatCard icon={FileVideo} value={videos.length} label="Vídeos na Biblioteca" color="purple" />
         <StatCard icon={BarChart3} value={totalViews.toLocaleString()} label="Visualizações Totais" color="orange" />
