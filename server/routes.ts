@@ -5539,39 +5539,44 @@ Seja conversacional e objetivo.`;
       // Get webinar info to schedule sequences
       const webinar = await storage.getWebinarById(req.params.id);
       if (webinar && webinar.ownerId) {
-        // Calculate next webinar session time
-        const now = new Date();
-        const todayStr = now.toISOString().split("T")[0];
+        // Calculate next webinar session time with timezone support
+        const { calculateNextSession } = await import("./session-calculator");
+        const nextSession = calculateNextSession({
+          startHour: webinar.startHour || 18,
+          startMinute: webinar.startMinute || 0,
+          timezone: webinar.timezone || "America/Sao_Paulo",
+          recurrence: webinar.recurrence || "daily",
+          onceDate: webinar.onceDate || "",
+          dayOfWeek: webinar.dayOfWeek || null,
+          dayOfMonth: webinar.dayOfMonth || null,
+          videoDuration: webinar.videoDuration || 3600,
+        });
         
-        // Trigger email sequences if email provided
-        if (email) {
-          try {
-            const { scheduleEmailsForLead } = await import("./email-scheduler");
-            const sessionTime = new Date();
-            sessionTime.setHours(webinar.startHour || 18, webinar.startMinute || 0, 0, 0);
-            if (sessionTime <= now) {
-              sessionTime.setDate(sessionTime.getDate() + 1);
+        if (!nextSession) {
+          console.log(`[register] No upcoming session found for webinar ${req.params.id}, skipping sequences`);
+        } else {
+          console.log(`[register] Next session for webinar ${req.params.id}: ${nextSession.sessionDate} at ${nextSession.sessionTime.toISOString()}`);
+          
+          // Trigger email sequences if email provided
+          if (email) {
+            try {
+              const { scheduleEmailsForLead } = await import("./email-scheduler");
+              await scheduleEmailsForLead(leadId, req.params.id, webinar.ownerId, nextSession.sessionTime, nextSession.sessionDate);
+              console.log(`[register] Scheduled email sequences for lead ${leadId}`);
+            } catch (e) {
+              console.error("[register] Error scheduling emails:", e);
             }
-            await scheduleEmailsForLead(leadId, req.params.id, webinar.ownerId, sessionTime, todayStr);
-            console.log(`[register] Scheduled email sequences for lead ${leadId}`);
-          } catch (e) {
-            console.error("[register] Error scheduling emails:", e);
           }
-        }
-        
-        // Trigger WhatsApp sequences if whatsapp provided
-        if (whatsapp) {
-          try {
-            const { scheduleWhatsappForLead } = await import("./whatsapp-scheduler");
-            const sessionTime = new Date();
-            sessionTime.setHours(webinar.startHour || 18, webinar.startMinute || 0, 0, 0);
-            if (sessionTime <= now) {
-              sessionTime.setDate(sessionTime.getDate() + 1);
+          
+          // Trigger WhatsApp sequences if whatsapp provided
+          if (whatsapp) {
+            try {
+              const { scheduleWhatsappForLead } = await import("./whatsapp-scheduler");
+              await scheduleWhatsappForLead(leadId, req.params.id, webinar.ownerId, nextSession.sessionTime, nextSession.sessionDate);
+              console.log(`[register] Scheduled WhatsApp sequences for lead ${leadId}`);
+            } catch (e) {
+              console.error("[register] Error scheduling WhatsApp:", e);
             }
-            await scheduleWhatsappForLead(leadId, req.params.id, webinar.ownerId, sessionTime, todayStr);
-            console.log(`[register] Scheduled WhatsApp sequences for lead ${leadId}`);
-          } catch (e) {
-            console.error("[register] Error scheduling WhatsApp:", e);
           }
         }
       }
