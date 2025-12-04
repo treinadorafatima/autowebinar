@@ -581,9 +581,12 @@ export default function WebinarPublicPage() {
 
     if (result.status === "live") {
       setStatus("live");
-      setCurrentTime(result.currentTime);
-      // Update ref immediately to avoid race condition with video loading
-      scheduledTimeRef.current = result.currentTime;
+      // Only set currentTime from calculation if video is NOT playing yet
+      // Once video is playing, we use the video's actual currentTime via onTimeUpdate
+      if (!isVideoPlaying) {
+        setCurrentTime(result.currentTime);
+        scheduledTimeRef.current = result.currentTime;
+      }
     } else if (result.status === "ended") {
       setStatus("ended");
       setCountdown(result.countdown);
@@ -596,7 +599,7 @@ export default function WebinarPublicPage() {
       }
       setCountdown(result.countdown);
     }
-  }, [webinar, previewMode]);
+  }, [webinar, previewMode, isVideoPlaying]);
 
   // Ref to store the current scheduled time for video initialization
   const scheduledTimeRef = useRef<number>(0);
