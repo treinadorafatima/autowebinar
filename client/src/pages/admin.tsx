@@ -118,6 +118,7 @@ export default function AdminPage() {
   const [customDateTo, setCustomDateTo] = useState<Date | undefined>(undefined);
   const [viewsData, setViewsData] = useState<ViewsData | null>(null);
   const [viewsLoading, setViewsLoading] = useState(false);
+  const [resettingViews, setResettingViews] = useState(false);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
@@ -290,6 +291,35 @@ export default function AdminPage() {
       fetchViews();
     }
   }, [viewPeriod, customDateFrom, customDateTo, loading]);
+
+  async function handleResetViews() {
+    if (!token) return;
+    if (!confirm("Tem certeza que deseja zerar o contador de visualizações totais? Esta ação não pode ser desfeita.")) {
+      return;
+    }
+    setResettingViews(true);
+    try {
+      const res = await fetch("/api/admin/reset-views", {
+        method: "POST",
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+      });
+      if (res.ok) {
+        toast({ title: "Visualizações zeradas com sucesso!" });
+        await fetchWebinars();
+        await fetchViews();
+      } else {
+        const error = await res.json();
+        toast({ title: error.error || "Erro ao zerar visualizações", variant: "destructive" });
+      }
+    } catch (error) {
+      toast({ title: "Erro ao zerar visualizações", variant: "destructive" });
+    } finally {
+      setResettingViews(false);
+    }
+  }
 
   const [uploadStatus, setUploadStatus] = useState<string>("Enviando...");
 
@@ -521,6 +551,16 @@ export default function AdminPage() {
             <CardDescription>Visualizações por período</CardDescription>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleResetViews}
+              disabled={resettingViews}
+              className="text-destructive hover:text-destructive"
+              data-testid="button-reset-views"
+            >
+              {resettingViews ? "Zerando..." : "Zerar Contador"}
+            </Button>
             <Select 
               value={viewPeriod} 
               onValueChange={(v) => setViewPeriod(v as ViewPeriod)}
@@ -620,14 +660,9 @@ export default function AdminPage() {
               )}
               
               {(!viewsData?.byDay || viewsData.byDay.length === 0) && viewsData?.total === 0 && (
-                <div className="text-center py-4 space-y-2">
-                  <p className="text-sm text-muted-foreground">
-                    Nenhuma visualização registrada neste período
-                  </p>
-                  <p className="text-xs text-muted-foreground/70">
-                    O registro detalhado por período foi ativado agora. As próximas visualizações aparecerão aqui.
-                  </p>
-                </div>
+                <p className="text-center text-sm text-muted-foreground py-4">
+                  Nenhuma visualização registrada neste período
+                </p>
               )}
             </div>
           )}

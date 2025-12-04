@@ -267,6 +267,7 @@ export interface IStorage {
   // Webinar View Logs - Histórico de visualizações
   logWebinarView(webinarId: string, ownerId: string | null, source: 'live' | 'replay' | 'embed'): Promise<void>;
   countViewsByOwnerAndRange(ownerId: string, from: Date, to: Date): Promise<number>;
+  resetWebinarViewsByOwner(ownerId: string): Promise<void>;
   getViewsByOwnerGroupedByDay(ownerId: string, from: Date, to: Date): Promise<{ date: string; count: number }[]>;
 }
 
@@ -3291,6 +3292,12 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
       date: String(r.date),
       count: Number(r.count)
     }));
+  }
+
+  async resetWebinarViewsByOwner(ownerId: string): Promise<void> {
+    await db.update(webinars2)
+      .set({ views: 0 })
+      .where(eq(webinars2.ownerId, ownerId));
   }
 }
 

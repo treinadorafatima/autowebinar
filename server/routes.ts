@@ -5841,6 +5841,27 @@ Seja conversacional e objetivo.`;
     }
   });
 
+  // Reset views counter for all webinars of current admin
+  app.post("/api/admin/reset-views", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin) {
+        return res.status(404).json({ error: "Admin not found" });
+      }
+
+      await storage.resetWebinarViewsByOwner(admin.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
   // ========== ACCOUNT DOMAIN API ==========
   
   // Get account info by domain
