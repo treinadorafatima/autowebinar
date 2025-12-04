@@ -1987,6 +1987,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Webinar not found" });
       }
       
+      // Log replay fields for debugging
+      console.log('[webinar-get] Replay fields from DB:', {
+        id: webinar.id,
+        replayEnabled: webinar.replayEnabled,
+        replayButtonText: webinar.replayButtonText,
+        replayButtonUrl: webinar.replayButtonUrl,
+      });
+      
       // Verificar se o plano do dono está ativo (apenas para acesso público)
       // Não bloquear se a requisição vier do painel admin (tem token de autenticação)
       const token = req.headers.authorization?.split(" ")[1];
