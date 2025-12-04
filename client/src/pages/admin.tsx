@@ -620,9 +620,14 @@ export default function AdminPage() {
               )}
               
               {(!viewsData?.byDay || viewsData.byDay.length === 0) && viewsData?.total === 0 && (
-                <p className="text-center text-sm text-muted-foreground py-4">
-                  Nenhuma visualização registrada neste período
-                </p>
+                <div className="text-center py-4 space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    Nenhuma visualização registrada neste período
+                  </p>
+                  <p className="text-xs text-muted-foreground/70">
+                    O registro detalhado por período foi ativado agora. As próximas visualizações aparecerão aqui.
+                  </p>
+                </div>
               )}
             </div>
           )}

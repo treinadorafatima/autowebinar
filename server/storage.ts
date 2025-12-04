@@ -3259,17 +3259,21 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
   }
 
   async countViewsByOwnerAndRange(ownerId: string, from: Date, to: Date): Promise<number> {
+    const fromStr = from.toISOString();
+    const toStr = to.toISOString();
     const result = await db.select({ count: sql<number>`count(*)` })
       .from(webinarViewLogs)
       .where(and(
         eq(webinarViewLogs.ownerId, ownerId),
-        sql`${webinarViewLogs.createdAt} >= ${from}`,
-        sql`${webinarViewLogs.createdAt} <= ${to}`
+        sql`${webinarViewLogs.createdAt} >= ${fromStr}::timestamp`,
+        sql`${webinarViewLogs.createdAt} <= ${toStr}::timestamp`
       ));
     return Number(result[0]?.count || 0);
   }
 
   async getViewsByOwnerGroupedByDay(ownerId: string, from: Date, to: Date): Promise<{ date: string; count: number }[]> {
+    const fromStr = from.toISOString();
+    const toStr = to.toISOString();
     const result = await db.select({
       date: sql<string>`DATE(${webinarViewLogs.createdAt})`,
       count: sql<number>`count(*)`
@@ -3277,8 +3281,8 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
       .from(webinarViewLogs)
       .where(and(
         eq(webinarViewLogs.ownerId, ownerId),
-        sql`${webinarViewLogs.createdAt} >= ${from}`,
-        sql`${webinarViewLogs.createdAt} <= ${to}`
+        sql`${webinarViewLogs.createdAt} >= ${fromStr}::timestamp`,
+        sql`${webinarViewLogs.createdAt} <= ${toStr}::timestamp`
       ))
       .groupBy(sql`DATE(${webinarViewLogs.createdAt})`)
       .orderBy(sql`DATE(${webinarViewLogs.createdAt})`);
