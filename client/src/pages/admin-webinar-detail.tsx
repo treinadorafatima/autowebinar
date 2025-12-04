@@ -50,8 +50,11 @@ import {
   Monitor,
   Mic,
   ArrowRightLeft,
-  Calendar as CalendarIcon
+  Calendar as CalendarIcon,
+  Link2,
+  Users
 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 
 function DomainConfigSection({ domain, serverHost }: { domain: string; serverHost: string }) {
   const [verifying, setVerifying] = useState(false);
@@ -3350,55 +3353,445 @@ export default function AdminWebinarDetailPage() {
 
         {/* Leads */}
         <TabsContent value="leads">
-          <Card>
-            <CardHeader>
-              <CardTitle>Captura de Leads</CardTitle>
-              <CardDescription>Configure a coleta de dados dos espectadores</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center gap-3 p-4 rounded-lg bg-muted/50">
-                <input
-                  type="checkbox"
-                  checked={leadsEnabled}
-                  onChange={(e) => setLeadsEnabled(e.target.checked)}
-                  className="h-5 w-5 rounded border-gray-300"
-                  id="leads-enabled"
-                  data-testid="checkbox-leads-enabled"
-                />
-                <Label htmlFor="leads-enabled" className="cursor-pointer font-medium">
-                  Habilitar captura de leads
-                </Label>
-              </div>
+          <div className="space-y-6">
+            {/* Link de Inscrição e Embed */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Link2 className="h-5 w-5" />
+                  Link de Inscrição
+                </CardTitle>
+                <CardDescription>Compartilhe o link ou incorpore o formulário em seu site</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Link de Inscrição</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      readOnly
+                      value={`${window.location.origin}/w/${webinar?.slug}/register`}
+                      className="font-mono text-sm"
+                      data-testid="input-registration-link"
+                    />
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        navigator.clipboard.writeText(`${window.location.origin}/w/${webinar?.slug}/register`);
+                        toast({ title: "Link copiado!" });
+                      }}
+                      data-testid="button-copy-registration-link"
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => window.open(`/w/${webinar?.slug}/register`, "_blank")}
+                      data-testid="button-preview-registration"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
 
-              {leadsEnabled && (
-                <div className="space-y-3 p-4 border rounded-lg">
-                  <h4 className="font-medium text-sm">Campos a coletar:</h4>
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="checkbox"
-                        checked={leadsCollectEmail}
-                        onChange={(e) => setLeadsCollectEmail(e.target.checked)}
-                        className="h-4 w-4 rounded"
-                        id="collect-email"
-                        data-testid="checkbox-collect-email"
-                      />
-                      <Label htmlFor="collect-email" className="cursor-pointer">Email</Label>
+                <div className="space-y-2">
+                  <Label>Código Embed (iframe)</Label>
+                  <Textarea
+                    readOnly
+                    value={`<iframe src="${window.location.origin}/w/${webinar?.slug}/register?embed=true" width="100%" height="700" frameborder="0" style="border: none; max-width: 500px; margin: 0 auto; display: block;"></iframe>`}
+                    className="font-mono text-xs h-20"
+                    data-testid="input-embed-code"
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      navigator.clipboard.writeText(`<iframe src="${window.location.origin}/w/${webinar?.slug}/register?embed=true" width="100%" height="700" frameborder="0" style="border: none; max-width: 500px; margin: 0 auto; display: block;"></iframe>`);
+                      toast({ title: "Código embed copiado!" });
+                    }}
+                    data-testid="button-copy-embed-code"
+                  >
+                    <Copy className="h-4 w-4 mr-1" />
+                    Copiar Código Embed
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Editor de Estilo do Formulário */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Palette className="h-5 w-5" />
+                  Personalização do Formulário
+                </CardTitle>
+                <CardDescription>Configure cores, textos e campos do formulário de captura</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Campos a Coletar */}
+                <div className="p-4 border rounded-lg space-y-4">
+                  <h4 className="font-medium text-sm">Campos do Formulário</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                    <div className="flex items-center gap-2">
+                      <Checkbox checked disabled className="opacity-50" />
+                      <Label className="text-sm text-muted-foreground">Nome (obrigatório)</Label>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="checkbox"
-                        checked={leadsCollectWhatsapp}
-                        onChange={(e) => setLeadsCollectWhatsapp(e.target.checked)}
-                        className="h-4 w-4 rounded"
-                        id="collect-whatsapp"
-                        data-testid="checkbox-collect-whatsapp"
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="form-collect-email"
+                        checked={leadsCollectEmail}
+                        onCheckedChange={(c: boolean) => setLeadsCollectEmail(c === true)}
+                        data-testid="checkbox-form-collect-email"
                       />
-                      <Label htmlFor="collect-whatsapp" className="cursor-pointer">WhatsApp</Label>
+                      <Label htmlFor="form-collect-email" className="text-sm cursor-pointer">E-mail</Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="form-collect-whatsapp"
+                        checked={leadsCollectWhatsapp}
+                        onCheckedChange={(c: boolean) => setLeadsCollectWhatsapp(c === true)}
+                        data-testid="checkbox-form-collect-whatsapp"
+                      />
+                      <Label htmlFor="form-collect-whatsapp" className="text-sm cursor-pointer">WhatsApp</Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="form-collect-city"
+                        checked={formData.leadFormCollectCity || false}
+                        onCheckedChange={(c: boolean) => setFormData({ ...formData, leadFormCollectCity: c === true })}
+                        data-testid="checkbox-form-collect-city"
+                      />
+                      <Label htmlFor="form-collect-city" className="text-sm cursor-pointer">Cidade</Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="form-collect-state"
+                        checked={formData.leadFormCollectState || false}
+                        onCheckedChange={(c: boolean) => setFormData({ ...formData, leadFormCollectState: c === true })}
+                        data-testid="checkbox-form-collect-state"
+                      />
+                      <Label htmlFor="form-collect-state" className="text-sm cursor-pointer">Estado</Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="form-require-consent"
+                        checked={formData.leadFormRequireConsent !== false}
+                        onCheckedChange={(c: boolean) => setFormData({ ...formData, leadFormRequireConsent: c === true })}
+                        data-testid="checkbox-form-require-consent"
+                      />
+                      <Label htmlFor="form-require-consent" className="text-sm cursor-pointer">Consentimento</Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="form-show-next-session"
+                        checked={formData.leadFormShowNextSession !== false}
+                        onCheckedChange={(c: boolean) => setFormData({ ...formData, leadFormShowNextSession: c === true })}
+                        data-testid="checkbox-form-show-next-session"
+                      />
+                      <Label htmlFor="form-show-next-session" className="text-sm cursor-pointer">Próxima Sessão</Label>
                     </div>
                   </div>
                 </div>
-              )}
+
+                {/* Textos */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Título do Formulário</Label>
+                    <Input
+                      value={formData.leadFormTitle || "Inscreva-se no Webinário"}
+                      onChange={(e) => setFormData({ ...formData, leadFormTitle: e.target.value })}
+                      placeholder="Inscreva-se no Webinário"
+                      data-testid="input-lead-form-title"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Subtítulo</Label>
+                    <Input
+                      value={formData.leadFormSubtitle || ""}
+                      onChange={(e) => setFormData({ ...formData, leadFormSubtitle: e.target.value })}
+                      placeholder="Preencha seus dados para participar"
+                      data-testid="input-lead-form-subtitle"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Texto do Botão</Label>
+                    <Input
+                      value={formData.leadFormButtonText || "Quero Participar"}
+                      onChange={(e) => setFormData({ ...formData, leadFormButtonText: e.target.value })}
+                      placeholder="Quero Participar"
+                      data-testid="input-lead-form-button-text"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Mensagem de Sucesso</Label>
+                    <Input
+                      value={formData.leadFormSuccessMessage || "Inscrição realizada com sucesso!"}
+                      onChange={(e) => setFormData({ ...formData, leadFormSuccessMessage: e.target.value })}
+                      placeholder="Inscrição realizada com sucesso!"
+                      data-testid="input-lead-form-success"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Texto do Consentimento</Label>
+                    <Input
+                      value={formData.leadFormConsentText || "Concordo em receber comunicações sobre este webinário"}
+                      onChange={(e) => setFormData({ ...formData, leadFormConsentText: e.target.value })}
+                      placeholder="Concordo em receber comunicações"
+                      data-testid="input-lead-form-consent-text"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>URL de Redirecionamento (após inscrição)</Label>
+                    <Input
+                      value={formData.leadFormRedirectUrl || ""}
+                      onChange={(e) => setFormData({ ...formData, leadFormRedirectUrl: e.target.value })}
+                      placeholder="https://... (vazio = ir para sala)"
+                      data-testid="input-lead-form-redirect-url"
+                    />
+                  </div>
+                </div>
+
+                {/* Cores */}
+                <div className="p-4 border rounded-lg space-y-4">
+                  <h4 className="font-medium text-sm">Cores do Formulário</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-xs">Cor de Fundo</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          type="color"
+                          value={formData.leadFormBgColor || "#1a1a2e"}
+                          onChange={(e) => setFormData({ ...formData, leadFormBgColor: e.target.value })}
+                          className="w-10 h-9 p-1"
+                          data-testid="input-lead-form-bg-color"
+                        />
+                        <Input
+                          value={formData.leadFormBgColor || "#1a1a2e"}
+                          onChange={(e) => setFormData({ ...formData, leadFormBgColor: e.target.value })}
+                          className="flex-1 text-xs"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs">Cor do Card</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          type="color"
+                          value={formData.leadFormCardColor || "#16213e"}
+                          onChange={(e) => setFormData({ ...formData, leadFormCardColor: e.target.value })}
+                          className="w-10 h-9 p-1"
+                          data-testid="input-lead-form-card-color"
+                        />
+                        <Input
+                          value={formData.leadFormCardColor || "#16213e"}
+                          onChange={(e) => setFormData({ ...formData, leadFormCardColor: e.target.value })}
+                          className="flex-1 text-xs"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs">Cor do Botão</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          type="color"
+                          value={formData.leadFormButtonColor || "#22c55e"}
+                          onChange={(e) => setFormData({ ...formData, leadFormButtonColor: e.target.value })}
+                          className="w-10 h-9 p-1"
+                          data-testid="input-lead-form-button-color"
+                        />
+                        <Input
+                          value={formData.leadFormButtonColor || "#22c55e"}
+                          onChange={(e) => setFormData({ ...formData, leadFormButtonColor: e.target.value })}
+                          className="flex-1 text-xs"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs">Texto do Botão</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          type="color"
+                          value={formData.leadFormButtonTextColor || "#ffffff"}
+                          onChange={(e) => setFormData({ ...formData, leadFormButtonTextColor: e.target.value })}
+                          className="w-10 h-9 p-1"
+                          data-testid="input-lead-form-button-text-color"
+                        />
+                        <Input
+                          value={formData.leadFormButtonTextColor || "#ffffff"}
+                          onChange={(e) => setFormData({ ...formData, leadFormButtonTextColor: e.target.value })}
+                          className="flex-1 text-xs"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs">Cor do Texto</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          type="color"
+                          value={formData.leadFormTextColor || "#ffffff"}
+                          onChange={(e) => setFormData({ ...formData, leadFormTextColor: e.target.value })}
+                          className="w-10 h-9 p-1"
+                          data-testid="input-lead-form-text-color"
+                        />
+                        <Input
+                          value={formData.leadFormTextColor || "#ffffff"}
+                          onChange={(e) => setFormData({ ...formData, leadFormTextColor: e.target.value })}
+                          className="flex-1 text-xs"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs">Cor dos Inputs</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          type="color"
+                          value={formData.leadFormInputColor || "#0f0f23"}
+                          onChange={(e) => setFormData({ ...formData, leadFormInputColor: e.target.value })}
+                          className="w-10 h-9 p-1"
+                          data-testid="input-lead-form-input-color"
+                        />
+                        <Input
+                          value={formData.leadFormInputColor || "#0f0f23"}
+                          onChange={(e) => setFormData({ ...formData, leadFormInputColor: e.target.value })}
+                          className="flex-1 text-xs"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs">Borda dos Inputs</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          type="color"
+                          value={formData.leadFormInputBorderColor || "#374151"}
+                          onChange={(e) => setFormData({ ...formData, leadFormInputBorderColor: e.target.value })}
+                          className="w-10 h-9 p-1"
+                          data-testid="input-lead-form-input-border-color"
+                        />
+                        <Input
+                          value={formData.leadFormInputBorderColor || "#374151"}
+                          onChange={(e) => setFormData({ ...formData, leadFormInputBorderColor: e.target.value })}
+                          className="flex-1 text-xs"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs">Cor das Labels</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          type="color"
+                          value={formData.leadFormLabelColor || "#9ca3af"}
+                          onChange={(e) => setFormData({ ...formData, leadFormLabelColor: e.target.value })}
+                          className="w-10 h-9 p-1"
+                          data-testid="input-lead-form-label-color"
+                        />
+                        <Input
+                          value={formData.leadFormLabelColor || "#9ca3af"}
+                          onChange={(e) => setFormData({ ...formData, leadFormLabelColor: e.target.value })}
+                          className="flex-1 text-xs"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tipografia e Estilo */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Fonte do Formulário</Label>
+                    <Select
+                      value={formData.leadFormFontFamily || "Inter, system-ui, sans-serif"}
+                      onValueChange={(v) => setFormData({ ...formData, leadFormFontFamily: v })}
+                    >
+                      <SelectTrigger data-testid="select-lead-form-font">
+                        <SelectValue placeholder="Selecione a fonte" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Inter, system-ui, sans-serif">Inter (Padrão)</SelectItem>
+                        <SelectItem value="Roboto, sans-serif">Roboto</SelectItem>
+                        <SelectItem value="Open Sans, sans-serif">Open Sans</SelectItem>
+                        <SelectItem value="Poppins, sans-serif">Poppins</SelectItem>
+                        <SelectItem value="Montserrat, sans-serif">Montserrat</SelectItem>
+                        <SelectItem value="Lato, sans-serif">Lato</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Raio da Borda (px)</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="32"
+                      value={formData.leadFormBorderRadius || "8"}
+                      onChange={(e) => setFormData({ ...formData, leadFormBorderRadius: e.target.value })}
+                      placeholder="8"
+                      data-testid="input-lead-form-border-radius"
+                    />
+                  </div>
+                </div>
+
+                <Button
+                  onClick={async () => {
+                    try {
+                      const token = localStorage.getItem("adminToken");
+                      const res = await fetch(`/api/webinars/${webinar?.id}/lead-form-config`, {
+                        method: "POST",
+                        headers: {
+                          "Content-Type": "application/json",
+                          Authorization: `Bearer ${token}`,
+                        },
+                        body: JSON.stringify({
+                          title: formData.leadFormTitle || "Inscreva-se no Webinário",
+                          subtitle: formData.leadFormSubtitle || "",
+                          collectName: true,
+                          collectEmail: leadsCollectEmail,
+                          collectWhatsapp: leadsCollectWhatsapp,
+                          collectCity: formData.leadFormCollectCity || false,
+                          collectState: formData.leadFormCollectState || false,
+                          requireConsent: formData.leadFormRequireConsent !== false,
+                          consentText: formData.leadFormConsentText || "Concordo em receber comunicações sobre este webinário",
+                          showNextSession: formData.leadFormShowNextSession !== false,
+                          buttonText: formData.leadFormButtonText || "Quero Participar",
+                          successMessage: formData.leadFormSuccessMessage || "Inscrição realizada com sucesso!",
+                          redirectUrl: formData.leadFormRedirectUrl || "",
+                          backgroundColor: formData.leadFormBgColor || "#1a1a2e",
+                          cardBackgroundColor: formData.leadFormCardColor || "#16213e",
+                          buttonColor: formData.leadFormButtonColor || "#22c55e",
+                          buttonTextColor: formData.leadFormButtonTextColor || "#ffffff",
+                          textColor: formData.leadFormTextColor || "#ffffff",
+                          inputBackgroundColor: formData.leadFormInputColor || "#0f0f23",
+                          inputBorderColor: formData.leadFormInputBorderColor || "#374151",
+                          inputTextColor: formData.leadFormTextColor || "#ffffff",
+                          labelColor: formData.leadFormLabelColor || "#9ca3af",
+                          fontFamily: formData.leadFormFontFamily || "Inter, system-ui, sans-serif",
+                          borderRadius: formData.leadFormBorderRadius || "8",
+                        }),
+                      });
+                      if (res.ok) {
+                        toast({ title: "Configuração do formulário salva!" });
+                      } else {
+                        throw new Error("Erro ao salvar");
+                      }
+                    } catch (e) {
+                      toast({ title: "Erro ao salvar configuração", variant: "destructive" });
+                    }
+                  }}
+                  data-testid="button-save-lead-form-config"
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  Salvar Configuração do Formulário
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Leads Capturados */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  Leads Capturados
+                </CardTitle>
+                <CardDescription>Visualize e exporte os leads inscritos e que assistiram</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
 
               {/* Leads separados por tipo */}
               <div className="mt-6 space-y-4">
@@ -3548,6 +3941,7 @@ export default function AdminWebinarDetailPage() {
               </div>
             </CardContent>
           </Card>
+          </div>
         </TabsContent>
 
         {/* Banner */}

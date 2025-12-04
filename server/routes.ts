@@ -5403,9 +5403,88 @@ Seja conversacional e objetivo.`;
           consentText: "Concordo em receber comunicações sobre este webinário",
           buttonText: "Quero Participar",
           buttonColor: "#22c55e",
+          buttonTextColor: "#ffffff",
           successMessage: "Inscrição realizada com sucesso!",
+          backgroundColor: "#1a1a2e",
+          cardBackgroundColor: "#16213e",
+          textColor: "#ffffff",
+          inputBackgroundColor: "#0f0f23",
+          inputBorderColor: "#374151",
+          inputTextColor: "#ffffff",
+          labelColor: "#9ca3af",
+          showNextSession: true,
+          fontFamily: "Inter, system-ui, sans-serif",
+          borderRadius: "8",
         });
       }
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Save/update lead form config (admin)
+  app.post("/api/webinars/:id/lead-form-config", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const webinar = await storage.getWebinarById(req.params.id);
+      if (!webinar) {
+        return res.status(404).json({ error: "Webinar not found" });
+      }
+
+      const existingConfig = await storage.getLeadFormConfigByWebinar(req.params.id);
+      
+      if (existingConfig) {
+        await storage.updateLeadFormConfig(existingConfig.id, req.body);
+        res.json({ success: true, message: "Configuração atualizada" });
+      } else {
+        await storage.createLeadFormConfig({
+          webinarId: req.params.id,
+          ...req.body,
+        });
+        res.json({ success: true, message: "Configuração criada" });
+      }
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Get registration link and embed code for lead form
+  app.get("/api/webinars/:id/registration-embed", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const webinar = await storage.getWebinarById(req.params.id);
+      if (!webinar) {
+        return res.status(404).json({ error: "Webinar not found" });
+      }
+
+      const baseUrl = req.query.base_url as string || `${req.protocol}://${req.get("host")}`;
+      const registrationUrl = `${baseUrl}/w/${webinar.slug}/register`;
+      
+      const embedCode = `<iframe 
+  src="${registrationUrl}?embed=true" 
+  width="100%" 
+  height="700" 
+  frameborder="0" 
+  style="border: none; max-width: 500px; margin: 0 auto; display: block;"
+  allow="clipboard-write"
+  title="Formulário de Inscrição - ${webinar.name}"
+></iframe>`;
+
+      res.json({
+        registrationUrl,
+        embedCode,
+        slug: webinar.slug,
+      });
     } catch (error: any) {
       res.status(400).json({ error: error.message });
     }

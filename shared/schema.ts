@@ -602,10 +602,21 @@ export const leadFormConfigs = pgTable("lead_form_configs", {
   consentText: text("consent_text").default("Concordo em receber comunicações sobre este webinário"),
   buttonText: text("button_text").default("Quero Participar"),
   buttonColor: text("button_color").default("#22c55e"),
+  buttonTextColor: text("button_text_color").default("#ffffff"),
   successMessage: text("success_message").default("Inscrição realizada com sucesso!"),
   redirectUrl: text("redirect_url"), // URL para redirecionar após cadastro
-  backgroundColor: text("background_color").default("#ffffff"),
-  textColor: text("text_color").default("#000000"),
+  backgroundColor: text("background_color").default("#1a1a2e"),
+  cardBackgroundColor: text("card_background_color").default("#16213e"),
+  textColor: text("text_color").default("#ffffff"),
+  inputBackgroundColor: text("input_background_color").default("#0f0f23"),
+  inputBorderColor: text("input_border_color").default("#374151"),
+  inputTextColor: text("input_text_color").default("#ffffff"),
+  labelColor: text("label_color").default("#9ca3af"),
+  logoUrl: text("logo_url"), // Logo do formulário
+  headerImageUrl: text("header_image_url"), // Imagem de cabeçalho
+  showNextSession: boolean("show_next_session").notNull().default(true), // Mostrar próxima sessão
+  fontFamily: text("font_family").default("Inter, system-ui, sans-serif"),
+  borderRadius: text("border_radius").default("8"), // em pixels
   embedVersion: integer("embed_version").notNull().default(1), // Versão do embed code
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
