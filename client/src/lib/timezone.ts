@@ -52,8 +52,40 @@ export function calculateWebinarStatusWithTimezone(
   const year = nowInTz.getFullYear();
   const month = nowInTz.getMonth();
   const day = nowInTz.getDate();
+  const nowHour = nowInTz.getHours();
+  const nowMinute = nowInTz.getMinutes();
   
-  const todayStartInTz = new Date(year, month, day, startHour, startMinute, 0, 0);
+  // Check if we need to look at yesterday's session
+  // This happens when the session started yesterday but extends past midnight
+  // e.g., webinar at 23:00 with 3h duration ends at 02:00 next day
+  let sessionDay = day;
+  
+  // If current time is before today's start time, check if yesterday's session is still running
+  if (nowHour < startHour || (nowHour === startHour && nowMinute < startMinute)) {
+    // Yesterday's session would have started at startHour:startMinute
+    // Calculate if it would still be running now
+    const yesterdayStartInTz = new Date(year, month, day - 1, startHour, startMinute, 0, 0);
+    const yesterdayStartUtc = fromZonedTime(yesterdayStartInTz, timezone);
+    const yesterdayEndUtc = new Date(yesterdayStartUtc.getTime() + videoDuration * 1000);
+    
+    if (nowUtc >= yesterdayStartUtc && nowUtc < yesterdayEndUtc) {
+      // Yesterday's session is still running!
+      const currentTime = Math.floor((nowUtc.getTime() - yesterdayStartUtc.getTime()) / 1000);
+      const remainingMs = yesterdayEndUtc.getTime() - nowUtc.getTime();
+      const remainingSecs = Math.max(0, Math.floor(remainingMs / 1000));
+      const rh = Math.floor(remainingSecs / 3600);
+      const rm = Math.floor((remainingSecs % 3600) / 60);
+      const rs = remainingSecs % 60;
+      return {
+        status: "live",
+        currentTime,
+        countdown: `${rh}:${rm.toString().padStart(2, "0")}:${rs.toString().padStart(2, "0")}`
+      };
+    }
+  }
+  
+  // Calculate today's session times
+  const todayStartInTz = new Date(year, month, sessionDay, startHour, startMinute, 0, 0);
   const todayStartUtc = fromZonedTime(todayStartInTz, timezone);
   const todayEndUtc = new Date(todayStartUtc.getTime() + videoDuration * 1000);
   
