@@ -85,10 +85,20 @@ export default function WebinarReplayPage() {
     document.body.style.padding = '0';
     document.body.style.overflow = 'hidden';
     document.body.style.background = 'transparent';
+    document.body.style.height = 'auto';
     document.documentElement.style.margin = '0';
     document.documentElement.style.padding = '0';
     document.documentElement.style.overflow = 'hidden';
     document.documentElement.style.background = 'transparent';
+    document.documentElement.style.height = 'auto';
+    
+    // Bloqueia eventos de scroll
+    const preventScroll = (e: Event) => {
+      e.preventDefault();
+    };
+    
+    document.addEventListener('wheel', preventScroll, { passive: false });
+    document.addEventListener('touchmove', preventScroll, { passive: false });
     
     let lastHeight = 0;
     
@@ -132,6 +142,8 @@ export default function WebinarReplayPage() {
       resizeObserver.disconnect();
       mutationObserver.disconnect();
       clearInterval(interval);
+      document.removeEventListener('wheel', preventScroll);
+      document.removeEventListener('touchmove', preventScroll);
     };
   }, [isEmbed]);
 
