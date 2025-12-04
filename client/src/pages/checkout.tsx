@@ -138,7 +138,8 @@ export default function Checkout() {
   const [formData, setFormData] = useState({
     nome: nomeFromUrl,
     email: emailFromUrl,
-    cpf: "",
+    tipoDocumento: "CPF" as "CPF" | "CNPJ",
+    documento: "",
     telefone: "",
   });
   const [step, setStep] = useState<"form" | "payment">("form");
@@ -203,7 +204,8 @@ export default function Checkout() {
       setFormData(prev => ({
         nome: prev.nome || currentUser.name || "",
         email: prev.email || currentUser.email || "",
-        cpf: prev.cpf || currentUser.cpf || "",
+        tipoDocumento: prev.tipoDocumento || "CPF",
+        documento: prev.documento || currentUser.cpf || "",
         telefone: prev.telefone || currentUser.telefone || "",
       }));
     }
@@ -396,11 +398,24 @@ export default function Checkout() {
   };
 
   const formatCPF = (value: string) => {
-    const numbers = value.replace(/\D/g, '');
-    if (numbers.length <= 11) {
-      return numbers.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
-    }
-    return value;
+    const numbers = value.replace(/\D/g, '').slice(0, 11);
+    if (numbers.length <= 3) return numbers;
+    if (numbers.length <= 6) return numbers.replace(/(\d{3})(\d+)/, '$1.$2');
+    if (numbers.length <= 9) return numbers.replace(/(\d{3})(\d{3})(\d+)/, '$1.$2.$3');
+    return numbers.replace(/(\d{3})(\d{3})(\d{3})(\d+)/, '$1.$2.$3-$4');
+  };
+
+  const formatCNPJ = (value: string) => {
+    const numbers = value.replace(/\D/g, '').slice(0, 14);
+    if (numbers.length <= 2) return numbers;
+    if (numbers.length <= 5) return numbers.replace(/(\d{2})(\d+)/, '$1.$2');
+    if (numbers.length <= 8) return numbers.replace(/(\d{2})(\d{3})(\d+)/, '$1.$2.$3');
+    if (numbers.length <= 12) return numbers.replace(/(\d{2})(\d{3})(\d{3})(\d+)/, '$1.$2.$3/$4');
+    return numbers.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d+)/, '$1.$2.$3/$4-$5');
+  };
+
+  const formatDocumento = (value: string) => {
+    return formData.tipoDocumento === "CPF" ? formatCPF(value) : formatCNPJ(value);
   };
 
   const formatPhone = (value: string) => {
@@ -772,17 +787,48 @@ export default function Checkout() {
                       </p>
                     )}
                   </div>
+                  <div className="space-y-2">
+                    <Label className="text-slate-700">Tipo de Documento *</Label>
+                    <div className="flex gap-4">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="tipoDocumento"
+                          value="CPF"
+                          checked={formData.tipoDocumento === "CPF"}
+                          onChange={(e) => setFormData({ ...formData, tipoDocumento: e.target.value as "CPF" | "CNPJ", documento: "" })}
+                          className="w-4 h-4 text-cyan-500"
+                          disabled={step === "payment"}
+                          data-testid="radio-tipo-cpf"
+                        />
+                        <span className="text-slate-700">CPF (Pessoa Física)</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="tipoDocumento"
+                          value="CNPJ"
+                          checked={formData.tipoDocumento === "CNPJ"}
+                          onChange={(e) => setFormData({ ...formData, tipoDocumento: e.target.value as "CPF" | "CNPJ", documento: "" })}
+                          className="w-4 h-4 text-cyan-500"
+                          disabled={step === "payment"}
+                          data-testid="radio-tipo-cnpj"
+                        />
+                        <span className="text-slate-700">CNPJ (Empresa)</span>
+                      </label>
+                    </div>
+                  </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="cpf" className="text-slate-700">CPF *</Label>
+                      <Label htmlFor="documento" className="text-slate-700">{formData.tipoDocumento} *</Label>
                       <Input
-                        id="cpf"
-                        data-testid="input-checkout-cpf"
-                        value={formData.cpf}
-                        onChange={(e) => setFormData({ ...formData, cpf: formatCPF(e.target.value) })}
-                        placeholder="000.000.000-00"
+                        id="documento"
+                        data-testid="input-checkout-documento"
+                        value={formData.documento}
+                        onChange={(e) => setFormData({ ...formData, documento: formatDocumento(e.target.value) })}
+                        placeholder={formData.tipoDocumento === "CPF" ? "000.000.000-00" : "00.000.000/0000-00"}
                         className="bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400 h-12"
-                        maxLength={14}
+                        maxLength={formData.tipoDocumento === "CPF" ? 14 : 18}
                         disabled={step === "payment"}
                       />
                     </div>
@@ -891,10 +937,11 @@ export default function Checkout() {
                               amount: selectedPlano.preco / 100,
                               payer: {
                                 email: formData.email,
-                                ...(formData.cpf && formData.cpf.replace(/\D/g, '').length >= 11 ? {
+                                ...((formData.tipoDocumento === "CPF" && formData.documento.replace(/\D/g, '').length >= 11) || 
+                                    (formData.tipoDocumento === "CNPJ" && formData.documento.replace(/\D/g, '').length >= 14) ? {
                                   identification: {
-                                    type: 'CPF',
-                                    number: formData.cpf.replace(/\D/g, ''),
+                                    type: formData.tipoDocumento,
+                                    number: formData.documento.replace(/\D/g, ''),
                                   },
                                 } : {}),
                               },
