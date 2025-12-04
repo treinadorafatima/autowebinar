@@ -5353,6 +5353,51 @@ Seja conversacional e objetivo.`;
     }
   });
 
+  // Generate embed code for replay page
+  // Suporta parâmetro base_url para definir o domínio manualmente
+  app.get("/api/webinars/:slug/replay-embed-code", async (req, res) => {
+    try {
+      const webinar = await storage.getWebinarBySlug(req.params.slug);
+      if (!webinar) {
+        return res.status(404).json({ error: "Webinar not found" });
+      }
+
+      if (!webinar.replayEnabled) {
+        return res.status(400).json({ error: "Replay não está habilitado para este webinário" });
+      }
+      
+      // Usar helper que suporta PUBLIC_BASE_URL, base_url param, e detecção automática
+      const queryBaseUrl = req.query.base_url as string | undefined;
+      const baseUrl = getPublicBaseUrl(req, queryBaseUrl);
+      
+      // Embed do replay (página completa com vídeo, oferta e benefícios)
+      const embedUrl = `${baseUrl}/w/${webinar.slug}/replay?embed=1`;
+      const iframeId = `webinar-replay-${webinar.slug}`;
+      const embedCode = `<div style="width:100%;border-radius:8px;overflow:hidden;">
+<iframe id="${iframeId}" src="${embedUrl}" frameborder="0" scrolling="no" allow="autoplay; fullscreen" allowfullscreen loading="lazy" style="width:100%;height:900px;border:none;display:block;"></iframe>
+</div>
+<script>
+(function(){
+  var iframe = document.getElementById('${iframeId}');
+  window.addEventListener('message', function(e) {
+    if (e.data && e.data.type === 'webinar-resize' && e.data.height) {
+      iframe.style.height = e.data.height + 'px';
+    }
+  });
+})();
+</script>`;
+      
+      res.json({ 
+        embedCode,
+        embedUrl,
+        baseUrl,
+        hint: "Para gerar embed com domínio customizado, use: ?base_url=https://seudominio.com"
+      });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
   // Save a lead (from in-room participation - source: room)
   app.post("/api/webinars/:id/leads", async (req, res) => {
     try {

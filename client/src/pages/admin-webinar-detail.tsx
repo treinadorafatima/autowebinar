@@ -212,6 +212,121 @@ function DomainConfigSection({ domain, serverHost }: { domain: string; serverHos
   );
 }
 
+function ReplayEmbedSection({ webinarSlug, customDomain, token }: { webinarSlug: string; customDomain?: string; token: string | null }) {
+  const [embedCode, setEmbedCode] = useState("");
+  const [embedUrl, setEmbedUrl] = useState("");
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
+
+  const fetchReplayEmbed = async () => {
+    if (!webinarSlug) return;
+    setLoading(true);
+    try {
+      let url = `/api/webinars/${webinarSlug}/replay-embed-code`;
+      if (customDomain) {
+        url += `?base_url=https://${customDomain}`;
+      }
+      const res = await fetch(url, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setEmbedCode(data.embedCode || "");
+        setEmbedUrl(data.embedUrl || "");
+      }
+    } catch (error) {
+      console.error("Erro ao carregar embed do replay:", error);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchReplayEmbed();
+  }, [webinarSlug, customDomain]);
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast({ title: "Copiado!" });
+  };
+
+  if (loading) {
+    return (
+      <Card className="mt-6">
+        <CardContent className="p-6 flex items-center justify-center">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="mt-6">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Code className="h-5 w-5" />
+          Código Embed do Replay
+        </CardTitle>
+        <CardDescription>
+          Use este código para incorporar a página de replay em outros sites.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-2">
+          <Label>URL do Replay (para embed)</Label>
+          <div className="flex gap-2">
+            <Input value={embedUrl} readOnly className="font-mono text-sm" />
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => copyToClipboard(embedUrl)}
+              data-testid="button-copy-replay-url"
+            >
+              <Copy className="h-4 w-4" />
+            </Button>
+            <a href={embedUrl} target="_blank" rel="noopener noreferrer">
+              <Button variant="outline" size="icon" data-testid="button-open-replay-embed">
+                <ExternalLink className="h-4 w-4" />
+              </Button>
+            </a>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label>Código Embed</Label>
+          <div className="relative">
+            <textarea
+              value={embedCode}
+              readOnly
+              rows={5}
+              className="w-full p-3 bg-muted border border-input rounded-lg text-sm font-mono resize-none"
+            />
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => copyToClipboard(embedCode)}
+              className="absolute top-2 right-2"
+              data-testid="button-copy-replay-embed"
+            >
+              <Copy className="h-4 w-4 mr-1" />
+              Copiar
+            </Button>
+          </div>
+        </div>
+
+        <div className="p-4 bg-muted rounded-lg">
+          <h4 className="font-medium text-sm mb-2">Instruções</h4>
+          <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+            <li>Cole o código embed no HTML do seu site onde deseja exibir o replay</li>
+            <li>O iframe se ajusta automaticamente à altura do conteúdo</li>
+            <li>A página de replay inclui vídeo, oferta e benefícios configurados</li>
+            <li>A cor de fundo e estilos são aplicados automaticamente</li>
+          </ul>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 interface Webinar {
   id: string;
   ownerId: string | null;
@@ -5447,6 +5562,14 @@ export default function AdminWebinarDetailPage() {
                     }}
                   />
                 </div>
+              )}
+
+              {formData.replayEnabled && (
+                <ReplayEmbedSection 
+                  webinarSlug={formData.slug}
+                  customDomain={formData.customDomain}
+                  token={token}
+                />
               )}
             </CardContent>
           </Card>

@@ -292,11 +292,11 @@ export default function WebinarReplayPage() {
       <div 
         ref={containerRef}
         className={isEmbed ? "w-full" : "min-h-screen"} 
-        style={{ backgroundColor: isEmbed ? "transparent" : "#4A8BB5" }}
+        style={{ backgroundColor: "#4A8BB5" }}
       >
         {/* Skeleton loader que simula o layout do vídeo */}
-        <div className={isEmbed ? "" : "container mx-auto py-4 md:py-8"}>
-          <div className={isEmbed ? "" : "mx-auto px-2 md:px-4"} style={{ maxWidth: isEmbed ? "100%" : "960px" }}>
+        <div className="container mx-auto py-4 md:py-8">
+          <div className="mx-auto px-2 md:px-4" style={{ maxWidth: "960px" }}>
             <div className="relative w-full overflow-hidden rounded-xl" style={{ backgroundColor: "#1a1a2e" }}>
               <div className="aspect-video flex flex-col items-center justify-center">
                 <div className="w-16 h-16 border-4 border-white/20 border-t-white rounded-full animate-spin mb-4" />
@@ -331,12 +331,12 @@ export default function WebinarReplayPage() {
       ref={containerRef}
       className={isEmbed ? "w-full" : "min-h-screen"} 
       style={{ 
-        backgroundColor: isEmbed ? "transparent" : bgColor,
+        backgroundColor: bgColor,
         overflow: isEmbed ? "hidden" : undefined
       }}
     >
-      <section className="container mx-auto py-3 md:py-16">
-        <div className="mx-auto px-3 md:px-4" style={{ maxWidth: "960px" }}>
+      <section className={isEmbed ? "py-4" : "container mx-auto py-3 md:py-16"}>
+        <div className={isEmbed ? "px-4" : "mx-auto px-3 md:px-4"} style={{ maxWidth: isEmbed ? "100%" : "960px" }}>
           {(webinar.replayBadgeText || webinar.replayTitle) && (
             <div className="text-center mb-4 md:mb-10">
               <div
