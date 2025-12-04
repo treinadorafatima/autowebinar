@@ -281,10 +281,15 @@ export const leads = pgTable("leads", {
   customData: text("custom_data"), // JSON for future custom fields
   capturedAt: timestamp("captured_at").defaultNow(),
   sessionId: text("session_id"),
+  // New fields for lead differentiation
+  status: text("status").notNull().default("registered"), // 'registered' (inscrito) or 'watched' (assistiu)
+  source: text("source").notNull().default("registration"), // 'registration' (página de inscrição) or 'room' (entrou direto na sala)
+  joinedAt: timestamp("joined_at"), // When the lead entered the webinar room
+  sequenceTriggered: boolean("sequence_triggered").notNull().default(false), // If email/whatsapp sequences were triggered
 });
 
 export type Lead = typeof leads.$inferSelect;
-export const leadInsertSchema = createInsertSchema(leads).omit({ id: true, capturedAt: true });
+export const leadInsertSchema = createInsertSchema(leads).omit({ id: true, capturedAt: true, joinedAt: true });
 export type LeadInsert = z.infer<typeof leadInsertSchema>;
 
 // Scripts table for webinar scripts and message generation

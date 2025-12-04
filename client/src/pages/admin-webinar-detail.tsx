@@ -3400,80 +3400,151 @@ export default function AdminWebinarDetailPage() {
                 </div>
               )}
 
-              <div className="mt-6 p-4 bg-muted rounded-lg">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="font-medium text-sm">Leads Capturados ({leads.length})</h4>
-                  {leads.length > 0 && (
-                    <div className="flex items-center gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          const headers = ["Nome", "Email", "WhatsApp", "Cidade", "Estado", "Data"];
-                          const rows = leads.map(l => [
-                            l.name || "",
-                            l.email || "",
-                            l.whatsapp || "",
-                            l.city || "",
-                            l.state || "",
-                            l.capturedAt ? new Date(l.capturedAt).toLocaleString("pt-BR") : ""
-                          ]);
-                          const csv = [headers.join(","), ...rows.map(r => r.map(c => `"${c}"`).join(","))].join("\n");
-                          const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-                          const url = URL.createObjectURL(blob);
-                          const a = document.createElement("a");
-                          a.href = url;
-                          a.download = `leads-${webinar?.slug || "webinar"}-${new Date().toISOString().split("T")[0]}.csv`;
-                          a.click();
-                          URL.revokeObjectURL(url);
-                        }}
-                        data-testid="button-export-leads"
-                      >
-                        <Download className="h-4 w-4 mr-1" />
-                        Exportar CSV
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={async () => {
-                          if (!confirm(`Tem certeza que deseja excluir todos os ${leads.length} leads? Esta ação não pode ser desfeita.`)) return;
-                          try {
-                            const token = localStorage.getItem("adminToken");
-                            const res = await fetch(`/api/webinars/${webinar?.id}/leads`, {
-                              method: "DELETE",
-                              headers: { Authorization: `Bearer ${token}` }
-                            });
-                            if (res.ok) {
-                              setLeads([]);
-                              toast({ title: "Leads excluídos", description: "Todos os leads foram removidos com sucesso." });
-                            } else {
-                              throw new Error("Erro ao excluir");
-                            }
-                          } catch (e) {
-                            toast({ title: "Erro", description: "Não foi possível excluir os leads.", variant: "destructive" });
+              {/* Leads separados por tipo */}
+              <div className="mt-6 space-y-4">
+                {/* Summary Cards */}
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="p-4 bg-muted rounded-lg text-center">
+                    <p className="text-2xl font-bold text-primary">{leads.length}</p>
+                    <p className="text-xs text-muted-foreground">Total de Leads</p>
+                  </div>
+                  <div className="p-4 bg-green-500/10 rounded-lg text-center">
+                    <p className="text-2xl font-bold text-green-600">{leads.filter(l => l.source === "registration" || l.status === "registered").length}</p>
+                    <p className="text-xs text-muted-foreground">Inscritos</p>
+                  </div>
+                  <div className="p-4 bg-blue-500/10 rounded-lg text-center">
+                    <p className="text-2xl font-bold text-blue-600">{leads.filter(l => l.status === "watched").length}</p>
+                    <p className="text-xs text-muted-foreground">Assistiram</p>
+                  </div>
+                </div>
+
+                {/* Export/Delete buttons */}
+                {leads.length > 0 && (
+                  <div className="flex items-center justify-end gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        const headers = ["Nome", "Email", "WhatsApp", "Cidade", "Estado", "Tipo", "Status", "Data Inscrição", "Data Assistiu"];
+                        const rows = leads.map(l => [
+                          l.name || "",
+                          l.email || "",
+                          l.whatsapp || "",
+                          l.city || "",
+                          l.state || "",
+                          l.source === "registration" ? "Inscrição" : "Sala",
+                          l.status === "watched" ? "Assistiu" : "Inscrito",
+                          l.capturedAt ? new Date(l.capturedAt).toLocaleString("pt-BR") : "",
+                          l.joinedAt ? new Date(l.joinedAt).toLocaleString("pt-BR") : ""
+                        ]);
+                        const csv = [headers.join(","), ...rows.map(r => r.map(c => `"${c}"`).join(","))].join("\n");
+                        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = `leads-${webinar?.slug || "webinar"}-${new Date().toISOString().split("T")[0]}.csv`;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                      }}
+                      data-testid="button-export-leads"
+                    >
+                      <Download className="h-4 w-4 mr-1" />
+                      Exportar CSV
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={async () => {
+                        if (!confirm(`Tem certeza que deseja excluir todos os ${leads.length} leads? Esta ação não pode ser desfeita.`)) return;
+                        try {
+                          const token = localStorage.getItem("adminToken");
+                          const res = await fetch(`/api/webinars/${webinar?.id}/leads`, {
+                            method: "DELETE",
+                            headers: { Authorization: `Bearer ${token}` }
+                          });
+                          if (res.ok) {
+                            setLeads([]);
+                            toast({ title: "Leads excluídos", description: "Todos os leads foram removidos com sucesso." });
+                          } else {
+                            throw new Error("Erro ao excluir");
                           }
-                        }}
-                        data-testid="button-clear-leads"
-                      >
-                        <Trash2 className="h-4 w-4 mr-1" />
-                        Limpar
-                      </Button>
+                        } catch (e) {
+                          toast({ title: "Erro", description: "Não foi possível excluir os leads.", variant: "destructive" });
+                        }
+                      }}
+                      data-testid="button-clear-leads"
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Limpar Todos
+                    </Button>
+                  </div>
+                )}
+
+                {/* Inscritos (Registered) */}
+                <div className="p-4 bg-green-500/5 border border-green-500/20 rounded-lg">
+                  <h4 className="font-medium text-sm mb-3 flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-600" />
+                    Inscritos ({leads.filter(l => l.source === "registration" || l.status === "registered").length})
+                    <span className="text-xs text-muted-foreground ml-2">Cadastrados na página de inscrição</span>
+                  </h4>
+                  {leads.filter(l => l.source === "registration" || l.status === "registered").length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Nenhum lead inscrito ainda. Compartilhe a página de inscrição: <code className="bg-muted px-1 rounded">/w/{webinar?.slug}/register</code></p>
+                  ) : (
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {leads.filter(l => l.source === "registration" || l.status === "registered").map((lead) => (
+                        <div key={lead.id} className="text-sm p-2 bg-background rounded flex items-center justify-between">
+                          <div>
+                            <p className="font-medium">{lead.name}</p>
+                            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                              {lead.email && <span>{lead.email}</span>}
+                              {lead.whatsapp && <span>{lead.whatsapp}</span>}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {lead.status === "watched" && (
+                              <Badge variant="secondary" className="text-xs bg-blue-500/10 text-blue-600">Assistiu</Badge>
+                            )}
+                            {lead.sequenceTriggered && (
+                              <Badge variant="outline" className="text-xs">Sequência ativada</Badge>
+                            )}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
-                {leads.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">Nenhum lead capturado ainda</p>
-                ) : (
-                  <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {leads.map((lead) => (
-                      <div key={lead.id} className="text-sm p-2 bg-background rounded">
-                        <p><strong>{lead.name}</strong></p>
-                        {lead.email && <p className="text-xs text-muted-foreground">{lead.email}</p>}
-                        {lead.whatsapp && <p className="text-xs text-muted-foreground">{lead.whatsapp}</p>}
-                      </div>
-                    ))}
-                  </div>
-                )}
+
+                {/* Assistiram direto (Entered room without registration) */}
+                <div className="p-4 bg-blue-500/5 border border-blue-500/20 rounded-lg">
+                  <h4 className="font-medium text-sm mb-3 flex items-center gap-2">
+                    <Video className="h-4 w-4 text-blue-600" />
+                    Entraram na Sala ({leads.filter(l => l.source === "room" && l.status !== "registered").length})
+                    <span className="text-xs text-muted-foreground ml-2">Entraram direto sem inscrição prévia</span>
+                  </h4>
+                  {leads.filter(l => l.source === "room" && l.status !== "registered").length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Nenhum lead entrou diretamente na sala</p>
+                  ) : (
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {leads.filter(l => l.source === "room" && l.status !== "registered").map((lead) => (
+                        <div key={lead.id} className="text-sm p-2 bg-background rounded flex items-center justify-between">
+                          <div>
+                            <p className="font-medium">{lead.name}</p>
+                            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                              {lead.email && <span>{lead.email}</span>}
+                              {lead.whatsapp && <span>{lead.whatsapp}</span>}
+                              {lead.city && lead.state && <span>{lead.city}/{lead.state}</span>}
+                            </div>
+                          </div>
+                          {lead.joinedAt && (
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(lead.joinedAt).toLocaleString("pt-BR")}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>

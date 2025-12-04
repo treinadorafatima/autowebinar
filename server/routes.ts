@@ -5331,10 +5331,37 @@ Seja conversacional e objetivo.`;
     }
   });
 
-  // Save a lead
+  // Save a lead (from in-room participation - source: room)
   app.post("/api/webinars/:id/leads", async (req, res) => {
     try {
       const { name, email, whatsapp, city, state, sessionId } = req.body;
+      
+      // Check if lead already exists by email or whatsapp
+      let existingLead = null;
+      if (email) {
+        const existing = await db.select().from(leads).where(and(eq(leads.webinarId, req.params.id), eq(leads.email, email))).limit(1);
+        if (existing.length > 0) existingLead = existing[0];
+      }
+      if (!existingLead && whatsapp) {
+        const existing = await db.select().from(leads).where(and(eq(leads.webinarId, req.params.id), eq(leads.whatsapp, whatsapp))).limit(1);
+        if (existing.length > 0) existingLead = existing[0];
+      }
+      
+      if (existingLead) {
+        // Update existing lead to "watched" status
+        await db.update(leads).set({
+          status: "watched",
+          joinedAt: new Date(),
+          sessionId: sessionId || existingLead.sessionId,
+          name: name || existingLead.name,
+          city: city || existingLead.city,
+          state: state || existingLead.state,
+        }).where(eq(leads.id, existingLead.id));
+        
+        return res.json({ success: true, id: existingLead.id, updated: true });
+      }
+      
+      // Create new lead with source: room (entered directly)
       const leadId = "lead_" + Date.now() + "_" + Math.random().toString(36).substring(7);
       
       await db.insert(leads).values({
@@ -5346,10 +5373,128 @@ Seja conversacional e objetivo.`;
         city: city || null,
         state: state || null,
         sessionId: sessionId || null,
+        status: "watched",
+        source: "room",
+        joinedAt: new Date(),
       });
       
       res.json({ success: true, id: leadId });
     } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Get lead form config for a webinar (public)
+  app.get("/api/webinars/:id/lead-form-config", async (req, res) => {
+    try {
+      const config = await storage.getLeadFormConfigByWebinar(req.params.id);
+      if (config) {
+        res.json(config);
+      } else {
+        res.json({
+          title: "Inscreva-se no Webinário",
+          subtitle: "Preencha seus dados para participar",
+          collectName: true,
+          collectEmail: true,
+          collectWhatsapp: true,
+          collectCity: false,
+          collectState: false,
+          requireConsent: true,
+          consentText: "Concordo em receber comunicações sobre este webinário",
+          buttonText: "Quero Participar",
+          buttonColor: "#22c55e",
+          successMessage: "Inscrição realizada com sucesso!",
+        });
+      }
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Register lead (from registration page - source: registration, triggers sequences)
+  app.post("/api/webinars/:id/register", async (req, res) => {
+    try {
+      const { name, email, whatsapp, city, state } = req.body;
+      
+      if (!name) {
+        return res.status(400).json({ error: "Nome é obrigatório" });
+      }
+      
+      // Check if lead already exists
+      let existingLead = null;
+      if (email) {
+        const existing = await db.select().from(leads).where(and(eq(leads.webinarId, req.params.id), eq(leads.email, email))).limit(1);
+        if (existing.length > 0) existingLead = existing[0];
+      }
+      if (!existingLead && whatsapp) {
+        const existing = await db.select().from(leads).where(and(eq(leads.webinarId, req.params.id), eq(leads.whatsapp, whatsapp))).limit(1);
+        if (existing.length > 0) existingLead = existing[0];
+      }
+      
+      if (existingLead) {
+        // Already registered - just return success
+        return res.json({ success: true, id: existingLead.id, message: "Você já está inscrito!" });
+      }
+      
+      // Create new lead with source: registration
+      const leadId = "lead_" + Date.now() + "_" + Math.random().toString(36).substring(7);
+      
+      await db.insert(leads).values({
+        id: leadId,
+        webinarId: req.params.id,
+        name,
+        email: email || null,
+        whatsapp: whatsapp || null,
+        city: city || null,
+        state: state || null,
+        status: "registered",
+        source: "registration",
+        sequenceTriggered: true,
+      });
+      
+      // Get webinar info to schedule sequences
+      const webinar = await storage.getWebinarById(req.params.id);
+      if (webinar && webinar.ownerId) {
+        // Calculate next webinar session time
+        const now = new Date();
+        const todayStr = now.toISOString().split("T")[0];
+        
+        // Trigger email sequences if email provided
+        if (email) {
+          try {
+            const { scheduleEmailsForLead } = await import("./email-scheduler");
+            const sessionTime = new Date();
+            sessionTime.setHours(webinar.startHour || 18, webinar.startMinute || 0, 0, 0);
+            if (sessionTime <= now) {
+              sessionTime.setDate(sessionTime.getDate() + 1);
+            }
+            await scheduleEmailsForLead(leadId, req.params.id, webinar.ownerId, sessionTime, todayStr);
+            console.log(`[register] Scheduled email sequences for lead ${leadId}`);
+          } catch (e) {
+            console.error("[register] Error scheduling emails:", e);
+          }
+        }
+        
+        // Trigger WhatsApp sequences if whatsapp provided
+        if (whatsapp) {
+          try {
+            const { scheduleWhatsappForLead } = await import("./whatsapp-scheduler");
+            const sessionTime = new Date();
+            sessionTime.setHours(webinar.startHour || 18, webinar.startMinute || 0, 0, 0);
+            if (sessionTime <= now) {
+              sessionTime.setDate(sessionTime.getDate() + 1);
+            }
+            await scheduleWhatsappForLead(leadId, req.params.id, webinar.ownerId, sessionTime, todayStr);
+            console.log(`[register] Scheduled WhatsApp sequences for lead ${leadId}`);
+          } catch (e) {
+            console.error("[register] Error scheduling WhatsApp:", e);
+          }
+        }
+      }
+      
+      res.json({ success: true, id: leadId, message: "Inscrição realizada com sucesso!" });
+    } catch (error: any) {
+      console.error("[register] Error:", error);
       res.status(400).json({ error: error.message });
     }
   });
