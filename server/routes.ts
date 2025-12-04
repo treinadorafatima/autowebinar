@@ -6817,11 +6817,13 @@ Seja conversacional e objetivo.`;
                             (plano.frequencia || 1) * 12 : (plano.frequencia || 1);
 
       // Create preapproval with card_token for transparent checkout
+      // IMPORTANT: status: "authorized" is required for card_token subscriptions
       const preapprovalRequest: any = {
         reason: plano.nome,
         external_reference: pagamentoId,
         payer_email: payerEmail || pagamento.email,
         card_token_id: cardToken,
+        status: "authorized",
         auto_recurring: {
           frequency: frequencyValue,
           frequency_type: frequencyType,
