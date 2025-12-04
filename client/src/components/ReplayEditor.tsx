@@ -45,11 +45,60 @@ function SimpleTextEditor({
 }) {
   const editorRef = useRef<HTMLDivElement>(null);
 
+  const sanitizeHtml = (html: string): string => {
+    const tmp = document.createElement("div");
+    tmp.innerHTML = html;
+    
+    const allowedTags = ["span", "b", "i", "u", "strong", "em", "br"];
+    
+    const clean = (node: Node): string => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        return node.textContent || "";
+      }
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        const el = node as Element;
+        const tag = el.tagName.toLowerCase();
+        
+        if (!allowedTags.includes(tag)) {
+          return Array.from(el.childNodes).map(clean).join("");
+        }
+        
+        let styleAttr = "";
+        const inlineStyle = el.getAttribute("style");
+        if (inlineStyle) {
+          const colorMatch = inlineStyle.match(/color:\s*([^;]+)/i);
+          const bgMatch = inlineStyle.match(/background(?:-color)?:\s*([^;]+)/i);
+          const styles: string[] = [];
+          if (colorMatch) styles.push(`color: ${colorMatch[1]}`);
+          if (bgMatch) styles.push(`background: ${bgMatch[1]}`);
+          if (styles.length) styleAttr = ` style="${styles.join("; ")}"`;
+        }
+        
+        const children = Array.from(el.childNodes).map(clean).join("");
+        if (tag === "br") return "<br>";
+        return `<${tag}${styleAttr}>${children}</${tag}>`;
+      }
+      return "";
+    };
+    
+    return Array.from(tmp.childNodes).map(clean).join("");
+  };
+
   const handleInput = useCallback(() => {
     if (editorRef.current) {
-      onChange(editorRef.current.innerHTML || "");
+      const rawHtml = editorRef.current.innerHTML || "";
+      const cleanHtml = sanitizeHtml(rawHtml);
+      onChange(cleanHtml);
     }
   }, [onChange]);
+
+  const handlePaste = useCallback((e: React.ClipboardEvent) => {
+    e.preventDefault();
+    const text = e.clipboardData.getData("text/plain");
+    document.execCommand("insertText", false, text);
+  }, []);
+
+  const displayValue = sanitizeHtml(value);
 
   return (
     <div className="relative">
@@ -59,11 +108,12 @@ function SimpleTextEditor({
         suppressContentEditableWarning
         spellCheck="false"
         onInput={handleInput}
+        onPaste={handlePaste}
         className={`outline-none min-h-[1.5em] cursor-text ${className}`}
         style={style}
         data-placeholder={placeholder}
         data-testid={testId}
-        dangerouslySetInnerHTML={{ __html: value }}
+        dangerouslySetInnerHTML={{ __html: displayValue }}
       />
       <style>{`
         [contenteditable]:empty:before {

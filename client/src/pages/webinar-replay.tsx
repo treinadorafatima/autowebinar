@@ -355,12 +355,11 @@ export default function WebinarReplayPage() {
                       color: "#000000",
                       boxShadow: "0 4px 15px rgba(255, 215, 0, 0.5)",
                     }}
-                  >
-                    {stripHtml(webinar.replayBadgeText)}
-                  </div>
+                    dangerouslySetInnerHTML={{ __html: webinar.replayBadgeText }}
+                  />
                 )}
                 {webinar.replayTitle && (
-                  <h1
+                  <div
                     className="text-2xl md:text-5xl lg:text-6xl font-extrabold leading-tight px-2"
                     style={{
                       background: "linear-gradient(180deg, #FFFFFF 0%, #FFD700 100%)",
@@ -370,9 +369,8 @@ export default function WebinarReplayPage() {
                       filter: "drop-shadow(0 4px 8px rgba(0, 0, 0, 0.8))",
                     }}
                     data-testid="text-replay-title"
-                  >
-                    {stripHtml(webinar.replayTitle)}
-                  </h1>
+                    dangerouslySetInnerHTML={{ __html: webinar.replayTitle }}
+                  />
                 )}
               </div>
             </div>
@@ -533,9 +531,8 @@ export default function WebinarReplayPage() {
                     boxShadow: "0 4px 15px rgba(255, 215, 0, 0.4)",
                   }}
                   data-testid="badge-offer"
-                >
-                  {stripHtml(webinar.replayOfferBadgeText)}
-                </div>
+                  dangerouslySetInnerHTML={{ __html: webinar.replayOfferBadgeText }}
+                />
               )}
 
               {webinar.replayOfferTitle && (
@@ -543,19 +540,17 @@ export default function WebinarReplayPage() {
                   className="text-2xl md:text-4xl font-bold mb-4"
                   style={{ color: "#ffffff", textShadow: "3px 3px 6px rgba(0,0,0,0.8)" }}
                   data-testid="text-offer-title"
-                >
-                  {stripHtml(webinar.replayOfferTitle)}
-                </h2>
+                  dangerouslySetInnerHTML={{ __html: webinar.replayOfferTitle }}
+                />
               )}
 
               {webinar.replayOfferSubtitle && (
-                <p
+                <div
                   className="text-base md:text-lg mb-6 font-medium"
                   style={{ color: "#ffffff", textShadow: "2px 2px 4px rgba(0,0,0,0.8)" }}
                   data-testid="text-offer-subtitle"
-                >
-                  {stripHtml(webinar.replayOfferSubtitle)}
-                </p>
+                  dangerouslySetInnerHTML={{ __html: webinar.replayOfferSubtitle }}
+                />
               )}
 
               {webinar.replayOfferImageUrl && (
@@ -590,9 +585,8 @@ export default function WebinarReplayPage() {
                       <span
                         className="text-base md:text-lg font-semibold"
                         style={{ color: "#ffffff", textShadow: "1px 1px 3px rgba(0,0,0,0.8)" }}
-                      >
-                        {stripHtml(benefit)}
-                      </span>
+                        dangerouslySetInnerHTML={{ __html: benefit }}
+                      />
                     </div>
                   ))}
                 </div>
@@ -607,13 +601,12 @@ export default function WebinarReplayPage() {
                     boxShadow: "0 15px 40px rgba(255, 215, 0, 0.4), inset 0 1px 0 rgba(255,255,255,0.2)",
                   }}
                 >
-                  <p
+                  <div
                     className="text-lg md:text-2xl font-bold leading-relaxed"
                     style={{ color: "#ffffff", textShadow: "2px 2px 6px rgba(0,0,0,0.9)" }}
                     data-testid="text-pricing"
-                  >
-                    {stripHtml(webinar.replayPriceText)}
-                  </p>
+                    dangerouslySetInnerHTML={{ __html: webinar.replayPriceText }}
+                  />
                 </div>
               )}
 
