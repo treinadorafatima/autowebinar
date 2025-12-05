@@ -401,6 +401,7 @@ export const checkoutPlanos = pgTable("checkout_planos", {
   disponivelRenovacao: boolean("disponivel_renovacao").notNull().default(false),
   beneficios: text("beneficios").default("[]"), // JSON array de benefícios
   destaque: boolean("destaque").notNull().default(false), // Destacar plano na página
+  exibirNaLanding: boolean("exibir_na_landing").notNull().default(true), // Exibir na landing page
   ordem: integer("ordem").notNull().default(0), // Ordem de exibição
   criadoEm: timestamp("criado_em").defaultNow(),
   atualizadoEm: timestamp("atualizado_em").defaultNow(),

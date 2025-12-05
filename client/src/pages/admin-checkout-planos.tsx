@@ -51,6 +51,7 @@ interface Plano {
   disponivelRenovacao: boolean;
   beneficios: string;
   destaque: boolean;
+  exibirNaLanding: boolean;
   ordem: number;
   criadoEm?: string;
   atualizadoEm?: string;
@@ -72,6 +73,7 @@ const defaultPlano: Partial<Plano> = {
   disponivelRenovacao: false,
   beneficios: "[]",
   destaque: false,
+  exibirNaLanding: true,
   ordem: 0,
 };
 
@@ -576,7 +578,7 @@ export default function AdminCheckoutPlanos() {
               </div>
 
               <div className="space-y-4">
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="flex flex-col gap-1">
                     <div className="flex items-center gap-2">
                       <Switch
@@ -589,7 +591,21 @@ export default function AdminCheckoutPlanos() {
                       />
                       <Label htmlFor="ativo">Ativo</Label>
                     </div>
-                    <p className="text-xs text-muted-foreground">Aparece para novos clientes</p>
+                    <p className="text-xs text-muted-foreground">Link funciona</p>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        id="exibirNaLanding"
+                        checked={editingPlano.exibirNaLanding ?? true}
+                        onCheckedChange={(checked) =>
+                          setEditingPlano({ ...editingPlano, exibirNaLanding: checked })
+                        }
+                        data-testid="switch-plano-exibir-landing"
+                      />
+                      <Label htmlFor="exibirNaLanding">Na Landing</Label>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Aparece na página</p>
                   </div>
                   <div className="flex flex-col gap-1">
                     <div className="flex items-center gap-2">

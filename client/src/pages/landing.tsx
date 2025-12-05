@@ -60,6 +60,7 @@ interface Plano {
   storageLimit: number;
   ativo: boolean;
   destaque: boolean;
+  exibirNaLanding?: boolean;
   beneficios: string;
   ordem: number;
   tipoCobranca: string;
@@ -82,7 +83,7 @@ export default function LandingPage() {
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
 
-  const planosAtivos = planos?.filter(p => p.ativo)?.sort((a, b) => (a.ordem || 0) - (b.ordem || 0)) || [];
+  const planosAtivos = planos?.filter(p => p.ativo && p.exibirNaLanding !== false)?.sort((a, b) => (a.ordem || 0) - (b.ordem || 0)) || [];
 
   useEffect(() => {
     async function loadAccountInfo() {
