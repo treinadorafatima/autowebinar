@@ -11,7 +11,7 @@ import { rescheduleSequencesForWebinar, cancelAllSequencesForWebinar } from "./s
 import { renderDomainsService } from "./render-domains";
 import multer from "multer";
 import { db } from "./db";
-import { eq, and, or, desc } from "drizzle-orm";
+import { eq, and, or, desc, sql } from "drizzle-orm";
 import { comments } from "@shared/schema";
 import OpenAI from "openai";
 import { z } from "zod";
@@ -2841,27 +2841,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "adjustSeconds must be a number" });
       }
 
-      // Get all simulated comments for this webinar
-      const simulatedComments = await db
-        .select()
+      // Count simulated comments first
+      const countResult = await db
+        .select({ count: sql<number>`count(*)` })
         .from(comments)
         .where(and(
           eq(comments.webinarId, req.params.id),
           eq(comments.isSimulated, true)
         ));
+      
+      const totalComments = Number(countResult[0]?.count || 0);
 
-      // Update each comment's timestamp
-      let updated = 0;
-      for (const comment of simulatedComments) {
-        const newTimestamp = Math.max(0, comment.timestamp + adjustSeconds);
-        await db
-          .update(comments)
-          .set({ timestamp: newTimestamp })
-          .where(eq(comments.id, comment.id));
-        updated++;
-      }
+      // Update all simulated comments in a single batch query
+      // Using GREATEST to ensure timestamp doesn't go below 0
+      await db
+        .update(comments)
+        .set({ 
+          timestamp: sql`GREATEST(0, ${comments.timestamp} + ${adjustSeconds})`
+        })
+        .where(and(
+          eq(comments.webinarId, req.params.id),
+          eq(comments.isSimulated, true)
+        ));
 
-      res.json({ success: true, updated });
+      res.json({ success: true, updated: totalComments });
     } catch (error: any) {
       res.status(400).json({ error: error.message });
     }
