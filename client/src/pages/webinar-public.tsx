@@ -7,6 +7,7 @@ import { Check, Volume2, VolumeX, Maximize } from "lucide-react";
 import DOMPurify from "dompurify";
 import Hls from "hls.js";
 import { calculateWebinarStatusWithTimezone } from "@/lib/timezone";
+import { toZonedTime, fromZonedTime } from 'date-fns-tz';
 import {
   Dialog,
   DialogContent,
@@ -1093,44 +1094,62 @@ export default function WebinarPublicPage() {
   }, [status, webinar?.showOfferInsteadOfEnded, webinar?.offerEnabled, webinar?.offerDisplayHours, webinar?.offerDisplayMinutes, webinar?.startHour, webinar?.startMinute, webinar?.videoDuration, webinar]);
 
   // Handle "offer_then_ended" mode - show offer first, then show ended screen
+  // This effect needs to work even when status is "waiting" because webinar may have ended yesterday
   useEffect(() => {
     if (!webinar) {
       setShowOfferThenEnded(null);
       return;
     }
 
-    // Only applies when postEndMode is "offer_then_ended"
-    if (status !== "ended" || webinar.postEndMode !== "offer_then_ended" || !webinar.offerEnabled) {
+    // Only applies when postEndMode is "offer_then_ended" and offerEnabled
+    if (webinar.postEndMode !== "offer_then_ended" || !webinar.offerEnabled) {
+      setShowOfferThenEnded(null);
+      return;
+    }
+
+    // If currently live, don't show the post-end offer
+    if (status === "live") {
       setShowOfferThenEnded(null);
       return;
     }
 
     const totalMinutes = (webinar.offerBeforeEndedHours || 0) * 60 + (webinar.offerBeforeEndedMinutes || 0);
     
-    // If no duration set, show offer forever (don't transition to ended)
+    // If no duration set, show offer forever (don't transition to ended) when not live
     if (totalMinutes === 0) {
       setShowOfferThenEnded(true);
       return;
     }
 
     // Calculate when webinar ended - find the most recent session end time
+    // Using timezone-aware calculation
     const calculateWebinarEndTime = () => {
+      const timezone = webinar.timezone || "America/Sao_Paulo";
       const now = new Date();
       const videoDurationMs = (webinar.videoDuration || 0) * 1000;
       
-      // Start with today's potential session
-      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), webinar.startHour, webinar.startMinute, 0);
-      const todayEnd = todayStart.getTime() + videoDurationMs;
+      // Get current time in the webinar's timezone
+      const nowInTz = toZonedTime(now, timezone);
+      const year = nowInTz.getFullYear();
+      const month = nowInTz.getMonth();
+      const day = nowInTz.getDate();
       
-      // If today's session hasn't ended yet, use yesterday's session
-      if (todayEnd > now.getTime()) {
-        const yesterdayStart = new Date(todayStart);
-        yesterdayStart.setDate(yesterdayStart.getDate() - 1);
-        return yesterdayStart.getTime() + videoDurationMs;
+      // Calculate today's session start/end in timezone
+      const todayStartInTz = new Date(year, month, day, webinar.startHour, webinar.startMinute, 0, 0);
+      const todayStartUtc = fromZonedTime(todayStartInTz, timezone);
+      const todayEndUtc = new Date(todayStartUtc.getTime() + videoDurationMs);
+      
+      // If today's session hasn't ended yet (we're before start time OR currently live)
+      if (now.getTime() < todayEndUtc.getTime()) {
+        // Use yesterday's session end time
+        const yesterdayStartInTz = new Date(year, month, day - 1, webinar.startHour, webinar.startMinute, 0, 0);
+        const yesterdayStartUtc = fromZonedTime(yesterdayStartInTz, timezone);
+        const yesterdayEndUtc = new Date(yesterdayStartUtc.getTime() + videoDurationMs);
+        return yesterdayEndUtc.getTime();
       }
       
       // Today's session has ended
-      return todayEnd;
+      return todayEndUtc.getTime();
     };
 
     const checkOfferThenEndedState = () => {
@@ -1140,11 +1159,11 @@ export default function WebinarPublicPage() {
       const timeSinceEnd = now - webinarEndTime;
       
       console.log("[offer_then_ended] Debug:", {
+        status,
         webinarEndTime: new Date(webinarEndTime).toLocaleString(),
         now: new Date(now).toLocaleString(),
-        timeSinceEnd: timeSinceEnd / 1000 / 60, // minutes
+        timeSinceEndMinutes: (timeSinceEnd / 1000 / 60).toFixed(2),
         offerDisplayMinutes: totalMinutes,
-        offerDisplayMillis,
         shouldShowOffer: timeSinceEnd >= 0 && timeSinceEnd <= offerDisplayMillis
       });
       
@@ -1158,7 +1177,7 @@ export default function WebinarPublicPage() {
     checkOfferThenEndedState();
     const interval = setInterval(checkOfferThenEndedState, 30000);
     return () => clearInterval(interval);
-  }, [status, webinar?.postEndMode, webinar?.offerEnabled, webinar?.offerBeforeEndedHours, webinar?.offerBeforeEndedMinutes, webinar?.startHour, webinar?.startMinute, webinar?.videoDuration, webinar]);
+  }, [status, webinar?.postEndMode, webinar?.offerEnabled, webinar?.offerBeforeEndedHours, webinar?.offerBeforeEndedMinutes, webinar?.startHour, webinar?.startMinute, webinar?.videoDuration, webinar?.timezone, webinar]);
 
   async function handleSendComment() {
     if (!userComment.trim() || !webinar) return;
@@ -1525,7 +1544,7 @@ export default function WebinarPublicPage() {
           <div className={isCompact ? "" : "mb-8"}>
             <div className={`relative w-full overflow-hidden ${isCompact ? "" : "rounded-xl"}`} style={{ backgroundColor: "#000" }}>
               <div className="relative">
-                {status === "waiting" && (
+                {status === "waiting" && !(webinar.postEndMode === "offer_then_ended" && showOfferThenEnded === true) && (
                   <div 
                     className="aspect-video flex flex-col items-center justify-center"
                     style={{ backgroundColor: webinar.backgroundColor }}
@@ -1614,6 +1633,63 @@ export default function WebinarPublicPage() {
                       <p className="text-white text-lg" style={{ textShadow: "2px 2px 4px rgba(0,0,0,0.8)" }}>
                         Amanha as {webinar.startHour.toString().padStart(2, '0')}:{webinar.startMinute.toString().padStart(2, '0')}
                       </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Tela para modo offer_then_ended quando status ainda é waiting mas oferta deve aparecer */}
+                {webinar.postEndMode === "offer_then_ended" && showOfferThenEnded === true && status !== "live" && (
+                  <div 
+                    className="aspect-video flex flex-col items-center justify-center p-8"
+                    style={{ backgroundColor: webinar.backgroundColor }}
+                  >
+                    <div className="text-center">
+                      <div 
+                        className="inline-block px-4 py-2 mb-6 rounded-full text-sm font-bold"
+                        style={{ backgroundColor: webinar.liveButtonColor, color: "#fff" }}
+                      >
+                        {webinar.offerThenEndedBadgeText || "OFERTA ESPECIAL"}
+                      </div>
+                      <h2 className="text-2xl md:text-4xl font-bold text-white mb-4">
+                        Aproveite esta oferta exclusiva!
+                      </h2>
+                    </div>
+                  </div>
+                )}
+
+                {/* Tela de ended para modo offer_then_ended quando a janela de oferta expirou */}
+                {webinar.postEndMode === "offer_then_ended" && showOfferThenEnded === false && status !== "live" && (
+                  <div 
+                    className="aspect-video flex flex-col items-center justify-center p-8"
+                    style={{ backgroundColor: webinar.backgroundColor }}
+                  >
+                    <div className="text-center">
+                      {webinar.showOfferThenEndedBadge !== false && (
+                        <div 
+                          className="inline-block px-4 py-2 mb-6 rounded-full text-sm font-bold"
+                          style={{ backgroundColor: webinar.liveButtonColor, color: "#fff" }}
+                        >
+                          {webinar.offerThenEndedBadgeText || "TRANSMISSAO ENCERRADA"}
+                        </div>
+                      )}
+                      {webinar.showOfferThenEndedCountdown !== false && (
+                        <>
+                          <h2 className="text-2xl md:text-4xl font-bold text-white mb-4">
+                            {webinar.nextWebinarText || "Proxima transmissao em:"}
+                          </h2>
+                          <div 
+                            className="text-4xl md:text-6xl font-mono font-bold mb-6"
+                            style={{ color: webinar.countdownColor }}
+                          >
+                            {countdown}
+                          </div>
+                        </>
+                      )}
+                      {webinar.showOfferThenEndedNextSession !== false && (
+                        <p className="text-white text-lg" style={{ textShadow: "2px 2px 4px rgba(0,0,0,0.8)" }}>
+                          Amanha as {webinar.startHour.toString().padStart(2, '0')}:{webinar.startMinute.toString().padStart(2, '0')}
+                        </p>
+                      )}
                     </div>
                   </div>
                 )}
@@ -1845,7 +1921,7 @@ export default function WebinarPublicPage() {
             </div>
           </div>
 
-          {((showOffer && webinar.offerEnabled) || (status === "ended" && webinar.showOfferInsteadOfEnded && webinar.offerEnabled && !offerExpiredAfterEnd) || (status === "ended" && webinar.postEndMode === "offer_then_ended" && webinar.offerEnabled && showOfferThenEnded === true) || showOfferAfterEnd) && (
+          {((showOffer && webinar.offerEnabled) || (status === "ended" && webinar.showOfferInsteadOfEnded && webinar.offerEnabled && !offerExpiredAfterEnd) || (webinar.postEndMode === "offer_then_ended" && webinar.offerEnabled && showOfferThenEnded === true) || showOfferAfterEnd) && (
             <div 
               className="text-center px-6 md:px-12 py-10 md:py-16 rounded-2xl"
               style={{ 
