@@ -1645,15 +1645,15 @@ export default function WebinarPublicPage() {
                     style={{ backgroundColor: webinar.backgroundColor }}
                   >
                     <div className="text-center">
-                      {webinar.showOfferThenEndedBadge !== false && (
+                      {webinar.showEndedScreen !== false && (
                         <div 
                           className="inline-block px-4 py-2 mb-6 rounded-full text-sm font-bold"
                           style={{ backgroundColor: webinar.liveButtonColor, color: "#fff" }}
                         >
-                          {webinar.offerThenEndedBadgeText || "TRANSMISSAO ENCERRADA"}
+                          {webinar.endedBadgeText || "TRANSMISSAO ENCERRADA"}
                         </div>
                       )}
-                      {webinar.showOfferThenEndedCountdown !== false && (
+                      {webinar.showNextCountdown !== false && (
                         <>
                           <h2 className="text-2xl md:text-4xl font-bold text-white mb-4">
                             {webinar.nextWebinarText || "Proxima transmissao em:"}
@@ -1666,7 +1666,7 @@ export default function WebinarPublicPage() {
                           </div>
                         </>
                       )}
-                      {webinar.showOfferThenEndedNextSession !== false && (
+                      {webinar.showNextSessionDate !== false && (
                         <p className="text-white text-lg" style={{ textShadow: "2px 2px 4px rgba(0,0,0,0.8)" }}>
                           Amanha as {webinar.startHour.toString().padStart(2, '0')}:{webinar.startMinute.toString().padStart(2, '0')}
                         </p>
