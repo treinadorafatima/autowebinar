@@ -484,12 +484,12 @@ export default function AdminVideosPage() {
                                 key={webinar.id} 
                                 variant="secondary" 
                                 className="text-xs"
-                                title={webinar.title}
+                                title={webinar.title || "Sem título"}
                               >
                                 <Link2 className="w-3 h-3 mr-1" />
-                                {webinar.title.length > 15 
-                                  ? webinar.title.substring(0, 15) + "..." 
-                                  : webinar.title}
+                                {(webinar.title || "Sem título").length > 15 
+                                  ? (webinar.title || "Sem título").substring(0, 15) + "..." 
+                                  : (webinar.title || "Sem título")}
                               </Badge>
                             ))}
                           </div>
