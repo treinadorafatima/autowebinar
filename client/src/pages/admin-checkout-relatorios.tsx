@@ -1,3 +1,4 @@
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,7 +11,23 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Loader2, DollarSign, ShoppingCart, TrendingUp, CreditCard, Eye, Check, Clock, X, Users } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { Loader2, DollarSign, ShoppingCart, TrendingUp, CreditCard, Eye, Check, Clock, X, Users, Filter, User, Mail, Phone, FileText } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -72,8 +89,13 @@ const statusConfig: Record<string, { label: string; variant: "default" | "second
   refunded: { label: "Reembolsado", variant: "destructive", icon: X },
 };
 
+type StatusFilter = "all" | "approved" | "pending" | "rejected";
+
 export default function AdminCheckoutRelatorios() {
   const { toast } = useToast();
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [selectedPagamento, setSelectedPagamento] = useState<Pagamento | null>(null);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
   const { data: stats, isLoading: loadingStats } = useQuery<Stats>({
     queryKey: ["/api/checkout/relatorios/stats"],
@@ -94,6 +116,39 @@ export default function AdminCheckoutRelatorios() {
   const { data: planos } = useQuery<Plano[]>({
     queryKey: ["/api/checkout/planos"],
   });
+
+  const filteredPagamentos = useMemo(() => {
+    if (!pagamentos) return [];
+    
+    switch (statusFilter) {
+      case "approved":
+        return pagamentos.filter(p => p.status === "approved");
+      case "pending":
+        return pagamentos.filter(p => ["pending", "in_process", "checkout_iniciado"].includes(p.status));
+      case "rejected":
+        return pagamentos.filter(p => ["rejected", "cancelled", "refunded"].includes(p.status));
+      default:
+        return pagamentos;
+    }
+  }, [pagamentos, statusFilter]);
+
+  const getUserPaymentAttempts = useMemo(() => {
+    if (!selectedPagamento || !pagamentos) return [];
+    
+    return pagamentos
+      .filter(p => p.email.toLowerCase() === selectedPagamento.email.toLowerCase())
+      .sort((a, b) => new Date(b.criadoEm).getTime() - new Date(a.criadoEm).getTime());
+  }, [selectedPagamento, pagamentos]);
+
+  const handleOpenDetails = (pagamento: Pagamento) => {
+    setSelectedPagamento(pagamento);
+    setIsDetailsOpen(true);
+  };
+
+  const handleCloseDetails = () => {
+    setIsDetailsOpen(false);
+    setSelectedPagamento(null);
+  };
 
   const liberarMutation = useMutation({
     mutationFn: async (pagamentoId: string) => {
@@ -263,8 +318,29 @@ export default function AdminCheckoutRelatorios() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Histórico de Pagamentos</CardTitle>
-          <CardDescription>Todos os pagamentos registrados no sistema</CardDescription>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <CardTitle>Histórico de Pagamentos</CardTitle>
+              <CardDescription>Todos os pagamentos registrados no sistema</CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-muted-foreground" />
+              <Select
+                value={statusFilter}
+                onValueChange={(value) => setStatusFilter(value as StatusFilter)}
+              >
+                <SelectTrigger className="w-[180px]" data-testid="select-status-filter">
+                  <SelectValue placeholder="Filtrar por status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" data-testid="filter-all">Todos</SelectItem>
+                  <SelectItem value="approved" data-testid="filter-approved">Aprovados</SelectItem>
+                  <SelectItem value="pending" data-testid="filter-pending">Pendentes</SelectItem>
+                  <SelectItem value="rejected" data-testid="filter-rejected">Rejeitados/Cancelados</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
@@ -279,14 +355,16 @@ export default function AdminCheckoutRelatorios() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {pagamentos?.length === 0 ? (
+              {filteredPagamentos.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                    Nenhum pagamento registrado
+                    {statusFilter === "all" 
+                      ? "Nenhum pagamento registrado" 
+                      : "Nenhum pagamento encontrado com este filtro"}
                   </TableCell>
                 </TableRow>
               ) : (
-                pagamentos?.map((pagamento) => {
+                filteredPagamentos.map((pagamento) => {
                   const statusInfo = getStatusInfo(pagamento.status);
                   const StatusIcon = statusInfo.icon;
                   return (
@@ -312,6 +390,15 @@ export default function AdminCheckoutRelatorios() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleOpenDetails(pagamento)}
+                            data-testid={`button-detalhes-${pagamento.id}`}
+                          >
+                            <Eye className="w-4 h-4 mr-1" />
+                            Detalhes
+                          </Button>
                           {pagamento.status !== "approved" && !pagamento.adminId && (
                             <Button
                               variant="outline"
@@ -347,6 +434,141 @@ export default function AdminCheckoutRelatorios() {
           </Table>
         </CardContent>
       </Card>
+
+      <Dialog open={isDetailsOpen} onOpenChange={(open) => {
+        setIsDetailsOpen(open);
+        if (!open) setSelectedPagamento(null);
+      }}>
+        <DialogContent className="max-w-2xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <User className="w-5 h-5" />
+              Detalhes do Cliente
+            </DialogTitle>
+            <DialogDescription>
+              Informações do cliente e histórico de tentativas de pagamento
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedPagamento && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-lg bg-muted/50">
+                <div className="flex items-start gap-3">
+                  <User className="w-4 h-4 mt-1 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm text-muted-foreground">Nome</p>
+                    <p className="font-medium" data-testid="text-user-name">{selectedPagamento.nome}</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Mail className="w-4 h-4 mt-1 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm text-muted-foreground">Email</p>
+                    <p className="font-medium" data-testid="text-user-email">{selectedPagamento.email}</p>
+                  </div>
+                </div>
+                {selectedPagamento.cpf && (
+                  <div className="flex items-start gap-3">
+                    <FileText className="w-4 h-4 mt-1 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">CPF</p>
+                      <p className="font-medium" data-testid="text-user-cpf">{selectedPagamento.cpf}</p>
+                    </div>
+                  </div>
+                )}
+                {selectedPagamento.telefone && (
+                  <div className="flex items-start gap-3">
+                    <Phone className="w-4 h-4 mt-1 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Telefone</p>
+                      <p className="font-medium" data-testid="text-user-phone">{selectedPagamento.telefone}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <Separator />
+
+              <div>
+                <h4 className="font-semibold mb-3 flex items-center gap-2">
+                  <CreditCard className="w-4 h-4" />
+                  Histórico de Tentativas ({getUserPaymentAttempts.length})
+                </h4>
+                <ScrollArea className="h-[300px] pr-4">
+                  <div className="space-y-3">
+                    {getUserPaymentAttempts.map((attempt) => {
+                      const statusInfo = getStatusInfo(attempt.status);
+                      const StatusIcon = statusInfo.icon;
+                      return (
+                        <div 
+                          key={attempt.id} 
+                          className="p-4 border rounded-lg space-y-2"
+                          data-testid={`row-attempt-${attempt.id}`}
+                        >
+                          <div className="flex items-center justify-between flex-wrap gap-2">
+                            <div className="flex items-center gap-2">
+                              <Badge variant={statusInfo.variant} className="flex items-center gap-1">
+                                <StatusIcon className="w-3 h-3" />
+                                {statusInfo.label}
+                              </Badge>
+                              {attempt.adminId && (
+                                <Badge variant="outline" className="text-green-600 text-xs">
+                                  Liberado Manualmente
+                                </Badge>
+                              )}
+                            </div>
+                            <span className="text-sm text-muted-foreground">
+                              {format(new Date(attempt.criadoEm), "dd/MM/yyyy 'às' HH:mm:ss", {
+                                locale: ptBR,
+                              })}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                            <div>
+                              <span className="text-muted-foreground">Plano:</span>{" "}
+                              <span className="font-medium">{getPlanoNome(attempt.planoId)}</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Valor:</span>{" "}
+                              <span className="font-medium">{formatCurrency(attempt.valor)}</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Método:</span>{" "}
+                              <span className="font-medium capitalize">
+                                {attempt.metodoPagamento?.replace(/_/g, " ") || "N/A"}
+                              </span>
+                            </div>
+                            {attempt.dataAprovacao && (
+                              <div>
+                                <span className="text-muted-foreground">Aprovado em:</span>{" "}
+                                <span className="font-medium">
+                                  {format(new Date(attempt.dataAprovacao), "dd/MM/yyyy HH:mm", {
+                                    locale: ptBR,
+                                  })}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                          {attempt.statusDetail && (
+                            <p className="text-xs text-muted-foreground">
+                              Detalhe: {attempt.statusDetail}
+                            </p>
+                          )}
+                          {(attempt.mercadopagoPaymentId || attempt.stripePaymentIntentId) && (
+                            <p className="text-xs text-muted-foreground font-mono">
+                              ID: {attempt.mercadopagoPaymentId || attempt.stripePaymentIntentId}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </ScrollArea>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
