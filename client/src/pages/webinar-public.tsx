@@ -172,7 +172,7 @@ export default function WebinarPublicPage() {
   const [showBanner, setShowBanner] = useState(false);
   const [showOfferAfterEnd, setShowOfferAfterEnd] = useState(false);
   const [offerExpiredAfterEnd, setOfferExpiredAfterEnd] = useState(false);
-  const [showOfferThenEnded, setShowOfferThenEnded] = useState(false); // Modo "oferta primeiro, depois encerrada"
+  const [showOfferThenEnded, setShowOfferThenEnded] = useState<boolean | null>(null); // Modo "oferta primeiro, depois encerrada" - null = não calculado ainda
   
   // Estados para formulário de LEAD (inscrição)
   const [userName, setUserName] = useState(() => {
@@ -1095,13 +1095,13 @@ export default function WebinarPublicPage() {
   // Handle "offer_then_ended" mode - show offer first, then show ended screen
   useEffect(() => {
     if (!webinar) {
-      setShowOfferThenEnded(false);
+      setShowOfferThenEnded(null);
       return;
     }
 
     // Only applies when postEndMode is "offer_then_ended"
     if (status !== "ended" || webinar.postEndMode !== "offer_then_ended" || !webinar.offerEnabled) {
-      setShowOfferThenEnded(false);
+      setShowOfferThenEnded(null);
       return;
     }
 
@@ -1113,18 +1113,23 @@ export default function WebinarPublicPage() {
       return;
     }
 
-    // Calculate when webinar ended
+    // Calculate when webinar ended - find the most recent session end time
     const calculateWebinarEndTime = () => {
       const now = new Date();
       const videoDurationMs = (webinar.videoDuration || 0) * 1000;
+      
+      // Start with today's potential session
       const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), webinar.startHour, webinar.startMinute, 0);
       const todayEnd = todayStart.getTime() + videoDurationMs;
       
+      // If today's session hasn't ended yet, use yesterday's session
       if (todayEnd > now.getTime()) {
         const yesterdayStart = new Date(todayStart);
         yesterdayStart.setDate(yesterdayStart.getDate() - 1);
         return yesterdayStart.getTime() + videoDurationMs;
       }
+      
+      // Today's session has ended
       return todayEnd;
     };
 
@@ -1134,7 +1139,18 @@ export default function WebinarPublicPage() {
       const now = Date.now();
       const timeSinceEnd = now - webinarEndTime;
       
+      console.log("[offer_then_ended] Debug:", {
+        webinarEndTime: new Date(webinarEndTime).toLocaleString(),
+        now: new Date(now).toLocaleString(),
+        timeSinceEnd: timeSinceEnd / 1000 / 60, // minutes
+        offerDisplayMinutes: totalMinutes,
+        offerDisplayMillis,
+        shouldShowOffer: timeSinceEnd >= 0 && timeSinceEnd <= offerDisplayMillis
+      });
+      
       // Show offer if within the configured duration after webinar ends
+      // timeSinceEnd >= 0 means webinar has ended
+      // timeSinceEnd <= offerDisplayMillis means we're within the offer window
       const shouldShowOffer = timeSinceEnd >= 0 && timeSinceEnd <= offerDisplayMillis;
       setShowOfferThenEnded(shouldShowOffer);
     };
@@ -1536,7 +1552,7 @@ export default function WebinarPublicPage() {
                 {/* Tela de Encerrado Normal (quando postEndMode = ended OU quando offer_then_ended e oferta expirou) */}
                 {status === "ended" && (
                   (webinar.postEndMode === "ended" || !webinar.postEndMode) || 
-                  (webinar.postEndMode === "offer_then_ended" && !showOfferThenEnded)
+                  (webinar.postEndMode === "offer_then_ended" && showOfferThenEnded === false)
                 ) && !webinar.showOfferInsteadOfEnded && (
                   <div 
                     className="aspect-video flex flex-col items-center justify-center p-8"
@@ -1829,7 +1845,7 @@ export default function WebinarPublicPage() {
             </div>
           </div>
 
-          {((showOffer && webinar.offerEnabled) || (status === "ended" && webinar.showOfferInsteadOfEnded && webinar.offerEnabled && !offerExpiredAfterEnd) || (status === "ended" && webinar.postEndMode === "offer_then_ended" && webinar.offerEnabled && showOfferThenEnded) || showOfferAfterEnd) && (
+          {((showOffer && webinar.offerEnabled) || (status === "ended" && webinar.showOfferInsteadOfEnded && webinar.offerEnabled && !offerExpiredAfterEnd) || (status === "ended" && webinar.postEndMode === "offer_then_ended" && webinar.offerEnabled && showOfferThenEnded === true) || showOfferAfterEnd) && (
             <div 
               className="text-center px-6 md:px-12 py-10 md:py-16 rounded-2xl"
               style={{ 
