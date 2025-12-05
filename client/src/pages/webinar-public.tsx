@@ -1568,11 +1568,11 @@ export default function WebinarPublicPage() {
                   </div>
                 )}
 
-                {/* Tela de Encerrado Normal (quando postEndMode = ended OU quando offer_then_ended e oferta expirou) */}
-                {status === "ended" && (
-                  (webinar.postEndMode === "ended" || !webinar.postEndMode) || 
-                  (webinar.postEndMode === "offer_then_ended" && showOfferThenEnded === false)
-                ) && !webinar.showOfferInsteadOfEnded && (
+                {/* Tela de Encerrado Normal - APENAS para postEndMode = ended ou sem modo definido */}
+                {status === "ended" && 
+                  webinar.postEndMode !== "offer_then_ended" && 
+                  (webinar.postEndMode === "ended" || !webinar.postEndMode) && 
+                  !webinar.showOfferInsteadOfEnded && (
                   <div 
                     className="aspect-video flex flex-col items-center justify-center p-8"
                     style={{ backgroundColor: webinar.backgroundColor }}
@@ -1608,8 +1608,8 @@ export default function WebinarPublicPage() {
                   </div>
                 )}
 
-                {/* Quando showOfferInsteadOfEnded está ativo e a oferta expira, mostra tela de próxima sessão */}
-                {status === "ended" && webinar.showOfferInsteadOfEnded && offerExpiredAfterEnd && (
+                {/* Quando showOfferInsteadOfEnded está ativo e a oferta expira, mostra tela de próxima sessão - NÃO para offer_then_ended */}
+                {status === "ended" && webinar.postEndMode !== "offer_then_ended" && webinar.showOfferInsteadOfEnded && offerExpiredAfterEnd && (
                   <div 
                     className="aspect-video flex flex-col items-center justify-center p-8"
                     style={{ backgroundColor: webinar.backgroundColor }}
