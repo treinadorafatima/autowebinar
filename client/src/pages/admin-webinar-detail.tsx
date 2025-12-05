@@ -453,6 +453,7 @@ interface Webinar {
   participantOscillationPercent: number;
   showLiveIndicator: boolean;
   liveIndicatorStyle: "full" | "number" | "hidden";
+  counterPosition: "left" | "right";
   showEndedScreen: boolean;
   showNextCountdown: boolean;
   showNextSessionDate: boolean;
@@ -616,6 +617,7 @@ export default function AdminWebinarDetailPage() {
     participantOscillationPercent: 20,
     showLiveIndicator: true,
     liveIndicatorStyle: "full",
+    counterPosition: "right",
     showEndedScreen: true,
     showNextCountdown: true,
     showNextSessionDate: true,
@@ -837,6 +839,7 @@ export default function AdminWebinarDetailPage() {
         bannerButtonTextColor: data.bannerButtonTextColor || "#ffffff",
         showLiveIndicator: data.showLiveIndicator !== false,
         liveIndicatorStyle: data.liveIndicatorStyle || "full",
+        counterPosition: data.counterPosition || "right",
         showEndedScreen: data.showEndedScreen !== false,
         showNextCountdown: data.showNextCountdown !== false,
         showNextSessionDate: data.showNextSessionDate !== false,
@@ -2101,7 +2104,7 @@ export default function AdminWebinarDetailPage() {
 
               <Separator />
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label>Mostrar Indicador "AO VIVO"</Label>
                   <Select 
@@ -2137,6 +2140,24 @@ export default function AdminWebinarDetailPage() {
                   </Select>
                   <p className="text-xs text-muted-foreground">
                     Escolha como exibir a quantidade de pessoas
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label>Posição do Contador</Label>
+                  <Select 
+                    value={formData.counterPosition || "right"} 
+                    onValueChange={(v) => setFormData({ ...formData, counterPosition: v })}
+                  >
+                    <SelectTrigger data-testid="select-counter-position">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="left">Lado esquerdo</SelectItem>
+                      <SelectItem value="right">Lado direito</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Onde o contador aparece no vídeo
                   </p>
                 </div>
               </div>

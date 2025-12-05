@@ -110,6 +110,7 @@ interface Webinar {
   participantOscillationPercent: number;
   showLiveIndicator?: boolean;
   liveIndicatorStyle?: "full" | "number" | "hidden";
+  counterPosition?: "left" | "right";
   showEndedScreen?: boolean;
   showNextCountdown?: boolean;
   showNextSessionDate?: boolean;
@@ -1556,9 +1557,9 @@ export default function WebinarPublicPage() {
                         </div>
                       </div>
                     )}
-                    {/* Participant counter - top right (independent of live indicator) */}
+                    {/* Participant counter - configurable position */}
                     {webinar.liveIndicatorStyle !== "hidden" && (
-                      <div className="absolute top-3 right-3 z-10">
+                      <div className={`absolute top-3 z-10 ${webinar.counterPosition === "left" ? "left-3" : "right-3"}`}>
                         <div 
                           className="flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium"
                           style={{ backgroundColor: "rgba(0,0,0,0.7)", color: "#fff" }}

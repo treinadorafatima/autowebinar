@@ -116,6 +116,7 @@ export const webinars = pgTable("webinars", {
   // Configuração de indicador "AO VIVO"
   showLiveIndicator: boolean("show_live_indicator").notNull().default(true),
   liveIndicatorStyle: text("live_indicator_style").notNull().default("full"), // 'full' (número + texto), 'number' (só número), 'hidden' (nada)
+  counterPosition: text("counter_position").notNull().default("right"), // 'left' ou 'right'
   // Configurações pós-término
   showEndedScreen: boolean("show_ended_screen").notNull().default(true), // Mostrar tela "Transmissão Encerrada"
   showNextCountdown: boolean("show_next_countdown").notNull().default(true), // Mostrar countdown para próxima sessão
