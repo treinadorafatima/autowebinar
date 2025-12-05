@@ -822,16 +822,10 @@ export default function LandingPage() {
                       <td className="p-4 text-center"><Check className="w-5 h-5 text-green-400 mx-auto" /></td>
                       <td className="p-4 text-center"><X className="w-5 h-5 text-red-400 mx-auto" /></td>
                     </tr>
-                    <tr className="bg-blue-500/10 hover:bg-blue-500/15 transition-colors">
-                      <td className="p-4">
-                        <div className="flex items-center gap-2">
-                          <Mail className="w-5 h-5 text-blue-400" />
-                          <span className="text-white font-medium">Automação de Email Marketing</span>
-                          <Badge className="bg-blue-500/20 text-blue-300 border-blue-500/30 text-xs">Exclusivo</Badge>
-                        </div>
-                      </td>
+                    <tr className="hover:bg-white/5 transition-colors">
+                      <td className="p-4 text-slate-200">Automação de Email Marketing</td>
                       <td className="p-4 text-center"><Check className="w-5 h-5 text-green-400 mx-auto" /></td>
-                      <td className="p-4 text-center"><X className="w-5 h-5 text-red-400 mx-auto" /></td>
+                      <td className="p-4 text-center"><Check className="w-5 h-5 text-slate-500 mx-auto" /></td>
                     </tr>
                     <tr className="bg-green-500/10 hover:bg-green-500/15 transition-colors">
                       <td className="p-4">
@@ -848,7 +842,7 @@ export default function LandingPage() {
                       <td className="p-4">
                         <div className="flex items-center gap-2">
                           <Bell className="w-5 h-5 text-orange-400" />
-                          <span className="text-white font-medium">Lembretes Automáticos (Antes/Durante/Depois)</span>
+                          <span className="text-white font-medium">Lembretes Multicanal (Email + WhatsApp)</span>
                           <Badge className="bg-orange-500/20 text-orange-300 border-orange-500/30 text-xs">Exclusivo</Badge>
                         </div>
                       </td>
@@ -856,9 +850,9 @@ export default function LandingPage() {
                       <td className="p-4 text-center"><X className="w-5 h-5 text-red-400 mx-auto" /></td>
                     </tr>
                     <tr className="hover:bg-white/5 transition-colors">
-                      <td className="p-4 text-slate-200">Domínio Customizado Incluso</td>
+                      <td className="p-4 text-slate-200">Conecte Seu Próprio Domínio</td>
                       <td className="p-4 text-center"><Check className="w-5 h-5 text-green-400 mx-auto" /></td>
-                      <td className="p-4 text-center"><X className="w-5 h-5 text-red-400 mx-auto" /></td>
+                      <td className="p-4 text-center"><Check className="w-5 h-5 text-slate-500 mx-auto" /></td>
                     </tr>
                   </tbody>
                 </table>
