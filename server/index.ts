@@ -33,6 +33,7 @@ app.use(express.text({ limit: '50mb' }));
 
 // Security headers for iframe embedding
 // Páginas públicas de webinar podem ser embedadas com ?embed=1
+// Rotas de embed de vídeo sempre permitem embedding
 // Admin e outras rotas ficam protegidas contra clickjacking
 app.use((req, res, next) => {
   const isEmbedMode = req.query.embed === "1";
@@ -44,8 +45,14 @@ app.use((req, res, next) => {
   const isApiForEmbed = req.path.includes("/embed-code") || 
                         (req.path.includes("/api/webinars/") && req.path.includes("/comments"));
   
-  if (isEmbedMode && (isPublicWebinar || isPublicPage) || isApiForEmbed) {
-    // Permitir embedding em qualquer domínio para páginas públicas com embed=1
+  // Rotas de embed de vídeo sempre permitem embedding em qualquer domínio
+  const isVideoEmbed = req.path.startsWith("/embed/video/") || 
+                       req.path.startsWith("/api/embed/video/") ||
+                       req.path.startsWith("/api/webinar/video/") ||
+                       req.path.startsWith("/api/webinar/hls/");
+  
+  if (isVideoEmbed || isEmbedMode && (isPublicWebinar || isPublicPage) || isApiForEmbed) {
+    // Permitir embedding em qualquer domínio para páginas públicas com embed=1 e embeds de vídeo
     res.removeHeader("X-Frame-Options");
     res.setHeader("Content-Security-Policy", "frame-ancestors *");
   } else {
