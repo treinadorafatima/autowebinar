@@ -6095,14 +6095,21 @@ Seja conversacional e objetivo.`;
         videosWithSize.push({ id: video.uploadedVideoId, size: videoSize });
       }
 
-      let limitGB = 5;
-      if (admin.planoId) {
+      // Superadmin tem armazenamento ilimitado
+      const isSuperadmin = admin.role === "superadmin";
+      
+      let limitGB = 5; // Padrão para usuários sem plano
+      if (isSuperadmin) {
+        limitGB = -1; // -1 significa ilimitado
+      } else if (admin.planoId) {
         const plano = await storage.getCheckoutPlanoById(admin.planoId);
         if (plano?.storageLimit) {
           limitGB = plano.storageLimit;
         }
       }
+      
       const usedGB = usedBytes / (1024 * 1024 * 1024);
+      // Para superadmin (ilimitado), percentUsed é sempre 0
       const percentUsed = limitGB > 0 ? (usedGB / limitGB) * 100 : 0;
 
       res.json({
@@ -6111,7 +6118,8 @@ Seja conversacional e objetivo.`;
         limitGB,
         percentUsed,
         videoCount: videos.length,
-        videosWithSize
+        videosWithSize,
+        isUnlimited: isSuperadmin
       });
     } catch (error: any) {
       res.status(400).json({ error: error.message });

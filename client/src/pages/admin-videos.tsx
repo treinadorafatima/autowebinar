@@ -82,6 +82,7 @@ interface StorageInfo {
   limitGB: number;
   percentUsed: number;
   videoCount: number;
+  isUnlimited?: boolean;
 }
 
 interface EmbedConfig {
@@ -179,7 +180,7 @@ export default function AdminVideosPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (storageInfo && storageInfo.percentUsed >= 100) {
+    if (storageInfo && !storageInfo.isUnlimited && storageInfo.percentUsed >= 100) {
       toast({
         title: "Limite de armazenamento atingido",
         description: "Exclua alguns vídeos ou faça upgrade do seu plano.",
@@ -465,7 +466,7 @@ export default function AdminVideosPage() {
           />
           <Button 
             asChild 
-            disabled={uploading || (storageInfo && storageInfo.percentUsed >= 100)}
+            disabled={uploading || (storageInfo && !storageInfo.isUnlimited && storageInfo.percentUsed >= 100)}
             className="cursor-pointer"
             data-testid="button-upload-video"
           >
@@ -510,21 +511,31 @@ export default function AdminVideosPage() {
                   <Film className="w-4 h-4 text-muted-foreground" />
                   {storageInfo.videoCount} vídeo{storageInfo.videoCount !== 1 ? "s" : ""}
                 </span>
-                <span className={storageInfo.percentUsed >= 90 ? "text-destructive font-medium" : ""}>
-                  {storageInfo.usedGB.toFixed(2)} GB / {storageInfo.limitGB} GB
-                </span>
+                {storageInfo.isUnlimited ? (
+                  <span className="text-green-600 dark:text-green-400 font-medium">
+                    {storageInfo.usedGB.toFixed(2)} GB / Ilimitado
+                  </span>
+                ) : (
+                  <span className={storageInfo.percentUsed >= 90 ? "text-destructive font-medium" : ""}>
+                    {storageInfo.usedGB.toFixed(2)} GB / {storageInfo.limitGB} GB
+                  </span>
+                )}
               </div>
-              <Progress 
-                value={Math.min(storageInfo.percentUsed, 100)} 
-                className={storageInfo.percentUsed >= 90 ? "[&>div]:bg-destructive" : ""}
-              />
-              {storageInfo.percentUsed >= 90 && (
-                <div className="flex items-center gap-2 text-sm text-destructive">
-                  <AlertCircle className="w-4 h-4" />
-                  {storageInfo.percentUsed >= 100 
-                    ? "Limite atingido! Exclua vídeos ou faça upgrade."
-                    : "Quase no limite! Considere fazer upgrade."}
-                </div>
+              {!storageInfo.isUnlimited && (
+                <>
+                  <Progress 
+                    value={Math.min(storageInfo.percentUsed, 100)} 
+                    className={storageInfo.percentUsed >= 90 ? "[&>div]:bg-destructive" : ""}
+                  />
+                  {storageInfo.percentUsed >= 90 && (
+                    <div className="flex items-center gap-2 text-sm text-destructive">
+                      <AlertCircle className="w-4 h-4" />
+                      {storageInfo.percentUsed >= 100 
+                        ? "Limite atingido! Exclua vídeos ou faça upgrade."
+                        : "Quase no limite! Considere fazer upgrade."}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           ) : (
