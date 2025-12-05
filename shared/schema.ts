@@ -211,6 +211,10 @@ export const uploadedVideos = pgTable("uploaded_videos", {
   uploadedAt: timestamp("uploaded_at").defaultNow(),
   hlsPlaylistUrl: text("hls_playlist_url"),
   hlsStatus: text("hls_status").default("pending"), // 'pending', 'processing', 'completed', 'failed'
+  // Configurações de embed
+  thumbnailUrl: text("thumbnail_url"), // URL da miniatura customizada
+  playerColor: text("player_color").default("#8B5CF6"), // Cor do player (roxo padrão)
+  showTime: boolean("show_time").default(true), // Mostrar tempo/controles no player
 });
 
 export type UploadedVideo = typeof uploadedVideos.$inferSelect;
