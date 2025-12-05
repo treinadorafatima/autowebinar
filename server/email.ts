@@ -17,9 +17,12 @@ function getResendClient() {
 }
 
 const APP_NAME = "AutoWebinar";
-const APP_URL = process.env.REPLIT_DEV_DOMAIN 
-  ? `https://${process.env.REPLIT_DEV_DOMAIN}` 
-  : "https://autowebinar.shop";
+const APP_URL = process.env.PUBLIC_BASE_URL 
+  ? process.env.PUBLIC_BASE_URL.replace(/\/$/, '')
+  : (process.env.REPLIT_DEV_DOMAIN 
+    ? `https://${process.env.REPLIT_DEV_DOMAIN}` 
+    : "https://autowebinar.com.br");
+const LOGIN_URL = `${APP_URL}/login`;
 
 export async function sendWelcomeEmail(to: string, name: string): Promise<boolean> {
   try {
@@ -132,6 +135,153 @@ ${APP_NAME}
     return true;
   } catch (error) {
     console.error(`[email] Erro ao enviar email de boas-vindas para ${to}:`, error);
+    return false;
+  }
+}
+
+export async function sendAccessCredentialsEmail(to: string, name: string, tempPassword: string, planName: string): Promise<boolean> {
+  try {
+    const { client, fromEmail } = getResendClient();
+    
+    const text = `
+Ola ${name},
+
+Seu acesso ao ${APP_NAME} foi liberado com sucesso!
+
+Aqui estao suas credenciais de acesso:
+
+E-mail: ${to}
+Senha: ${tempPassword}
+
+Acesse sua conta agora: ${LOGIN_URL}
+
+IMPORTANTE: Por seguranca, recomendamos que voce altere sua senha apos o primeiro login.
+
+Plano: ${planName}
+
+O que voce pode fazer:
+- Criar webinarios automatizados que rodam 24/7
+- Usar IA para gerar roteiros de vendas
+- Criar mensagens de email e WhatsApp com IA
+- Capturar leads automaticamente
+- Transcrever videos automaticamente com IA
+
+Se tiver qualquer duvida, estamos aqui para ajudar!
+
+---
+${APP_NAME}
+    `.trim();
+    
+    const html = `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Seu Acesso ao ${APP_NAME}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background-color: #f4f4f5;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f5;">
+    <tr>
+      <td style="padding: 40px 20px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden;">
+          <tr>
+            <td style="background-color: #10b981; padding: 30px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 600;">Seu Acesso Foi Liberado!</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 40px 30px;">
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Ola <strong>${name}</strong>,
+              </p>
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Seu acesso ao ${APP_NAME} foi liberado com sucesso! Use as credenciais abaixo para acessar sua conta:
+              </p>
+              
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 25px 0; background-color: #ecfdf5; border-radius: 6px; border: 2px solid #10b981;">
+                <tr>
+                  <td style="padding: 20px;">
+                    <p style="margin: 0 0 12px; color: #047857; font-weight: 600; font-size: 14px;">Suas Credenciais de Acesso:</p>
+                    <p style="margin: 0 0 8px; color: #374151; font-size: 15px; line-height: 1.8;">
+                      <strong>E-mail:</strong> ${to}
+                    </p>
+                    <p style="margin: 0; color: #374151; font-size: 15px; line-height: 1.8;">
+                      <strong>Senha:</strong> <span style="background-color: #d1fae5; padding: 4px 12px; border-radius: 4px; font-family: monospace; font-size: 16px; letter-spacing: 1px;">${tempPassword}</span>
+                    </p>
+                  </td>
+                </tr>
+              </table>
+
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 20px 0; background-color: #fef3c7; border-radius: 6px;">
+                <tr>
+                  <td style="padding: 16px;">
+                    <p style="margin: 0; color: #92400e; font-size: 14px; line-height: 1.6;">
+                      <strong>Plano:</strong> ${planName}<br>
+                      <strong>Importante:</strong> Por seguranca, recomendamos que voce altere sua senha apos o primeiro login.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+              
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                <tr>
+                  <td style="text-align: center; padding: 20px 0;">
+                    <a href="${LOGIN_URL}" style="display: inline-block; background-color: #10b981; color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 6px; font-weight: 600; font-size: 16px;">
+                      Acessar Minha Conta
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 30px 0; background-color: #f8fafc; border-radius: 6px;">
+                <tr>
+                  <td style="padding: 20px;">
+                    <p style="margin: 0 0 12px; color: #1e40af; font-weight: 600; font-size: 14px;">O que voce pode fazer:</p>
+                    <p style="margin: 0; color: #374151; font-size: 14px; line-height: 1.8;">
+                      - Criar webinarios automatizados que rodam 24/7<br>
+                      - Usar IA para gerar roteiros de vendas<br>
+                      - Criar mensagens de email e WhatsApp com IA<br>
+                      - Capturar leads automaticamente<br>
+                      - Transcrever videos automaticamente com IA
+                    </p>
+                  </td>
+                </tr>
+              </table>
+              
+              <p style="margin: 30px 0 0; color: #6b7280; font-size: 14px; line-height: 1.6;">
+                Se tiver qualquer duvida, estamos aqui para ajudar!
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color: #f8fafc; padding: 20px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0; color: #9ca3af; font-size: 12px;">
+                ${APP_NAME} - Webinarios Automatizados
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `;
+
+    const result = await client.emails.send({
+      from: fromEmail,
+      replyTo: REPLY_TO_EMAIL,
+      to: [to],
+      subject: `Seu acesso ao ${APP_NAME} foi liberado!`,
+      html,
+      text,
+    });
+
+    console.log(`[email] Email de credenciais enviado para ${to}`, result);
+    return true;
+  } catch (error) {
+    console.error(`[email] Erro ao enviar email de credenciais para ${to}:`, error);
     return false;
   }
 }
