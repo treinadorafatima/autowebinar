@@ -1617,6 +1617,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update video embed config
+  app.patch("/api/webinar/videos/:videoId/embed-config", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const { thumbnailUrl, playerColor, showTime } = req.body;
+      await storage.updateVideoEmbedConfig(req.params.videoId, { thumbnailUrl, playerColor, showTime });
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Get video config for embed (public endpoint)
+  app.get("/api/embed/video/:videoId/config", async (req, res) => {
+    try {
+      const video = await storage.getVideoByUploadedVideoId(req.params.videoId);
+      if (!video) {
+        return res.status(404).json({ error: "Video not found" });
+      }
+
+      res.json({
+        uploadedVideoId: video.uploadedVideoId,
+        title: video.title,
+        duration: video.duration,
+        thumbnailUrl: video.thumbnailUrl || null,
+        playerColor: video.playerColor || "#8B5CF6",
+        showTime: video.showTime !== false,
+      });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Upload video thumbnail
+  app.post("/api/webinar/videos/:videoId/thumbnail", upload.single("thumbnail"), async (req: MulterRequest, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) {
+        if (req.file?.path && existsSync(req.file.path)) {
+          unlinkSync(req.file.path);
+        }
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ error: "No image file provided" });
+      }
+
+      const fileBuffer = readFileSync(req.file.path);
+      const imageId = await storage.uploadImage(fileBuffer, req.file.originalname);
+      const thumbnailUrl = storage.getImageUrl(imageId);
+
+      await storage.updateVideoEmbedConfig(req.params.videoId, { thumbnailUrl });
+
+      if (req.file?.path && existsSync(req.file.path)) {
+        unlinkSync(req.file.path);
+      }
+
+      res.json({ success: true, thumbnailUrl });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
   // ========== DOMAIN VERIFICATION ==========
   
   // Verify if custom domain is correctly configured

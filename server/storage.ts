@@ -106,6 +106,8 @@ export interface IStorage {
   deleteComment(id: string): Promise<void>;
   approveCommentForFutureSessions(id: string): Promise<void>;
   updateVideoTitle(videoId: string, title: string): Promise<void>;
+  updateVideoEmbedConfig(videoId: string, config: { thumbnailUrl?: string; playerColor?: string; showTime?: boolean }): Promise<void>;
+  getVideoByUploadedVideoId(uploadedVideoId: string): Promise<UploadedVideo | undefined>;
   // Webinars CRUD
   listWebinars(): Promise<Webinar[]>;
   getWebinarById(id: string): Promise<Webinar | undefined>;
@@ -1202,6 +1204,29 @@ export class DatabaseStorage implements IStorage {
     } else {
       console.log(`[updateVideoTitle] Vídeo não encontrado: ${videoId}`);
     }
+  }
+
+  async updateVideoEmbedConfig(videoId: string, config: { thumbnailUrl?: string; playerColor?: string; showTime?: boolean }): Promise<void> {
+    // Try to find by uploadedVideoId first, then by id
+    let video = await db.select().from(uploadedVideos).where(eq(uploadedVideos.uploadedVideoId, videoId)).limit(1);
+    
+    if (video.length === 0) {
+      video = await db.select().from(uploadedVideos).where(eq(uploadedVideos.id, videoId)).limit(1);
+    }
+    
+    if (video.length > 0) {
+      await db.update(uploadedVideos)
+        .set(config)
+        .where(eq(uploadedVideos.id, video[0].id));
+      console.log(`[updateVideoEmbedConfig] Config atualizada para vídeo: ${videoId}`);
+    } else {
+      console.log(`[updateVideoEmbedConfig] Vídeo não encontrado: ${videoId}`);
+    }
+  }
+
+  async getVideoByUploadedVideoId(uploadedVideoId: string): Promise<UploadedVideo | undefined> {
+    const result = await db.select().from(uploadedVideos).where(eq(uploadedVideos.uploadedVideoId, uploadedVideoId)).limit(1);
+    return result[0];
   }
 
   async importCommentsFromText(fileContent: string): Promise<{ imported: number; errors: number }> {

@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { 
@@ -20,7 +22,11 @@ import {
   RefreshCw,
   Pencil,
   Check,
-  X
+  X,
+  Code,
+  Copy,
+  Image,
+  Camera
 } from "lucide-react";
 import {
   AlertDialog,
@@ -33,6 +39,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Table,
   TableBody,
   TableCell,
@@ -40,6 +53,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 
 interface VideoWithWebinar {
   id: string;
@@ -65,6 +84,14 @@ interface StorageInfo {
   videoCount: number;
 }
 
+interface EmbedConfig {
+  videoId: string;
+  title: string;
+  thumbnailUrl: string;
+  playerColor: string;
+  showTime: boolean;
+}
+
 export default function AdminVideosPage() {
   const { toast } = useToast();
   const [uploading, setUploading] = useState(false);
@@ -74,6 +101,13 @@ export default function AdminVideosPage() {
   const [deleteVideoId, setDeleteVideoId] = useState<string | null>(null);
   const [editingVideoId, setEditingVideoId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
+  
+  const [embedModalOpen, setEmbedModalOpen] = useState(false);
+  const [embedConfig, setEmbedConfig] = useState<EmbedConfig | null>(null);
+  const [uploadingThumbnail, setUploadingThumbnail] = useState(false);
+  const [capturingFrame, setCapturingFrame] = useState(false);
+  const videoPreviewRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const token = localStorage.getItem("adminToken");
 
@@ -272,6 +306,139 @@ export default function AdminVideosPage() {
   function handleRename() {
     if (!editingTitle.trim() || !editingVideoId) return;
     renameVideoMutation.mutate({ videoId: editingVideoId, title: editingTitle });
+  }
+
+  async function openEmbedModal(video: VideoWithWebinar) {
+    setEmbedModalOpen(true);
+    
+    // Carregar configurações existentes do vídeo
+    try {
+      const response = await fetch(`/api/embed/video/${video.uploadedVideoId}/config`);
+      if (response.ok) {
+        const data = await response.json();
+        setEmbedConfig({
+          videoId: video.uploadedVideoId,
+          title: video.title,
+          thumbnailUrl: data.thumbnailUrl || "",
+          playerColor: data.playerColor || "#8B5CF6",
+          showTime: data.showTime !== false,
+        });
+      } else {
+        // Valores padrão se não encontrar config
+        setEmbedConfig({
+          videoId: video.uploadedVideoId,
+          title: video.title,
+          thumbnailUrl: "",
+          playerColor: "#8B5CF6",
+          showTime: true,
+        });
+      }
+    } catch {
+      setEmbedConfig({
+        videoId: video.uploadedVideoId,
+        title: video.title,
+        thumbnailUrl: "",
+        playerColor: "#8B5CF6",
+        showTime: true,
+      });
+    }
+  }
+
+  async function saveEmbedConfig() {
+    if (!embedConfig) return;
+    try {
+      await apiRequest("PATCH", `/api/webinar/videos/${embedConfig.videoId}/embed-config`, {
+        thumbnailUrl: embedConfig.thumbnailUrl || null,
+        playerColor: embedConfig.playerColor,
+        showTime: embedConfig.showTime,
+      });
+      toast({ title: "Configurações salvas!" });
+      setEmbedModalOpen(false);
+      // Invalidar queries relacionadas
+      await queryClient.invalidateQueries({ queryKey: ["/api/admin/videos-with-webinars"] });
+    } catch (error: any) {
+      toast({ title: "Erro ao salvar", description: error.message, variant: "destructive" });
+    }
+  }
+
+  async function handleThumbnailUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !embedConfig) return;
+    
+    setUploadingThumbnail(true);
+    const formData = new FormData();
+    formData.append("thumbnail", file);
+
+    try {
+      const response = await fetch(`/api/webinar/videos/${embedConfig.videoId}/thumbnail`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+      const data = await response.json();
+      if (data.thumbnailUrl) {
+        setEmbedConfig(prev => prev ? { ...prev, thumbnailUrl: data.thumbnailUrl } : null);
+        toast({ title: "Thumbnail atualizada!" });
+      }
+    } catch (error: any) {
+      toast({ title: "Erro ao enviar thumbnail", description: error.message, variant: "destructive" });
+    } finally {
+      setUploadingThumbnail(false);
+      e.target.value = "";
+    }
+  }
+
+  async function captureVideoFrame() {
+    if (!videoPreviewRef.current || !canvasRef.current || !embedConfig) return;
+    
+    setCapturingFrame(true);
+    const video = videoPreviewRef.current;
+    const canvas = canvasRef.current;
+    
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    
+    canvas.toBlob(async (blob) => {
+      if (!blob) {
+        setCapturingFrame(false);
+        return;
+      }
+      
+      const formData = new FormData();
+      formData.append("thumbnail", blob, "thumbnail.jpg");
+
+      try {
+        const response = await fetch(`/api/webinar/videos/${embedConfig.videoId}/thumbnail`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData,
+        });
+        const data = await response.json();
+        if (data.thumbnailUrl) {
+          setEmbedConfig(prev => prev ? { ...prev, thumbnailUrl: data.thumbnailUrl } : null);
+          toast({ title: "Frame capturado como thumbnail!" });
+        }
+      } catch (error: any) {
+        toast({ title: "Erro ao capturar frame", description: error.message, variant: "destructive" });
+      } finally {
+        setCapturingFrame(false);
+      }
+    }, "image/jpeg", 0.9);
+  }
+
+  function getEmbedCode() {
+    if (!embedConfig) return "";
+    const baseUrl = window.location.origin;
+    return `<iframe src="${baseUrl}/embed/video/${embedConfig.videoId}" width="100%" height="450" frameborder="0" allowfullscreen></iframe>`;
+  }
+
+  function copyEmbedCode() {
+    navigator.clipboard.writeText(getEmbedCode());
+    toast({ title: "Código copiado!" });
   }
 
   const filteredVideos = videos.filter((video) =>
@@ -496,6 +663,15 @@ export default function AdminVideosPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openEmbedModal(video)}
+                            title="Código Embed"
+                            data-testid={`button-embed-video-${video.id}`}
+                          >
+                            <Code className="w-4 h-4" />
+                          </Button>
                           {editingVideoId !== video.uploadedVideoId && (
                             <Button
                               variant="ghost"
@@ -550,6 +726,199 @@ export default function AdminVideosPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={embedModalOpen} onOpenChange={setEmbedModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Código Embed do Vídeo</DialogTitle>
+            <DialogDescription>
+              Configure e copie o código para incorporar o vídeo em sites externos
+            </DialogDescription>
+          </DialogHeader>
+
+          {embedConfig && (
+            <div className="space-y-6">
+              <Tabs defaultValue="config">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="config">Configurações</TabsTrigger>
+                  <TabsTrigger value="code">Código</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="config" className="space-y-4 mt-4">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Cor do Player</Label>
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="color"
+                          value={embedConfig.playerColor}
+                          onChange={(e) => setEmbedConfig(prev => prev ? { ...prev, playerColor: e.target.value } : null)}
+                          className="w-12 h-10 rounded cursor-pointer border"
+                          data-testid="input-player-color"
+                        />
+                        <Input
+                          value={embedConfig.playerColor}
+                          onChange={(e) => setEmbedConfig(prev => prev ? { ...prev, playerColor: e.target.value } : null)}
+                          className="w-28"
+                          data-testid="input-player-color-hex"
+                        />
+                        <div className="flex gap-2">
+                          {["#8B5CF6", "#EF4444", "#22C55E", "#3B82F6", "#F59E0B"].map(color => (
+                            <button
+                              key={color}
+                              className="w-8 h-8 rounded-full border-2 border-transparent hover:border-white/50 transition-colors"
+                              style={{ backgroundColor: color }}
+                              onClick={() => setEmbedConfig(prev => prev ? { ...prev, playerColor: color } : null)}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-1">
+                        <Label>Mostrar Tempo/Controles</Label>
+                        <p className="text-sm text-muted-foreground">Exibe a barra de progresso e tempo no player</p>
+                      </div>
+                      <Switch
+                        checked={embedConfig.showTime}
+                        onCheckedChange={(checked) => setEmbedConfig(prev => prev ? { ...prev, showTime: checked } : null)}
+                        data-testid="switch-show-time"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Miniatura (Thumbnail)</Label>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={handleThumbnailUpload}
+                              disabled={uploadingThumbnail}
+                              data-testid="input-thumbnail-upload"
+                            />
+                            <Button variant="outline" className="w-full" asChild disabled={uploadingThumbnail}>
+                              <span className="cursor-pointer">
+                                <Image className="w-4 h-4 mr-2" />
+                                {uploadingThumbnail ? "Enviando..." : "Enviar Imagem"}
+                              </span>
+                            </Button>
+                          </label>
+                        </div>
+                        <Button
+                          variant="outline"
+                          onClick={captureVideoFrame}
+                          disabled={capturingFrame}
+                          data-testid="button-capture-frame"
+                        >
+                          <Camera className="w-4 h-4 mr-2" />
+                          {capturingFrame ? "Capturando..." : "Capturar Frame"}
+                        </Button>
+                      </div>
+                      {embedConfig.thumbnailUrl && (
+                        <div className="mt-2 relative">
+                          <img 
+                            src={embedConfig.thumbnailUrl} 
+                            alt="Thumbnail" 
+                            className="w-full h-32 object-cover rounded border"
+                          />
+                          <Button
+                            variant="destructive"
+                            size="icon"
+                            className="absolute top-2 right-2"
+                            onClick={() => setEmbedConfig(prev => prev ? { ...prev, thumbnailUrl: "" } : null)}
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Preview do Vídeo (para captura de frame)</Label>
+                      <div className="relative bg-black rounded overflow-hidden">
+                        <video
+                          ref={videoPreviewRef}
+                          src={`/api/webinar/video/${embedConfig.videoId}`}
+                          className="w-full h-48 object-contain"
+                          controls
+                          data-testid="video-preview"
+                        />
+                        <canvas ref={canvasRef} className="hidden" />
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Navegue até o momento desejado e clique em "Capturar Frame"
+                      </p>
+                    </div>
+
+                    <Button onClick={saveEmbedConfig} className="w-full" data-testid="button-save-config">
+                      Salvar Configurações
+                    </Button>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="code" className="space-y-4 mt-4">
+                  <div className="space-y-2">
+                    <Label>Código Iframe</Label>
+                    <div className="relative">
+                      <textarea
+                        readOnly
+                        value={getEmbedCode()}
+                        className="w-full h-24 p-3 text-sm bg-muted rounded border font-mono resize-none"
+                        data-testid="textarea-embed-code"
+                      />
+                      <Button
+                        size="sm"
+                        className="absolute top-2 right-2"
+                        onClick={copyEmbedCode}
+                        data-testid="button-copy-embed"
+                      >
+                        <Copy className="w-4 h-4 mr-1" />
+                        Copiar
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Preview</Label>
+                    <div className="border rounded p-4 bg-muted/50">
+                      <div 
+                        className="w-full aspect-video bg-black rounded overflow-hidden flex items-center justify-center"
+                        style={{ maxHeight: "300px" }}
+                      >
+                        <div className="text-center text-white">
+                          <div 
+                            className="w-16 h-16 rounded-full mx-auto mb-2 flex items-center justify-center"
+                            style={{ backgroundColor: embedConfig.playerColor }}
+                          >
+                            <Play className="w-8 h-8 text-white ml-1" />
+                          </div>
+                          <p className="text-sm opacity-70">{embedConfig.title}</p>
+                          {embedConfig.showTime && (
+                            <p className="text-xs opacity-50 mt-1">00:00 / --:--</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="text-sm text-muted-foreground">
+                    <p className="font-medium mb-1">Como usar:</p>
+                    <ol className="list-decimal list-inside space-y-1">
+                      <li>Copie o código acima</li>
+                      <li>Cole no HTML do seu site onde deseja exibir o vídeo</li>
+                      <li>Ajuste width e height conforme necessário</li>
+                    </ol>
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

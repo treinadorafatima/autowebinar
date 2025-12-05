@@ -32,6 +32,7 @@ import PagamentoResultado from "@/pages/pagamento-resultado";
 import LandingPage from "@/pages/landing";
 import WebinarModeratorPage from "@/pages/webinar-moderator";
 import WebinarRegisterPage from "@/pages/webinar-register";
+import VideoEmbedPage from "@/pages/video-embed";
 import FreeTrialPage from "@/pages/free-trial";
 import ForgotPasswordPage from "@/pages/forgot-password";
 import ResetPasswordPage from "@/pages/reset-password";
@@ -148,6 +149,7 @@ function Router() {
       <Route path="/w/:slug/register" component={WebinarRegisterPage} />
       <Route path="/w/:slug/replay" component={WebinarReplayPage} />
       <Route path="/w/:slug/moderate" component={WebinarModeratorPage} />
+      <Route path="/embed/video/:videoId" component={VideoEmbedPage} />
       <Route path="/checkout" component={CheckoutPage} />
       <Route path="/checkout/:planoId" component={CheckoutPage} />
       <Route path="/pagamento/sucesso">{() => <PagamentoResultado tipo="sucesso" />}</Route>
