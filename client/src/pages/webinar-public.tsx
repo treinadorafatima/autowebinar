@@ -1544,7 +1544,7 @@ export default function WebinarPublicPage() {
           <div className={isCompact ? "" : "mb-8"}>
             <div className={`relative w-full overflow-hidden ${isCompact ? "" : "rounded-xl"}`} style={{ backgroundColor: "#000" }}>
               <div className="relative">
-                {status === "waiting" && !(webinar.postEndMode === "offer_then_ended" && showOfferThenEnded === true) && (
+                {status === "waiting" && webinar.postEndMode !== "offer_then_ended" && (
                   <div 
                     className="aspect-video flex flex-col items-center justify-center"
                     style={{ backgroundColor: webinar.backgroundColor }}
