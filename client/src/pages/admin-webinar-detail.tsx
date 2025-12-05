@@ -2196,35 +2196,90 @@ export default function AdminWebinarDetailPage() {
 
                 {/* Opções para: Oferta primeiro, depois Transmissão Encerrada */}
                 {formData.postEndMode === "offer_then_ended" && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-lg bg-muted/30">
-                    <div className="space-y-2">
-                      <Label>Oferta Visível - Horas</Label>
-                      <Input
-                        type="number"
-                        min={0}
-                        max={48}
-                        value={formData.offerBeforeEndedHours}
-                        onChange={(e) => setFormData({ ...formData, offerBeforeEndedHours: parseInt(e.target.value) || 0 })}
-                        placeholder="Ex: 2"
-                        data-testid="input-offer-before-ended-hours"
-                      />
+                  <div className="space-y-4">
+                    {/* Tempo da Oferta */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-lg bg-muted/30">
+                      <div className="space-y-2">
+                        <Label>Oferta Visível - Horas</Label>
+                        <Input
+                          type="number"
+                          min={0}
+                          max={48}
+                          value={formData.offerBeforeEndedHours}
+                          onChange={(e) => setFormData(prev => ({ ...prev, offerBeforeEndedHours: parseInt(e.target.value) || 0 }))}
+                          placeholder="Ex: 2"
+                          data-testid="input-offer-before-ended-hours"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Oferta Visível - Minutos</Label>
+                        <Input
+                          type="number"
+                          min={0}
+                          max={59}
+                          value={formData.offerBeforeEndedMinutes}
+                          onChange={(e) => setFormData(prev => ({ ...prev, offerBeforeEndedMinutes: parseInt(e.target.value) || 0 }))}
+                          placeholder="Ex: 30"
+                          data-testid="input-offer-before-ended-minutes"
+                        />
+                      </div>
+                      <div className="md:col-span-2">
+                        <p className="text-xs text-muted-foreground">
+                          Após o término, a oferta aparece por {formData.offerBeforeEndedHours || 0}h {formData.offerBeforeEndedMinutes || 0}min, depois a tela "Transmissão Encerrada" é exibida até a próxima sessão
+                        </p>
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      <Label>Oferta Visível - Minutos</Label>
-                      <Input
-                        type="number"
-                        min={0}
-                        max={59}
-                        value={formData.offerBeforeEndedMinutes}
-                        onChange={(e) => setFormData({ ...formData, offerBeforeEndedMinutes: parseInt(e.target.value) || 0 })}
-                        placeholder="Ex: 30"
-                        data-testid="input-offer-before-ended-minutes"
-                      />
-                    </div>
-                    <div className="md:col-span-2">
-                      <p className="text-xs text-muted-foreground">
-                        Após o término, a oferta aparece por {formData.offerBeforeEndedHours || 0}h {formData.offerBeforeEndedMinutes || 0}min, depois a tela "Transmissão Encerrada" é exibida até a próxima sessão
-                      </p>
+
+                    {/* Personalização da Tela Encerrada */}
+                    <div className="p-4 border rounded-lg bg-muted/30">
+                      <h4 className="text-sm font-medium mb-4">Personalização da Tela "Transmissão Encerrada"</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label>Mostrar Badge "Transmissão Encerrada"</Label>
+                          <Select 
+                            value={formData.showEndedScreen ? "true" : "false"} 
+                            onValueChange={(v) => setFormData(prev => ({ ...prev, showEndedScreen: v === "true" }))}
+                          >
+                            <SelectTrigger data-testid="select-show-ended-screen-offer-then">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="true">Sim</SelectItem>
+                              <SelectItem value="false">Não</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Mostrar Countdown Próxima Sessão</Label>
+                          <Select 
+                            value={formData.showNextCountdown ? "true" : "false"} 
+                            onValueChange={(v) => setFormData(prev => ({ ...prev, showNextCountdown: v === "true" }))}
+                          >
+                            <SelectTrigger data-testid="select-show-next-countdown-offer-then">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="true">Sim</SelectItem>
+                              <SelectItem value="false">Não</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Mostrar Data Próxima Sessão</Label>
+                          <Select 
+                            value={formData.showNextSessionDate ? "true" : "false"} 
+                            onValueChange={(v) => setFormData(prev => ({ ...prev, showNextSessionDate: v === "true" }))}
+                          >
+                            <SelectTrigger data-testid="select-show-next-date-offer-then">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="true">Sim</SelectItem>
+                              <SelectItem value="false">Não</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}
