@@ -989,7 +989,8 @@ export default function WebinarPublicPage() {
     }
 
     // Only show if webinar has ended and showOfferInsteadOfEnded is false (Mode 1)
-    if (status !== "ended" || webinar.showOfferInsteadOfEnded || !webinar.offerEnabled) {
+    // DO NOT use this for offer_then_ended mode - that mode has its own logic
+    if (status !== "ended" || webinar.showOfferInsteadOfEnded || !webinar.offerEnabled || webinar.postEndMode === "offer_then_ended") {
       setShowOfferAfterEnd(false);
       return;
     }
@@ -1039,7 +1040,7 @@ export default function WebinarPublicPage() {
     // Re-check every 30 seconds to catch when delay expires
     const interval = setInterval(checkOfferDisplay, 30000);
     return () => clearInterval(interval);
-  }, [status, webinar?.showOfferInsteadOfEnded, webinar?.offerEnabled, webinar?.offerDisplayHours, webinar?.offerDisplayMinutes, webinar?.startHour, webinar?.startMinute, webinar?.videoDuration, webinar]);
+  }, [status, webinar?.showOfferInsteadOfEnded, webinar?.offerEnabled, webinar?.offerDisplayHours, webinar?.offerDisplayMinutes, webinar?.startHour, webinar?.startMinute, webinar?.videoDuration, webinar?.postEndMode, webinar]);
 
   // Handle offer expiration when showOfferInsteadOfEnded is active (Mode 2)
   useEffect(() => {
