@@ -75,7 +75,7 @@ export default function AdminVideosPage() {
   const [editingVideoId, setEditingVideoId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
 
-  const token = localStorage.getItem("admin_token");
+  const token = localStorage.getItem("adminToken");
 
   const { data: videos = [], isLoading: loadingVideos, refetch: refetchVideos } = useQuery<VideoWithWebinar[]>({
     queryKey: ["/api/admin/videos-with-webinars"],
