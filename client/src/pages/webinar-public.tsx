@@ -1902,7 +1902,7 @@ export default function WebinarPublicPage() {
             </div>
           </div>
 
-          {((showOffer && webinar.offerEnabled) || (status === "ended" && webinar.showOfferInsteadOfEnded && webinar.offerEnabled && !offerExpiredAfterEnd) || (webinar.postEndMode === "offer_then_ended" && webinar.offerEnabled && showOfferThenEnded === true) || showOfferAfterEnd) && (
+          {((showOffer && webinar.offerEnabled && !(webinar.postEndMode === "offer_then_ended" && status !== "live" && showOfferThenEnded === false)) || (status === "ended" && webinar.showOfferInsteadOfEnded && webinar.offerEnabled && !offerExpiredAfterEnd) || (webinar.postEndMode === "offer_then_ended" && webinar.offerEnabled && showOfferThenEnded === true) || showOfferAfterEnd) && (
             <div 
               className="text-center px-6 md:px-12 py-10 md:py-16 rounded-2xl"
               style={{ 
