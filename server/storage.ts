@@ -700,10 +700,15 @@ export class DatabaseStorage implements IStorage {
     }
 
     console.log(`[storage] Salvando metadados no banco... (tier: ${storageTier})`);
+    
+    // Extrair título do nome do arquivo (remover extensão)
+    const titleFromFilename = originalFilename.replace(/\.[^/.]+$/, "");
+    
     await db.insert(uploadedVideos).values({
       id: randomUUID(),
       uploadedVideoId: videoId,
       filename: originalFilename,
+      title: titleFromFilename,
       duration,
       fileSize: fileBuffer.length, // Salvar o tamanho do arquivo em bytes
       ownerId: ownerId || null,

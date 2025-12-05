@@ -180,11 +180,13 @@ export default function AdminVideosPage() {
         }
       });
 
-      xhr.onload = () => {
+      xhr.onload = async () => {
         if (xhr.status === 200) {
           toast({ title: "Vídeo enviado com sucesso!" });
-          refetchVideos();
-          refetchStorage();
+          // Invalidar cache e forçar refetch para atualizar lista
+          await queryClient.invalidateQueries({ queryKey: ["/api/admin/videos-with-webinars"] });
+          await queryClient.invalidateQueries({ queryKey: ["/api/admin/storage-info"] });
+          await queryClient.invalidateQueries({ queryKey: ["/api/webinar/videos"] });
         } else {
           let errorMsg = "Falha ao enviar";
           try {
