@@ -123,8 +123,11 @@ export const webinars = pgTable("webinars", {
   showNextSessionDate: boolean("show_next_session_date").notNull().default(true), // Mostrar data/hora próxima sessão
   offerDisplayAfterEnd: integer("offer_display_after_end").notNull().default(0), // Minutos para mostrar oferta (0 = não mostrar)
   showOfferInsteadOfEnded: boolean("show_offer_instead_of_ended").notNull().default(false), // Mostrar oferta em vez de "Transmissão Encerrada"
+  postEndMode: text("post_end_mode").notNull().default("ended"), // 'ended', 'offer', 'offer_then_ended'
   offerDisplayHours: integer("offer_display_hours").notNull().default(0), // Horas para oferta ficar visível
   offerDisplayMinutes: integer("offer_display_minutes").notNull().default(30), // Minutos para oferta ficar visível
+  offerBeforeEndedHours: integer("offer_before_ended_hours").notNull().default(0), // Horas da oferta antes de mostrar tela encerrada
+  offerBeforeEndedMinutes: integer("offer_before_ended_minutes").notNull().default(30), // Minutos da oferta antes de mostrar tela encerrada
   customDomain: text("custom_domain"), // Domínio customizado (ex: webinar.seusite.com)
   moderatorToken: text("moderator_token"), // Token único para moderação
   // Campos do Replay

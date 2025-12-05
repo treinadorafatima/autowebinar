@@ -116,8 +116,11 @@ interface Webinar {
   showNextSessionDate?: boolean;
   offerDisplayAfterEnd?: number;
   showOfferInsteadOfEnded?: boolean;
+  postEndMode?: "ended" | "offer" | "offer_then_ended";
   offerDisplayHours?: number;
   offerDisplayMinutes?: number;
+  offerBeforeEndedHours?: number;
+  offerBeforeEndedMinutes?: number;
   commentTheme: string;
   // SEO e compartilhamento
   seoSiteName?: string;
@@ -169,6 +172,7 @@ export default function WebinarPublicPage() {
   const [showBanner, setShowBanner] = useState(false);
   const [showOfferAfterEnd, setShowOfferAfterEnd] = useState(false);
   const [offerExpiredAfterEnd, setOfferExpiredAfterEnd] = useState(false);
+  const [showOfferThenEnded, setShowOfferThenEnded] = useState(false); // Modo "oferta primeiro, depois encerrada"
   
   // Estados para formulário de LEAD (inscrição)
   const [userName, setUserName] = useState(() => {
@@ -1088,6 +1092,58 @@ export default function WebinarPublicPage() {
     return () => clearInterval(interval);
   }, [status, webinar?.showOfferInsteadOfEnded, webinar?.offerEnabled, webinar?.offerDisplayHours, webinar?.offerDisplayMinutes, webinar?.startHour, webinar?.startMinute, webinar?.videoDuration, webinar]);
 
+  // Handle "offer_then_ended" mode - show offer first, then show ended screen
+  useEffect(() => {
+    if (!webinar) {
+      setShowOfferThenEnded(false);
+      return;
+    }
+
+    // Only applies when postEndMode is "offer_then_ended"
+    if (status !== "ended" || webinar.postEndMode !== "offer_then_ended" || !webinar.offerEnabled) {
+      setShowOfferThenEnded(false);
+      return;
+    }
+
+    const totalMinutes = (webinar.offerBeforeEndedHours || 0) * 60 + (webinar.offerBeforeEndedMinutes || 0);
+    
+    // If no duration set, show offer forever (don't transition to ended)
+    if (totalMinutes === 0) {
+      setShowOfferThenEnded(true);
+      return;
+    }
+
+    // Calculate when webinar ended
+    const calculateWebinarEndTime = () => {
+      const now = new Date();
+      const videoDurationMs = (webinar.videoDuration || 0) * 1000;
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), webinar.startHour, webinar.startMinute, 0);
+      const todayEnd = todayStart.getTime() + videoDurationMs;
+      
+      if (todayEnd > now.getTime()) {
+        const yesterdayStart = new Date(todayStart);
+        yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+        return yesterdayStart.getTime() + videoDurationMs;
+      }
+      return todayEnd;
+    };
+
+    const checkOfferThenEndedState = () => {
+      const webinarEndTime = calculateWebinarEndTime();
+      const offerDisplayMillis = totalMinutes * 60 * 1000;
+      const now = Date.now();
+      const timeSinceEnd = now - webinarEndTime;
+      
+      // Show offer if within the configured duration after webinar ends
+      const shouldShowOffer = timeSinceEnd >= 0 && timeSinceEnd <= offerDisplayMillis;
+      setShowOfferThenEnded(shouldShowOffer);
+    };
+
+    checkOfferThenEndedState();
+    const interval = setInterval(checkOfferThenEndedState, 30000);
+    return () => clearInterval(interval);
+  }, [status, webinar?.postEndMode, webinar?.offerEnabled, webinar?.offerBeforeEndedHours, webinar?.offerBeforeEndedMinutes, webinar?.startHour, webinar?.startMinute, webinar?.videoDuration, webinar]);
+
   async function handleSendComment() {
     if (!userComment.trim() || !webinar) return;
     
@@ -1477,8 +1533,11 @@ export default function WebinarPublicPage() {
                   </div>
                 )}
 
-                {/* Tela de Encerrado Normal (quando showOfferInsteadOfEnded = false) */}
-                {status === "ended" && !webinar.showOfferInsteadOfEnded && (
+                {/* Tela de Encerrado Normal (quando postEndMode = ended OU quando offer_then_ended e oferta expirou) */}
+                {status === "ended" && (
+                  (webinar.postEndMode === "ended" || !webinar.postEndMode) || 
+                  (webinar.postEndMode === "offer_then_ended" && !showOfferThenEnded)
+                ) && !webinar.showOfferInsteadOfEnded && (
                   <div 
                     className="aspect-video flex flex-col items-center justify-center p-8"
                     style={{ backgroundColor: webinar.backgroundColor }}
@@ -1770,7 +1829,7 @@ export default function WebinarPublicPage() {
             </div>
           </div>
 
-          {((showOffer && webinar.offerEnabled) || (status === "ended" && webinar.showOfferInsteadOfEnded && webinar.offerEnabled && !offerExpiredAfterEnd) || showOfferAfterEnd) && (
+          {((showOffer && webinar.offerEnabled) || (status === "ended" && webinar.showOfferInsteadOfEnded && webinar.offerEnabled && !offerExpiredAfterEnd) || (status === "ended" && webinar.postEndMode === "offer_then_ended" && webinar.offerEnabled && showOfferThenEnded) || showOfferAfterEnd) && (
             <div 
               className="text-center px-6 md:px-12 py-10 md:py-16 rounded-2xl"
               style={{ 

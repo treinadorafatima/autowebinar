@@ -459,8 +459,11 @@ interface Webinar {
   showNextSessionDate: boolean;
   offerDisplayAfterEnd: number;
   showOfferInsteadOfEnded: boolean;
+  postEndMode: "ended" | "offer" | "offer_then_ended";
   offerDisplayHours: number;
   offerDisplayMinutes: number;
+  offerBeforeEndedHours: number;
+  offerBeforeEndedMinutes: number;
   offerEnabled: boolean;
   offerDelaySeconds: number;
   offerStartSeconds: number;
@@ -623,8 +626,11 @@ export default function AdminWebinarDetailPage() {
     showNextSessionDate: true,
     offerDisplayAfterEnd: 0,
     showOfferInsteadOfEnded: false,
+    postEndMode: "ended",
     offerDisplayHours: 0,
     offerDisplayMinutes: 30,
+    offerBeforeEndedHours: 0,
+    offerBeforeEndedMinutes: 30,
     replayEnabled: false,
     replayVideoId: "",
     replayShowControls: true,
@@ -845,8 +851,11 @@ export default function AdminWebinarDetailPage() {
         showNextSessionDate: data.showNextSessionDate !== false,
         offerDisplayAfterEnd: data.offerDisplayAfterEnd || 0,
         showOfferInsteadOfEnded: data.showOfferInsteadOfEnded || false,
+        postEndMode: data.postEndMode || (data.showOfferInsteadOfEnded ? "offer" : "ended"),
         offerDisplayHours: data.offerDisplayHours || 0,
         offerDisplayMinutes: data.offerDisplayMinutes || 30,
+        offerBeforeEndedHours: data.offerBeforeEndedHours || 0,
+        offerBeforeEndedMinutes: data.offerBeforeEndedMinutes || 30,
         replayEnabled: data.replayEnabled || false,
         replayVideoId: data.replayVideoId || "",
         replayShowControls: data.replayShowControls !== false,
@@ -2167,12 +2176,12 @@ export default function AdminWebinarDetailPage() {
               <div className="space-y-4">
                 <h3 className="text-sm font-semibold">Após Webinário Terminar</h3>
                 
-                {/* Escolha principal: Tela Encerrada OU Oferta no Lugar */}
+                {/* Escolha principal: Modo pós-término */}
                 <div className="space-y-2">
                   <Label>O que mostrar quando o vídeo terminar?</Label>
                   <Select 
-                    value={formData.showOfferInsteadOfEnded ? "offer" : "ended"} 
-                    onValueChange={(v) => setFormData({ ...formData, showOfferInsteadOfEnded: v === "offer" })}
+                    value={formData.postEndMode || "ended"} 
+                    onValueChange={(v) => setFormData({ ...formData, postEndMode: v, showOfferInsteadOfEnded: v === "offer" })}
                   >
                     <SelectTrigger data-testid="select-post-end-mode">
                       <SelectValue />
@@ -2180,12 +2189,48 @@ export default function AdminWebinarDetailPage() {
                     <SelectContent>
                       <SelectItem value="ended">Tela "Transmissão Encerrada"</SelectItem>
                       <SelectItem value="offer">Apenas a Oferta (sem caixa de vídeo)</SelectItem>
+                      <SelectItem value="offer_then_ended">Oferta primeiro, depois Transmissão Encerrada</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
+                {/* Opções para: Oferta primeiro, depois Transmissão Encerrada */}
+                {formData.postEndMode === "offer_then_ended" && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-lg bg-muted/30">
+                    <div className="space-y-2">
+                      <Label>Oferta Visível - Horas</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={48}
+                        value={formData.offerBeforeEndedHours}
+                        onChange={(e) => setFormData({ ...formData, offerBeforeEndedHours: parseInt(e.target.value) || 0 })}
+                        placeholder="Ex: 2"
+                        data-testid="input-offer-before-ended-hours"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Oferta Visível - Minutos</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={59}
+                        value={formData.offerBeforeEndedMinutes}
+                        onChange={(e) => setFormData({ ...formData, offerBeforeEndedMinutes: parseInt(e.target.value) || 0 })}
+                        placeholder="Ex: 30"
+                        data-testid="input-offer-before-ended-minutes"
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <p className="text-xs text-muted-foreground">
+                        Após o término, a oferta aparece por {formData.offerBeforeEndedHours || 0}h {formData.offerBeforeEndedMinutes || 0}min, depois a tela "Transmissão Encerrada" é exibida até a próxima sessão
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 {/* Opções da Tela de Encerrado */}
-                {!formData.showOfferInsteadOfEnded && (
+                {formData.postEndMode === "ended" && (
                   <>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-lg bg-muted/30">
                       <div className="space-y-2">
@@ -2269,7 +2314,7 @@ export default function AdminWebinarDetailPage() {
                 )}
 
                 {/* Opções da Oferta no Lugar */}
-                {formData.showOfferInsteadOfEnded && (
+                {formData.postEndMode === "offer" && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-lg bg-muted/30">
                     <div className="space-y-2">
                       <Label>Oferta Visível - Horas</Label>
