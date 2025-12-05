@@ -451,14 +451,9 @@ export default function AdminVideosPage() {
                                 </Button>
                               </div>
                             ) : (
-                              <>
-                                <p className="font-medium truncate max-w-[200px]" title={video.title}>
-                                  {video.title}
-                                </p>
-                                <p className="text-xs text-muted-foreground truncate max-w-[200px]" title={video.filename}>
-                                  {video.filename}
-                                </p>
-                              </>
+                              <p className="font-medium truncate max-w-[200px]" title={video.title}>
+                                {video.title}
+                              </p>
                             )}
                           </div>
                         </div>
