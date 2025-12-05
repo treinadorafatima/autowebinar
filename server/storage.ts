@@ -94,6 +94,8 @@ export interface IStorage {
   countVideosByOwner(ownerId: string): Promise<number>;
   deleteVideo(videoId: string): Promise<void>;
   updateUploadedVideoOwner(videoId: string, newOwnerId: string): Promise<void>;
+  getVideoFileSize(videoId: string): Promise<number>;
+  updateVideoFileSize(videoId: string, fileSize: number): Promise<void>;
   createComment(comment: CommentInsert): Promise<Comment>;
   getComments(): Promise<Comment[]>;
   getSimulatedComments(): Promise<Comment[]>;
@@ -927,14 +929,57 @@ export class DatabaseStorage implements IStorage {
     return null;
   }
 
-  getVideoFileSize(videoId: string): number | null {
+  async getVideoFileSize(videoId: string): Promise<number> {
     const filePath = this.getVideoPath(videoId);
-    if (!filePath) return null;
+    if (filePath) {
+      try {
+        const stats = fs.statSync(filePath);
+        return stats.size;
+      } catch {
+        // Continue to try cloud storage
+      }
+    }
+
+    if (r2Client) {
+      try {
+        const response = await r2Client.send(new HeadObjectCommand({
+          Bucket: 'webinar-videos',
+          Key: `videos/${videoId}.mp4`,
+        }));
+        if (response.ContentLength) {
+          return response.ContentLength;
+        }
+      } catch {
+        // Continue to try Supabase
+      }
+    }
+
+    if (supabaseClient) {
+      try {
+        const { data } = await supabaseClient.storage
+          .from('webinar-videos')
+          .list('videos', { search: `${videoId}.mp4` });
+        if (data && data.length > 0) {
+          const file = data.find(f => f.name === `${videoId}.mp4`);
+          if (file && file.metadata?.size) {
+            return file.metadata.size;
+          }
+        }
+      } catch {
+        // File not found in Supabase
+      }
+    }
+
+    return 0;
+  }
+
+  async updateVideoFileSize(videoId: string, fileSize: number): Promise<void> {
     try {
-      const stats = fs.statSync(filePath);
-      return stats.size;
-    } catch {
-      return null;
+      await db.update(uploadedVideos)
+        .set({ fileSize })
+        .where(eq(uploadedVideos.uploadedVideoId, videoId));
+    } catch (error) {
+      console.error(`[storage] Error updating file size for ${videoId}:`, error);
     }
   }
 

@@ -5912,9 +5912,9 @@ Seja conversacional e objetivo.`;
       const videosWithWebinars = videos.map(video => {
         const linkedWebinars = webinars
           .filter((w: { uploadedVideoId: string | null }) => w.uploadedVideoId === video.uploadedVideoId)
-          .map((w: { id: string; title: string; slug: string }) => ({
+          .map((w: { id: string; name: string; slug: string }) => ({
             id: w.id,
-            title: w.title,
+            title: w.name,
             slug: w.slug
           }));
 
@@ -5954,8 +5954,21 @@ Seja conversacional e objetivo.`;
       const videos = await storage.listVideosByOwner(admin.id);
       
       let usedBytes = 0;
+      const videosWithSize: { id: string; size: number }[] = [];
+      
       for (const video of videos) {
-        usedBytes += video.fileSize || 0;
+        let videoSize = video.fileSize || 0;
+        
+        if (!videoSize && video.uploadedVideoId) {
+          const calculatedSize = await storage.getVideoFileSize(video.uploadedVideoId);
+          if (calculatedSize > 0) {
+            videoSize = calculatedSize;
+            await storage.updateVideoFileSize(video.uploadedVideoId, calculatedSize);
+          }
+        }
+        
+        usedBytes += videoSize;
+        videosWithSize.push({ id: video.uploadedVideoId, size: videoSize });
       }
 
       let limitGB = 5;
@@ -5966,14 +5979,15 @@ Seja conversacional e objetivo.`;
         }
       }
       const usedGB = usedBytes / (1024 * 1024 * 1024);
-      const percentUsed = (usedGB / limitGB) * 100;
+      const percentUsed = limitGB > 0 ? (usedGB / limitGB) * 100 : 0;
 
       res.json({
         usedBytes,
         usedGB,
         limitGB,
         percentUsed,
-        videoCount: videos.length
+        videoCount: videos.length,
+        videosWithSize
       });
     } catch (error: any) {
       res.status(400).json({ error: error.message });
