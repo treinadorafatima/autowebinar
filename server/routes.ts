@@ -7567,10 +7567,10 @@ Seja conversacional e objetivo.`;
                   
                   console.log(`[MP Webhook] Created admin for subscription: ${pagamento.email}, temp password: ${tempPassword}`);
                   
-                  // Send payment confirmation email for new users
-                  import("./email").then(({ sendPaymentConfirmedEmail }) => {
-                    sendPaymentConfirmedEmail(pagamento.email, pagamento.nome, plano.nome, expirationDate).catch(err => {
-                      console.error(`[MP Webhook] Error sending confirmation email:`, err);
+                  // Send access credentials email for new users
+                  import("./email").then(({ sendAccessCredentialsEmail }) => {
+                    sendAccessCredentialsEmail(pagamento.email, pagamento.nome, tempPassword, plano.nome).catch(err => {
+                      console.error(`[MP Webhook] Error sending credentials email:`, err);
                     });
                   });
                 }
@@ -7697,10 +7697,10 @@ Seja conversacional e objetivo.`;
                   
                   console.log(`[MP Webhook] Created admin: ${pagamento.email}, temp password: ${tempPassword}`);
                   
-                  // Send payment confirmation email for new users
-                  import("./email").then(({ sendPaymentConfirmedEmail }) => {
-                    sendPaymentConfirmedEmail(pagamento.email, pagamento.nome, plano.nome, expirationDate).catch(err => {
-                      console.error(`[MP Webhook] Error sending confirmation email:`, err);
+                  // Send access credentials email for new users
+                  import("./email").then(({ sendAccessCredentialsEmail }) => {
+                    sendAccessCredentialsEmail(pagamento.email, pagamento.nome, tempPassword, plano.nome).catch(err => {
+                      console.error(`[MP Webhook] Error sending credentials email:`, err);
                     });
                   });
                 }
@@ -7847,6 +7847,13 @@ Seja conversacional e objetivo.`;
                 updateData.adminId = admin.id;
                 
                 console.log(`[Stripe Webhook] Created admin: ${pagamento.email}, temp password: ${tempPassword}`);
+                
+                // Send access credentials email for new users
+                import("./email").then(({ sendAccessCredentialsEmail }) => {
+                  sendAccessCredentialsEmail(pagamento.email, pagamento.nome, tempPassword, plano.nome).catch(err => {
+                    console.error(`[Stripe Webhook] Error sending credentials email:`, err);
+                  });
+                });
               }
             }
 
@@ -7910,6 +7917,13 @@ Seja conversacional e objetivo.`;
                 updateData.adminId = admin.id;
                 
                 console.log(`[Stripe Webhook] Created admin via PI: ${pagamento.email}, temp password: ${tempPassword}`);
+                
+                // Send access credentials email for new users
+                import("./email").then(({ sendAccessCredentialsEmail }) => {
+                  sendAccessCredentialsEmail(pagamento.email, pagamento.nome, tempPassword, plano.nome).catch(err => {
+                    console.error(`[Stripe Webhook] Error sending credentials email:`, err);
+                  });
+                });
               }
             }
 
@@ -7980,10 +7994,10 @@ Seja conversacional e objetivo.`;
                 });
                 console.log(`[Stripe Webhook] Created admin via subscription: ${pagamento.email}, temp password: ${tempPassword}`);
                 
-                // Send payment confirmation email for new users
-                import("./email").then(({ sendPaymentConfirmedEmail }) => {
-                  sendPaymentConfirmedEmail(pagamento.email, pagamento.nome, plano.nome, expirationDate).catch(err => {
-                    console.error(`[Stripe Webhook] Error sending confirmation email:`, err);
+                // Send access credentials email for new users
+                import("./email").then(({ sendAccessCredentialsEmail }) => {
+                  sendAccessCredentialsEmail(pagamento.email, pagamento.nome, tempPassword, plano.nome).catch(err => {
+                    console.error(`[Stripe Webhook] Error sending credentials email:`, err);
                   });
                 });
               }
@@ -8126,6 +8140,15 @@ Seja conversacional e objetivo.`;
           webinarLimit: plano.webinarLimit,
           isActive: true,
           accessExpiresAt: expirationDate,
+        });
+        
+        console.log(`[Manual Release] Created admin: ${pagamento.email}, temp password: ${tempPassword}`);
+        
+        // Send access credentials email for new users
+        import("./email").then(({ sendAccessCredentialsEmail }) => {
+          sendAccessCredentialsEmail(pagamento.email, pagamento.nome, tempPassword, plano.nome).catch(err => {
+            console.error(`[Manual Release] Error sending credentials email:`, err);
+          });
         });
       }
 
