@@ -55,6 +55,12 @@ const mainMenuItems = [
     superadminOnly: false,
   },
   {
+    title: "Vídeos",
+    url: "/admin/videos",
+    icon: Film,
+    superadminOnly: false,
+  },
+  {
     title: "Roteirizador",
     url: "/admin/scripts",
     icon: ScrollText,

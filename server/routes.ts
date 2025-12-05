@@ -5892,6 +5892,94 @@ Seja conversacional e objetivo.`;
     }
   });
 
+  // Get videos with linked webinars
+  app.get("/api/admin/videos-with-webinars", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin) {
+        return res.status(404).json({ error: "Admin not found" });
+      }
+
+      const videos = await storage.listVideosByOwner(admin.id);
+      const webinars = await storage.listWebinarsByOwner(admin.id);
+
+      const videosWithWebinars = videos.map(video => {
+        const linkedWebinars = webinars
+          .filter((w: { uploadedVideoId: string | null }) => w.uploadedVideoId === video.uploadedVideoId)
+          .map((w: { id: string; title: string; slug: string }) => ({
+            id: w.id,
+            title: w.title,
+            slug: w.slug
+          }));
+
+        return {
+          id: video.id,
+          uploadedVideoId: video.uploadedVideoId,
+          filename: video.filename,
+          title: video.title || video.filename,
+          duration: video.duration,
+          fileSize: video.fileSize || null,
+          uploadedAt: video.uploadedAt,
+          hlsStatus: video.hlsStatus || "pending",
+          linkedWebinars
+        };
+      });
+
+      res.json(videosWithWebinars);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Get storage info for current admin
+  app.get("/api/admin/storage-info", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin) {
+        return res.status(404).json({ error: "Admin not found" });
+      }
+
+      const videos = await storage.listVideosByOwner(admin.id);
+      
+      let usedBytes = 0;
+      for (const video of videos) {
+        usedBytes += video.fileSize || 0;
+      }
+
+      let limitGB = 5;
+      if (admin.planoId) {
+        const plano = await storage.getCheckoutPlanoById(admin.planoId);
+        if (plano?.storageLimit) {
+          limitGB = plano.storageLimit;
+        }
+      }
+      const usedGB = usedBytes / (1024 * 1024 * 1024);
+      const percentUsed = (usedGB / limitGB) * 100;
+
+      res.json({
+        usedBytes,
+        usedGB,
+        limitGB,
+        percentUsed,
+        videoCount: videos.length
+      });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
   // ========== ACCOUNT DOMAIN API ==========
   
   // Get account info by domain
