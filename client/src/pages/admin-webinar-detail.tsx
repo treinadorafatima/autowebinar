@@ -19,7 +19,8 @@ import OfferEditor from "@/components/OfferEditor";
 import ReplayEditor from "@/components/ReplayEditor";
 import WebinarAnalytics from "@/components/WebinarAnalytics";
 import { 
-  ArrowLeft, 
+  ArrowLeft,
+  ArrowRight,
   Save, 
   Trash2, 
   Upload,
@@ -683,6 +684,13 @@ export default function AdminWebinarDetailPage() {
   const [showPasteModal, setShowPasteModal] = useState(false);
   const [pasteContent, setPasteContent] = useState("");
   const [pasteLoading, setPasteLoading] = useState(false);
+  
+  // Ajuste de tempo em massa dos comentários
+  const [showTimeAdjustModal, setShowTimeAdjustModal] = useState(false);
+  const [timeAdjustMinutes, setTimeAdjustMinutes] = useState(0);
+  const [timeAdjustSeconds, setTimeAdjustSeconds] = useState(0);
+  const [timeAdjustDirection, setTimeAdjustDirection] = useState<"forward" | "backward">("forward");
+  const [timeAdjustLoading, setTimeAdjustLoading] = useState(false);
   const [commentTheme, setCommentTheme] = useState("dark");
   const [leadsEnabled, setLeadsEnabled] = useState(false);
   const [leadsCollectEmail, setLeadsCollectEmail] = useState(true);
@@ -1476,6 +1484,47 @@ export default function AdminWebinarDetailPage() {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     toast({ title: "Comentários exportados!" });
+  }
+
+  async function handleTimeAdjust() {
+    if (!webinar) return;
+    
+    const totalSeconds = (timeAdjustMinutes * 60) + timeAdjustSeconds;
+    if (totalSeconds === 0) {
+      toast({ title: "Informe o tempo para ajustar", variant: "destructive" });
+      return;
+    }
+
+    const adjustValue = timeAdjustDirection === "forward" ? totalSeconds : -totalSeconds;
+    
+    setTimeAdjustLoading(true);
+    try {
+      const res = await fetch(`/api/webinars/${webinar.id}/comments/adjust-time`, {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}` 
+        },
+        body: JSON.stringify({ adjustSeconds: adjustValue }),
+      });
+      
+      if (!res.ok) throw new Error("Erro ao ajustar tempo");
+      
+      const result = await res.json();
+      toast({ 
+        title: "Tempo ajustado!", 
+        description: `${result.updated} comentários ${timeAdjustDirection === "forward" ? "adiantados" : "atrasados"} em ${timeAdjustMinutes}min ${timeAdjustSeconds}s` 
+      });
+      
+      await fetchComments(webinar.id);
+      setShowTimeAdjustModal(false);
+      setTimeAdjustMinutes(0);
+      setTimeAdjustSeconds(0);
+    } catch (error) {
+      toast({ title: "Erro ao ajustar tempo", variant: "destructive" });
+    } finally {
+      setTimeAdjustLoading(false);
+    }
   }
 
   function startEditComment(comment: Comment) {
@@ -3281,6 +3330,17 @@ export default function AdminWebinarDetailPage() {
                 >
                   <FileText className="h-4 w-4 mr-2" />
                   Colar Texto
+                </Button>
+                
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowTimeAdjustModal(true)}
+                  disabled={comments.length === 0}
+                  className="bg-amber-600 hover:bg-amber-700 text-white border-amber-600"
+                  data-testid="button-adjust-time"
+                >
+                  <Clock className="h-4 w-4 mr-2" />
+                  Ajustar Tempo
                 </Button>
               </div>
               
@@ -6008,6 +6068,101 @@ Exemplo:
             >
               {pasteLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
               Importar Comentários
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal para ajustar tempo de todos os comentários */}
+      <Dialog open={showTimeAdjustModal} onOpenChange={setShowTimeAdjustModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Ajustar Tempo dos Comentários</DialogTitle>
+            <DialogDescription>
+              Adiante ou atrase o tempo de todos os {comments.length} comentários simulados de uma vez.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-6">
+            <div className="space-y-3">
+              <Label>Direção do ajuste</Label>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant={timeAdjustDirection === "forward" ? "default" : "outline"}
+                  onClick={() => setTimeAdjustDirection("forward")}
+                  className="flex-1"
+                  data-testid="button-time-forward"
+                >
+                  <ArrowRight className="h-4 w-4 mr-2" />
+                  Adiantar
+                </Button>
+                <Button
+                  type="button"
+                  variant={timeAdjustDirection === "backward" ? "default" : "outline"}
+                  onClick={() => setTimeAdjustDirection("backward")}
+                  className="flex-1"
+                  data-testid="button-time-backward"
+                >
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Atrasar
+                </Button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Minutos</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={180}
+                  value={timeAdjustMinutes}
+                  onChange={(e) => setTimeAdjustMinutes(Math.max(0, parseInt(e.target.value) || 0))}
+                  placeholder="0"
+                  data-testid="input-time-adjust-minutes"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Segundos</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={59}
+                  value={timeAdjustSeconds}
+                  onChange={(e) => setTimeAdjustSeconds(Math.min(59, Math.max(0, parseInt(e.target.value) || 0)))}
+                  placeholder="0"
+                  data-testid="input-time-adjust-seconds"
+                />
+              </div>
+            </div>
+
+            <div className="p-3 bg-muted/50 rounded-lg text-sm">
+              <p className="font-medium text-foreground">
+                {timeAdjustDirection === "forward" ? "Adiantar" : "Atrasar"} todos os comentários em: 
+                <span className="text-primary ml-1">
+                  {timeAdjustMinutes}min {timeAdjustSeconds}s
+                </span>
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {timeAdjustDirection === "forward" 
+                  ? "Os comentários aparecerão mais tarde no vídeo."
+                  : "Os comentários aparecerão mais cedo no vídeo. Valores negativos serão ajustados para 0."}
+              </p>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowTimeAdjustModal(false)}>
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleTimeAdjust}
+              disabled={timeAdjustLoading || (timeAdjustMinutes === 0 && timeAdjustSeconds === 0)}
+              data-testid="button-apply-time-adjust"
+            >
+              {timeAdjustLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              Aplicar em Todos
             </Button>
           </DialogFooter>
         </DialogContent>

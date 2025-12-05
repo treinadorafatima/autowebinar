@@ -2813,6 +2813,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Adjust time for all simulated comments
+  app.post("/api/webinars/:id/comments/adjust-time", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin) {
+        return res.status(401).json({ error: "Admin not found" });
+      }
+
+      const webinar = await storage.getWebinarById(req.params.id);
+      if (!webinar) {
+        return res.status(404).json({ error: "Webinar not found" });
+      }
+
+      if (webinar.ownerId !== admin.id) {
+        return res.status(403).json({ error: "Você não tem permissão para ajustar comentários deste webinar" });
+      }
+
+      const { adjustSeconds } = req.body;
+      if (typeof adjustSeconds !== "number") {
+        return res.status(400).json({ error: "adjustSeconds must be a number" });
+      }
+
+      // Get all simulated comments for this webinar
+      const simulatedComments = await db
+        .select()
+        .from(comments)
+        .where(and(
+          eq(comments.webinarId, req.params.id),
+          eq(comments.isSimulated, true)
+        ));
+
+      // Update each comment's timestamp
+      let updated = 0;
+      for (const comment of simulatedComments) {
+        const newTimestamp = Math.max(0, comment.timestamp + adjustSeconds);
+        await db
+          .update(comments)
+          .set({ timestamp: newTimestamp })
+          .where(eq(comments.id, comment.id));
+        updated++;
+      }
+
+      res.json({ success: true, updated });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
   // Import comments for a specific webinar
   app.post("/api/webinars/:id/upload-comments", memoryUpload.single("file"), async (req: MulterRequest, res) => {
     try {
