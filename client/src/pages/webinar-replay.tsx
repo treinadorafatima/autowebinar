@@ -219,6 +219,15 @@ export default function WebinarReplayPage() {
 
     const videoElement = videoRef.current;
     const hlsUrl = `/api/webinar/hls/${video.uploadedVideoId}/playlist.m3u8`;
+    const directVideoUrl = `/api/webinar/video/${video.uploadedVideoId}`;
+
+    const useFallbackVideo = () => {
+      console.log("[replay] Using direct video fallback");
+      videoElement.src = directVideoUrl;
+      if (webinar?.replayAutoplay) {
+        videoElement.play().catch(() => {});
+      }
+    };
 
     if (Hls.isSupported()) {
       const hls = new Hls({
@@ -243,15 +252,30 @@ export default function WebinarReplayPage() {
         }
       });
 
+      hls.on(Hls.Events.ERROR, (_, data) => {
+        if (data.fatal) {
+          console.log("[replay] HLS fatal error, switching to direct video");
+          hls.destroy();
+          hlsRef.current = null;
+          useFallbackVideo();
+        }
+      });
+
       return () => {
         hls.destroy();
         hlsRef.current = null;
       };
     } else if (videoElement.canPlayType("application/vnd.apple.mpegurl")) {
       videoElement.src = hlsUrl;
+      videoElement.onerror = () => {
+        console.log("[replay] Native HLS error, switching to direct video");
+        useFallbackVideo();
+      };
       if (webinar?.replayAutoplay) {
         videoElement.play().catch(() => {});
       }
+    } else {
+      useFallbackVideo();
     }
   }, [video, webinar?.replayAutoplay]);
 
