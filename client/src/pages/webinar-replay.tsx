@@ -123,6 +123,8 @@ export default function WebinarReplayPage() {
   const [duration, setDuration] = useState(0);
   const [showControls, setShowControls] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
+  const [isVideoReady, setIsVideoReady] = useState(false);
+  const [isBuffering, setIsBuffering] = useState(false);
 
   useEffect(() => {
     if (!isEmbed) return;
@@ -221,12 +223,14 @@ export default function WebinarReplayPage() {
     const hlsUrl = `/api/webinar/hls/${video.uploadedVideoId}/playlist.m3u8`;
     const directVideoUrl = `/api/webinar/video/${video.uploadedVideoId}`;
 
+    // Set preload to start buffering immediately
+    videoElement.preload = "auto";
+    setIsVideoReady(false);
+
     const useFallbackVideo = () => {
       console.log("[replay] Using direct video fallback");
       videoElement.src = directVideoUrl;
-      if (webinar?.replayAutoplay) {
-        videoElement.play().catch(() => {});
-      }
+      videoElement.preload = "auto";
     };
 
     if (Hls.isSupported()) {
@@ -234,6 +238,9 @@ export default function WebinarReplayPage() {
         enableWorker: true,
         lowLatencyMode: false,
         backBufferLength: 90,
+        startFragPrefetch: true,
+        maxBufferLength: 30,
+        maxMaxBufferLength: 60,
       });
 
       hls.loadSource(hlsUrl);
@@ -247,9 +254,15 @@ export default function WebinarReplayPage() {
       });
 
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        // Start loading first segments immediately
+        hls.startLoad(0);
         if (webinar?.replayAutoplay) {
           videoElement.play().catch(() => {});
         }
+      });
+
+      hls.on(Hls.Events.FRAG_BUFFERED, () => {
+        setIsVideoReady(true);
       });
 
       hls.on(Hls.Events.ERROR, (_, data) => {
@@ -295,8 +308,11 @@ export default function WebinarReplayPage() {
       }
     };
     const handleCanPlay = () => {
-      // Don't set hasStarted here - let user click the overlay first
+      setIsVideoReady(true);
+      setIsBuffering(false);
     };
+    const handleWaiting = () => setIsBuffering(true);
+    const handlePlaying = () => setIsBuffering(false);
     const handlePlay = () => {
       setIsPlaying(true);
       setHasStarted(true);
@@ -307,6 +323,8 @@ export default function WebinarReplayPage() {
     videoEl.addEventListener("durationchange", handleDurationChange);
     videoEl.addEventListener("loadedmetadata", handleLoadedMetadata);
     videoEl.addEventListener("canplay", handleCanPlay);
+    videoEl.addEventListener("waiting", handleWaiting);
+    videoEl.addEventListener("playing", handlePlaying);
     videoEl.addEventListener("play", handlePlay);
     videoEl.addEventListener("pause", handlePause);
 
@@ -315,6 +333,8 @@ export default function WebinarReplayPage() {
       videoEl.removeEventListener("durationchange", handleDurationChange);
       videoEl.removeEventListener("loadedmetadata", handleLoadedMetadata);
       videoEl.removeEventListener("canplay", handleCanPlay);
+      videoEl.removeEventListener("waiting", handleWaiting);
+      videoEl.removeEventListener("playing", handlePlaying);
       videoEl.removeEventListener("play", handlePlay);
       videoEl.removeEventListener("pause", handlePause);
     };
@@ -354,6 +374,9 @@ export default function WebinarReplayPage() {
     if (videoRef.current) {
       setHasStarted(true);
       setShowControls(true);
+      if (!isVideoReady) {
+        setIsBuffering(true);
+      }
       videoRef.current.play();
     }
   };
@@ -507,6 +530,17 @@ export default function WebinarReplayPage() {
                     <p className="mt-4 text-white text-lg font-medium drop-shadow-lg">
                       Clique para iniciar
                     </p>
+                  </div>
+                )}
+
+                {hasStarted && isBuffering && (
+                  <div
+                    className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none"
+                    data-testid="overlay-buffering"
+                  >
+                    <div className="w-16 h-16 rounded-full flex items-center justify-center bg-black/50">
+                      <Loader2 className="w-10 h-10 text-white animate-spin" />
+                    </div>
                   </div>
                 )}
 
