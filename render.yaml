@@ -3,8 +3,15 @@ services:
     name: webinario-sistema
     env: node
     plan: free
-    buildCommand: npm install && npm run db:push && npm run build
+    buildCommand: |
+      apt-get update && apt-get install -y ffmpeg
+      npm install
+      npm run db:push
+      npm run build
+      mkdir -p uploads/temp uploads/videos uploads/images videos
+      chmod -R 755 uploads videos
     startCommand: npm start
+    healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
         value: production
@@ -12,6 +19,6 @@ services:
         fromDatabase:
           name: postgres
           property: connectionString
-  - type: postgres
-    name: postgres
+databases:
+  - name: postgres
     plan: free

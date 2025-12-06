@@ -19,13 +19,39 @@ import XLSX from "xlsx";
 import { spawn } from "child_process";
 import { createWriteStream } from "fs";
 
-// Ensure upload directories exist
+// Ensure upload directories exist with error handling
 const uploadTempDir = path.join(process.cwd(), "uploads", "temp");
 const videosDir = path.join(process.cwd(), "uploads", "videos");
 const imagesDir = path.join(process.cwd(), "uploads", "images");
-if (!existsSync(uploadTempDir)) mkdirSync(uploadTempDir, { recursive: true });
-if (!existsSync(videosDir)) mkdirSync(videosDir, { recursive: true });
-if (!existsSync(imagesDir)) mkdirSync(imagesDir, { recursive: true });
+
+let directoryWriteEnabled = true;
+
+function ensureDirectoryExists(dir: string): boolean {
+  try {
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true });
+    }
+    return true;
+  } catch (error) {
+    console.warn(`[warning] Could not create directory ${dir}:`, error);
+    return false;
+  }
+}
+
+try {
+  directoryWriteEnabled = ensureDirectoryExists(uploadTempDir) && 
+                          ensureDirectoryExists(videosDir) && 
+                          ensureDirectoryExists(imagesDir);
+  
+  if (!directoryWriteEnabled) {
+    console.warn("[warning] Local file storage disabled - using cloud storage only (R2/Supabase)");
+  } else {
+    console.log("[storage] Local directories ready:", { uploadTempDir, videosDir, imagesDir });
+  }
+} catch (error) {
+  console.warn("[warning] Failed to initialize local directories:", error);
+  directoryWriteEnabled = false;
+}
 
 // Use disk storage for large video files
 const diskStorage = multer.diskStorage({
@@ -214,6 +240,16 @@ function getPublicBaseUrl(req: Request, queryBaseUrl?: string): string {
 export async function registerRoutes(app: Express): Promise<Server> {
   // Trust proxy for correct URL detection behind reverse proxies (Replit, Render, etc.)
   app.set("trust proxy", true);
+  
+  // Health check endpoint for Render and other platforms
+  app.get("/api/health", (req, res) => {
+    res.json({ 
+      status: "ok", 
+      timestamp: new Date().toISOString(),
+      directoryWriteEnabled,
+      environment: process.env.NODE_ENV || "development"
+    });
+  });
   
   // Initialize defaults on startup
   await storage.initializeDefaults();
