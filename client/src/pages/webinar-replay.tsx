@@ -441,7 +441,6 @@ export default function WebinarReplayPage() {
                   className="absolute top-0 left-0 w-full h-full object-cover"
                   style={{ backgroundColor: "#1a1a2e" }}
                   playsInline
-                  poster={webinar.replayThumbnailUrl || undefined}
                   data-testid="video-replay"
                 />
 
