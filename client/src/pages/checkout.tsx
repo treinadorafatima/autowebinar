@@ -1,5 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -271,6 +271,23 @@ export default function Checkout() {
       });
     },
   });
+
+  // Auto-start checkout when CPF/CNPJ is complete
+  const hasAutoStartedRef = useRef(false);
+  useEffect(() => {
+    if (step !== "form" || hasAutoStartedRef.current || iniciarMutation.isPending) return;
+    if (!formData.nome || !formData.email || !selectedPlano) return;
+    
+    const docDigits = formData.documento.replace(/\D/g, '');
+    const isDocComplete = formData.tipoDocumento === "CPF" 
+      ? docDigits.length === 11 
+      : docDigits.length === 14;
+    
+    if (isDocComplete) {
+      hasAutoStartedRef.current = true;
+      iniciarMutation.mutate();
+    }
+  }, [formData.documento, formData.tipoDocumento, formData.nome, formData.email, step, selectedPlano, iniciarMutation]);
 
   const processarPagamentoMpMutation = useMutation({
     mutationFn: async (paymentData: any) => {
