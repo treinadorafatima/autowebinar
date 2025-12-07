@@ -44,6 +44,8 @@ import {
   AlertTriangle,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
   Calendar,
   CreditCard,
   History,
@@ -55,6 +57,8 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+
+const ITEMS_PER_PAGE = 10;
 
 interface User {
   id: string;
@@ -97,6 +101,7 @@ export default function AdminUsersPage() {
   const [filterTrialExpired, setFilterTrialExpired] = useState(false);
   const [filterInactive, setFilterInactive] = useState(false);
   const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set());
+  const [currentPage, setCurrentPage] = useState(1);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [formData, setFormData] = useState({
     name: "",
@@ -525,6 +530,7 @@ export default function AdminUsersPage() {
     setFilterTrialActive(false);
     setFilterTrialExpired(false);
     setFilterInactive(false);
+    setCurrentPage(1);
   }
   
   // Descrição do filtro ativo
@@ -541,6 +547,20 @@ export default function AdminUsersPage() {
   }
   
   const hasActiveFilters = filterExpired || filterActive !== null || filterPlano !== null || filterTrialActive || filterTrialExpired || filterInactive;
+
+  // Paginação
+  const totalPages = Math.ceil(regularUsers.length / ITEMS_PER_PAGE);
+  const paginatedUsers = regularUsers.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+  
+  // Resetar página se for maior que o total de páginas (usando useEffect para evitar render loop)
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(1);
+    }
+  }, [currentPage, totalPages]);
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
@@ -591,6 +611,7 @@ export default function AdminUsersPage() {
           onClick={() => {
             setFilterActive(filterActive === true ? null : true);
             setFilterExpired(false);
+            setCurrentPage(1);
           }}
           data-testid="filter-active-users"
         >
@@ -612,6 +633,7 @@ export default function AdminUsersPage() {
           onClick={() => {
             setFilterExpired(!filterExpired);
             setFilterActive(null);
+            setCurrentPage(1);
           }}
           data-testid="filter-expired-users"
         >
@@ -826,9 +848,10 @@ export default function AdminUsersPage() {
               </Button>
             </div>
           ) : (
-            <ScrollArea className="max-h-[400px]">
-              <div className="space-y-3">
-                {regularUsers.map((user, index) => (
+            <div className="space-y-4">
+              <ScrollArea className="h-[600px] pr-4">
+                <div className="space-y-3">
+                  {paginatedUsers.map((user, index) => (
                   <Collapsible 
                     key={user.id} 
                     open={expandedUsers.has(user.id)}
@@ -1016,11 +1039,69 @@ export default function AdminUsersPage() {
                       </div>
                     </CollapsibleContent>
                     
-                    {index < regularUsers.length - 1 && <Separator className="my-1" />}
+                    {index < paginatedUsers.length - 1 && <Separator className="my-1" />}
                   </Collapsible>
                 ))}
-              </div>
-            </ScrollArea>
+                </div>
+              </ScrollArea>
+              
+              {/* Controles de Paginação */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between pt-4 border-t">
+                  <p className="text-sm text-muted-foreground">
+                    Mostrando {((currentPage - 1) * ITEMS_PER_PAGE) + 1} a {Math.min(currentPage * ITEMS_PER_PAGE, regularUsers.length)} de {regularUsers.length} clientes
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                      data-testid="button-prev-page"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </Button>
+                    
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: totalPages }, (_, i) => i + 1)
+                        .filter(page => {
+                          if (totalPages <= 7) return true;
+                          if (page === 1 || page === totalPages) return true;
+                          if (Math.abs(page - currentPage) <= 1) return true;
+                          return false;
+                        })
+                        .map((page, idx, arr) => {
+                          const showEllipsis = idx > 0 && arr[idx - 1] !== page - 1;
+                          return (
+                            <div key={page} className="flex items-center gap-1">
+                              {showEllipsis && <span className="px-2 text-muted-foreground">...</span>}
+                              <Button
+                                variant={currentPage === page ? "default" : "outline"}
+                                size="sm"
+                                className="w-8 h-8 p-0"
+                                onClick={() => setCurrentPage(page)}
+                                data-testid={`button-page-${page}`}
+                              >
+                                {page}
+                              </Button>
+                            </div>
+                          );
+                        })}
+                    </div>
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                      data-testid="button-next-page"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
         </CardContent>
       </Card>
