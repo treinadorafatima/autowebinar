@@ -7237,8 +7237,9 @@ Seja conversacional e objetivo.`;
         tipoAssinatura: 'recorrente',
       };
 
-      // If authorized, create/update admin account
-      if (mpData.status === 'authorized' || mpData.status === 'pending') {
+      // ONLY grant access when payment is AUTHORIZED (not pending)
+      // Pending means payment is still processing and should NOT grant access
+      if (mpData.status === 'authorized') {
         updateData.dataAprovacao = new Date();
         
         // Calculate expiration date based on frequency

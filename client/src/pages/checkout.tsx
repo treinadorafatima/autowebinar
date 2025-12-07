@@ -338,7 +338,8 @@ export default function Checkout() {
       return res.json();
     },
     onSuccess: (data: any) => {
-      if (data.status === 'authorized' || data.status === 'pending') {
+      if (data.status === 'authorized') {
+        // Only track purchase and redirect to success when ACTUALLY authorized
         if (selectedPlano) {
           trackPurchase({
             value: selectedPlano.preco,
@@ -347,6 +348,9 @@ export default function Checkout() {
           });
         }
         setLocation('/pagamento/sucesso?gateway=mercadopago&tipo=assinatura');
+      } else if (data.status === 'pending') {
+        // Pending means still processing - do NOT grant access yet
+        setLocation('/pagamento/pendente?gateway=mercadopago&tipo=assinatura');
       } else {
         toast({
           title: "Assinatura não autorizada",
