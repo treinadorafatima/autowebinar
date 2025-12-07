@@ -534,6 +534,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ 
       email, 
       name: admin?.name || "Administrador",
+      telefone: admin?.telefone || null,
       role: admin?.role || "user",
       webinarLimit: admin?.webinarLimit || 5,
       accessExpiresAt: admin?.accessExpiresAt || null,
@@ -555,6 +556,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       id: admin.id, 
       name: admin.name, 
       email: admin.email,
+      telefone: admin.telefone,
       role: admin.role,
       webinarLimit: admin.webinarLimit,
     });
@@ -568,7 +570,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Unauthorized" });
       }
       
-      const { name, newEmail, currentPassword, newPassword } = req.body;
+      const { name, telefone, newEmail, currentPassword, newPassword } = req.body;
       const admin = await storage.getAdminByEmail(email);
       if (!admin) {
         return res.status(404).json({ error: "Admin not found" });
@@ -607,6 +609,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         name: name || admin.name,
         email: newEmail || admin.email,
         password: passwordToSave,
+        telefone: telefone !== undefined ? telefone : admin.telefone,
       });
 
       res.json({ success: true, message: "Profile updated successfully" });
@@ -7116,6 +7119,7 @@ Seja conversacional e objetivo.`;
             name: pagamento.nome,
             email: pagamento.email,
             password: hashedPassword,
+            telefone: pagamento.telefone,
             role: 'user',
             webinarLimit: plano.webinarLimit,
             uploadLimit: plano.uploadLimit || plano.webinarLimit,
@@ -7301,6 +7305,7 @@ Seja conversacional e objetivo.`;
             name: pagamento.nome,
             email: pagamento.email,
             password: hashedPassword,
+            telefone: pagamento.telefone,
             role: 'user',
             webinarLimit: plano.webinarLimit,
             uploadLimit: plano.uploadLimit || plano.webinarLimit,
@@ -7695,6 +7700,7 @@ Seja conversacional e objetivo.`;
                     name: pagamento.nome,
                     email: pagamento.email,
                     password: hashedPassword,
+                    telefone: pagamento.telefone,
                     role: 'user',
                     webinarLimit: plano.webinarLimit,
                     uploadLimit: plano.uploadLimit || plano.webinarLimit,
@@ -7825,6 +7831,7 @@ Seja conversacional e objetivo.`;
                     name: pagamento.nome,
                     email: pagamento.email,
                     password: hashedPassword,
+                    telefone: pagamento.telefone,
                     role: 'user',
                     webinarLimit: plano.webinarLimit,
                     uploadLimit: plano.uploadLimit || plano.webinarLimit,
@@ -8046,6 +8053,7 @@ Seja conversacional e objetivo.`;
                   name: pagamento.nome,
                   email: pagamento.email,
                   password: hashedPassword,
+                  telefone: pagamento.telefone,
                   role: 'user',
                   webinarLimit: plano.webinarLimit,
                   uploadLimit: plano.uploadLimit || plano.webinarLimit,
@@ -8124,6 +8132,7 @@ Seja conversacional e objetivo.`;
                   name: pagamento.nome,
                   email: pagamento.email,
                   password: hashedPassword,
+                  telefone: pagamento.telefone,
                   role: 'user',
                   webinarLimit: plano.webinarLimit,
                   uploadLimit: plano.uploadLimit || plano.webinarLimit,
@@ -8275,6 +8284,7 @@ Seja conversacional e objetivo.`;
           name: pagamento.nome,
           email: pagamento.email,
           password: hashedPassword,
+          telefone: pagamento.telefone,
           role: 'user',
           webinarLimit: plano.webinarLimit,
           isActive: true,

@@ -74,7 +74,7 @@ export interface IStorage {
   deleteAdmin(id: string): Promise<void>;
   deleteAdminCompletely(id: string): Promise<{ deletedWebinars: number; deletedVideos: number; deletedComments: number }>;
   updateAdmin(id: string, data: Partial<AdminInsert>): Promise<void>;
-  updateAdminProfile(id: string, data: { name?: string; email?: string; password?: string }): Promise<void>;
+  updateAdminProfile(id: string, data: { name?: string; email?: string; password?: string; telefone?: string | null }): Promise<void>;
   countWebinarsByOwner(ownerId: string): Promise<number>;
   listWebinarsByOwner(ownerId: string): Promise<Webinar[]>;
   fixOrphanedWebinars(superadminId: string): Promise<number>;
@@ -379,6 +379,7 @@ export class DatabaseStorage implements IStorage {
       id, 
       createdAt: new Date(),
       name: admin.name ?? null,
+      telefone: admin.telefone ?? null,
       role: admin.role ?? "user",
       webinarLimit: admin.webinarLimit ?? 5,
       uploadLimit: admin.uploadLimit ?? 5,
@@ -508,11 +509,12 @@ export class DatabaseStorage implements IStorage {
     return { deletedWebinars, deletedVideos, deletedComments };
   }
 
-  async updateAdminProfile(id: string, data: { name?: string; email?: string; password?: string }): Promise<void> {
+  async updateAdminProfile(id: string, data: { name?: string; email?: string; password?: string; telefone?: string | null }): Promise<void> {
     const updates: any = {};
     if (data.name !== undefined) updates.name = data.name;
     if (data.email !== undefined) updates.email = data.email;
     if (data.password !== undefined) updates.password = data.password;
+    if (data.telefone !== undefined) updates.telefone = data.telefone;
     
     if (Object.keys(updates).length > 0) {
       await db.update(admins).set(updates).where(eq(admins.id, id));
