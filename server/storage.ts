@@ -2779,6 +2779,7 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
       "Pro": "Avançado",
       "Enterprise": "Elite",
       "Premium": "Elite",
+      "Ilimitado": "Elite",
     };
     
     for (const plano of existingPlanos) {
