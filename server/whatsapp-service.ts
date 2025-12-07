@@ -182,9 +182,22 @@ async function processMessageQueue(adminId: string): Promise<void> {
       if (isSpamOrBanError(error)) {
         console.error(`[whatsapp] SPAM/BAN detected for admin ${adminId}!`);
         conn.status = "banned";
+        
+        // Clear rate limit counters for isolation
+        messageCounts.delete(adminId);
+        
+        // Clear auth directory for complete isolation
+        const authDir = getAuthDir(adminId);
+        if (fs.existsSync(authDir)) {
+          fs.rmSync(authDir, { recursive: true });
+          console.log(`[whatsapp] Auth cleared for banned admin ${adminId} during queue processing`);
+        }
+        
         await storage.upsertWhatsappSession(adminId, {
           status: "banned",
           qrCode: null,
+          phoneNumber: null,
+          sessionData: null,
         });
         
         while (conn.messageQueue.length > 0) {
@@ -349,6 +362,16 @@ export async function initWhatsAppConnection(adminId: string): Promise<{
             }
           }
           
+          // Clear rate limit counters for this admin to ensure isolation
+          messageCounts.delete(adminId);
+          
+          // Clear auth directory to ensure complete isolation from other users
+          const authDir = getAuthDir(adminId);
+          if (fs.existsSync(authDir)) {
+            fs.rmSync(authDir, { recursive: true });
+            console.log(`[whatsapp] Auth cleared for banned admin ${adminId} - complete isolation ensured`);
+          }
+          
           connections.set(adminId, {
             ...currentConn!,
             socket: null,
@@ -363,6 +386,7 @@ export async function initWhatsAppConnection(adminId: string): Promise<{
             status: "banned",
             qrCode: null,
             phoneNumber: null,
+            sessionData: null, // Clear session data in database too
           });
           return;
         }
@@ -605,6 +629,177 @@ export interface MediaMessage {
   mimetype?: string;
 }
 
+// WhatsApp media limits (in bytes)
+const MEDIA_LIMITS = {
+  image: {
+    maxSize: 5 * 1024 * 1024, // 5MB
+    allowedMimes: ["image/jpeg", "image/jpg", "image/png", "image/webp"],
+    allowedExtensions: [".jpg", ".jpeg", ".png", ".webp"],
+  },
+  audio: {
+    maxSize: 16 * 1024 * 1024, // 16MB
+    allowedMimes: ["audio/ogg", "audio/mpeg", "audio/mp3", "audio/mp4", "audio/m4a", "audio/wav", "audio/x-wav"],
+    allowedExtensions: [".ogg", ".mp3", ".m4a", ".wav"],
+  },
+  video: {
+    maxSize: 16 * 1024 * 1024, // 16MB
+    allowedMimes: ["video/mp4", "video/3gpp", "video/3gp"],
+    allowedExtensions: [".mp4", ".3gp"],
+  },
+  document: {
+    maxSize: 100 * 1024 * 1024, // 100MB
+    allowedMimes: ["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"],
+    allowedExtensions: [".pdf", ".doc", ".docx", ".xls", ".xlsx"],
+  },
+};
+
+interface MediaValidationResult {
+  valid: boolean;
+  error?: string;
+  contentLength?: number;
+  contentType?: string;
+}
+
+function getExtensionFromUrl(url: string): string {
+  try {
+    const pathname = new URL(url).pathname;
+    const ext = path.extname(pathname).toLowerCase();
+    return ext;
+  } catch {
+    return "";
+  }
+}
+
+function validateMimeType(media: MediaMessage, contentType: string): { valid: boolean; error?: string } {
+  const limits = MEDIA_LIMITS[media.type];
+  
+  const serverMime = contentType?.toLowerCase() || "";
+  const providedMime = media.mimetype?.toLowerCase() || "";
+  const urlExtension = getExtensionFromUrl(media.url);
+  
+  // Priority: Server Content-Type > URL Extension > Provided mimetype (only as last resort)
+  // Server Content-Type is the most trustworthy source
+  if (serverMime) {
+    const isValidServerMime = limits.allowedMimes.some(allowed => 
+      serverMime.includes(allowed) || allowed.includes(serverMime.split("/")[1] || "")
+    );
+    if (!isValidServerMime) {
+      return { 
+        valid: false, 
+        error: `Formato não suportado pelo servidor (${serverMime}). Formatos aceitos para ${media.type}: ${limits.allowedExtensions.join(", ")}`
+      };
+    }
+    // Server MIME is valid
+    return { valid: true };
+  }
+  
+  // If no server MIME, check URL extension (second most trustworthy)
+  if (urlExtension) {
+    const isValidExtension = limits.allowedExtensions.includes(urlExtension);
+    if (!isValidExtension) {
+      return { 
+        valid: false, 
+        error: `Formato não suportado (${urlExtension}). Formatos aceitos para ${media.type}: ${limits.allowedExtensions.join(", ")}`
+      };
+    }
+    // Extension is valid
+    return { valid: true };
+  }
+  
+  // Only if no server MIME and no URL extension, accept provided mimetype (least trustworthy)
+  // But still validate it
+  if (providedMime) {
+    const isValidProvidedMime = limits.allowedMimes.some(allowed => 
+      providedMime.includes(allowed) || allowed.includes(providedMime.split("/")[1] || "")
+    );
+    if (!isValidProvidedMime) {
+      return { 
+        valid: false, 
+        error: `Formato não suportado (${providedMime}). Formatos aceitos para ${media.type}: ${limits.allowedExtensions.join(", ")}`
+      };
+    }
+    // Provided MIME is valid (but warn in logs)
+    console.warn(`[whatsapp] Media validation using only provided mimetype '${providedMime}' - no server MIME or URL extension available`);
+    return { valid: true };
+  }
+  
+  // No source available to determine format - reject
+  return { 
+    valid: false, 
+    error: `Não foi possível determinar o formato do arquivo. Formatos aceitos para ${media.type}: ${limits.allowedExtensions.join(", ")}`
+  };
+}
+
+async function validateMediaBeforeSend(media: MediaMessage): Promise<MediaValidationResult> {
+  const limits = MEDIA_LIMITS[media.type];
+  if (!limits) {
+    return { valid: false, error: `Tipo de mídia '${media.type}' não suportado` };
+  }
+
+  try {
+    // HEAD request to check size and type without downloading
+    const headResponse = await fetch(media.url, { method: "HEAD" });
+    if (!headResponse.ok) {
+      // Try GET with range to check if URL is accessible
+      const rangeResponse = await fetch(media.url, { 
+        method: "GET",
+        headers: { "Range": "bytes=0-0" }
+      });
+      if (!rangeResponse.ok && rangeResponse.status !== 206) {
+        return { valid: false, error: `Não foi possível acessar o arquivo de mídia (HTTP ${headResponse.status})` };
+      }
+    }
+
+    const contentLength = parseInt(headResponse.headers.get("content-length") || "0", 10);
+    const contentType = headResponse.headers.get("content-type")?.split(";")[0]?.toLowerCase() || "";
+
+    // Check file size if available in headers
+    if (contentLength > 0) {
+      if (contentLength > limits.maxSize) {
+        const maxSizeMB = Math.round(limits.maxSize / (1024 * 1024));
+        const fileSizeMB = (contentLength / (1024 * 1024)).toFixed(2);
+        return { 
+          valid: false, 
+          error: `Arquivo muito grande (${fileSizeMB}MB). Limite para ${media.type}: ${maxSizeMB}MB`,
+          contentLength,
+          contentType
+        };
+      }
+    }
+
+    // Validate MIME type using multiple sources
+    const mimeValidation = validateMimeType(media, contentType);
+    if (!mimeValidation.valid) {
+      return { 
+        valid: false, 
+        error: mimeValidation.error,
+        contentLength,
+        contentType
+      };
+    }
+
+    return { valid: true, contentLength, contentType };
+  } catch (error: any) {
+    console.error("[whatsapp] Error validating media:", error);
+    return { valid: false, error: `Erro ao validar arquivo: ${error.message}` };
+  }
+}
+
+function validateDownloadedMedia(buffer: Buffer, mediaType: "image" | "audio" | "video" | "document"): { valid: boolean; error?: string } {
+  const limits = MEDIA_LIMITS[mediaType];
+  
+  if (buffer.length > limits.maxSize) {
+    const maxSizeMB = Math.round(limits.maxSize / (1024 * 1024));
+    const fileSizeMB = (buffer.length / (1024 * 1024)).toFixed(2);
+    return { 
+      valid: false, 
+      error: `Arquivo muito grande (${fileSizeMB}MB). Limite para ${mediaType}: ${maxSizeMB}MB`
+    };
+  }
+  
+  return { valid: true };
+}
+
 export async function sendWhatsAppMediaMessage(
   adminId: string,
   phone: string,
@@ -624,6 +819,27 @@ export async function sendWhatsAppMediaMessage(
     return { success: false, error: "WhatsApp não conectado" };
   }
 
+  // Validate media before sending
+  const validation = await validateMediaBeforeSend(media);
+  if (!validation.valid) {
+    console.error(`[whatsapp] Media validation failed for ${media.type}: ${validation.error}`);
+    return { success: false, error: validation.error };
+  }
+
+  // Apply rate limiting for media messages too
+  const rateCheck = checkRateLimit(adminId);
+  if (!rateCheck.allowed) {
+    console.log(`[whatsapp] Rate limit hit for media message from admin ${adminId}, waiting ${rateCheck.waitMs}ms`);
+    await new Promise(resolve => setTimeout(resolve, rateCheck.waitMs));
+  }
+
+  // Wait for minimum message interval
+  const timeSinceLastMessage = Date.now() - conn.lastMessageSentAt;
+  const requiredDelay = getRandomMessageDelay();
+  if (timeSinceLastMessage < requiredDelay) {
+    await new Promise(resolve => setTimeout(resolve, requiredDelay - timeSinceLastMessage));
+  }
+
   try {
     let formattedPhone = phone.replace(/\D/g, "");
     if (!formattedPhone.startsWith("55")) {
@@ -636,6 +852,13 @@ export async function sendWhatsAppMediaMessage(
       return { success: false, error: "Erro ao baixar arquivo de mídia" };
     }
     const buffer = Buffer.from(await response.arrayBuffer());
+
+    // Post-download validation to catch cases where HEAD didn't provide size
+    const postDownloadValidation = validateDownloadedMedia(buffer, media.type);
+    if (!postDownloadValidation.valid) {
+      console.error(`[whatsapp] Post-download validation failed for ${media.type}: ${postDownloadValidation.error}`);
+      return { success: false, error: postDownloadValidation.error };
+    }
 
     let messageContent: any;
     
@@ -687,9 +910,22 @@ export async function sendWhatsAppMediaMessage(
     
     if (isSpamOrBanError(error)) {
       conn.status = "banned";
+      
+      // Clear rate limit counters for isolation
+      messageCounts.delete(adminId);
+      
+      // Clear auth directory for complete isolation
+      const authDir = getAuthDir(adminId);
+      if (fs.existsSync(authDir)) {
+        fs.rmSync(authDir, { recursive: true });
+        console.log(`[whatsapp] Auth cleared for banned admin ${adminId} during media send`);
+      }
+      
       await storage.upsertWhatsappSession(adminId, {
         status: "banned",
         qrCode: null,
+        phoneNumber: null,
+        sessionData: null,
       });
       return { success: false, error: "Conta suspensa por spam. Aguarde antes de tentar novamente." };
     }

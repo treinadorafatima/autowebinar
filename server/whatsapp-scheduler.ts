@@ -4,7 +4,7 @@ import { eq, and, lte, sql } from "drizzle-orm";
 import { scheduledWhatsappMessages, leads, webinars as webinarsTable, whatsappSequences } from "@shared/schema";
 import { sendWhatsAppMessage, sendWhatsAppMediaMessage, MediaMessage } from "./whatsapp-service";
 
-const SCHEDULER_INTERVAL_MS = 60000; // Check every minute
+const SCHEDULER_INTERVAL_MS = 15000; // Check every 15 seconds for better timing accuracy
 const BATCH_SIZE = 10; // Process 10 messages at a time
 
 let schedulerInterval: NodeJS.Timeout | null = null;
