@@ -3364,10 +3364,20 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
     });
   }
 
+  // Helper to format date in São Paulo timezone as YYYY-MM-DD
+  private formatDateInSaoPaulo(date: Date): string {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Sao_Paulo',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).format(date);
+  }
+
   async countViewsByOwnerAndRange(ownerId: string, from: Date, to: Date): Promise<number> {
-    // Extract the date parts to filter by São Paulo date, not UTC timestamp
-    const fromDate = from.toISOString().split('T')[0]; // YYYY-MM-DD
-    const toDate = to.toISOString().split('T')[0]; // YYYY-MM-DD
+    // Format dates in São Paulo timezone to ensure correct day boundaries
+    const fromDate = this.formatDateInSaoPaulo(from);
+    const toDate = this.formatDateInSaoPaulo(to);
     
     const result = await db.select({ count: sql<number>`count(*)` })
       .from(webinarViewLogs)
@@ -3380,9 +3390,9 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
   }
 
   async getViewsByOwnerGroupedByDay(ownerId: string, from: Date, to: Date): Promise<{ date: string; count: number }[]> {
-    // Extract the date parts to filter by São Paulo date, not UTC timestamp
-    const fromDate = from.toISOString().split('T')[0]; // YYYY-MM-DD
-    const toDate = to.toISOString().split('T')[0]; // YYYY-MM-DD
+    // Format dates in São Paulo timezone to ensure correct day boundaries
+    const fromDate = this.formatDateInSaoPaulo(from);
+    const toDate = this.formatDateInSaoPaulo(to);
     
     const result = await db.select({
       date: sql<string>`DATE(${webinarViewLogs.createdAt} AT TIME ZONE 'America/Sao_Paulo')`,
