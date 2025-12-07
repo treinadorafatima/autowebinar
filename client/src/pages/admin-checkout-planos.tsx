@@ -43,6 +43,7 @@ interface Plano {
   webinarLimit: number;
   uploadLimit: number;
   storageLimit: number;
+  whatsappAccountLimit: number;
   ativo: boolean;
   gateway: string;
   tipoCobranca: string;
@@ -65,6 +66,7 @@ const defaultPlano: Partial<Plano> = {
   webinarLimit: 5,
   uploadLimit: 999,
   storageLimit: 5,
+  whatsappAccountLimit: 2,
   ativo: true,
   gateway: "mercadopago",
   tipoCobranca: "unico",
@@ -375,22 +377,23 @@ export default function AdminCheckoutPlanos() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="preco">Preço (centavos)</Label>
+                  <Label htmlFor="preco">Preço (R$)</Label>
                   <Input
                     id="preco"
                     data-testid="input-plano-preco"
                     type="number"
-                    value={editingPlano.preco || 0}
+                    step="0.01"
+                    value={((editingPlano.preco || 0) / 100).toFixed(2)}
                     onChange={(e) =>
                       setEditingPlano({
                         ...editingPlano,
-                        preco: parseInt(e.target.value) || 0,
+                        preco: Math.round(parseFloat(e.target.value) * 100) || 0,
                       })
                     }
-                    placeholder="9700 = R$ 97,00"
+                    placeholder="97.00"
                   />
                   <p className="text-xs text-muted-foreground">
-                    {formatCurrency(editingPlano.preco || 0)}
+                    Valor em reais (ex: 97.00 para R$ 97,00)
                   </p>
                 </div>
               </div>
@@ -471,6 +474,22 @@ export default function AdminCheckoutPlanos() {
                     }
                   />
                   <p className="text-xs text-muted-foreground">Limite de espaço para vídeos</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="whatsappAccountLimit">Limite de Contas WhatsApp</Label>
+                  <Input
+                    id="whatsappAccountLimit"
+                    data-testid="input-plano-whatsapp-limit"
+                    type="number"
+                    value={editingPlano.whatsappAccountLimit || 2}
+                    onChange={(e) =>
+                      setEditingPlano({
+                        ...editingPlano,
+                        whatsappAccountLimit: parseInt(e.target.value) || 2,
+                      })
+                    }
+                  />
+                  <p className="text-xs text-muted-foreground">Conexões WhatsApp permitidas</p>
                 </div>
               </div>
 
