@@ -18,6 +18,7 @@ import OpenAI from "openai";
 import { z } from "zod";
 import XLSX from "xlsx";
 import { spawn } from "child_process";
+import { getMercadoPagoErrorMessage, getStripeErrorMessage, logPaymentError, logPaymentSuccess } from "./payment-errors";
 import { createWriteStream } from "fs";
 
 // Ensure upload directories exist with error handling
@@ -7058,11 +7059,37 @@ Seja conversacional e objetivo.`;
       const mpData = await mpResponse.json();
       console.log('[MP Payment] Response:', JSON.stringify(mpData, null, 2));
 
+      // Handle API errors (non-200 responses)
       if (!mpResponse.ok) {
-        console.error('[MP Payment] Error:', mpData);
+        const errorInfo = getMercadoPagoErrorMessage(mpData.cause?.[0]?.code || mpData.message);
+        
+        logPaymentError({
+          gateway: 'mercadopago',
+          pagamentoId,
+          email: pagamento.email,
+          valor: plano.preco,
+          metodo: paymentData.payment_method_id || 'unknown',
+          errorCode: mpData.cause?.[0]?.code || 'api_error',
+          errorMessage: mpData.message || 'API Error',
+          gatewayResponse: mpData,
+        });
+
+        // Atualizar registro com informações do erro
+        await storage.updateCheckoutPagamento(pagamentoId, {
+          status: 'rejected',
+          statusDetail: mpData.message,
+          gatewayErrorCode: mpData.cause?.[0]?.code || 'api_error',
+          gatewayErrorMessage: mpData.message,
+          userFriendlyError: `${errorInfo.message} ${errorInfo.action}`,
+          failureAttempts: (pagamento.failureAttempts || 0) + 1,
+          lastFailureAt: new Date(),
+        });
+
         return res.status(400).json({ 
-          error: mpData.message || 'Erro ao processar pagamento',
-          cause: mpData.cause,
+          error: errorInfo.message,
+          action: errorInfo.action,
+          retryable: errorInfo.retryable,
+          errorCode: mpData.cause?.[0]?.code,
         });
       }
 
@@ -7074,6 +7101,39 @@ Seja conversacional e objetivo.`;
         mercadopagoPaymentId: mpData.id?.toString(),
         dataPagamento: new Date(),
       };
+
+      // Handle rejected payments (status = rejected but HTTP 200)
+      if (mpData.status === 'rejected') {
+        const errorInfo = getMercadoPagoErrorMessage(mpData.status_detail);
+        
+        logPaymentError({
+          gateway: 'mercadopago',
+          pagamentoId,
+          email: pagamento.email,
+          valor: plano.preco,
+          metodo: mpData.payment_method_id || paymentData.payment_method_id,
+          errorCode: mpData.status_detail || 'rejected',
+          errorMessage: errorInfo.message,
+          gatewayResponse: mpData,
+        });
+
+        updateData.gatewayErrorCode = mpData.status_detail;
+        updateData.gatewayErrorMessage = errorInfo.message;
+        updateData.userFriendlyError = `${errorInfo.message} ${errorInfo.action}`;
+        updateData.failureAttempts = (pagamento.failureAttempts || 0) + 1;
+        updateData.lastFailureAt = new Date();
+
+        await storage.updateCheckoutPagamento(pagamentoId, updateData);
+
+        return res.json({
+          status: 'rejected',
+          statusDetail: mpData.status_detail,
+          paymentId: mpData.id,
+          error: errorInfo.message,
+          action: errorInfo.action,
+          retryable: errorInfo.retryable,
+        });
+      }
 
       // Handle PIX QR Code
       if (mpData.point_of_interaction?.transaction_data) {
@@ -7090,6 +7150,16 @@ Seja conversacional e objetivo.`;
       // If approved, create/update admin account
       if (mpData.status === 'approved') {
         updateData.dataAprovacao = new Date();
+        
+        // Log payment success
+        logPaymentSuccess({
+          gateway: 'mercadopago',
+          pagamentoId,
+          email: pagamento.email,
+          valor: plano.preco,
+          metodo: mpData.payment_method_id || paymentData.payment_method_id,
+          externalId: mpData.id?.toString(),
+        });
         
         // Calculate expiration date
         const expirationDate = new Date();
@@ -7228,12 +7298,38 @@ Seja conversacional e objetivo.`;
       const mpData = await mpResponse.json();
       console.log('[MP Subscription] Response:', JSON.stringify(mpData, null, 2));
 
+      // Handle API errors (non-200 responses)
       if (!mpResponse.ok) {
-        console.error('[MP Subscription] Error:', mpData);
-        return res.status(400).json({ 
-          error: mpData.message || 'Erro ao criar assinatura',
-          cause: mpData.cause,
+        const errorCode = mpData.cause?.[0]?.code || mpData.message || 'subscription_error';
+        const errorInfo = getMercadoPagoErrorMessage(errorCode);
+        
+        logPaymentError({
+          gateway: 'mercadopago',
+          pagamentoId,
+          email: pagamento.email,
+          valor: plano.preco,
+          metodo: 'credit_card',
+          errorCode,
+          errorMessage: mpData.message || 'Erro na assinatura',
+          gatewayResponse: mpData,
+        });
+
+        // Atualizar registro com informações do erro
+        await storage.updateCheckoutPagamento(pagamentoId, {
+          status: 'rejected',
           statusDetail: mpData.message,
+          gatewayErrorCode: errorCode,
+          gatewayErrorMessage: mpData.message,
+          userFriendlyError: `${errorInfo.message} ${errorInfo.action}`,
+          failureAttempts: (pagamento.failureAttempts || 0) + 1,
+          lastFailureAt: new Date(),
+        });
+
+        return res.status(400).json({ 
+          error: errorInfo.message,
+          action: errorInfo.action,
+          retryable: errorInfo.retryable,
+          errorCode,
         });
       }
 
@@ -7247,10 +7343,40 @@ Seja conversacional e objetivo.`;
         tipoAssinatura: 'recorrente',
       };
 
+      // Handle pending status (payment still processing)
+      if (mpData.status === 'pending') {
+        const errorInfo = getMercadoPagoErrorMessage('pending_contingency');
+        
+        logPaymentError({
+          gateway: 'mercadopago',
+          pagamentoId,
+          email: pagamento.email,
+          valor: plano.preco,
+          metodo: 'credit_card',
+          errorCode: 'pending',
+          errorMessage: 'Pagamento pendente',
+          gatewayResponse: mpData,
+        });
+
+        updateData.gatewayErrorCode = 'pending';
+        updateData.gatewayErrorMessage = errorInfo.message;
+        updateData.userFriendlyError = `${errorInfo.message} ${errorInfo.action}`;
+      }
+
       // ONLY grant access when payment is AUTHORIZED (not pending)
       // Pending means payment is still processing and should NOT grant access
       if (mpData.status === 'authorized') {
         updateData.dataAprovacao = new Date();
+        
+        // Log success
+        logPaymentSuccess({
+          gateway: 'mercadopago',
+          pagamentoId,
+          email: pagamento.email,
+          valor: plano.preco,
+          metodo: 'credit_card',
+          externalId: mpData.id?.toString(),
+        });
         
         // Calculate expiration date based on frequency
         const expirationDate = new Date();

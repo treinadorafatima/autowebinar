@@ -437,6 +437,12 @@ export const checkoutPagamentos = pgTable("checkout_pagamentos", {
   pixCopiaCola: text("pix_copia_cola"), // Código PIX copia e cola
   boletoUrl: text("boleto_url"), // URL do boleto
   boletoCodigo: text("boleto_codigo"), // Código de barras do boleto
+  // Campos para tracking de falhas de pagamento
+  gatewayErrorCode: text("gateway_error_code"), // Código de erro do gateway (cc_rejected_bad_filled_security_code, etc)
+  gatewayErrorMessage: text("gateway_error_message"), // Mensagem original do gateway
+  userFriendlyError: text("user_friendly_error"), // Mensagem amigável para o usuário
+  failureAttempts: integer("failure_attempts").default(0), // Número de tentativas falhas
+  lastFailureAt: timestamp("last_failure_at"), // Data/hora da última falha
   criadoEm: timestamp("criado_em").defaultNow(),
   atualizadoEm: timestamp("atualizado_em").defaultNow(),
 });
