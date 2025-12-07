@@ -269,7 +269,7 @@ export interface IStorage {
   createMediaFile(data: MediaFileInsert): Promise<MediaFile>;
   deleteMediaFile(adminId: string, mediaId: string): Promise<boolean>;
   // Webinar View Logs - Histórico de visualizações
-  logWebinarView(webinarId: string, ownerId: string | null, source: 'live' | 'replay' | 'embed'): Promise<void>;
+  logWebinarView(webinarId: string, ownerId: string | null, source: 'live' | 'replay' | 'embed', viewerId?: string): Promise<void>;
   countViewsByOwnerAndRange(ownerId: string, from: Date, to: Date): Promise<number>;
   resetWebinarViewsByOwner(ownerId: string): Promise<void>;
   getViewsByOwnerGroupedByDay(ownerId: string, from: Date, to: Date): Promise<{ date: string; count: number }[]>;
@@ -3353,12 +3353,35 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
   }
 
   // Webinar View Logs methods
-  async logWebinarView(webinarId: string, ownerId: string | null, source: 'live' | 'replay' | 'embed'): Promise<void> {
+  async logWebinarView(webinarId: string, ownerId: string | null, source: 'live' | 'replay' | 'embed', viewerId?: string): Promise<void> {
+    const viewDate = this.formatDateInSaoPaulo(new Date());
+    
+    // Se viewerId foi fornecido, usa UPSERT para evitar contagem duplicada
+    if (viewerId) {
+      // Verifica se já existe registro para este viewer + webinar + data
+      const existing = await db.select({ id: webinarViewLogs.id })
+        .from(webinarViewLogs)
+        .where(and(
+          eq(webinarViewLogs.webinarId, webinarId),
+          eq(webinarViewLogs.viewerId, viewerId),
+          eq(webinarViewLogs.viewDate, viewDate)
+        ))
+        .limit(1);
+      
+      // Se já existe, não insere novamente
+      if (existing.length > 0) {
+        return;
+      }
+    }
+    
+    // Insere novo registro
     const id = randomUUID();
     await db.insert(webinarViewLogs).values({
       id,
       webinarId,
       ownerId,
+      viewerId: viewerId || null,
+      viewDate,
       source,
       createdAt: new Date(),
     });

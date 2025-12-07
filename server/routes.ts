@@ -1,5 +1,6 @@
 import type { Express, Request } from "express";
 import { createServer, type Server } from "http";
+import crypto from "crypto";
 import { createReadStream, existsSync, mkdirSync, renameSync, unlinkSync, statSync, readFileSync, writeFileSync } from "fs";
 import { pipeline } from "stream/promises";
 import path from "path";
@@ -2112,11 +2113,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get or create viewer ID for unique view counting
+  app.get("/api/viewer-id", (req, res) => {
+    try {
+      // Check if viewer_id cookie exists
+      let viewerId = req.cookies?.viewer_id;
+      
+      if (!viewerId) {
+        // Generate new UUID for this viewer
+        viewerId = crypto.randomUUID();
+        
+        // Set cookie that expires in 1 year
+        res.cookie('viewer_id', viewerId, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          maxAge: 365 * 24 * 60 * 60 * 1000 // 1 year
+        });
+      }
+      
+      res.json({ viewerId });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Increment webinar views
   app.post("/api/webinars/:id/increment-view", async (req, res) => {
     try {
       const { id } = req.params;
       const source = (req.body?.source as 'live' | 'replay' | 'embed') || 'live';
+      const viewerId = req.body?.viewerId as string | undefined;
       const webinar = await storage.getWebinarById(id);
       if (!webinar) {
         const webinarBySlug = await storage.getWebinarBySlug(id);
@@ -2130,7 +2157,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         await storage.incrementWebinarViews(webinarBySlug.id);
-        await storage.logWebinarView(webinarBySlug.id, webinarBySlug.ownerId, source);
+        await storage.logWebinarView(webinarBySlug.id, webinarBySlug.ownerId, source, viewerId);
       } else {
         // Verificar se o plano do dono está ativo
         if (webinar.ownerId && !(await isWebinarOwnerPlanActive(webinar.ownerId))) {
@@ -2138,7 +2165,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         await storage.incrementWebinarViews(id);
-        await storage.logWebinarView(webinar.id, webinar.ownerId, source);
+        await storage.logWebinarView(webinar.id, webinar.ownerId, source, viewerId);
       }
       res.json({ success: true });
     } catch (error: any) {

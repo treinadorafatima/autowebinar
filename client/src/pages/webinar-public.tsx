@@ -462,7 +462,23 @@ export default function WebinarPublicPage() {
 
   async function incrementViews() {
     try {
-      await fetch(`/api/webinars/${params.slug}/increment-view`, { method: "POST" });
+      // Try to get viewer ID for unique counting (fallback to no ID if fails)
+      let viewerId: string | undefined;
+      try {
+        const viewerResponse = await fetch('/api/viewer-id', { credentials: 'include' });
+        if (viewerResponse.ok) {
+          const data = await viewerResponse.json();
+          viewerId = data.viewerId;
+        }
+      } catch {
+        // Cookies may be blocked - continue without viewerId
+      }
+      
+      await fetch(`/api/webinars/${params.slug}/increment-view`, { 
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ source: 'live', viewerId })
+      });
     } catch (error) {
       console.error("Erro ao registrar visualização:", error);
     }
