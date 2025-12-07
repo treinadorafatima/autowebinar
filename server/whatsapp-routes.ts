@@ -67,6 +67,17 @@ async function validateSessionAndGetAdmin(req: Request): Promise<AuthResult> {
   }
 }
 
+async function validateAccountOwnership(accountId: string, adminId: string): Promise<{ valid: boolean; error?: string }> {
+  const account = await storage.getWhatsappAccountById(accountId);
+  if (!account) {
+    return { valid: false, error: "Conta WhatsApp não encontrada" };
+  }
+  if (account.adminId !== adminId) {
+    return { valid: false, error: "Você não tem permissão para acessar esta conta" };
+  }
+  return { valid: true };
+}
+
 export function registerWhatsAppRoutes(app: Express) {
   
   app.get("/api/whatsapp/status", async (req: Request, res: Response) => {
@@ -79,6 +90,11 @@ export function registerWhatsAppRoutes(app: Express) {
       const { accountId } = req.query;
       if (!accountId) {
         return res.status(400).json({ error: "accountId é obrigatório" });
+      }
+
+      const ownership = await validateAccountOwnership(accountId as string, admin.id);
+      if (!ownership.valid) {
+        return res.status(403).json({ error: ownership.error });
       }
 
       const status = await getWhatsAppStatus(accountId as string);
@@ -101,6 +117,11 @@ export function registerWhatsAppRoutes(app: Express) {
         return res.status(400).json({ error: "accountId é obrigatório" });
       }
 
+      const ownership = await validateAccountOwnership(accountId, admin.id);
+      if (!ownership.valid) {
+        return res.status(403).json({ error: ownership.error });
+      }
+
       const result = await initWhatsAppConnection(accountId, admin.id);
       res.json(result);
     } catch (error: any) {
@@ -119,6 +140,11 @@ export function registerWhatsAppRoutes(app: Express) {
       const { accountId } = req.body;
       if (!accountId) {
         return res.status(400).json({ error: "accountId é obrigatório" });
+      }
+
+      const ownership = await validateAccountOwnership(accountId, admin.id);
+      if (!ownership.valid) {
+        return res.status(403).json({ error: ownership.error });
       }
 
       const success = await disconnectWhatsApp(accountId, admin.id);
@@ -144,6 +170,11 @@ export function registerWhatsAppRoutes(app: Express) {
         return res.status(400).json({ error: "Telefone e mensagem são obrigatórios" });
       }
 
+      const ownership = await validateAccountOwnership(accountId, admin.id);
+      if (!ownership.valid) {
+        return res.status(403).json({ error: ownership.error });
+      }
+
       const result = await sendWhatsAppMessage(accountId, phone, message);
       res.json(result);
     } catch (error: any) {
@@ -165,6 +196,11 @@ export function registerWhatsAppRoutes(app: Express) {
       }
       if (!phone || !mediaType || !mediaUrl) {
         return res.status(400).json({ error: "Telefone, tipo de mídia e URL são obrigatórios" });
+      }
+
+      const ownership = await validateAccountOwnership(accountId, admin.id);
+      if (!ownership.valid) {
+        return res.status(403).json({ error: ownership.error });
       }
 
       const media: MediaMessage = {
@@ -275,6 +311,11 @@ export function registerWhatsAppRoutes(app: Express) {
       const { accountId } = req.body;
       if (!accountId) {
         return res.status(400).json({ error: "accountId é obrigatório" });
+      }
+
+      const ownership = await validateAccountOwnership(accountId, admin.id);
+      if (!ownership.valid) {
+        return res.status(403).json({ error: ownership.error });
       }
 
       const success = await clearBanStatus(accountId, admin.id);
