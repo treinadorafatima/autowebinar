@@ -462,7 +462,7 @@ export default function WebinarPublicPage() {
 
   async function incrementViews() {
     try {
-      // Try to get viewer ID for unique counting (fallback to no ID if fails)
+      // Try to get viewer ID - if cookies blocked, don't count view
       let viewerId: string | undefined;
       try {
         const viewerResponse = await fetch('/api/viewer-id', { credentials: 'include' });
@@ -471,7 +471,13 @@ export default function WebinarPublicPage() {
           viewerId = data.viewerId;
         }
       } catch {
-        // Cookies may be blocked - continue without viewerId
+        // Cookies blocked - don't count view
+        return;
+      }
+      
+      // Only count view if we have a valid viewerId
+      if (!viewerId) {
+        return;
       }
       
       await fetch(`/api/webinars/${params.slug}/increment-view`, { 
