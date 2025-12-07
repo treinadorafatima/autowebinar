@@ -135,12 +135,13 @@ export function ExpiredPlanBlocker({
             <div className="p-4 rounded-xl bg-gradient-to-r from-violet-500/10 via-purple-500/10 to-emerald-500/10 border border-violet-500/20" data-testid="section-ai-features-expired">
               <div className="flex items-center gap-2 mb-3">
                 <Bot className="w-5 h-5 text-violet-400" />
-                <span className="text-white font-semibold text-sm" data-testid="text-ai-features-title">Ferramentas IA Exclusivas incluídas:</span>
+                <span className="text-white font-semibold text-sm" data-testid="text-ai-features-title">Ferramentas IA Exclusivas:</span>
               </div>
               <div className="grid grid-cols-1 gap-2">
                 <div className="flex items-center gap-2 text-sm" data-testid="text-ai-script-generator">
                   <FileText className="w-4 h-4 text-violet-400 flex-shrink-0" />
                   <span className="text-slate-300">Gerador de Roteiro IA</span>
+                  <Badge variant="outline" className="text-xs bg-purple-500/10 text-purple-400 border-purple-500/30">Pro+</Badge>
                 </div>
                 <div className="flex items-center gap-2 text-sm" data-testid="text-ai-message-generator">
                   <Mail className="w-4 h-4 text-emerald-400 flex-shrink-0" />
@@ -149,10 +150,11 @@ export function ExpiredPlanBlocker({
                 <div className="flex items-center gap-2 text-sm" data-testid="text-ai-transcription">
                   <Mic className="w-4 h-4 text-rose-400 flex-shrink-0" />
                   <span className="text-slate-300">Transcrição Automática</span>
+                  <Badge variant="outline" className="text-xs bg-purple-500/10 text-purple-400 border-purple-500/30">Pro+</Badge>
                 </div>
               </div>
               <p className="text-xs text-slate-400 mt-2" data-testid="text-ai-differentiator">
-                Diferenciais exclusivos que nenhum concorrente oferece
+                Disponíveis nos planos Pro+ (segundo plano em diante)
               </p>
             </div>
 

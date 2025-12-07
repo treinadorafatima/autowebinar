@@ -378,12 +378,14 @@ export default function AdminSubscription() {
                   </div>
                   <div className="grid gap-1.5 text-sm">
                     <div className="flex items-center gap-2" data-testid="text-trial-script-generator">
-                      <FileText className="w-3.5 h-3.5 text-violet-500" />
-                      <span className="text-muted-foreground">Gerador de Roteiro IA</span>
+                      <X className="w-3.5 h-3.5 text-muted-foreground" />
+                      <span className="text-muted-foreground/50 line-through">Gerador de Roteiro IA</span>
+                      <Badge variant="outline" className="text-xs bg-purple-500/10 text-purple-400 border-purple-500/30">Pro+</Badge>
                     </div>
                     <div className="flex items-center gap-2" data-testid="text-trial-transcription">
-                      <Mic className="w-3.5 h-3.5 text-rose-500" />
-                      <span className="text-muted-foreground">Transcrição Automática</span>
+                      <X className="w-3.5 h-3.5 text-muted-foreground" />
+                      <span className="text-muted-foreground/50 line-through">Transcrição Automática</span>
+                      <Badge variant="outline" className="text-xs bg-purple-500/10 text-purple-400 border-purple-500/30">Pro+</Badge>
                     </div>
                   </div>
                 </div>
@@ -502,14 +504,30 @@ export default function AdminSubscription() {
                     <span className="text-sm font-medium" data-testid="text-ai-features-plan-title">Ferramentas IA</span>
                   </div>
                   <div className="grid gap-1.5 text-sm">
-                    <div className="flex items-center gap-2" data-testid="text-plan-script-generator">
-                      <FileText className="w-3.5 h-3.5 text-violet-500" />
-                      <span className="text-muted-foreground">Gerador de Roteiro IA</span>
-                    </div>
-                    <div className="flex items-center gap-2" data-testid="text-plan-transcription">
-                      <Mic className="w-3.5 h-3.5 text-rose-500" />
-                      <span className="text-muted-foreground">Transcrição Automática</span>
-                    </div>
+                    {plano.webinarLimit > 5 ? (
+                      <div className="flex items-center gap-2" data-testid="text-plan-script-generator">
+                        <FileText className="w-3.5 h-3.5 text-violet-500" />
+                        <span className="text-muted-foreground">Gerador de Roteiro IA</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2" data-testid="text-plan-script-generator">
+                        <X className="w-3.5 h-3.5 text-muted-foreground" />
+                        <span className="text-muted-foreground/50 line-through">Gerador de Roteiro IA</span>
+                        <Badge variant="outline" className="text-xs bg-purple-500/10 text-purple-400 border-purple-500/30">Pro+</Badge>
+                      </div>
+                    )}
+                    {plano.webinarLimit > 5 ? (
+                      <div className="flex items-center gap-2" data-testid="text-plan-transcription">
+                        <Mic className="w-3.5 h-3.5 text-rose-500" />
+                        <span className="text-muted-foreground">Transcrição Automática</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2" data-testid="text-plan-transcription">
+                        <X className="w-3.5 h-3.5 text-muted-foreground" />
+                        <span className="text-muted-foreground/50 line-through">Transcrição Automática</span>
+                        <Badge variant="outline" className="text-xs bg-purple-500/10 text-purple-400 border-purple-500/30">Pro+</Badge>
+                      </div>
+                    )}
                   </div>
                 </div>
 

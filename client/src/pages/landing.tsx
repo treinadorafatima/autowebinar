@@ -1023,14 +1023,30 @@ export default function LandingPage() {
                             <Bot className="w-4 h-4 text-violet-400" />
                             <span className="text-xs font-semibold text-violet-400 uppercase tracking-wide">Ferramentas IA</span>
                           </div>
-                          <div className="flex items-center gap-2 text-slate-200">
-                            <Sparkles className="w-5 h-5 text-violet-400 flex-shrink-0" />
-                            <span>Gerador de Roteiro IA</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-slate-200 mt-2">
-                            <Mic className="w-5 h-5 text-rose-400 flex-shrink-0" />
-                            <span>Transcrição Automática</span>
-                          </div>
+                          {plano.webinarLimit > 5 ? (
+                            <div className="flex items-center gap-2 text-slate-200">
+                              <Sparkles className="w-5 h-5 text-violet-400 flex-shrink-0" />
+                              <span>Gerador de Roteiro IA</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2 text-slate-400">
+                              <X className="w-5 h-5 text-slate-500 flex-shrink-0" />
+                              <span className="line-through">Gerador de Roteiro IA</span>
+                              <Badge variant="outline" className="ml-1 text-xs bg-purple-500/10 text-purple-400 border-purple-500/30">Pro+</Badge>
+                            </div>
+                          )}
+                          {plano.webinarLimit > 5 ? (
+                            <div className="flex items-center gap-2 text-slate-200 mt-2">
+                              <Mic className="w-5 h-5 text-rose-400 flex-shrink-0" />
+                              <span>Transcrição Automática</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2 text-slate-400 mt-2">
+                              <X className="w-5 h-5 text-slate-500 flex-shrink-0" />
+                              <span className="line-through">Transcrição Automática</span>
+                              <Badge variant="outline" className="ml-1 text-xs bg-purple-500/10 text-purple-400 border-purple-500/30">Pro+</Badge>
+                            </div>
+                          )}
                           <div className="flex items-center gap-2 text-slate-200 mt-2">
                             <Check className="w-5 h-5 text-green-400 flex-shrink-0" />
                             <span>Chat simulado inteligente</span>

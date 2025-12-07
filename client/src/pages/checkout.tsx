@@ -655,18 +655,38 @@ export default function Checkout() {
                               <Badge variant="outline" className="text-xs bg-purple-500/10 text-purple-400 border-purple-500/30">Pro+</Badge>
                             </div>
                           )}
-                          <div className="flex items-center gap-3 text-sm">
-                            <div className="w-5 h-5 rounded-full bg-violet-500/20 flex items-center justify-center">
-                              <Sparkles className="w-3 h-3 text-violet-400" />
+                          {plano.webinarLimit > 5 ? (
+                            <div className="flex items-center gap-3 text-sm">
+                              <div className="w-5 h-5 rounded-full bg-violet-500/20 flex items-center justify-center">
+                                <Sparkles className="w-3 h-3 text-violet-400" />
+                              </div>
+                              <span className="text-slate-300">Gerador de Roteiro IA</span>
                             </div>
-                            <span className="text-slate-300">Gerador de Roteiro IA</span>
-                          </div>
-                          <div className="flex items-center gap-3 text-sm">
-                            <div className="w-5 h-5 rounded-full bg-rose-500/20 flex items-center justify-center">
-                              <Mic className="w-3 h-3 text-rose-400" />
+                          ) : (
+                            <div className="flex items-center gap-3 text-sm">
+                              <div className="w-5 h-5 rounded-full bg-slate-600/20 flex items-center justify-center">
+                                <X className="w-3 h-3 text-slate-500" />
+                              </div>
+                              <span className="text-slate-500 line-through">Gerador de Roteiro IA</span>
+                              <Badge variant="outline" className="text-xs bg-purple-500/10 text-purple-400 border-purple-500/30">Pro+</Badge>
                             </div>
-                            <span className="text-slate-300">Transcrição Automática</span>
-                          </div>
+                          )}
+                          {plano.webinarLimit > 5 ? (
+                            <div className="flex items-center gap-3 text-sm">
+                              <div className="w-5 h-5 rounded-full bg-rose-500/20 flex items-center justify-center">
+                                <Mic className="w-3 h-3 text-rose-400" />
+                              </div>
+                              <span className="text-slate-300">Transcrição Automática</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-3 text-sm">
+                              <div className="w-5 h-5 rounded-full bg-slate-600/20 flex items-center justify-center">
+                                <X className="w-3 h-3 text-slate-500" />
+                              </div>
+                              <span className="text-slate-500 line-through">Transcrição Automática</span>
+                              <Badge variant="outline" className="text-xs bg-purple-500/10 text-purple-400 border-purple-500/30">Pro+</Badge>
+                            </div>
+                          )}
                           {beneficios
                             .filter((b: string) => 
                               !b.toLowerCase().includes('suporte por email') &&
