@@ -155,6 +155,24 @@ export default function AdminWhatsAppMarketing() {
 
   const qrRefreshInterval = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  interface AccountLimitInfo {
+    currentCount: number;
+    limit: number;
+    planName: string;
+    canCreate: boolean;
+    remaining: number;
+  }
+
+  const { data: accountLimit } = useQuery<AccountLimitInfo>({
+    queryKey: ["/api/whatsapp/accounts/limit"],
+    queryFn: async () => {
+      const res = await fetch("/api/whatsapp/accounts/limit", {
+        headers: { Authorization: `Bearer ${localStorage.getItem("adminToken")}` }
+      });
+      return res.json();
+    },
+  });
+
   const { data: accounts, isLoading: loadingAccounts } = useQuery<WhatsAppAccount[]>({
     queryKey: ["/api/whatsapp/accounts"],
   });
@@ -271,11 +289,16 @@ export default function AdminWhatsAppMarketing() {
   const createAccountMutation = useMutation({
     mutationFn: async (data: { label: string; dailyLimit: number; priority: number }) => {
       const res = await apiRequest("POST", "/api/whatsapp/accounts", data);
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Erro ao criar conta");
+      }
       return res.json();
     },
     onSuccess: () => {
       toast({ title: "Conta WhatsApp criada com sucesso" });
       queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/accounts/limit"] });
       setShowNewAccountDialog(false);
       setNewAccount({ label: "", dailyLimit: 100, priority: 0 });
     },
@@ -307,6 +330,7 @@ export default function AdminWhatsAppMarketing() {
     onSuccess: () => {
       toast({ title: "Conta excluída com sucesso" });
       queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/accounts/limit"] });
       if (selectedAccountId && accounts) {
         const remaining = accounts.filter(a => a.id !== selectedAccountId);
         setSelectedAccountId(remaining.length > 0 ? remaining[0].id : null);
@@ -663,12 +687,30 @@ export default function AdminWhatsAppMarketing() {
           </TabsList>
 
           <TabsContent value="accounts" className="space-y-6">
-            <div className="flex items-center justify-between gap-4">
-              <h2 className="text-lg font-semibold">Minhas Contas WhatsApp</h2>
-              <Button onClick={() => setShowNewAccountDialog(true)} data-testid="button-new-account">
-                <Plus className="w-4 h-4 mr-2" />
-                Nova Conta
-              </Button>
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div className="flex items-center gap-3">
+                <h2 className="text-lg font-semibold">Minhas Contas WhatsApp</h2>
+                {accountLimit && (
+                  <Badge variant="outline" className="text-muted-foreground" data-testid="badge-account-limit">
+                    {accountLimit.currentCount}/{accountLimit.limit === 999 ? "∞" : accountLimit.limit} contas
+                  </Badge>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                {accountLimit && !accountLimit.canCreate && (
+                  <span className="text-sm text-muted-foreground" data-testid="text-limit-reached">
+                    Limite atingido
+                  </span>
+                )}
+                <Button 
+                  onClick={() => setShowNewAccountDialog(true)} 
+                  disabled={accountLimit && !accountLimit.canCreate}
+                  data-testid="button-new-account"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Nova Conta
+                </Button>
+              </div>
             </div>
 
             {loadingAccounts ? (

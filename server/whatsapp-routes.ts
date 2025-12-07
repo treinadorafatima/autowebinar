@@ -334,6 +334,38 @@ export function registerWhatsAppRoutes(app: Express) {
   // WHATSAPP ACCOUNTS CRUD (Multiple accounts per admin)
   // ============================================
 
+  app.get("/api/whatsapp/accounts/limit", async (req: Request, res: Response) => {
+    try {
+      const { admin, error, errorCode } = await validateSessionAndGetAdmin(req);
+      if (!admin) {
+        return res.status(errorCode || 401).json({ error: error || "Não autenticado" });
+      }
+
+      const existingAccounts = await storage.listWhatsappAccountsByAdmin(admin.id);
+      let accountLimit = 2; // Limite padrão (Essencial)
+      let planName = "Essencial";
+      
+      if (admin.planoId) {
+        const plano = await storage.getCheckoutPlanoById(admin.planoId);
+        if (plano?.whatsappAccountLimit) {
+          accountLimit = plano.whatsappAccountLimit;
+          planName = plano.nome;
+        }
+      }
+      
+      res.json({
+        currentCount: existingAccounts.length,
+        limit: accountLimit,
+        planName,
+        canCreate: existingAccounts.length < accountLimit,
+        remaining: Math.max(0, accountLimit - existingAccounts.length)
+      });
+    } catch (error: any) {
+      console.error("[whatsapp-api] Error getting account limit:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get("/api/whatsapp/accounts", async (req: Request, res: Response) => {
     try {
       const { admin, error, errorCode } = await validateSessionAndGetAdmin(req);
@@ -361,10 +393,27 @@ export function registerWhatsAppRoutes(app: Express) {
         return res.status(400).json({ error: "Label é obrigatório" });
       }
 
-      const accountId = "wa_" + Date.now() + "_" + Math.random().toString(36).substring(7);
+      // Verificar limite de contas WhatsApp do plano
+      const existingAccounts = await storage.listWhatsappAccountsByAdmin(admin.id);
+      let accountLimit = 2; // Limite padrão (Essencial)
+      
+      if (admin.planoId) {
+        const plano = await storage.getCheckoutPlanoById(admin.planoId);
+        if (plano?.whatsappAccountLimit) {
+          accountLimit = plano.whatsappAccountLimit;
+        }
+      }
+      
+      if (existingAccounts.length >= accountLimit) {
+        return res.status(403).json({ 
+          error: `Limite de ${accountLimit} conta${accountLimit > 1 ? 's' : ''} WhatsApp atingido. Faça upgrade do seu plano para adicionar mais contas.`,
+          limitReached: true,
+          currentCount: existingAccounts.length,
+          limit: accountLimit
+        });
+      }
       
       const account = await storage.createWhatsappAccount({
-        id: accountId,
         adminId: admin.id,
         label,
         dailyLimit: dailyLimit || 100,
