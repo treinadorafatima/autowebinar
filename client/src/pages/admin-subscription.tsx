@@ -76,6 +76,7 @@ interface SubscriptionInfo {
     webinarLimit: number;
     uploadLimit: number;
     storageLimit: number;
+    whatsappAccountLimit: number;
     tipoCobranca: string;
     frequencia: number;
     frequenciaTipo: string;
@@ -437,6 +438,10 @@ export default function AdminSubscription() {
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Armazenamento</span>
                     <span>{plano.storageLimit}GB</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Conexões WhatsApp</span>
+                    <span>{(plano.whatsappAccountLimit ?? 2) >= 999 ? "Ilimitadas" : `${plano.whatsappAccountLimit ?? 2} conexões`}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Visualizações</span>

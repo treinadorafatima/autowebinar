@@ -58,6 +58,7 @@ interface Plano {
   webinarLimit: number;
   uploadLimit: number;
   storageLimit: number;
+  whatsappAccountLimit: number;
   ativo: boolean;
   destaque: boolean;
   exibirNaLanding?: boolean;
@@ -962,6 +963,10 @@ export default function LandingPage() {
                         <div className="flex items-center gap-2 text-slate-200">
                           <Check className="w-5 h-5 text-green-400 flex-shrink-0" />
                           <span>{plano.storageLimit || 5}GB de armazenamento</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-slate-200">
+                          <SiWhatsapp className="w-5 h-5 text-green-400 flex-shrink-0" />
+                          <span>{(plano.whatsappAccountLimit ?? 2) >= 999 ? 'Conexões WhatsApp ilimitadas' : `${plano.whatsappAccountLimit ?? 2} conexões WhatsApp`}</span>
                         </div>
                         <div className="flex items-center gap-2 text-slate-200">
                           <Check className="w-5 h-5 text-green-400 flex-shrink-0" />
