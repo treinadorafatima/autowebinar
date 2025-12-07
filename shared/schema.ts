@@ -19,6 +19,7 @@ export const admins = pgTable("admins", {
   name: text("name").default("Administrador"),
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
+  telefone: text("telefone"), // Telefone do usuário
   role: text("role").notNull().default("user"), // 'superadmin' ou 'user'
   webinarLimit: integer("webinar_limit").notNull().default(5), // limite de webinars
   uploadLimit: integer("upload_limit").notNull().default(5), // limite de uploads
