@@ -273,22 +273,25 @@ export default function Checkout() {
     },
   });
 
-  // Auto-start checkout when CPF/CNPJ is complete
+  // Auto-start checkout when CPF/CNPJ and telefone are complete
   const hasAutoStartedRef = useRef(false);
   useEffect(() => {
     if (step !== "form" || hasAutoStartedRef.current || iniciarMutation.isPending) return;
-    if (!formData.nome || !formData.email || !selectedPlano) return;
+    if (!formData.nome || !formData.email || !formData.telefone || !selectedPlano) return;
     
     const docDigits = formData.documento.replace(/\D/g, '');
     const isDocComplete = formData.tipoDocumento === "CPF" 
       ? docDigits.length === 11 
       : docDigits.length === 14;
     
-    if (isDocComplete) {
+    const phoneDigits = formData.telefone.replace(/\D/g, '');
+    const isPhoneComplete = phoneDigits.length >= 10;
+    
+    if (isDocComplete && isPhoneComplete) {
       hasAutoStartedRef.current = true;
       iniciarMutation.mutate();
     }
-  }, [formData.documento, formData.tipoDocumento, formData.nome, formData.email, step, selectedPlano, iniciarMutation]);
+  }, [formData.documento, formData.tipoDocumento, formData.nome, formData.email, formData.telefone, step, selectedPlano, iniciarMutation]);
 
   const processarPagamentoMpMutation = useMutation({
     mutationFn: async (paymentData: any) => {
@@ -462,14 +465,26 @@ export default function Checkout() {
 
   const handleSubmitForm = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.nome || !formData.email) {
+    if (!formData.nome || !formData.email || !formData.telefone) {
       toast({
         title: "Preencha os campos obrigatórios",
-        description: "Nome e email são necessários.",
+        description: "Nome, email e telefone são necessários.",
         variant: "destructive",
       });
       return;
     }
+    
+    // Validate phone has at least 10 digits
+    const phoneDigits = formData.telefone.replace(/\D/g, '');
+    if (phoneDigits.length < 10) {
+      toast({
+        title: "Telefone inválido",
+        description: "Informe um telefone válido com DDD.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     iniciarMutation.mutate();
   };
 
@@ -950,7 +965,7 @@ export default function Checkout() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="telefone" className="text-slate-700">Telefone</Label>
+                      <Label htmlFor="telefone" className="text-slate-700">Telefone *</Label>
                       <Input
                         id="telefone"
                         data-testid="input-checkout-telefone"
@@ -959,6 +974,8 @@ export default function Checkout() {
                         placeholder="(00) 00000-0000"
                         className="bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400 h-12"
                         maxLength={15}
+                        required
+                        disabled={step === "payment"}
                       />
                     </div>
                   </div>
