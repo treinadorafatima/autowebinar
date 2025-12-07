@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type WebinarConfig, type WebinarConfigInsert, type Admin, type AdminInsert, type UploadedVideo, type UploadedVideoInsert, type Comment, type CommentInsert, type Webinar, type WebinarInsert, type Setting, type SettingInsert, type ViewerSession, type WebinarScript, type WebinarScriptInsert, type AiConfig, type AiConfigInsert, type AiMemory, type AiMemoryInsert, type CheckoutPlano, type CheckoutPlanoInsert, type CheckoutPagamento, type CheckoutPagamentoInsert, type CheckoutConfig, type CheckoutConfigInsert, type CheckoutAssinatura, type CheckoutAssinaturaInsert, type AiChat, type AiChatInsert, type AiMessageChat, type AiMessageChatInsert, type VideoTranscription, type VideoTranscriptionInsert, type AdminEmailCredential, type AdminEmailCredentialInsert, type EmailSequence, type EmailSequenceInsert, type ScheduledEmail, type ScheduledEmailInsert, type LeadFormConfig, type LeadFormConfigInsert, type WhatsappAccount, type WhatsappAccountInsert, type WhatsappSession, type WhatsappSessionInsert, type WhatsappSequence, type WhatsappSequenceInsert, type ScheduledWhatsappMessage, type ScheduledWhatsappMessageInsert, type MediaFile, type MediaFileInsert, type LeadMessage, type LeadMessageInsert, type Lead, admins, webinarConfigs, users, uploadedVideos, comments, webinars as webinarsTable, settings, viewerSessions, webinarScripts, aiConfigs, aiMemories, checkoutPlanos, checkoutPagamentos, checkoutConfigs, checkoutAssinaturas, aiChats, aiMessageChats, videoTranscriptions, adminEmailCredentials, emailSequences, scheduledEmails, leadFormConfigs, whatsappAccounts, whatsappSessions, whatsappSequences, scheduledWhatsappMessages, mediaFiles, webinarViewLogs, leads, leadMessages } from "@shared/schema";
+import { type User, type InsertUser, type WebinarConfig, type WebinarConfigInsert, type Admin, type AdminInsert, type UploadedVideo, type UploadedVideoInsert, type Comment, type CommentInsert, type Webinar, type WebinarInsert, type Setting, type SettingInsert, type ViewerSession, type WebinarScript, type WebinarScriptInsert, type AiConfig, type AiConfigInsert, type AiMemory, type AiMemoryInsert, type CheckoutPlano, type CheckoutPlanoInsert, type CheckoutPagamento, type CheckoutPagamentoInsert, type CheckoutConfig, type CheckoutConfigInsert, type CheckoutAssinatura, type CheckoutAssinaturaInsert, type AiChat, type AiChatInsert, type AiMessageChat, type AiMessageChatInsert, type VideoTranscription, type VideoTranscriptionInsert, type AdminEmailCredential, type AdminEmailCredentialInsert, type EmailSequence, type EmailSequenceInsert, type ScheduledEmail, type ScheduledEmailInsert, type LeadFormConfig, type LeadFormConfigInsert, type WhatsappAccount, type WhatsappAccountInsert, type WhatsappSession, type WhatsappSessionInsert, type WhatsappSequence, type WhatsappSequenceInsert, type ScheduledWhatsappMessage, type ScheduledWhatsappMessageInsert, type MediaFile, type MediaFileInsert, type LeadMessage, type LeadMessageInsert, type Lead, type WhatsappBroadcast, type WhatsappBroadcastInsert, type WhatsappBroadcastRecipient, type WhatsappBroadcastRecipientInsert, admins, webinarConfigs, users, uploadedVideos, comments, webinars as webinarsTable, settings, viewerSessions, webinarScripts, aiConfigs, aiMemories, checkoutPlanos, checkoutPagamentos, checkoutConfigs, checkoutAssinaturas, aiChats, aiMessageChats, videoTranscriptions, adminEmailCredentials, emailSequences, scheduledEmails, leadFormConfigs, whatsappAccounts, whatsappSessions, whatsappSequences, scheduledWhatsappMessages, mediaFiles, webinarViewLogs, leads, leadMessages, whatsappBroadcasts, whatsappBroadcastRecipients } from "@shared/schema";
 import * as crypto from "crypto";
 import { randomUUID } from "crypto";
 import { db } from "./db";
@@ -301,6 +301,22 @@ export interface IStorage {
   getLeadMessageByTrackingId(trackingId: string): Promise<LeadMessage | undefined>;
   markMessageAsOpened(trackingId: string): Promise<void>;
   markMessageAsClicked(trackingId: string): Promise<void>;
+  // WhatsApp Broadcasts - Envios em Massa
+  listWhatsappBroadcastsByAdmin(adminId: string): Promise<WhatsappBroadcast[]>;
+  getWhatsappBroadcastById(id: string): Promise<WhatsappBroadcast | undefined>;
+  createWhatsappBroadcast(data: WhatsappBroadcastInsert): Promise<WhatsappBroadcast>;
+  updateWhatsappBroadcast(id: string, data: Partial<WhatsappBroadcastInsert>): Promise<WhatsappBroadcast | undefined>;
+  deleteWhatsappBroadcast(id: string): Promise<void>;
+  // WhatsApp Broadcast Recipients
+  listWhatsappBroadcastRecipients(broadcastId: string): Promise<WhatsappBroadcastRecipient[]>;
+  createWhatsappBroadcastRecipient(data: WhatsappBroadcastRecipientInsert): Promise<WhatsappBroadcastRecipient>;
+  createWhatsappBroadcastRecipientsBulk(data: WhatsappBroadcastRecipientInsert[]): Promise<number>;
+  updateWhatsappBroadcastRecipient(id: string, data: Partial<WhatsappBroadcastRecipientInsert>): Promise<WhatsappBroadcastRecipient | undefined>;
+  getPendingBroadcastRecipients(broadcastId: string, limit?: number): Promise<WhatsappBroadcastRecipient[]>;
+  countBroadcastRecipientsByStatus(broadcastId: string): Promise<{ pending: number; sent: number; failed: number }>;
+  // Leads filtering for broadcasts
+  listLeadsWithWhatsappByWebinar(webinarId: string, filters?: { dateStart?: string; dateEnd?: string; sessionDate?: string }): Promise<Lead[]>;
+  getDistinctSessionDatesByWebinar(webinarId: string): Promise<string[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3733,6 +3749,159 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
     await db.update(leadMessages)
       .set({ status: 'clicked', clickedAt: new Date() })
       .where(eq(leadMessages.trackingId, trackingId));
+  }
+
+  // ============================================
+  // WHATSAPP BROADCASTS (ENVIOS EM MASSA)
+  // ============================================
+
+  async listWhatsappBroadcastsByAdmin(adminId: string): Promise<WhatsappBroadcast[]> {
+    return db.select()
+      .from(whatsappBroadcasts)
+      .where(eq(whatsappBroadcasts.adminId, adminId))
+      .orderBy(desc(whatsappBroadcasts.createdAt));
+  }
+
+  async getWhatsappBroadcastById(id: string): Promise<WhatsappBroadcast | undefined> {
+    const result = await db.select()
+      .from(whatsappBroadcasts)
+      .where(eq(whatsappBroadcasts.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async createWhatsappBroadcast(data: WhatsappBroadcastInsert): Promise<WhatsappBroadcast> {
+    const id = randomUUID();
+    const broadcast = {
+      ...data,
+      id,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    await db.insert(whatsappBroadcasts).values(broadcast);
+    return broadcast as WhatsappBroadcast;
+  }
+
+  async updateWhatsappBroadcast(id: string, data: Partial<WhatsappBroadcastInsert>): Promise<WhatsappBroadcast | undefined> {
+    const result = await db.update(whatsappBroadcasts)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(whatsappBroadcasts.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteWhatsappBroadcast(id: string): Promise<void> {
+    await db.delete(whatsappBroadcastRecipients).where(eq(whatsappBroadcastRecipients.broadcastId, id));
+    await db.delete(whatsappBroadcasts).where(eq(whatsappBroadcasts.id, id));
+  }
+
+  // WhatsApp Broadcast Recipients
+
+  async listWhatsappBroadcastRecipients(broadcastId: string): Promise<WhatsappBroadcastRecipient[]> {
+    return db.select()
+      .from(whatsappBroadcastRecipients)
+      .where(eq(whatsappBroadcastRecipients.broadcastId, broadcastId))
+      .orderBy(whatsappBroadcastRecipients.createdAt);
+  }
+
+  async createWhatsappBroadcastRecipient(data: WhatsappBroadcastRecipientInsert): Promise<WhatsappBroadcastRecipient> {
+    const id = randomUUID();
+    const recipient = {
+      ...data,
+      id,
+      createdAt: new Date(),
+    };
+    await db.insert(whatsappBroadcastRecipients).values(recipient);
+    return recipient as WhatsappBroadcastRecipient;
+  }
+
+  async createWhatsappBroadcastRecipientsBulk(data: WhatsappBroadcastRecipientInsert[]): Promise<number> {
+    if (data.length === 0) return 0;
+    const recipients = data.map(d => ({
+      ...d,
+      id: randomUUID(),
+      createdAt: new Date(),
+    }));
+    await db.insert(whatsappBroadcastRecipients).values(recipients);
+    return recipients.length;
+  }
+
+  async updateWhatsappBroadcastRecipient(id: string, data: Partial<WhatsappBroadcastRecipientInsert>): Promise<WhatsappBroadcastRecipient | undefined> {
+    const result = await db.update(whatsappBroadcastRecipients)
+      .set(data)
+      .where(eq(whatsappBroadcastRecipients.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async getPendingBroadcastRecipients(broadcastId: string, limit: number = 50): Promise<WhatsappBroadcastRecipient[]> {
+    return db.select()
+      .from(whatsappBroadcastRecipients)
+      .where(and(
+        eq(whatsappBroadcastRecipients.broadcastId, broadcastId),
+        eq(whatsappBroadcastRecipients.status, 'pending')
+      ))
+      .orderBy(whatsappBroadcastRecipients.createdAt)
+      .limit(limit);
+  }
+
+  async countBroadcastRecipientsByStatus(broadcastId: string): Promise<{ pending: number; sent: number; failed: number }> {
+    const recipients = await db.select()
+      .from(whatsappBroadcastRecipients)
+      .where(eq(whatsappBroadcastRecipients.broadcastId, broadcastId));
+    
+    return {
+      pending: recipients.filter(r => r.status === 'pending').length,
+      sent: recipients.filter(r => r.status === 'sent').length,
+      failed: recipients.filter(r => r.status === 'failed').length,
+    };
+  }
+
+  // Leads filtering for broadcasts
+
+  async listLeadsWithWhatsappByWebinar(webinarId: string, filters?: { dateStart?: string; dateEnd?: string; sessionDate?: string }): Promise<Lead[]> {
+    let query = db.select()
+      .from(leads)
+      .where(and(
+        eq(leads.webinarId, webinarId),
+        sql`${leads.whatsapp} IS NOT NULL AND ${leads.whatsapp} != ''`
+      ));
+
+    const results = await query.orderBy(desc(leads.capturedAt));
+    
+    if (!filters) return results;
+
+    return results.filter(lead => {
+      if (!lead.capturedAt) return true;
+      const capturedDate = lead.capturedAt.toISOString().split('T')[0];
+      
+      if (filters.sessionDate) {
+        return capturedDate === filters.sessionDate;
+      }
+      
+      if (filters.dateStart && capturedDate < filters.dateStart) return false;
+      if (filters.dateEnd && capturedDate > filters.dateEnd) return false;
+      
+      return true;
+    });
+  }
+
+  async getDistinctSessionDatesByWebinar(webinarId: string): Promise<string[]> {
+    const results = await db.select({ capturedAt: leads.capturedAt })
+      .from(leads)
+      .where(and(
+        eq(leads.webinarId, webinarId),
+        sql`${leads.whatsapp} IS NOT NULL AND ${leads.whatsapp} != ''`
+      ))
+      .orderBy(desc(leads.capturedAt));
+    
+    const dates = new Set<string>();
+    for (const r of results) {
+      if (r.capturedAt) {
+        dates.add(r.capturedAt.toISOString().split('T')[0]);
+      }
+    }
+    return Array.from(dates).sort().reverse();
   }
 }
 

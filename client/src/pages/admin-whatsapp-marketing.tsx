@@ -15,7 +15,8 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { 
   CheckCircle, XCircle, Loader2, Send, Trash2, Plus, Edit, 
   Clock, QrCode, Smartphone, Wifi, WifiOff, RefreshCcw, ArrowLeft,
-  Upload, FileAudio, FileVideo, FileText, Image, Mic, Info, Check
+  Upload, FileAudio, FileVideo, FileText, Image, Mic, Info, Check,
+  Radio, Play, Pause, X, Users, Calendar, Filter, Eye
 } from "lucide-react";
 import { SiWhatsapp } from "react-icons/si";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -72,6 +73,32 @@ interface MediaFile {
   mediaType: string;
   publicUrl: string;
   createdAt: string;
+}
+
+interface WhatsAppBroadcast {
+  id: string;
+  adminId: string;
+  webinarId: string;
+  name: string;
+  status: 'draft' | 'pending' | 'running' | 'paused' | 'completed' | 'cancelled';
+  messageText: string;
+  messageType: string;
+  mediaUrl?: string | null;
+  totalRecipients: number;
+  sentCount: number;
+  failedCount: number;
+  filterType?: string | null;
+  filterDateStart?: string | null;
+  filterDateEnd?: string | null;
+  filterSessionDate?: string | null;
+  createdAt: string;
+  startedAt?: string | null;
+  completedAt?: string | null;
+}
+
+interface BroadcastPreview {
+  count: number;
+  leads: { id: string; name: string; whatsapp: string; capturedAt: string }[];
 }
 
 const PHASES = [
@@ -152,6 +179,24 @@ export default function AdminWhatsAppMarketing() {
     dailyLimit: 100,
     priority: 0,
   });
+
+  // Broadcast states
+  const [broadcastWebinarId, setBroadcastWebinarId] = useState<string>("");
+  const [broadcastFilterType, setBroadcastFilterType] = useState<"all" | "date_range" | "session">("all");
+  const [broadcastDateStart, setBroadcastDateStart] = useState<string>("");
+  const [broadcastDateEnd, setBroadcastDateEnd] = useState<string>("");
+  const [broadcastSessionDate, setBroadcastSessionDate] = useState<string>("");
+  const [showNewBroadcastDialog, setShowNewBroadcastDialog] = useState(false);
+  const [newBroadcast, setNewBroadcast] = useState({
+    name: "",
+    messageText: "",
+    messageType: "text",
+    mediaUrl: "",
+    mediaFileName: "",
+    mediaMimeType: "",
+  });
+  const [previewLeads, setPreviewLeads] = useState<BroadcastPreview | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
 
   const qrRefreshInterval = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -234,11 +279,41 @@ export default function AdminWhatsAppMarketing() {
     enabled: activeTab === "files"
   });
 
+  // Broadcast queries
+  const { data: broadcasts, isLoading: loadingBroadcasts } = useQuery<WhatsAppBroadcast[]>({
+    queryKey: ["/api/whatsapp/broadcasts"],
+    queryFn: async () => {
+      const res = await fetch("/api/whatsapp/broadcasts", {
+        headers: { Authorization: `Bearer ${localStorage.getItem("adminToken")}` }
+      });
+      return res.json();
+    },
+    enabled: activeTab === "broadcasts",
+    refetchInterval: 5000,
+  });
+
+  const { data: sessionDates } = useQuery<string[]>({
+    queryKey: ["/api/whatsapp/broadcasts/webinar", broadcastWebinarId, "dates"],
+    queryFn: async () => {
+      const res = await fetch(`/api/whatsapp/broadcasts/webinar/${broadcastWebinarId}/dates`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("adminToken")}` }
+      });
+      return res.json();
+    },
+    enabled: !!broadcastWebinarId && activeTab === "broadcasts",
+  });
+
   useEffect(() => {
     if (webinars && webinars.length > 0 && !selectedWebinarId) {
       setSelectedWebinarId(webinars[0].id);
     }
   }, [webinars, selectedWebinarId]);
+
+  useEffect(() => {
+    if (webinars && webinars.length > 0 && !broadcastWebinarId) {
+      setBroadcastWebinarId(webinars[0].id);
+    }
+  }, [webinars, broadcastWebinarId]);
 
   useEffect(() => {
     if (editingSequence) {
@@ -432,6 +507,171 @@ export default function AdminWhatsAppMarketing() {
       toast({ title: "Erro ao excluir", description: error.message, variant: "destructive" });
     },
   });
+
+  // Broadcast mutations
+  const createBroadcastMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await apiRequest("POST", "/api/whatsapp/broadcasts", data);
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Erro ao criar broadcast");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Envio em massa criado com sucesso" });
+      queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/broadcasts"] });
+      setShowNewBroadcastDialog(false);
+      setNewBroadcast({ name: "", messageText: "", messageType: "text", mediaUrl: "", mediaFileName: "", mediaMimeType: "" });
+      setPreviewLeads(null);
+    },
+    onError: (error: any) => {
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const startBroadcastMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("POST", `/api/whatsapp/broadcasts/${id}/start`);
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Erro ao iniciar");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Envio iniciado" });
+      queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/broadcasts"] });
+    },
+    onError: (error: any) => {
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const pauseBroadcastMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("POST", `/api/whatsapp/broadcasts/${id}/pause`);
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Erro ao pausar");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Envio pausado" });
+      queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/broadcasts"] });
+    },
+    onError: (error: any) => {
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const cancelBroadcastMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("POST", `/api/whatsapp/broadcasts/${id}/cancel`);
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Erro ao cancelar");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Envio cancelado" });
+      queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/broadcasts"] });
+    },
+    onError: (error: any) => {
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteBroadcastMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("DELETE", `/api/whatsapp/broadcasts/${id}`);
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Erro ao excluir");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Envio excluído" });
+      queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/broadcasts"] });
+    },
+    onError: (error: any) => {
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handlePreviewLeads = async () => {
+    if (!broadcastWebinarId) {
+      toast({ title: "Selecione um webinar", variant: "destructive" });
+      return;
+    }
+    setLoadingPreview(true);
+    try {
+      const res = await fetch("/api/whatsapp/broadcasts/preview", {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("adminToken")}` 
+        },
+        body: JSON.stringify({
+          webinarId: broadcastWebinarId,
+          filterType: broadcastFilterType,
+          filterDateStart: broadcastFilterType === "date_range" ? broadcastDateStart : undefined,
+          filterDateEnd: broadcastFilterType === "date_range" ? broadcastDateEnd : undefined,
+          filterSessionDate: broadcastFilterType === "session" ? broadcastSessionDate : undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setPreviewLeads(data);
+    } catch (error: any) {
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
+    } finally {
+      setLoadingPreview(false);
+    }
+  };
+
+  const handleCreateBroadcast = () => {
+    if (!newBroadcast.name) {
+      toast({ title: "Preencha o nome do envio", variant: "destructive" });
+      return;
+    }
+    if (!newBroadcast.messageText) {
+      toast({ title: "Preencha a mensagem", variant: "destructive" });
+      return;
+    }
+    if (!broadcastWebinarId) {
+      toast({ title: "Selecione um webinar", variant: "destructive" });
+      return;
+    }
+    createBroadcastMutation.mutate({
+      webinarId: broadcastWebinarId,
+      name: newBroadcast.name,
+      messageText: newBroadcast.messageText,
+      messageType: newBroadcast.messageType,
+      mediaUrl: newBroadcast.mediaUrl || undefined,
+      mediaFileName: newBroadcast.mediaFileName || undefined,
+      mediaMimeType: newBroadcast.mediaMimeType || undefined,
+      filterType: broadcastFilterType,
+      filterDateStart: broadcastFilterType === "date_range" ? broadcastDateStart : undefined,
+      filterDateEnd: broadcastFilterType === "date_range" ? broadcastDateEnd : undefined,
+      filterSessionDate: broadcastFilterType === "session" ? broadcastSessionDate : undefined,
+    });
+  };
+
+  const getBroadcastStatusBadge = (status: string) => {
+    switch (status) {
+      case "draft": return <Badge variant="outline">Rascunho</Badge>;
+      case "pending": return <Badge className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20">Pendente</Badge>;
+      case "running": return <Badge className="bg-blue-500/10 text-blue-500 border-blue-500/20"><Loader2 className="w-3 h-3 mr-1 animate-spin" />Enviando</Badge>;
+      case "paused": return <Badge className="bg-orange-500/10 text-orange-500 border-orange-500/20">Pausado</Badge>;
+      case "completed": return <Badge className="bg-green-500/10 text-green-500 border-green-500/20">Concluído</Badge>;
+      case "cancelled": return <Badge variant="secondary">Cancelado</Badge>;
+      default: return <Badge variant="outline">{status}</Badge>;
+    }
+  };
 
   const formatFileSize = (bytes: number) => {
     if (bytes < 1024) return bytes + " B";
@@ -663,7 +903,7 @@ export default function AdminWhatsAppMarketing() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid grid-cols-5 w-full max-w-3xl">
+          <TabsList className="grid grid-cols-6 w-full max-w-4xl">
             <TabsTrigger value="accounts" data-testid="tab-accounts">
               <SiWhatsapp className="w-4 h-4 mr-2" />
               Contas
@@ -676,9 +916,13 @@ export default function AdminWhatsAppMarketing() {
               <Clock className="w-4 h-4 mr-2" />
               Sequências
             </TabsTrigger>
+            <TabsTrigger value="broadcasts" data-testid="tab-broadcasts">
+              <Radio className="w-4 h-4 mr-2" />
+              Envios em Massa
+            </TabsTrigger>
             <TabsTrigger value="files" data-testid="tab-files">
               <Image className="w-4 h-4 mr-2" />
-              Meus Arquivos
+              Arquivos
             </TabsTrigger>
             <TabsTrigger value="test" data-testid="tab-test">
               <Send className="w-4 h-4 mr-2" />
@@ -1137,6 +1381,343 @@ export default function AdminWhatsAppMarketing() {
                 </CardContent>
               </Card>
             )}
+          </TabsContent>
+
+          <TabsContent value="broadcasts" className="space-y-6">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <h2 className="text-lg font-semibold">Envios em Massa</h2>
+              <Button 
+                onClick={() => {
+                  if (!previewLeads || previewLeads.count === 0) {
+                    toast({ title: "Visualize os leads primeiro", description: "Selecione os filtros e clique em 'Visualizar Leads' antes de criar um envio", variant: "destructive" });
+                    return;
+                  }
+                  setShowNewBroadcastDialog(true);
+                }}
+                data-testid="button-new-broadcast"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Novo Envio
+              </Button>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Filter className="w-5 h-5" />
+                  Filtros de Leads
+                </CardTitle>
+                <CardDescription>
+                  Selecione o webinar e filtre os leads por data de sessão
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Webinar</Label>
+                    <Select value={broadcastWebinarId} onValueChange={setBroadcastWebinarId}>
+                      <SelectTrigger data-testid="select-broadcast-webinar">
+                        <SelectValue placeholder="Selecione um webinar" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {webinars?.map((webinar) => (
+                          <SelectItem key={webinar.id} value={webinar.id}>
+                            {webinar.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Tipo de Filtro</Label>
+                    <Select value={broadcastFilterType} onValueChange={(v) => setBroadcastFilterType(v as any)}>
+                      <SelectTrigger data-testid="select-filter-type">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos os leads</SelectItem>
+                        <SelectItem value="date_range">Intervalo de datas</SelectItem>
+                        <SelectItem value="session">Data de sessão específica</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {broadcastFilterType === "date_range" && (
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Data Inicial</Label>
+                      <Input
+                        type="date"
+                        value={broadcastDateStart}
+                        onChange={(e) => setBroadcastDateStart(e.target.value)}
+                        data-testid="input-date-start"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Data Final</Label>
+                      <Input
+                        type="date"
+                        value={broadcastDateEnd}
+                        onChange={(e) => setBroadcastDateEnd(e.target.value)}
+                        data-testid="input-date-end"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {broadcastFilterType === "session" && (
+                  <div className="space-y-2">
+                    <Label>Data da Sessão</Label>
+                    <Select value={broadcastSessionDate} onValueChange={setBroadcastSessionDate}>
+                      <SelectTrigger data-testid="select-session-date">
+                        <SelectValue placeholder="Selecione uma data" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {sessionDates?.map((date) => (
+                          <SelectItem key={date} value={date}>
+                            {new Date(date).toLocaleDateString("pt-BR")}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-4 flex-wrap">
+                  <Button 
+                    variant="outline" 
+                    onClick={handlePreviewLeads}
+                    disabled={loadingPreview || !broadcastWebinarId}
+                    data-testid="button-preview-leads"
+                  >
+                    {loadingPreview ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Eye className="w-4 h-4 mr-2" />
+                    )}
+                    Visualizar Leads
+                  </Button>
+
+                  {previewLeads && (
+                    <div className="flex items-center gap-2">
+                      <Users className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-sm">
+                        <span className="font-medium">{previewLeads.count}</span> leads encontrados
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {previewLeads && previewLeads.leads.length > 0 && (
+                  <div className="border rounded-lg overflow-hidden">
+                    <div className="bg-muted p-2 text-sm font-medium">
+                      Prévia dos leads (mostrando até 50)
+                    </div>
+                    <div className="max-h-48 overflow-y-auto">
+                      <table className="w-full text-sm">
+                        <thead className="bg-muted/50 sticky top-0">
+                          <tr>
+                            <th className="text-left p-2">Nome</th>
+                            <th className="text-left p-2">WhatsApp</th>
+                            <th className="text-left p-2">Capturado em</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {previewLeads.leads.map((lead) => (
+                            <tr key={lead.id} className="border-t">
+                              <td className="p-2">{lead.name}</td>
+                              <td className="p-2">{lead.whatsapp}</td>
+                              <td className="p-2">{new Date(lead.capturedAt).toLocaleDateString("pt-BR")}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Radio className="w-5 h-5" />
+                  Histórico de Envios
+                </CardTitle>
+                <CardDescription>
+                  Acompanhe o progresso dos seus envios em massa
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {loadingBroadcasts ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+                  </div>
+                ) : broadcasts && broadcasts.length > 0 ? (
+                  <div className="space-y-4">
+                    {broadcasts.map((broadcast) => (
+                      <Card key={broadcast.id} data-testid={`card-broadcast-${broadcast.id}`}>
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between gap-4 flex-wrap">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <h3 className="font-medium">{broadcast.name}</h3>
+                                {getBroadcastStatusBadge(broadcast.status)}
+                              </div>
+                              <p className="text-sm text-muted-foreground">
+                                {new Date(broadcast.createdAt).toLocaleDateString("pt-BR")} - {broadcast.totalRecipients} destinatários
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {(broadcast.status === "pending" || broadcast.status === "paused") && (
+                                <Button
+                                  size="sm"
+                                  onClick={() => startBroadcastMutation.mutate(broadcast.id)}
+                                  disabled={startBroadcastMutation.isPending}
+                                  data-testid={`button-start-${broadcast.id}`}
+                                >
+                                  <Play className="w-3 h-3 mr-1" />
+                                  {broadcast.status === "paused" ? "Retomar" : "Iniciar"}
+                                </Button>
+                              )}
+                              {broadcast.status === "running" && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => pauseBroadcastMutation.mutate(broadcast.id)}
+                                  disabled={pauseBroadcastMutation.isPending}
+                                  data-testid={`button-pause-${broadcast.id}`}
+                                >
+                                  <Pause className="w-3 h-3 mr-1" />
+                                  Pausar
+                                </Button>
+                              )}
+                              {(broadcast.status === "pending" || broadcast.status === "running" || broadcast.status === "paused") && (
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={() => {
+                                    if (confirm("Tem certeza que deseja cancelar este envio?")) {
+                                      cancelBroadcastMutation.mutate(broadcast.id);
+                                    }
+                                  }}
+                                  disabled={cancelBroadcastMutation.isPending}
+                                  data-testid={`button-cancel-${broadcast.id}`}
+                                >
+                                  <X className="w-3 h-3 mr-1" />
+                                  Cancelar
+                                </Button>
+                              )}
+                              {(broadcast.status === "completed" || broadcast.status === "cancelled") && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => {
+                                    if (confirm("Excluir este envio?")) {
+                                      deleteBroadcastMutation.mutate(broadcast.id);
+                                    }
+                                  }}
+                                  disabled={deleteBroadcastMutation.isPending}
+                                  data-testid={`button-delete-${broadcast.id}`}
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                          <div className="mt-3 grid grid-cols-3 gap-4 text-center">
+                            <div>
+                              <p className="text-2xl font-bold text-green-500">{broadcast.sentCount}</p>
+                              <p className="text-xs text-muted-foreground">Enviados</p>
+                            </div>
+                            <div>
+                              <p className="text-2xl font-bold text-red-500">{broadcast.failedCount}</p>
+                              <p className="text-xs text-muted-foreground">Falhas</p>
+                            </div>
+                            <div>
+                              <p className="text-2xl font-bold text-muted-foreground">
+                                {broadcast.totalRecipients - broadcast.sentCount - broadcast.failedCount}
+                              </p>
+                              <p className="text-xs text-muted-foreground">Pendentes</p>
+                            </div>
+                          </div>
+                          {broadcast.status === "running" && (
+                            <div className="mt-3">
+                              <div className="h-2 bg-muted rounded-full overflow-hidden">
+                                <div 
+                                  className="h-full bg-green-500 transition-all"
+                                  style={{ width: `${((broadcast.sentCount + broadcast.failedCount) / broadcast.totalRecipients) * 100}%` }}
+                                />
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-1 text-center">
+                                {Math.round(((broadcast.sentCount + broadcast.failedCount) / broadcast.totalRecipients) * 100)}% concluído
+                              </p>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Radio className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p>Nenhum envio em massa criado ainda</p>
+                    <Button 
+                      className="mt-4" 
+                      onClick={() => setShowNewBroadcastDialog(true)}
+                      data-testid="button-create-first-broadcast"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Criar primeiro envio
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Contas Disponíveis para Rotação</CardTitle>
+                <CardDescription>
+                  Contas WhatsApp conectadas que serão usadas para distribuir os envios
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {accounts && accounts.filter(a => a.status === "connected").length > 0 ? (
+                  <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                    {accounts.filter(a => a.status === "connected").map((account) => (
+                      <div key={account.id} className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                        <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center">
+                          <SiWhatsapp className="w-5 h-5 text-green-500" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{account.label}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {account.messagesSentToday}/{account.dailyLimit} hoje
+                          </p>
+                        </div>
+                        <Badge variant="outline" className="shrink-0">
+                          P{account.priority}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-4 text-muted-foreground">
+                    <WifiOff className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">Nenhuma conta conectada</p>
+                    <Button 
+                      variant="link" 
+                      onClick={() => setActiveTab("accounts")}
+                      className="mt-2"
+                    >
+                      Ir para Contas
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="files" className="space-y-6">
@@ -1889,6 +2470,57 @@ export default function AdminWhatsAppMarketing() {
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 )}
                 Salvar Alterações
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={showNewBroadcastDialog} onOpenChange={setShowNewBroadcastDialog}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Novo Envio em Massa</DialogTitle>
+              <DialogDescription>
+                Crie um novo envio para os {previewLeads?.count || 0} leads selecionados
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Nome do Envio</Label>
+                <Input
+                  placeholder="Ex: Lembrete Webinar Dezembro"
+                  value={newBroadcast.name}
+                  onChange={(e) => setNewBroadcast({ ...newBroadcast, name: e.target.value })}
+                  data-testid="input-broadcast-name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Mensagem</Label>
+                <Textarea
+                  placeholder="Digite a mensagem... Use {nome} para personalizar"
+                  value={newBroadcast.messageText}
+                  onChange={(e) => setNewBroadcast({ ...newBroadcast, messageText: e.target.value })}
+                  rows={6}
+                  data-testid="input-broadcast-message"
+                />
+                <p className="text-xs text-muted-foreground">Use {"{nome}"} para inserir o nome do lead</p>
+              </div>
+              {previewLeads && (
+                <div className="bg-muted/50 p-3 rounded-lg">
+                  <p className="text-sm"><strong>{previewLeads.count}</strong> leads serão enviados</p>
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowNewBroadcastDialog(false)}>Cancelar</Button>
+              <Button 
+                onClick={() => {
+                  handleCreateBroadcast();
+                }}
+                disabled={createBroadcastMutation.isPending || !newBroadcast.name || !newBroadcast.messageText}
+                data-testid="button-create-broadcast"
+              >
+                {createBroadcastMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Criar Envio
               </Button>
             </DialogFooter>
           </DialogContent>

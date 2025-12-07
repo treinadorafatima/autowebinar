@@ -797,3 +797,58 @@ export const webinarViewLogs = pgTable("webinar_view_logs", {
 export type WebinarViewLog = typeof webinarViewLogs.$inferSelect;
 export const webinarViewLogInsertSchema = createInsertSchema(webinarViewLogs).omit({ id: true, createdAt: true });
 export type WebinarViewLogInsert = z.infer<typeof webinarViewLogInsertSchema>;
+
+// ============================================
+// WHATSAPP BROADCAST (ENVIOS EM MASSA)
+// ============================================
+
+// WhatsApp Broadcasts - Envios em massa com filtros e rotação de contas
+export const whatsappBroadcasts = pgTable("whatsapp_broadcasts", {
+  id: text("id").primaryKey(),
+  adminId: text("admin_id").notNull(),
+  webinarId: text("webinar_id").notNull(),
+  name: text("name").notNull(),
+  messageText: text("message_text").notNull(),
+  messageType: text("message_type").notNull().default("text"),
+  mediaUrl: text("media_url"),
+  mediaFileName: text("media_file_name"),
+  mediaMimeType: text("media_mime_type"),
+  filterType: text("filter_type").notNull().default("all"),
+  filterDateStart: text("filter_date_start"),
+  filterDateEnd: text("filter_date_end"),
+  filterSessionDate: text("filter_session_date"),
+  status: text("status").notNull().default("draft"),
+  totalRecipients: integer("total_recipients").notNull().default(0),
+  sentCount: integer("sent_count").notNull().default(0),
+  failedCount: integer("failed_count").notNull().default(0),
+  pendingCount: integer("pending_count").notNull().default(0),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type WhatsappBroadcast = typeof whatsappBroadcasts.$inferSelect;
+export const whatsappBroadcastInsertSchema = createInsertSchema(whatsappBroadcasts).omit({ id: true, createdAt: true, updatedAt: true });
+export type WhatsappBroadcastInsert = z.infer<typeof whatsappBroadcastInsertSchema>;
+
+// WhatsApp Broadcast Recipients - Destinatários individuais de cada broadcast
+export const whatsappBroadcastRecipients = pgTable("whatsapp_broadcast_recipients", {
+  id: text("id").primaryKey(),
+  broadcastId: text("broadcast_id").notNull(),
+  leadId: text("lead_id").notNull(),
+  phone: text("phone").notNull(),
+  name: text("name"),
+  sessionDate: text("session_date"),
+  accountId: text("account_id"),
+  status: text("status").notNull().default("pending"),
+  attempts: integer("attempts").notNull().default(0),
+  lastAttemptAt: timestamp("last_attempt_at"),
+  sentAt: timestamp("sent_at"),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type WhatsappBroadcastRecipient = typeof whatsappBroadcastRecipients.$inferSelect;
+export const whatsappBroadcastRecipientInsertSchema = createInsertSchema(whatsappBroadcastRecipients).omit({ id: true, createdAt: true });
+export type WhatsappBroadcastRecipientInsert = z.infer<typeof whatsappBroadcastRecipientInsertSchema>;
