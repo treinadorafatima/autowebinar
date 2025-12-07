@@ -312,8 +312,8 @@ export default function Checkout() {
         setLocation('/pagamento/pendente?gateway=mercadopago');
       } else {
         toast({
-          title: "Pagamento não aprovado",
-          description: data.statusDetail || "Tente novamente com outro método de pagamento.",
+          title: data.error || "Pagamento não aprovado",
+          description: data.action || "Tente novamente com outro método de pagamento.",
           variant: "destructive",
         });
       }
@@ -354,8 +354,8 @@ export default function Checkout() {
         setLocation('/pagamento/pendente?gateway=mercadopago&tipo=assinatura');
       } else {
         toast({
-          title: "Assinatura não autorizada",
-          description: data.statusDetail || "Tente novamente com outro cartão.",
+          title: data.error || "Assinatura não autorizada",
+          description: data.action || "Tente novamente com outro cartão.",
           variant: "destructive",
         });
       }
