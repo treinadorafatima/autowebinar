@@ -151,6 +151,11 @@ export default function AdminUsersPage() {
     fetchPlanos();
   }, []);
 
+  // Resetar página quando filtros mudam
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterExpired, filterActive, filterPlano, filterTrialActive, filterTrialExpired, filterInactive]);
+
   async function fetchUsers() {
     try {
       const res = await fetch("/api/users", {
@@ -555,13 +560,6 @@ export default function AdminUsersPage() {
     currentPage * ITEMS_PER_PAGE
   );
   
-  // Resetar página se for maior que o total de páginas (usando useEffect para evitar render loop)
-  useEffect(() => {
-    if (currentPage > totalPages && totalPages > 0) {
-      setCurrentPage(1);
-    }
-  }, [currentPage, totalPages]);
-
   return (
     <div className="p-4 sm:p-6 space-y-6">
       {/* Header */}
