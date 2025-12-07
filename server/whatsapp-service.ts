@@ -19,12 +19,15 @@ interface WhatsAppConnection {
   qrGeneratedAt: number | null;
   status: "disconnected" | "connecting" | "qr_ready" | "connected" | "banned";
   phoneNumber: string | null;
+  adminId: string; // Admin que possui esta conta
+  accountId: string; // ID único da conta WhatsApp
   reconnectAttempts: number;
   lastMessageSentAt: number;
   messageQueue: Array<{ phone: string; message: string; resolve: (result: any) => void; reject: (error: any) => void }>;
   isProcessingQueue: boolean;
 }
 
+// Map key is now accountId (not adminId) for complete isolation between accounts
 const connections: Map<string, WhatsAppConnection> = new Map();
 
 const AUTH_DIR = path.join(process.cwd(), "whatsapp-sessions");
@@ -45,8 +48,8 @@ if (!fs.existsSync(AUTH_DIR)) {
   fs.mkdirSync(AUTH_DIR, { recursive: true });
 }
 
-function getAuthDir(adminId: string): string {
-  const dir = path.join(AUTH_DIR, adminId);
+function getAuthDir(accountId: string): string {
+  const dir = path.join(AUTH_DIR, accountId);
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
@@ -98,12 +101,12 @@ function getReconnectDelay(attempts: number): number {
   return Math.min(delay + jitter, 60000);
 }
 
-function checkRateLimit(adminId: string): { allowed: boolean; waitMs: number } {
+function checkRateLimit(accountId: string): { allowed: boolean; waitMs: number } {
   const now = Date.now();
-  const record = messageCounts.get(adminId);
+  const record = messageCounts.get(accountId);
   
   if (!record || now > record.resetAt) {
-    messageCounts.set(adminId, { count: 1, resetAt: now + 60000 });
+    messageCounts.set(accountId, { count: 1, resetAt: now + 60000 });
     return { allowed: true, waitMs: 0 };
   }
   
@@ -119,14 +122,14 @@ function getRandomMessageDelay(): number {
   return MIN_MESSAGE_INTERVAL_MS + Math.random() * (MAX_MESSAGE_INTERVAL_MS - MIN_MESSAGE_INTERVAL_MS);
 }
 
-async function processMessageQueue(adminId: string): Promise<void> {
-  const conn = connections.get(adminId);
+async function processMessageQueue(accountId: string): Promise<void> {
+  const conn = connections.get(accountId);
   if (!conn || conn.isProcessingQueue) return;
   
   conn.isProcessingQueue = true;
   
   while (conn.messageQueue.length > 0) {
-    const currentConn = connections.get(adminId);
+    const currentConn = connections.get(accountId);
     
     if (!currentConn || currentConn.status === "banned") {
       while (conn.messageQueue.length > 0) {
@@ -137,16 +140,16 @@ async function processMessageQueue(adminId: string): Promise<void> {
     }
     
     if (!currentConn.socket || currentConn.status !== "connected") {
-      console.log(`[whatsapp] Queue paused for admin ${adminId} - waiting for connection (status: ${currentConn.status})`);
+      console.log(`[whatsapp] Queue paused for account ${accountId} - waiting for connection (status: ${currentConn.status})`);
       conn.isProcessingQueue = false;
       return;
     }
     
     const item = conn.messageQueue[0];
     
-    const rateCheck = checkRateLimit(adminId);
+    const rateCheck = checkRateLimit(accountId);
     if (!rateCheck.allowed) {
-      console.log(`[whatsapp] Rate limit hit for admin ${adminId}, waiting ${rateCheck.waitMs}ms`);
+      console.log(`[whatsapp] Rate limit hit for account ${accountId}, waiting ${rateCheck.waitMs}ms`);
       await new Promise(resolve => setTimeout(resolve, rateCheck.waitMs));
       continue;
     }
@@ -174,26 +177,26 @@ async function processMessageQueue(adminId: string): Promise<void> {
       await conn.socket.sendMessage(jid, { text: item.message });
       conn.lastMessageSentAt = Date.now();
       
-      console.log(`[whatsapp] Message sent to ${item.phone} from admin ${adminId}`);
+      console.log(`[whatsapp] Message sent to ${item.phone} from account ${accountId}`);
       item.resolve({ success: true });
     } catch (error: any) {
       console.error(`[whatsapp] Error sending message:`, error);
       
       if (isSpamOrBanError(error)) {
-        console.error(`[whatsapp] SPAM/BAN detected for admin ${adminId}!`);
+        console.error(`[whatsapp] SPAM/BAN detected for account ${accountId}!`);
         conn.status = "banned";
         
         // Clear rate limit counters for isolation
-        messageCounts.delete(adminId);
+        messageCounts.delete(accountId);
         
         // Clear auth directory for complete isolation
-        const authDir = getAuthDir(adminId);
+        const authDir = getAuthDir(accountId);
         if (fs.existsSync(authDir)) {
           fs.rmSync(authDir, { recursive: true });
-          console.log(`[whatsapp] Auth cleared for banned admin ${adminId} during queue processing`);
+          console.log(`[whatsapp] Auth cleared for banned account ${accountId} during queue processing`);
         }
         
-        await storage.upsertWhatsappSession(adminId, {
+        await storage.upsertWhatsappSessionByAccountId(accountId, conn.adminId, {
           status: "banned",
           qrCode: null,
           phoneNumber: null,
@@ -233,7 +236,7 @@ function isSpamOrBanError(error: any): boolean {
   return banIndicators.some(indicator => errorStr.includes(indicator));
 }
 
-export async function initWhatsAppConnection(adminId: string): Promise<{
+export async function initWhatsAppConnection(accountId: string, adminId: string): Promise<{
   success: boolean;
   status: string;
   qrCode?: string;
@@ -241,7 +244,7 @@ export async function initWhatsAppConnection(adminId: string): Promise<{
   error?: string;
 }> {
   try {
-    const existing = connections.get(adminId);
+    const existing = connections.get(accountId);
     
     if (existing?.status === "banned") {
       return {
@@ -276,24 +279,26 @@ export async function initWhatsAppConnection(adminId: string): Promise<{
       }
     }
 
-    connections.set(adminId, {
+    connections.set(accountId, {
       socket: null,
       qrCode: null,
       qrGeneratedAt: null,
       status: "connecting",
       phoneNumber: null,
+      adminId,
+      accountId,
       reconnectAttempts: existing?.reconnectAttempts || 0,
       lastMessageSentAt: 0,
       messageQueue: existing?.messageQueue || [],
       isProcessingQueue: false,
     });
 
-    await storage.upsertWhatsappSession(adminId, {
+    await storage.upsertWhatsappSessionByAccountId(accountId, adminId, {
       status: "connecting",
       qrCode: null,
     });
 
-    const authDir = getAuthDir(adminId);
+    const authDir = getAuthDir(accountId);
     const { state, saveCreds } = await useMultiFileAuthState(authDir);
     const { version } = await fetchLatestBaileysVersion();
 
@@ -314,13 +319,13 @@ export async function initWhatsAppConnection(adminId: string): Promise<{
 
     socket.ev.on("connection.update", async (update) => {
       const { connection, lastDisconnect, qr } = update;
-      const conn = connections.get(adminId);
+      const conn = connections.get(accountId);
 
       if (qr) {
         try {
           const qrDataUrl = await QRCode.toDataURL(qr, { width: 256 });
           
-          connections.set(adminId, {
+          connections.set(accountId, {
             ...conn!,
             socket,
             qrCode: qrDataUrl,
@@ -330,12 +335,12 @@ export async function initWhatsAppConnection(adminId: string): Promise<{
             reconnectAttempts: 0,
           });
 
-          await storage.upsertWhatsappSession(adminId, {
+          await storage.upsertWhatsappSessionByAccountId(accountId, adminId, {
             status: "qr_ready",
             qrCode: qrDataUrl,
           });
 
-          console.log(`[whatsapp] QR code generated for admin ${adminId}`);
+          console.log(`[whatsapp] QR code generated for account ${accountId}`);
         } catch (err) {
           console.error("[whatsapp] Error generating QR:", err);
         }
@@ -344,35 +349,35 @@ export async function initWhatsAppConnection(adminId: string): Promise<{
       if (connection === "close") {
         const statusCode = (lastDisconnect?.error as Boom)?.output?.statusCode;
         const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
-        const currentConn = connections.get(adminId);
+        const currentConn = connections.get(accountId);
         const attempts = currentConn?.reconnectAttempts || 0;
 
         console.log(
-          `[whatsapp] Connection closed for admin ${adminId}. Status: ${statusCode}, Reconnect: ${shouldReconnect}, Attempts: ${attempts}`
+          `[whatsapp] Connection closed for account ${accountId}. Status: ${statusCode}, Reconnect: ${shouldReconnect}, Attempts: ${attempts}`
         );
 
         if (isSpamOrBanError(lastDisconnect?.error)) {
-          console.error(`[whatsapp] BAN detected on disconnect for admin ${adminId}`);
+          console.error(`[whatsapp] BAN detected on disconnect for account ${accountId}`);
           
           if (currentConn?.messageQueue && currentConn.messageQueue.length > 0) {
-            console.log(`[whatsapp] Flushing ${currentConn.messageQueue.length} queued messages for banned admin ${adminId}`);
+            console.log(`[whatsapp] Flushing ${currentConn.messageQueue.length} queued messages for banned account ${accountId}`);
             while (currentConn.messageQueue.length > 0) {
               const item = currentConn.messageQueue.shift();
               item?.reject(new Error("Conta suspensa por spam. Aguarde algumas horas antes de tentar novamente."));
             }
           }
           
-          // Clear rate limit counters for this admin to ensure isolation
-          messageCounts.delete(adminId);
+          // Clear rate limit counters for this account to ensure isolation
+          messageCounts.delete(accountId);
           
           // Clear auth directory to ensure complete isolation from other users
-          const authDir = getAuthDir(adminId);
+          const authDir = getAuthDir(accountId);
           if (fs.existsSync(authDir)) {
             fs.rmSync(authDir, { recursive: true });
-            console.log(`[whatsapp] Auth cleared for banned admin ${adminId} - complete isolation ensured`);
+            console.log(`[whatsapp] Auth cleared for banned account ${accountId} - complete isolation ensured`);
           }
           
-          connections.set(adminId, {
+          connections.set(accountId, {
             ...currentConn!,
             socket: null,
             qrCode: null,
@@ -382,7 +387,7 @@ export async function initWhatsAppConnection(adminId: string): Promise<{
             messageQueue: [],
           });
 
-          await storage.upsertWhatsappSession(adminId, {
+          await storage.upsertWhatsappSessionByAccountId(accountId, adminId, {
             status: "banned",
             qrCode: null,
             phoneNumber: null,
@@ -395,24 +400,24 @@ export async function initWhatsAppConnection(adminId: string): Promise<{
           const delay = getReconnectDelay(attempts);
           console.log(`[whatsapp] Reconnecting in ${delay}ms (attempt ${attempts + 1}/${MAX_RECONNECT_ATTEMPTS})`);
           
-          connections.set(adminId, {
+          connections.set(accountId, {
             ...currentConn!,
             socket: null,
             status: "connecting",
             reconnectAttempts: attempts + 1,
           });
           
-          setTimeout(() => initWhatsAppConnection(adminId), delay);
+          setTimeout(() => initWhatsAppConnection(accountId, adminId), delay);
         } else {
           if (currentConn?.messageQueue && currentConn.messageQueue.length > 0) {
-            console.log(`[whatsapp] Flushing ${currentConn.messageQueue.length} queued messages for admin ${adminId} (connection permanently closed)`);
+            console.log(`[whatsapp] Flushing ${currentConn.messageQueue.length} queued messages for account ${accountId} (connection permanently closed)`);
             while (currentConn.messageQueue.length > 0) {
               const item = currentConn.messageQueue.shift();
               item?.reject(new Error("Conexão encerrada permanentemente. Por favor, reconecte manualmente."));
             }
           }
           
-          connections.set(adminId, {
+          connections.set(accountId, {
             ...currentConn!,
             socket: null,
             qrCode: null,
@@ -423,17 +428,17 @@ export async function initWhatsAppConnection(adminId: string): Promise<{
             messageQueue: [],
           });
 
-          await storage.upsertWhatsappSession(adminId, {
+          await storage.upsertWhatsappSessionByAccountId(accountId, adminId, {
             status: "disconnected",
             qrCode: null,
             phoneNumber: null,
           });
 
           if (!shouldReconnect) {
-            const authDir = getAuthDir(adminId);
+            const authDir = getAuthDir(accountId);
             if (fs.existsSync(authDir)) {
               fs.rmSync(authDir, { recursive: true });
-              console.log(`[whatsapp] Auth cleared for admin ${adminId} (logged out)`);
+              console.log(`[whatsapp] Auth cleared for account ${accountId} (logged out)`);
             }
           }
         }
@@ -442,7 +447,7 @@ export async function initWhatsAppConnection(adminId: string): Promise<{
       if (connection === "open") {
         const phoneNumber = socket.user?.id?.split(":")[0] || null;
         
-        connections.set(adminId, {
+        connections.set(accountId, {
           ...conn!,
           socket,
           qrCode: null,
@@ -452,16 +457,16 @@ export async function initWhatsAppConnection(adminId: string): Promise<{
           reconnectAttempts: 0,
         });
 
-        await storage.upsertWhatsappSession(adminId, {
+        await storage.upsertWhatsappSessionByAccountId(accountId, adminId, {
           status: "connected",
           qrCode: null,
           phoneNumber,
           lastConnectedAt: new Date(),
         });
 
-        console.log(`[whatsapp] Connected for admin ${adminId}: ${phoneNumber}`);
+        console.log(`[whatsapp] Connected for account ${accountId}: ${phoneNumber}`);
         
-        processMessageQueue(adminId);
+        processMessageQueue(accountId);
       }
     });
 
@@ -472,13 +477,15 @@ export async function initWhatsAppConnection(adminId: string): Promise<{
   } catch (error) {
     console.error("[whatsapp] Error initializing connection:", error);
     
-    const existing = connections.get(adminId);
-    connections.set(adminId, {
+    const existing = connections.get(accountId);
+    connections.set(accountId, {
       socket: null,
       qrCode: null,
       qrGeneratedAt: null,
       status: "disconnected",
       phoneNumber: null,
+      adminId,
+      accountId,
       reconnectAttempts: (existing?.reconnectAttempts || 0) + 1,
       lastMessageSentAt: 0,
       messageQueue: existing?.messageQueue || [],
@@ -493,13 +500,13 @@ export async function initWhatsAppConnection(adminId: string): Promise<{
   }
 }
 
-export async function getWhatsAppStatus(adminId: string): Promise<{
+export async function getWhatsAppStatus(accountId: string): Promise<{
   status: string;
   qrCode?: string;
   phoneNumber?: string;
   qrExpired?: boolean;
 }> {
-  const conn = connections.get(adminId);
+  const conn = connections.get(accountId);
   
   if (conn) {
     let qrExpired = false;
@@ -516,7 +523,7 @@ export async function getWhatsAppStatus(adminId: string): Promise<{
     };
   }
 
-  const session = await storage.getWhatsappSession(adminId);
+  const session = await storage.getWhatsappSessionByAccountId(accountId);
   if (session) {
     return {
       status: session.status,
@@ -528,12 +535,12 @@ export async function getWhatsAppStatus(adminId: string): Promise<{
   return { status: "disconnected" };
 }
 
-export async function disconnectWhatsApp(adminId: string): Promise<boolean> {
+export async function disconnectWhatsApp(accountId: string, adminId: string): Promise<boolean> {
   try {
-    const conn = connections.get(adminId);
+    const conn = connections.get(accountId);
     
     if (conn?.messageQueue && conn.messageQueue.length > 0) {
-      console.log(`[whatsapp] Flushing ${conn.messageQueue.length} queued messages before disconnect for admin ${adminId}`);
+      console.log(`[whatsapp] Flushing ${conn.messageQueue.length} queued messages before disconnect for account ${accountId}`);
       while (conn.messageQueue.length > 0) {
         const item = conn.messageQueue.shift();
         item?.reject(new Error("WhatsApp desconectado pelo usuário."));
@@ -544,20 +551,20 @@ export async function disconnectWhatsApp(adminId: string): Promise<boolean> {
       await conn.socket.logout();
     }
 
-    connections.delete(adminId);
+    connections.delete(accountId);
 
-    await storage.upsertWhatsappSession(adminId, {
+    await storage.upsertWhatsappSessionByAccountId(accountId, adminId, {
       status: "disconnected",
       qrCode: null,
       phoneNumber: null,
     });
 
-    const authDir = getAuthDir(adminId);
+    const authDir = getAuthDir(accountId);
     if (fs.existsSync(authDir)) {
       fs.rmSync(authDir, { recursive: true });
     }
 
-    console.log(`[whatsapp] Disconnected for admin ${adminId}`);
+    console.log(`[whatsapp] Disconnected for account ${accountId}`);
     return true;
   } catch (error) {
     console.error("[whatsapp] Error disconnecting:", error);
@@ -566,11 +573,11 @@ export async function disconnectWhatsApp(adminId: string): Promise<boolean> {
 }
 
 export async function sendWhatsAppMessage(
-  adminId: string,
+  accountId: string,
   phone: string,
   message: string
 ): Promise<{ success: boolean; error?: string; queued?: boolean }> {
-  let conn = connections.get(adminId);
+  let conn = connections.get(accountId);
   
   if (!conn) {
     return { success: false, error: "WhatsApp não inicializado" };
@@ -607,7 +614,7 @@ export async function sendWhatsAppMessage(
         }
       });
       
-      console.log(`[whatsapp] Message queued for admin ${adminId} (status: ${conn!.status})`);
+      console.log(`[whatsapp] Message queued for account ${accountId} (status: ${conn!.status})`);
     });
   }
   
@@ -617,7 +624,7 @@ export async function sendWhatsAppMessage(
 
   return new Promise((resolve, reject) => {
     conn!.messageQueue.push({ phone, message, resolve, reject });
-    processMessageQueue(adminId);
+    processMessageQueue(accountId);
   });
 }
 
@@ -801,11 +808,11 @@ function validateDownloadedMedia(buffer: Buffer, mediaType: "image" | "audio" | 
 }
 
 export async function sendWhatsAppMediaMessage(
-  adminId: string,
+  accountId: string,
   phone: string,
   media: MediaMessage
 ): Promise<{ success: boolean; error?: string }> {
-  const conn = connections.get(adminId);
+  const conn = connections.get(accountId);
   
   if (!conn) {
     return { success: false, error: "WhatsApp não inicializado" };
@@ -827,9 +834,9 @@ export async function sendWhatsAppMediaMessage(
   }
 
   // Apply rate limiting for media messages too
-  const rateCheck = checkRateLimit(adminId);
+  const rateCheck = checkRateLimit(accountId);
   if (!rateCheck.allowed) {
-    console.log(`[whatsapp] Rate limit hit for media message from admin ${adminId}, waiting ${rateCheck.waitMs}ms`);
+    console.log(`[whatsapp] Rate limit hit for media message from account ${accountId}, waiting ${rateCheck.waitMs}ms`);
     await new Promise(resolve => setTimeout(resolve, rateCheck.waitMs));
   }
 
@@ -903,7 +910,7 @@ export async function sendWhatsAppMediaMessage(
     await conn.socket.sendMessage(jid, messageContent);
     conn.lastMessageSentAt = Date.now();
     
-    console.log(`[whatsapp] Media (${media.type}) sent to ${phone} from admin ${adminId}`);
+    console.log(`[whatsapp] Media (${media.type}) sent to ${phone} from account ${accountId}`);
     return { success: true };
   } catch (error: any) {
     console.error(`[whatsapp] Error sending media:`, error);
@@ -912,16 +919,16 @@ export async function sendWhatsAppMediaMessage(
       conn.status = "banned";
       
       // Clear rate limit counters for isolation
-      messageCounts.delete(adminId);
+      messageCounts.delete(accountId);
       
       // Clear auth directory for complete isolation
-      const authDir = getAuthDir(adminId);
+      const authDir = getAuthDir(accountId);
       if (fs.existsSync(authDir)) {
         fs.rmSync(authDir, { recursive: true });
-        console.log(`[whatsapp] Auth cleared for banned admin ${adminId} during media send`);
+        console.log(`[whatsapp] Auth cleared for banned account ${accountId} during media send`);
       }
       
-      await storage.upsertWhatsappSession(adminId, {
+      await storage.upsertWhatsappSessionByAccountId(accountId, conn.adminId, {
         status: "banned",
         qrCode: null,
         phoneNumber: null,
@@ -939,17 +946,17 @@ export async function restoreWhatsAppSessions(): Promise<void> {
     const sessions = await storage.getActiveWhatsappSessions();
     
     for (const session of sessions) {
-      if (session.status === "connected") {
-        console.log(`[whatsapp] Restoring session for admin ${session.adminId}`);
+      if (session.status === "connected" && session.accountId) {
+        console.log(`[whatsapp] Restoring session for account ${session.accountId} (admin: ${session.adminId})`);
         
         await new Promise(resolve => setTimeout(resolve, 1000));
         
         try {
-          await initWhatsAppConnection(session.adminId);
+          await initWhatsAppConnection(session.accountId, session.adminId);
         } catch (error) {
-          console.error(`[whatsapp] Failed to restore session for admin ${session.adminId}:`, error);
+          console.error(`[whatsapp] Failed to restore session for account ${session.accountId}:`, error);
           
-          await storage.upsertWhatsappSession(session.adminId, {
+          await storage.upsertWhatsappSessionByAccountId(session.accountId, session.adminId, {
             status: "disconnected",
             qrCode: null,
           });
@@ -985,13 +992,13 @@ export function replaceWhatsappMergeTags(
     .replace(/\{\{replay_link\}\}/gi, data.replayLink || "");
 }
 
-export async function clearBanStatus(adminId: string): Promise<boolean> {
+export async function clearBanStatus(accountId: string, adminId: string): Promise<boolean> {
   try {
-    const conn = connections.get(adminId);
+    const conn = connections.get(accountId);
     
     if (conn) {
       if (conn.messageQueue && conn.messageQueue.length > 0) {
-        console.log(`[whatsapp] Flushing ${conn.messageQueue.length} queued messages before clearing ban for admin ${adminId}`);
+        console.log(`[whatsapp] Flushing ${conn.messageQueue.length} queued messages before clearing ban for account ${accountId}`);
         while (conn.messageQueue.length > 0) {
           const item = conn.messageQueue.shift();
           item?.reject(new Error("Conta banida - sessao resetada."));
@@ -1004,24 +1011,24 @@ export async function clearBanStatus(adminId: string): Promise<boolean> {
         } catch (e) {}
       }
       
-      connections.delete(adminId);
+      connections.delete(accountId);
     }
     
-    const authDir = getAuthDir(adminId);
+    const authDir = getAuthDir(accountId);
     if (fs.existsSync(authDir)) {
       fs.rmSync(authDir, { recursive: true });
-      console.log(`[whatsapp] Auth directory cleared for admin ${adminId}`);
+      console.log(`[whatsapp] Auth directory cleared for account ${accountId}`);
     }
     
-    messageCounts.delete(adminId);
+    messageCounts.delete(accountId);
     
-    await storage.upsertWhatsappSession(adminId, {
+    await storage.upsertWhatsappSessionByAccountId(accountId, adminId, {
       status: "disconnected",
       qrCode: null,
       phoneNumber: null,
     });
     
-    console.log(`[whatsapp] Ban status and session data cleared for admin ${adminId}`);
+    console.log(`[whatsapp] Ban status and session data cleared for account ${accountId}`);
     return true;
   } catch (error) {
     console.error("[whatsapp] Error clearing ban status:", error);
@@ -1033,12 +1040,12 @@ async function performHealthCheck(): Promise<void> {
   console.log(`[whatsapp] Running health check for ${connections.size} connections`);
   
   const entries = Array.from(connections.entries());
-  for (const [adminId, conn] of entries) {
+  for (const [accountId, conn] of entries) {
     try {
       if (conn.status === "qr_ready" && conn.qrGeneratedAt) {
         const qrAge = Date.now() - conn.qrGeneratedAt;
         if (qrAge > QR_CODE_TTL_MS) {
-          console.log(`[whatsapp] QR expired for admin ${adminId}, regenerating...`);
+          console.log(`[whatsapp] QR expired for account ${accountId}, regenerating...`);
           
           if (conn.socket) {
             try {
@@ -1047,7 +1054,7 @@ async function performHealthCheck(): Promise<void> {
             }
           }
           
-          connections.set(adminId, {
+          connections.set(accountId, {
             ...conn,
             socket: null,
             qrCode: null,
@@ -1055,7 +1062,7 @@ async function performHealthCheck(): Promise<void> {
             status: "disconnected",
           });
           
-          await initWhatsAppConnection(adminId);
+          await initWhatsAppConnection(accountId, conn.adminId);
         }
       }
       
@@ -1064,36 +1071,36 @@ async function performHealthCheck(): Promise<void> {
           const ws = conn.socket.ws as any;
           const state = ws?.readyState;
           if (state !== undefined && state !== 1) {
-            console.log(`[whatsapp] Socket unhealthy for admin ${adminId} (state: ${state}), attempting recovery...`);
+            console.log(`[whatsapp] Socket unhealthy for account ${accountId} (state: ${state}), attempting recovery...`);
             
-            connections.set(adminId, {
+            connections.set(accountId, {
               ...conn,
               socket: null,
               status: "disconnected",
               reconnectAttempts: 0,
             });
             
-            await storage.upsertWhatsappSession(adminId, {
+            await storage.upsertWhatsappSessionByAccountId(accountId, conn.adminId, {
               status: "disconnected",
             });
             
             setTimeout(() => {
-              console.log(`[whatsapp] Auto-recovering connection for admin ${adminId}`);
-              initWhatsAppConnection(adminId).catch(err => {
-                console.error(`[whatsapp] Auto-recovery failed for admin ${adminId}:`, err);
+              console.log(`[whatsapp] Auto-recovering connection for account ${accountId}`);
+              initWhatsAppConnection(accountId, conn.adminId).catch(err => {
+                console.error(`[whatsapp] Auto-recovery failed for account ${accountId}:`, err);
               });
             }, 2000);
           }
         } catch (e) {
-          console.log(`[whatsapp] Socket check failed for admin ${adminId}:`, e);
+          console.log(`[whatsapp] Socket check failed for account ${accountId}:`, e);
         }
       }
       
-      const dbSession = await storage.getWhatsappSession(adminId);
+      const dbSession = await storage.getWhatsappSessionByAccountId(accountId);
       if (dbSession) {
         if (dbSession.status === "connected" && conn.status !== "connected") {
-          console.log(`[whatsapp] DB/memory mismatch for admin ${adminId}: DB=${dbSession.status}, MEM=${conn.status}`);
-          await storage.upsertWhatsappSession(adminId, {
+          console.log(`[whatsapp] DB/memory mismatch for account ${accountId}: DB=${dbSession.status}, MEM=${conn.status}`);
+          await storage.upsertWhatsappSessionByAccountId(accountId, conn.adminId, {
             status: conn.status,
           });
         }
@@ -1103,14 +1110,14 @@ async function performHealthCheck(): Promise<void> {
         const errorMsg = conn.status === "banned" 
           ? "Conta suspensa por spam. Aguarde antes de tentar novamente."
           : "WhatsApp desconectado. Por favor, reconecte para enviar mensagens.";
-        console.log(`[whatsapp] Health check: flushing ${conn.messageQueue.length} stale messages for ${conn.status} admin ${adminId}`);
+        console.log(`[whatsapp] Health check: flushing ${conn.messageQueue.length} stale messages for ${conn.status} account ${accountId}`);
         while (conn.messageQueue.length > 0) {
           const item = conn.messageQueue.shift();
           item?.reject(new Error(errorMsg));
         }
       }
     } catch (error) {
-      console.error(`[whatsapp] Health check error for admin ${adminId}:`, error);
+      console.error(`[whatsapp] Health check error for account ${accountId}:`, error);
     }
   }
 }

@@ -76,7 +76,12 @@ export function registerWhatsAppRoutes(app: Express) {
         return res.status(errorCode || 401).json({ error: error || "Não autenticado" });
       }
 
-      const status = await getWhatsAppStatus(admin.id);
+      const { accountId } = req.query;
+      if (!accountId) {
+        return res.status(400).json({ error: "accountId é obrigatório" });
+      }
+
+      const status = await getWhatsAppStatus(accountId as string);
       res.json(status);
     } catch (error: any) {
       console.error("[whatsapp-api] Error getting status:", error);
@@ -91,7 +96,12 @@ export function registerWhatsAppRoutes(app: Express) {
         return res.status(errorCode || 401).json({ error: error || "Não autenticado" });
       }
 
-      const result = await initWhatsAppConnection(admin.id);
+      const { accountId } = req.body;
+      if (!accountId) {
+        return res.status(400).json({ error: "accountId é obrigatório" });
+      }
+
+      const result = await initWhatsAppConnection(accountId, admin.id);
       res.json(result);
     } catch (error: any) {
       console.error("[whatsapp-api] Error connecting:", error);
@@ -106,7 +116,12 @@ export function registerWhatsAppRoutes(app: Express) {
         return res.status(errorCode || 401).json({ error: error || "Não autenticado" });
       }
 
-      const success = await disconnectWhatsApp(admin.id);
+      const { accountId } = req.body;
+      if (!accountId) {
+        return res.status(400).json({ error: "accountId é obrigatório" });
+      }
+
+      const success = await disconnectWhatsApp(accountId, admin.id);
       res.json({ success });
     } catch (error: any) {
       console.error("[whatsapp-api] Error disconnecting:", error);
@@ -121,12 +136,15 @@ export function registerWhatsAppRoutes(app: Express) {
         return res.status(errorCode || 401).json({ error: error || "Não autenticado" });
       }
 
-      const { phone, message } = req.body;
+      const { accountId, phone, message } = req.body;
+      if (!accountId) {
+        return res.status(400).json({ error: "accountId é obrigatório" });
+      }
       if (!phone || !message) {
         return res.status(400).json({ error: "Telefone e mensagem são obrigatórios" });
       }
 
-      const result = await sendWhatsAppMessage(admin.id, phone, message);
+      const result = await sendWhatsAppMessage(accountId, phone, message);
       res.json(result);
     } catch (error: any) {
       console.error("[whatsapp-api] Error sending test:", error);
@@ -141,7 +159,10 @@ export function registerWhatsAppRoutes(app: Express) {
         return res.status(errorCode || 401).json({ error: error || "Não autenticado" });
       }
 
-      const { phone, mediaType, mediaUrl, caption, fileName, mimetype } = req.body;
+      const { accountId, phone, mediaType, mediaUrl, caption, fileName, mimetype } = req.body;
+      if (!accountId) {
+        return res.status(400).json({ error: "accountId é obrigatório" });
+      }
       if (!phone || !mediaType || !mediaUrl) {
         return res.status(400).json({ error: "Telefone, tipo de mídia e URL são obrigatórios" });
       }
@@ -154,7 +175,7 @@ export function registerWhatsAppRoutes(app: Express) {
         mimetype,
       };
 
-      const result = await sendWhatsAppMediaMessage(admin.id, phone, media);
+      const result = await sendWhatsAppMediaMessage(accountId, phone, media);
       res.json(result);
     } catch (error: any) {
       console.error("[whatsapp-api] Error sending media test:", error);
@@ -251,7 +272,12 @@ export function registerWhatsAppRoutes(app: Express) {
         return res.status(errorCode || 401).json({ error: error || "Não autenticado" });
       }
 
-      const success = await clearBanStatus(admin.id);
+      const { accountId } = req.body;
+      if (!accountId) {
+        return res.status(400).json({ error: "accountId é obrigatório" });
+      }
+
+      const success = await clearBanStatus(accountId, admin.id);
       if (success) {
         res.json({ success: true, message: "Status de suspensão limpo. Você pode tentar reconectar." });
       } else {

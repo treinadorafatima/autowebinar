@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type WebinarConfig, type WebinarConfigInsert, type Admin, type AdminInsert, type UploadedVideo, type UploadedVideoInsert, type Comment, type CommentInsert, type Webinar, type WebinarInsert, type Setting, type SettingInsert, type ViewerSession, type WebinarScript, type WebinarScriptInsert, type AiConfig, type AiConfigInsert, type AiMemory, type AiMemoryInsert, type CheckoutPlano, type CheckoutPlanoInsert, type CheckoutPagamento, type CheckoutPagamentoInsert, type CheckoutConfig, type CheckoutConfigInsert, type CheckoutAssinatura, type CheckoutAssinaturaInsert, type AiChat, type AiChatInsert, type AiMessageChat, type AiMessageChatInsert, type VideoTranscription, type VideoTranscriptionInsert, type AdminEmailCredential, type AdminEmailCredentialInsert, type EmailSequence, type EmailSequenceInsert, type ScheduledEmail, type ScheduledEmailInsert, type LeadFormConfig, type LeadFormConfigInsert, type WhatsappSession, type WhatsappSessionInsert, type WhatsappSequence, type WhatsappSequenceInsert, type ScheduledWhatsappMessage, type ScheduledWhatsappMessageInsert, type MediaFile, type MediaFileInsert, type LeadMessage, type LeadMessageInsert, type Lead, admins, webinarConfigs, users, uploadedVideos, comments, webinars as webinarsTable, settings, viewerSessions, webinarScripts, aiConfigs, aiMemories, checkoutPlanos, checkoutPagamentos, checkoutConfigs, checkoutAssinaturas, aiChats, aiMessageChats, videoTranscriptions, adminEmailCredentials, emailSequences, scheduledEmails, leadFormConfigs, whatsappSessions, whatsappSequences, scheduledWhatsappMessages, mediaFiles, webinarViewLogs, leads, leadMessages } from "@shared/schema";
+import { type User, type InsertUser, type WebinarConfig, type WebinarConfigInsert, type Admin, type AdminInsert, type UploadedVideo, type UploadedVideoInsert, type Comment, type CommentInsert, type Webinar, type WebinarInsert, type Setting, type SettingInsert, type ViewerSession, type WebinarScript, type WebinarScriptInsert, type AiConfig, type AiConfigInsert, type AiMemory, type AiMemoryInsert, type CheckoutPlano, type CheckoutPlanoInsert, type CheckoutPagamento, type CheckoutPagamentoInsert, type CheckoutConfig, type CheckoutConfigInsert, type CheckoutAssinatura, type CheckoutAssinaturaInsert, type AiChat, type AiChatInsert, type AiMessageChat, type AiMessageChatInsert, type VideoTranscription, type VideoTranscriptionInsert, type AdminEmailCredential, type AdminEmailCredentialInsert, type EmailSequence, type EmailSequenceInsert, type ScheduledEmail, type ScheduledEmailInsert, type LeadFormConfig, type LeadFormConfigInsert, type WhatsappAccount, type WhatsappAccountInsert, type WhatsappSession, type WhatsappSessionInsert, type WhatsappSequence, type WhatsappSequenceInsert, type ScheduledWhatsappMessage, type ScheduledWhatsappMessageInsert, type MediaFile, type MediaFileInsert, type LeadMessage, type LeadMessageInsert, type Lead, admins, webinarConfigs, users, uploadedVideos, comments, webinars as webinarsTable, settings, viewerSessions, webinarScripts, aiConfigs, aiMemories, checkoutPlanos, checkoutPagamentos, checkoutConfigs, checkoutAssinaturas, aiChats, aiMessageChats, videoTranscriptions, adminEmailCredentials, emailSequences, scheduledEmails, leadFormConfigs, whatsappAccounts, whatsappSessions, whatsappSequences, scheduledWhatsappMessages, mediaFiles, webinarViewLogs, leads, leadMessages } from "@shared/schema";
 import * as crypto from "crypto";
 import { randomUUID } from "crypto";
 import { db } from "./db";
@@ -246,9 +246,19 @@ export interface IStorage {
   createLeadFormConfig(data: LeadFormConfigInsert): Promise<LeadFormConfig>;
   updateLeadFormConfig(webinarId: string, data: Partial<LeadFormConfigInsert>): Promise<LeadFormConfig | undefined>;
   deleteLeadFormConfig(webinarId: string): Promise<void>;
+  // WhatsApp Marketing - Accounts (múltiplas contas por admin)
+  listWhatsappAccountsByAdmin(adminId: string): Promise<WhatsappAccount[]>;
+  getWhatsappAccountById(id: string): Promise<WhatsappAccount | undefined>;
+  createWhatsappAccount(data: WhatsappAccountInsert): Promise<WhatsappAccount>;
+  updateWhatsappAccount(id: string, data: Partial<WhatsappAccountInsert>): Promise<WhatsappAccount | undefined>;
+  deleteWhatsappAccount(id: string): Promise<void>;
+  getNextAvailableWhatsappAccount(adminId: string): Promise<WhatsappAccount | undefined>;
+  incrementWhatsappAccountMessageCount(accountId: string): Promise<void>;
   // WhatsApp Marketing - Sessions
   getWhatsappSession(adminId: string): Promise<WhatsappSession | undefined>;
+  getWhatsappSessionByAccountId(accountId: string): Promise<WhatsappSession | undefined>;
   upsertWhatsappSession(adminId: string, data: Partial<WhatsappSessionInsert>): Promise<WhatsappSession>;
+  upsertWhatsappSessionByAccountId(accountId: string, adminId: string, data: Partial<WhatsappSessionInsert>): Promise<WhatsappSession>;
   getActiveWhatsappSessions(): Promise<WhatsappSession[]>;
   // WhatsApp Marketing - Sequences
   listWhatsappSequencesByAdmin(adminId: string): Promise<WhatsappSequence[]>;
@@ -3144,12 +3154,113 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
   }
 
   // ============================================
+  // WHATSAPP MARKETING - ACCOUNTS
+  // ============================================
+
+  async listWhatsappAccountsByAdmin(adminId: string): Promise<WhatsappAccount[]> {
+    return db.select().from(whatsappAccounts)
+      .where(eq(whatsappAccounts.adminId, adminId))
+      .orderBy(whatsappAccounts.priority, whatsappAccounts.createdAt);
+  }
+
+  async getWhatsappAccountById(id: string): Promise<WhatsappAccount | undefined> {
+    const [result] = await db.select().from(whatsappAccounts)
+      .where(eq(whatsappAccounts.id, id))
+      .limit(1);
+    return result;
+  }
+
+  async createWhatsappAccount(data: WhatsappAccountInsert): Promise<WhatsappAccount> {
+    const id = randomUUID();
+    const now = new Date();
+    const [result] = await db.insert(whatsappAccounts).values({
+      id,
+      ...data,
+      createdAt: now,
+      updatedAt: now,
+    }).returning();
+    return result;
+  }
+
+  async updateWhatsappAccount(id: string, data: Partial<WhatsappAccountInsert>): Promise<WhatsappAccount | undefined> {
+    const [result] = await db.update(whatsappAccounts)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(whatsappAccounts.id, id))
+      .returning();
+    return result;
+  }
+
+  async deleteWhatsappAccount(id: string): Promise<void> {
+    // Also delete associated session
+    await db.delete(whatsappSessions).where(eq(whatsappSessions.accountId, id));
+    await db.delete(whatsappAccounts).where(eq(whatsappAccounts.id, id));
+  }
+
+  async getNextAvailableWhatsappAccount(adminId: string): Promise<WhatsappAccount | undefined> {
+    // Get today's date in YYYY-MM-DD format for counter reset check
+    const today = new Date().toISOString().split('T')[0];
+    
+    // Find connected accounts ordered by lastUsedAt (round-robin)
+    const accounts = await db.select().from(whatsappAccounts)
+      .where(and(
+        eq(whatsappAccounts.adminId, adminId),
+        eq(whatsappAccounts.status, "connected")
+      ))
+      .orderBy(whatsappAccounts.lastUsedAt);
+    
+    if (accounts.length === 0) return undefined;
+    
+    // Filter out accounts that have hit daily limit (reset if new day)
+    for (const account of accounts) {
+      // Reset counter if it's a new day
+      if (account.lastMessageResetDate !== today) {
+        await db.update(whatsappAccounts)
+          .set({ 
+            messagesSentToday: 0, 
+            lastMessageResetDate: today,
+            updatedAt: new Date()
+          })
+          .where(eq(whatsappAccounts.id, account.id));
+        account.messagesSentToday = 0;
+      }
+      
+      // Check if under daily limit (e.g., 1000 messages per day per account)
+      if (account.messagesSentToday < 1000) {
+        return account;
+      }
+    }
+    
+    return undefined; // All accounts have hit their limit
+  }
+
+  async incrementWhatsappAccountMessageCount(accountId: string): Promise<void> {
+    const today = new Date().toISOString().split('T')[0];
+    const now = new Date();
+    
+    await db.update(whatsappAccounts)
+      .set({ 
+        messagesSentToday: sql`${whatsappAccounts.messagesSentToday} + 1`,
+        lastUsedAt: now,
+        lastMessageResetDate: today,
+        updatedAt: now
+      })
+      .where(eq(whatsappAccounts.id, accountId));
+  }
+
+  // ============================================
   // WHATSAPP MARKETING - SESSIONS
   // ============================================
 
   async getWhatsappSession(adminId: string): Promise<WhatsappSession | undefined> {
     const [result] = await db.select().from(whatsappSessions)
       .where(eq(whatsappSessions.adminId, adminId))
+      .limit(1);
+    return result;
+  }
+
+  async getWhatsappSessionByAccountId(accountId: string): Promise<WhatsappSession | undefined> {
+    const [result] = await db.select().from(whatsappSessions)
+      .where(eq(whatsappSessions.accountId, accountId))
       .limit(1);
     return result;
   }
@@ -3169,6 +3280,31 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
       const [result] = await db.insert(whatsappSessions).values({
         id,
         adminId,
+        status: data.status || "disconnected",
+        ...data,
+        createdAt: now,
+        updatedAt: now,
+      }).returning();
+      return result;
+    }
+  }
+
+  async upsertWhatsappSessionByAccountId(accountId: string, adminId: string, data: Partial<WhatsappSessionInsert>): Promise<WhatsappSession> {
+    const existing = await this.getWhatsappSessionByAccountId(accountId);
+    const now = new Date();
+    
+    if (existing) {
+      const [result] = await db.update(whatsappSessions)
+        .set({ ...data, updatedAt: now })
+        .where(eq(whatsappSessions.accountId, accountId))
+        .returning();
+      return result;
+    } else {
+      const id = randomUUID();
+      const [result] = await db.insert(whatsappSessions).values({
+        id,
+        adminId,
+        accountId,
         status: data.status || "disconnected",
         ...data,
         createdAt: now,

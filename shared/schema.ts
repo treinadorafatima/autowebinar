@@ -672,13 +672,35 @@ export type LeadFormConfigInsert = z.infer<typeof leadFormConfigInsertSchema>;
 // WHATSAPP MARKETING SYSTEM
 // ============================================
 
-// WhatsApp Sessions - Store Baileys auth data per admin
+// WhatsApp Accounts - Multiple accounts per admin for round-robin sending
+export const whatsappAccounts = pgTable("whatsapp_accounts", {
+  id: text("id").primaryKey(),
+  adminId: text("admin_id").notNull(), // FK para admins (sem unique - múltiplas contas)
+  label: text("label").notNull(), // Nome/apelido da conta (ex: "Conta Principal", "Conta 2")
+  phoneNumber: text("phone_number"), // Número conectado
+  status: text("status").notNull().default("disconnected"), // 'disconnected', 'connecting', 'qr_ready', 'connected', 'banned'
+  qrCode: text("qr_code"), // QR code atual para conexão
+  lastConnectedAt: timestamp("last_connected_at"),
+  lastUsedAt: timestamp("last_used_at"), // Última vez que foi usada para envio (round-robin)
+  priority: integer("priority").notNull().default(0), // Prioridade para ordenação
+  messagesSentToday: integer("messages_sent_today").notNull().default(0), // Contador de mensagens hoje
+  lastMessageResetDate: text("last_message_reset_date"), // Data do último reset do contador (YYYY-MM-DD)
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type WhatsappAccount = typeof whatsappAccounts.$inferSelect;
+export const whatsappAccountInsertSchema = createInsertSchema(whatsappAccounts).omit({ id: true, createdAt: true, updatedAt: true });
+export type WhatsappAccountInsert = z.infer<typeof whatsappAccountInsertSchema>;
+
+// WhatsApp Sessions - Store Baileys auth data per account (not per admin)
 export const whatsappSessions = pgTable("whatsapp_sessions", {
   id: text("id").primaryKey(),
-  adminId: text("admin_id").notNull().unique(), // FK para admins
+  adminId: text("admin_id").notNull(), // FK para admins (sem unique - múltiplas sessões)
+  accountId: text("account_id"), // FK para whatsapp_accounts (nova coluna)
   phoneNumber: text("phone_number"), // Número conectado
   sessionData: text("session_data"), // JSON com dados de auth do Baileys
-  status: text("status").notNull().default("disconnected"), // 'disconnected', 'connecting', 'qr_ready', 'connected'
+  status: text("status").notNull().default("disconnected"), // 'disconnected', 'connecting', 'qr_ready', 'connected', 'banned'
   qrCode: text("qr_code"), // QR code atual para conexão
   lastConnectedAt: timestamp("last_connected_at"),
   createdAt: timestamp("created_at").defaultNow(),
