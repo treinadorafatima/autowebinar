@@ -1,5 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useParams, useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -399,6 +399,66 @@ export default function Checkout() {
       variant: "destructive",
     });
   }, [toast]);
+
+  // Memoize CardPayment initialization to prevent re-renders
+  const cardPaymentInitialization = useMemo(() => {
+    if (!selectedPlano || !formData.email) return null;
+    const docDigits = formData.documento.replace(/\D/g, '');
+    const hasValidDoc = (formData.tipoDocumento === "CPF" && docDigits.length >= 11) || 
+                        (formData.tipoDocumento === "CNPJ" && docDigits.length >= 14);
+    return {
+      amount: selectedPlano.preco / 100,
+      payer: {
+        email: formData.email,
+        ...(hasValidDoc ? {
+          identification: {
+            type: formData.tipoDocumento,
+            number: docDigits,
+          },
+        } : {}),
+      },
+    };
+  }, [selectedPlano?.preco, formData.email, formData.documento, formData.tipoDocumento]);
+
+  // Memoize CardPayment customization
+  const cardPaymentCustomization = useMemo(() => ({
+    visual: {
+      style: {
+        theme: 'default' as const,
+      },
+      texts: {
+        formTitle: 'Dados do Cartão',
+        formSubmit: 'Assinar Agora',
+      },
+    },
+    paymentMethods: {
+      maxInstallments: 1,
+    },
+  }), []);
+
+  // Memoize Payment initialization
+  const paymentInitialization = useMemo(() => {
+    if (!selectedPlano) return null;
+    return {
+      amount: selectedPlano.preco / 100,
+      preferenceId: undefined,
+    };
+  }, [selectedPlano?.preco]);
+
+  // Memoize Payment customization
+  const paymentCustomization = useMemo(() => ({
+    paymentMethods: {
+      creditCard: 'all' as const,
+      debitCard: 'all' as const,
+      ticket: 'all' as const,
+      bankTransfer: 'all' as const,
+    },
+    visual: {
+      style: {
+        theme: 'default' as const,
+      },
+    },
+  }), []);
 
   const handleSubmitForm = (e: React.FormEvent) => {
     e.preventDefault();
@@ -986,36 +1046,11 @@ export default function Checkout() {
 
                   {isMercadoPago && pagamentoId ? (
                     isRecurring ? (
-                      mpInitialized ? (
-                        <div className="mercadopago-container">
+                      mpInitialized && cardPaymentInitialization ? (
+                        <div className="mercadopago-container" key="card-payment-container">
                           <CardPayment
-                            initialization={{
-                              amount: selectedPlano.preco / 100,
-                              payer: {
-                                email: formData.email,
-                                ...((formData.tipoDocumento === "CPF" && formData.documento.replace(/\D/g, '').length >= 11) || 
-                                    (formData.tipoDocumento === "CNPJ" && formData.documento.replace(/\D/g, '').length >= 14) ? {
-                                  identification: {
-                                    type: formData.tipoDocumento,
-                                    number: formData.documento.replace(/\D/g, ''),
-                                  },
-                                } : {}),
-                              },
-                            }}
-                            customization={{
-                              visual: {
-                                style: {
-                                  theme: 'default',
-                                },
-                                texts: {
-                                  formTitle: 'Dados do Cartão',
-                                  formSubmit: isProcessingPayment ? 'Processando...' : 'Assinar Agora',
-                                },
-                              },
-                              paymentMethods: {
-                                maxInstallments: 1,
-                              },
-                            }}
+                            initialization={cardPaymentInitialization}
+                            customization={cardPaymentCustomization}
                             onSubmit={handleCardPaymentSubmit}
                             onReady={handleMpReady}
                             onError={handleMpError}
@@ -1026,26 +1061,11 @@ export default function Checkout() {
                           <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
                         </div>
                       )
-                    ) : mpInitialized ? (
-                      <div className="mercadopago-container">
+                    ) : mpInitialized && paymentInitialization ? (
+                      <div className="mercadopago-container" key="payment-container">
                         <Payment
-                          initialization={{
-                            amount: selectedPlano.preco / 100,
-                            preferenceId: undefined,
-                          }}
-                          customization={{
-                            paymentMethods: {
-                              creditCard: 'all',
-                              debitCard: 'all',
-                              ticket: 'all',
-                              bankTransfer: 'all',
-                            },
-                            visual: {
-                              style: {
-                                theme: 'default',
-                              },
-                            },
-                          }}
+                          initialization={paymentInitialization}
+                          customization={paymentCustomization}
                           onSubmit={handleMpSubmit}
                           onReady={handleMpReady}
                           onError={handleMpError}
