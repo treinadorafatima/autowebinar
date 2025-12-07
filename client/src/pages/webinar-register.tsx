@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, CheckCircle2, Calendar, Clock, Users, Video, MapPin } from "lucide-react";
 import type { Webinar, LeadFormConfig } from "@shared/schema";
 
-function getNextSessionDate(webinar: Webinar): { date: string; time: string; dayOfWeek: string } | null {
+function getNextSessionDate(webinar: Webinar): { date: string; time: string; dayOfWeek: string; rawDate: string } | null {
   if (!webinar) return null;
   
   const now = new Date();
@@ -48,6 +48,7 @@ function getNextSessionDate(webinar: Webinar): { date: string; time: string; day
     date: sessionDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" }),
     time: `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`,
     dayOfWeek: daysOfWeek[sessionDate.getDay()],
+    rawDate: sessionDate.toISOString(),
   };
 }
 
@@ -154,6 +155,7 @@ export default function WebinarRegister() {
           whatsapp: collectWhatsapp ? whatsapp.replace(/\D/g, "") : null,
           city: collectCity ? city.trim() : null,
           state: collectState ? state.trim().toUpperCase() : null,
+          sessionDate: nextSession?.rawDate || null,
         }),
       });
       

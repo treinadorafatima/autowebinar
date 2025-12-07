@@ -5816,7 +5816,7 @@ Seja conversacional e objetivo.`;
   // Register lead (from registration page - source: registration, triggers sequences)
   app.post("/api/webinars/:id/register", async (req, res) => {
     try {
-      const { name, email, whatsapp, city, state } = req.body;
+      const { name, email, whatsapp, city, state, sessionDate: requestedSessionDate } = req.body;
       
       if (!name) {
         return res.status(400).json({ error: "Nome é obrigatório" });
@@ -5857,7 +5857,8 @@ Seja conversacional e objetivo.`;
       // Get webinar info to schedule sequences
       const webinar = await storage.getWebinarById(req.params.id);
       if (webinar && webinar.ownerId) {
-        // Calculate next webinar session time with timezone support
+        // Always use server-side calculateNextSession as the authoritative source
+        // The frontend sessionDate is only used as a hint for logging purposes
         const { calculateNextSession } = await import("./session-calculator");
         const nextSession = calculateNextSession({
           startHour: webinar.startHour || 18,
@@ -5872,29 +5873,44 @@ Seja conversacional e objetivo.`;
         
         if (!nextSession) {
           console.log(`[register] No upcoming session found for webinar ${req.params.id}, skipping sequences`);
-        } else {
-          console.log(`[register] Next session for webinar ${req.params.id}: ${nextSession.sessionDate} at ${nextSession.sessionTime.toISOString()}`);
-          
-          // Trigger email sequences if email provided
-          if (email) {
-            try {
-              const { scheduleEmailsForLead } = await import("./email-scheduler");
-              await scheduleEmailsForLead(leadId, req.params.id, webinar.ownerId, nextSession.sessionTime, nextSession.sessionDate);
-              console.log(`[register] Scheduled email sequences for lead ${leadId}`);
-            } catch (e) {
-              console.error("[register] Error scheduling emails:", e);
+          return res.json({ success: true, id: leadId, message: "Inscrição realizada com sucesso!" });
+        }
+        
+        const sessionTime = nextSession.sessionTime;
+        const sessionDateStr = nextSession.sessionDate;
+        
+        // Log if frontend hint differs from calculated session (for debugging timezone issues)
+        if (requestedSessionDate) {
+          const clientDate = new Date(requestedSessionDate);
+          if (!isNaN(clientDate.getTime())) {
+            const clientDateStr = clientDate.toISOString().split("T")[0];
+            if (clientDateStr !== sessionDateStr) {
+              console.log(`[register] Note: Frontend hint (${clientDateStr}) differs from calculated session (${sessionDateStr})`);
             }
           }
-          
-          // Trigger WhatsApp sequences if whatsapp provided
-          if (whatsapp) {
-            try {
-              const { scheduleWhatsappForLead } = await import("./whatsapp-scheduler");
-              await scheduleWhatsappForLead(leadId, req.params.id, webinar.ownerId, nextSession.sessionTime, nextSession.sessionDate);
-              console.log(`[register] Scheduled WhatsApp sequences for lead ${leadId}`);
-            } catch (e) {
-              console.error("[register] Error scheduling WhatsApp:", e);
-            }
+        }
+        
+        console.log(`[register] Scheduling sequences for session: ${sessionDateStr} at ${sessionTime.toISOString()}`);
+        
+        // Trigger email sequences if email provided
+        if (email) {
+          try {
+            const { scheduleEmailsForLead } = await import("./email-scheduler");
+            await scheduleEmailsForLead(leadId, req.params.id, webinar.ownerId, sessionTime, sessionDateStr);
+            console.log(`[register] Scheduled email sequences for lead ${leadId}`);
+          } catch (e) {
+            console.error("[register] Error scheduling emails:", e);
+          }
+        }
+        
+        // Trigger WhatsApp sequences if whatsapp provided
+        if (whatsapp) {
+          try {
+            const { scheduleWhatsappForLead } = await import("./whatsapp-scheduler");
+            await scheduleWhatsappForLead(leadId, req.params.id, webinar.ownerId, sessionTime, sessionDateStr);
+            console.log(`[register] Scheduled WhatsApp sequences for lead ${leadId}`);
+          } catch (e) {
+            console.error("[register] Error scheduling WhatsApp:", e);
           }
         }
       }
