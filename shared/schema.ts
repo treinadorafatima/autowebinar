@@ -764,6 +764,8 @@ export const webinarViewLogs = pgTable("webinar_view_logs", {
   id: text("id").primaryKey(),
   webinarId: text("webinar_id").notNull(), // FK para webinars
   ownerId: text("owner_id"), // FK para admins (dono do webinar)
+  viewerId: text("viewer_id"), // UUID do viewer para evitar contagem duplicada
+  viewDate: text("view_date"), // Data no formato YYYY-MM-DD (São Paulo timezone)
   source: text("source").notNull().default("live"), // 'live', 'replay', 'embed'
   createdAt: timestamp("created_at").defaultNow(),
 });
