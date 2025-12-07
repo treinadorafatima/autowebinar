@@ -435,15 +435,15 @@ export default function AdminSubscription() {
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Webinários</span>
-                    <span>{plano.webinarLimit >= 999 ? "Ilimitados" : `${plano.webinarLimit} webinários`}</span>
+                    <span>{consumo?.isSuperadmin || plano.webinarLimit >= 999 ? "Ilimitados" : `${plano.webinarLimit} webinários`}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Armazenamento</span>
-                    <span>{plano.storageLimit}GB</span>
+                    <span>{consumo?.isSuperadmin ? "Ilimitado" : `${plano.storageLimit}GB`}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Conexões WhatsApp</span>
-                    <span>{(plano.whatsappAccountLimit ?? 2) >= 999 ? "Ilimitadas" : `${plano.whatsappAccountLimit ?? 2} conexões`}</span>
+                    <span>{consumo?.isSuperadmin || (plano.whatsappAccountLimit ?? 2) >= 999 ? "Ilimitadas" : `${plano.whatsappAccountLimit ?? 2} conexões`}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Visualizações</span>
@@ -482,7 +482,7 @@ export default function AdminSubscription() {
                       <Globe className="w-3.5 h-3.5 text-cyan-500" />
                       <span className="text-muted-foreground">Domínio customizado</span>
                     </div>
-                    {plano.webinarLimit > 5 ? (
+                    {plano.webinarLimit > 5 || consumo?.isSuperadmin ? (
                       <div className="flex items-center gap-2" data-testid="text-plan-replay">
                         <Play className="w-3.5 h-3.5 text-purple-500" />
                         <span className="text-muted-foreground">Replay automático</span>
@@ -504,7 +504,7 @@ export default function AdminSubscription() {
                     <span className="text-sm font-medium" data-testid="text-ai-features-plan-title">Ferramentas IA</span>
                   </div>
                   <div className="grid gap-1.5 text-sm">
-                    {plano.webinarLimit > 5 ? (
+                    {plano.webinarLimit > 5 || consumo?.isSuperadmin ? (
                       <div className="flex items-center gap-2" data-testid="text-plan-script-generator">
                         <FileText className="w-3.5 h-3.5 text-violet-500" />
                         <span className="text-muted-foreground">Gerador de Roteiro IA</span>
@@ -516,7 +516,7 @@ export default function AdminSubscription() {
                         <Badge variant="outline" className="text-xs bg-purple-500/10 text-purple-400 border-purple-500/30">Pro+</Badge>
                       </div>
                     )}
-                    {plano.webinarLimit > 5 ? (
+                    {plano.webinarLimit > 5 || consumo?.isSuperadmin ? (
                       <div className="flex items-center gap-2" data-testid="text-plan-transcription">
                         <Mic className="w-3.5 h-3.5 text-rose-500" />
                         <span className="text-muted-foreground">Transcrição Automática</span>
