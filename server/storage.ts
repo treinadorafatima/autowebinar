@@ -3365,21 +3365,25 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
   }
 
   async countViewsByOwnerAndRange(ownerId: string, from: Date, to: Date): Promise<number> {
-    const fromStr = from.toISOString();
-    const toStr = to.toISOString();
+    // Extract the date parts to filter by São Paulo date, not UTC timestamp
+    const fromDate = from.toISOString().split('T')[0]; // YYYY-MM-DD
+    const toDate = to.toISOString().split('T')[0]; // YYYY-MM-DD
+    
     const result = await db.select({ count: sql<number>`count(*)` })
       .from(webinarViewLogs)
       .where(and(
         eq(webinarViewLogs.ownerId, ownerId),
-        sql`${webinarViewLogs.createdAt} >= ${fromStr}::timestamp`,
-        sql`${webinarViewLogs.createdAt} <= ${toStr}::timestamp`
+        sql`DATE(${webinarViewLogs.createdAt} AT TIME ZONE 'America/Sao_Paulo') >= ${fromDate}::date`,
+        sql`DATE(${webinarViewLogs.createdAt} AT TIME ZONE 'America/Sao_Paulo') <= ${toDate}::date`
       ));
     return Number(result[0]?.count || 0);
   }
 
   async getViewsByOwnerGroupedByDay(ownerId: string, from: Date, to: Date): Promise<{ date: string; count: number }[]> {
-    const fromStr = from.toISOString();
-    const toStr = to.toISOString();
+    // Extract the date parts to filter by São Paulo date, not UTC timestamp
+    const fromDate = from.toISOString().split('T')[0]; // YYYY-MM-DD
+    const toDate = to.toISOString().split('T')[0]; // YYYY-MM-DD
+    
     const result = await db.select({
       date: sql<string>`DATE(${webinarViewLogs.createdAt} AT TIME ZONE 'America/Sao_Paulo')`,
       count: sql<number>`count(*)`
@@ -3387,8 +3391,8 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
       .from(webinarViewLogs)
       .where(and(
         eq(webinarViewLogs.ownerId, ownerId),
-        sql`${webinarViewLogs.createdAt} >= ${fromStr}::timestamp`,
-        sql`${webinarViewLogs.createdAt} <= ${toStr}::timestamp`
+        sql`DATE(${webinarViewLogs.createdAt} AT TIME ZONE 'America/Sao_Paulo') >= ${fromDate}::date`,
+        sql`DATE(${webinarViewLogs.createdAt} AT TIME ZONE 'America/Sao_Paulo') <= ${toDate}::date`
       ))
       .groupBy(sql`DATE(${webinarViewLogs.createdAt} AT TIME ZONE 'America/Sao_Paulo')`)
       .orderBy(sql`DATE(${webinarViewLogs.createdAt} AT TIME ZONE 'America/Sao_Paulo')`);

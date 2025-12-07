@@ -5981,14 +5981,29 @@ Seja conversacional e objetivo.`;
         return res.status(404).json({ error: "Admin not found" });
       }
 
-      // Parse query params
+      // Parse query params - keep the dates as sent by frontend (already in correct timezone)
       const { from, to } = req.query;
       
       // Default to last 7 days if no range provided
       const now = new Date();
-      const toDate = to ? new Date(to as string) : new Date(now.setHours(23, 59, 59, 999));
-      const fromDate = from ? new Date(from as string) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-      fromDate.setHours(0, 0, 0, 0);
+      let toDate: Date;
+      let fromDate: Date;
+      
+      if (to) {
+        toDate = new Date(to as string);
+      } else {
+        toDate = new Date();
+        toDate.setHours(23, 59, 59, 999);
+      }
+      
+      if (from) {
+        fromDate = new Date(from as string);
+      } else {
+        fromDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+        fromDate.setHours(0, 0, 0, 0);
+      }
+      
+      // Don't modify incoming dates - they already have the correct time range from frontend
 
       const count = await storage.countViewsByOwnerAndRange(admin.id, fromDate, toDate);
       const byDay = await storage.getViewsByOwnerGroupedByDay(admin.id, fromDate, toDate);
