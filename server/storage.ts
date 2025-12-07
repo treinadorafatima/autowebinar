@@ -3381,7 +3381,7 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
     const fromStr = from.toISOString();
     const toStr = to.toISOString();
     const result = await db.select({
-      date: sql<string>`DATE(${webinarViewLogs.createdAt})`,
+      date: sql<string>`DATE(${webinarViewLogs.createdAt} AT TIME ZONE 'America/Sao_Paulo')`,
       count: sql<number>`count(*)`
     })
       .from(webinarViewLogs)
@@ -3390,8 +3390,8 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
         sql`${webinarViewLogs.createdAt} >= ${fromStr}::timestamp`,
         sql`${webinarViewLogs.createdAt} <= ${toStr}::timestamp`
       ))
-      .groupBy(sql`DATE(${webinarViewLogs.createdAt})`)
-      .orderBy(sql`DATE(${webinarViewLogs.createdAt})`);
+      .groupBy(sql`DATE(${webinarViewLogs.createdAt} AT TIME ZONE 'America/Sao_Paulo')`)
+      .orderBy(sql`DATE(${webinarViewLogs.createdAt} AT TIME ZONE 'America/Sao_Paulo')`);
     
     return result.map(r => ({
       date: String(r.date),
