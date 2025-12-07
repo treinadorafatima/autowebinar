@@ -7126,7 +7126,13 @@ Seja conversacional e objetivo.`;
           updateData.adminId = admin.id;
           
           console.log(`[MP Payment] Created admin: ${pagamento.email}, temp password: ${tempPassword}`);
-          // TODO: Send email with credentials
+          
+          // Send access credentials email for new users
+          import("./email").then(({ sendAccessCredentialsEmail }) => {
+            sendAccessCredentialsEmail(pagamento.email, pagamento.nome, tempPassword, plano.nome).catch(err => {
+              console.error(`[MP Payment] Error sending credentials email:`, err);
+            });
+          });
         }
       }
 
@@ -7315,6 +7321,13 @@ Seja conversacional e objetivo.`;
           });
           
           console.log(`[MP Subscription] Created admin: ${pagamento.email}, temp password: ${tempPassword}`);
+          
+          // Send access credentials email for new users
+          import("./email").then(({ sendAccessCredentialsEmail }) => {
+            sendAccessCredentialsEmail(pagamento.email, pagamento.nome, tempPassword, plano.nome).catch(err => {
+              console.error(`[MP Subscription] Error sending credentials email:`, err);
+            });
+          });
         }
       }
 
