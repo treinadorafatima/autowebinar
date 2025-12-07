@@ -34,6 +34,8 @@ import {
   Bot,
   Send,
   Bell,
+  Upload,
+  Settings,
 } from "lucide-react";
 import { SiWhatsapp } from "react-icons/si";
 
@@ -621,22 +623,22 @@ export default function LandingPage() {
                     <span className="text-2xl font-bold text-white">2</span>
                   </div>
                   <div className="w-12 h-12 rounded-full bg-cyan-500/20 flex items-center justify-center mx-auto mb-3">
-                    <Video className="w-6 h-6 text-cyan-400" />
+                    <Upload className="w-6 h-6 text-cyan-400" />
                   </div>
-                  <h3 className="text-lg font-semibold text-white mb-2">Configure o webinário</h3>
-                  <p className="text-slate-300 text-sm mb-4">Personalize tudo do seu jeito em minutos</p>
+                  <h3 className="text-lg font-semibold text-white mb-2">Suba seu vídeo</h3>
+                  <p className="text-slate-300 text-sm mb-4">Upload simples com conversão automática</p>
                   <ul className="text-left space-y-2">
                     <li className="flex items-start gap-2 text-slate-300 text-xs">
                       <Check className="w-4 h-4 text-green-400 flex-shrink-0 mt-0.5" />
-                      <span>Nome, URL personalizada</span>
+                      <span>Arraste e solte o arquivo</span>
                     </li>
                     <li className="flex items-start gap-2 text-slate-300 text-xs">
                       <Check className="w-4 h-4 text-green-400 flex-shrink-0 mt-0.5" />
-                      <span>Cores e textos da marca</span>
+                      <span>Conversão HLS automática</span>
                     </li>
                     <li className="flex items-start gap-2 text-slate-300 text-xs">
                       <Check className="w-4 h-4 text-green-400 flex-shrink-0 mt-0.5" />
-                      <span>Agendamento automático</span>
+                      <span>Otimizado para streaming</span>
                     </li>
                   </ul>
                 </CardContent>
@@ -651,22 +653,22 @@ export default function LandingPage() {
                     <span className="text-2xl font-bold text-white">3</span>
                   </div>
                   <div className="w-12 h-12 rounded-full bg-purple-500/20 flex items-center justify-center mx-auto mb-3">
-                    <BarChart3 className="w-6 h-6 text-purple-400" />
+                    <Settings className="w-6 h-6 text-purple-400" />
                   </div>
-                  <h3 className="text-lg font-semibold text-white mb-2">Suba seu vídeo</h3>
-                  <p className="text-slate-300 text-sm mb-4">Upload simples com conversão automática HLS</p>
+                  <h3 className="text-lg font-semibold text-white mb-2">Configure tudo</h3>
+                  <p className="text-slate-300 text-sm mb-4">Ofertas, banner, chat e automações</p>
                   <ul className="text-left space-y-2">
                     <li className="flex items-start gap-2 text-slate-300 text-xs">
                       <Check className="w-4 h-4 text-green-400 flex-shrink-0 mt-0.5" />
-                      <span>Arraste e solte o arquivo</span>
+                      <span>Oferta e banner de CTA</span>
                     </li>
                     <li className="flex items-start gap-2 text-slate-300 text-xs">
                       <Check className="w-4 h-4 text-green-400 flex-shrink-0 mt-0.5" />
-                      <span>Conversão para streaming</span>
+                      <span>Comentários e agendamento</span>
                     </li>
                     <li className="flex items-start gap-2 text-slate-300 text-xs">
                       <Check className="w-4 h-4 text-green-400 flex-shrink-0 mt-0.5" />
-                      <span>Otimizado para web</span>
+                      <span>Email e WhatsApp automático</span>
                     </li>
                   </ul>
                 </CardContent>
