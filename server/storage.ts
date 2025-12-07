@@ -2770,6 +2770,25 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
 
   async initializeDefaultPlanos(): Promise<void> {
     const existingPlanos = await this.listCheckoutPlanos();
+    
+    // Migrate old plan names to new names
+    const nameMapping: Record<string, string> = {
+      "Básico": "Essencial",
+      "Starter": "Essencial",
+      "Profissional": "Avançado",
+      "Pro": "Avançado",
+      "Enterprise": "Elite",
+      "Premium": "Elite",
+    };
+    
+    for (const plano of existingPlanos) {
+      const newName = nameMapping[plano.nome];
+      if (newName) {
+        await this.updateCheckoutPlano(plano.id, { nome: newName });
+        console.log(`[storage] Updated plan name: ${plano.nome} -> ${newName}`);
+      }
+    }
+    
     if (existingPlanos.length > 0) return;
 
     const defaultPlanos = [
