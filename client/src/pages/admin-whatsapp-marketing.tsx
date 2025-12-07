@@ -34,7 +34,7 @@ interface WhatsAppAccount {
   phoneNumber: string | null;
   status: string;
   dailyLimit: number;
-  messagesCountToday: number;
+  messagesSentToday: number;
   priority: number;
   createdAt: string;
   updatedAt: string;
@@ -473,8 +473,9 @@ export default function AdminWhatsAppMarketing() {
   };
 
   const handleMediaUpload = async (file: File, isEditing: boolean = false) => {
-    const mediaType = newSequence.messageType as keyof typeof MEDIA_LIMITS;
-    if (mediaType === "text") return;
+    const messageType = newSequence.messageType;
+    if (messageType === "text") return;
+    const mediaType = messageType as keyof typeof MEDIA_LIMITS;
     
     const limits = MEDIA_LIMITS[mediaType];
     if (!limits) {
@@ -705,7 +706,7 @@ export default function AdminWhatsAppMarketing() {
                       <div className="space-y-2 text-sm text-muted-foreground">
                         <div className="flex justify-between">
                           <span>Mensagens hoje:</span>
-                          <span className="font-medium">{account.messagesCountToday} / {account.dailyLimit}</span>
+                          <span className="font-medium">{account.messagesSentToday} / {account.dailyLimit}</span>
                         </div>
                         <div className="flex justify-between">
                           <span>Prioridade:</span>
