@@ -1,10 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
 import { Skeleton } from "@/components/ui/skeleton";
-import { BarChart3, TrendingDown, Clock, Users } from "lucide-react";
+import { BarChart3, TrendingDown, Clock, Users, Eye } from "lucide-react";
 
 interface Analytics {
   totalSessions: number;
@@ -24,6 +24,8 @@ export default function WebinarAnalytics({ webinarId, videoDuration, token }: We
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [availableDates, setAvailableDates] = useState<string[]>([]);
   const [error, setError] = useState<string>("");
+  const [uniqueViews, setUniqueViews] = useState<number>(0);
+  const selectedDateRef = useRef<string>("");
 
   const today = new Date();
   const dateString = today.toISOString().split("T")[0];
@@ -33,14 +35,33 @@ export default function WebinarAnalytics({ webinarId, videoDuration, token }: We
   }, [dateString]);
 
   useEffect(() => {
+    selectedDateRef.current = selectedDate;
+  }, [selectedDate]);
+
+  useEffect(() => {
     if (selectedDate) {
       fetchAnalytics(selectedDate);
+      fetchUniqueViews(selectedDate);
     }
   }, [selectedDate, webinarId, token]);
 
-  async function fetchAnalytics(date: string) {
+  // Auto-refresh every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (selectedDateRef.current) {
+        fetchAnalytics(selectedDateRef.current, true);
+        fetchUniqueViews(selectedDateRef.current);
+      }
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [webinarId, token]);
+
+  async function fetchAnalytics(date: string, silent: boolean = false) {
     try {
-      setLoading(true);
+      if (!silent) {
+        setLoading(true);
+      }
       setError("");
       const res = await fetch(`/api/webinars/${webinarId}/analytics?date=${date}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -57,7 +78,23 @@ export default function WebinarAnalytics({ webinarId, videoDuration, token }: We
       console.error("Erro ao carregar analytics:", error);
       setError("Erro de conexão ao carregar estatísticas");
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
+    }
+  }
+
+  async function fetchUniqueViews(date: string) {
+    try {
+      const res = await fetch(`/api/webinars/${webinarId}/unique-views?date=${date}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUniqueViews(data.uniqueViews || 0);
+      }
+    } catch (error) {
+      console.error("Erro ao carregar visualizações únicas:", error);
     }
   }
 
@@ -120,7 +157,23 @@ export default function WebinarAnalytics({ webinarId, videoDuration, token }: We
       </Card>
 
       {/* Métricas */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Eye className="h-4 w-4 text-cyan-500" />
+              Visualizações Únicas
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : (
+              <div className="text-2xl font-bold" data-testid="text-unique-views">{uniqueViews}</div>
+            )}
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
