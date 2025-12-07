@@ -270,6 +270,7 @@ export interface IStorage {
   deleteMediaFile(adminId: string, mediaId: string): Promise<boolean>;
   // Webinar View Logs - Histórico de visualizações
   logWebinarView(webinarId: string, ownerId: string | null, source: 'live' | 'replay' | 'embed', viewerId?: string): Promise<void>;
+  getUniqueViewsByWebinarAndDate(webinarId: string, date?: string): Promise<number>;
   countViewsByOwnerAndRange(ownerId: string, from: Date, to: Date): Promise<number>;
   resetWebinarViewsByOwner(ownerId: string): Promise<void>;
   getViewsByOwnerGroupedByDay(ownerId: string, from: Date, to: Date): Promise<{ date: string; count: number }[]>;
@@ -3395,6 +3396,17 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
       month: '2-digit',
       day: '2-digit'
     }).format(date);
+  }
+
+  async getUniqueViewsByWebinarAndDate(webinarId: string, date?: string): Promise<number> {
+    const conditions = [eq(webinarViewLogs.webinarId, webinarId)];
+    if (date) {
+      conditions.push(eq(webinarViewLogs.viewDate, date));
+    }
+    const result = await db.select({ count: sql<number>`count(*)` })
+      .from(webinarViewLogs)
+      .where(and(...conditions));
+    return Number(result[0]?.count || 0);
   }
 
   async countViewsByOwnerAndRange(ownerId: string, from: Date, to: Date): Promise<number> {

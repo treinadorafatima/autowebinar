@@ -3901,6 +3901,37 @@ IMPORTANTE: Se o usuário pedir algo específico, sugira imediatamente. Se for v
     }
   });
 
+  // Get unique views count for a webinar
+  app.get("/api/webinars/:id/unique-views", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin) {
+        return res.status(401).json({ error: "Admin not found" });
+      }
+
+      const webinar = await storage.getWebinarById(req.params.id);
+      if (!webinar) {
+        return res.status(404).json({ error: "Webinar not found" });
+      }
+
+      if (webinar.ownerId !== admin.id) {
+        return res.status(403).json({ error: "Você não tem permissão para ver estatísticas deste webinar" });
+      }
+
+      const date = req.query.date as string | undefined;
+      const uniqueViews = await storage.getUniqueViewsByWebinarAndDate(req.params.id, date);
+      res.json({ uniqueViews });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
   // Scripts CRUD endpoints
   
   // Chat with AI to generate scripts
