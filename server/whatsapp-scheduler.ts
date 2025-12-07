@@ -1,7 +1,7 @@
 import { storage } from "./storage";
 import { db } from "./db";
 import { eq, and, lte, sql } from "drizzle-orm";
-import { scheduledWhatsappMessages, leads, webinars as webinarsTable, whatsappSequences } from "@shared/schema";
+import { scheduledWhatsappMessages, leads, webinars as webinarsTable, whatsappSequences, WhatsappAccount } from "@shared/schema";
 import { sendWhatsAppMessage, sendWhatsAppMediaMessage, MediaMessage } from "./whatsapp-service";
 
 const SCHEDULER_INTERVAL_MS = 15000; // Check every 15 seconds for better timing accuracy
@@ -80,6 +80,19 @@ async function processScheduledWhatsappMessages(): Promise<void> {
 
         const processedMessage = replaceMergeTags(sequence.messageText, mergeFields);
 
+        // Get next available WhatsApp account using round-robin selection
+        const account = await storage.getNextAvailableWhatsappAccount(scheduled.adminId);
+        if (!account) {
+          console.error(`[whatsapp-scheduler] No available WhatsApp account for admin ${scheduled.adminId}`);
+          await storage.updateScheduledWhatsappMessage(scheduled.id, {
+            status: "failed",
+            lastError: "Nenhuma conta WhatsApp disponível"
+          });
+          continue;
+        }
+
+        console.log(`[whatsapp-scheduler] Using account ${account.label} (${account.id}) for message to ${scheduled.targetPhone}`);
+
         let result: { success: boolean; error?: string };
 
         if (sequence.messageType !== "text" && sequence.mediaUrl) {
@@ -90,17 +103,20 @@ async function processScheduledWhatsappMessages(): Promise<void> {
             fileName: sequence.mediaFileName || undefined,
             mimetype: sequence.mediaMimeType || undefined,
           };
-          result = await sendWhatsAppMediaMessage(scheduled.adminId, scheduled.targetPhone, media);
+          result = await sendWhatsAppMediaMessage(account.id, scheduled.targetPhone, media);
         } else {
-          result = await sendWhatsAppMessage(scheduled.adminId, scheduled.targetPhone, processedMessage);
+          result = await sendWhatsAppMessage(account.id, scheduled.targetPhone, processedMessage);
         }
 
         if (result.success) {
+          // Increment message counter for the account used
+          await storage.incrementWhatsappAccountMessageCount(account.id);
+          
           await storage.updateScheduledWhatsappMessage(scheduled.id, {
             status: "sent",
             sentAt: new Date()
           });
-          console.log(`[whatsapp-scheduler] Message sent to ${scheduled.targetPhone}`);
+          console.log(`[whatsapp-scheduler] Message sent to ${scheduled.targetPhone} via account ${account.label}`);
         } else {
           const errorMessage = result.error || "Erro desconhecido";
           console.error(`[whatsapp-scheduler] Failed to send to ${scheduled.targetPhone}: ${errorMessage}`);

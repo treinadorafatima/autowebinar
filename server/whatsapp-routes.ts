@@ -330,6 +330,125 @@ export function registerWhatsAppRoutes(app: Express) {
     }
   });
 
+  // ============================================
+  // WHATSAPP ACCOUNTS CRUD (Multiple accounts per admin)
+  // ============================================
+
+  app.get("/api/whatsapp/accounts", async (req: Request, res: Response) => {
+    try {
+      const { admin, error, errorCode } = await validateSessionAndGetAdmin(req);
+      if (!admin) {
+        return res.status(errorCode || 401).json({ error: error || "Não autenticado" });
+      }
+
+      const accounts = await storage.listWhatsappAccountsByAdmin(admin.id);
+      res.json(accounts);
+    } catch (error: any) {
+      console.error("[whatsapp-api] Error listing accounts:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/whatsapp/accounts", async (req: Request, res: Response) => {
+    try {
+      const { admin, error, errorCode } = await validateSessionAndGetAdmin(req);
+      if (!admin) {
+        return res.status(errorCode || 401).json({ error: error || "Não autenticado" });
+      }
+
+      const { label, dailyLimit, priority } = req.body;
+      if (!label) {
+        return res.status(400).json({ error: "Label é obrigatório" });
+      }
+
+      const accountId = "wa_" + Date.now() + "_" + Math.random().toString(36).substring(7);
+      
+      const account = await storage.createWhatsappAccount({
+        id: accountId,
+        adminId: admin.id,
+        label,
+        dailyLimit: dailyLimit || 100,
+        priority: priority || 0,
+        status: "disconnected",
+      });
+
+      res.json(account);
+    } catch (error: any) {
+      console.error("[whatsapp-api] Error creating account:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/whatsapp/accounts/:id", async (req: Request, res: Response) => {
+    try {
+      const { admin, error, errorCode } = await validateSessionAndGetAdmin(req);
+      if (!admin) {
+        return res.status(errorCode || 401).json({ error: error || "Não autenticado" });
+      }
+
+      const ownership = await validateAccountOwnership(req.params.id, admin.id);
+      if (!ownership.valid) {
+        return res.status(403).json({ error: ownership.error });
+      }
+
+      const account = await storage.getWhatsappAccountById(req.params.id);
+      res.json(account);
+    } catch (error: any) {
+      console.error("[whatsapp-api] Error getting account:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/whatsapp/accounts/:id", async (req: Request, res: Response) => {
+    try {
+      const { admin, error, errorCode } = await validateSessionAndGetAdmin(req);
+      if (!admin) {
+        return res.status(errorCode || 401).json({ error: error || "Não autenticado" });
+      }
+
+      const ownership = await validateAccountOwnership(req.params.id, admin.id);
+      if (!ownership.valid) {
+        return res.status(403).json({ error: ownership.error });
+      }
+
+      const { label, dailyLimit, priority } = req.body;
+      const updateData: Record<string, any> = {};
+      
+      if (label !== undefined) updateData.label = label;
+      if (dailyLimit !== undefined) updateData.dailyLimit = dailyLimit;
+      if (priority !== undefined) updateData.priority = priority;
+
+      const updated = await storage.updateWhatsappAccount(req.params.id, updateData);
+      res.json(updated);
+    } catch (error: any) {
+      console.error("[whatsapp-api] Error updating account:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/whatsapp/accounts/:id", async (req: Request, res: Response) => {
+    try {
+      const { admin, error, errorCode } = await validateSessionAndGetAdmin(req);
+      if (!admin) {
+        return res.status(errorCode || 401).json({ error: error || "Não autenticado" });
+      }
+
+      const ownership = await validateAccountOwnership(req.params.id, admin.id);
+      if (!ownership.valid) {
+        return res.status(403).json({ error: ownership.error });
+      }
+
+      // Disconnect WhatsApp if connected before deleting
+      await disconnectWhatsApp(req.params.id, admin.id);
+      
+      await storage.deleteWhatsappAccount(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[whatsapp-api] Error deleting account:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   console.log("[whatsapp-api] Routes registered");
   
   setTimeout(() => {

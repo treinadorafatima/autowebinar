@@ -3200,13 +3200,13 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
     // Get today's date in YYYY-MM-DD format for counter reset check
     const today = new Date().toISOString().split('T')[0];
     
-    // Find connected accounts ordered by lastUsedAt (round-robin)
+    // Find connected accounts ordered by priority (higher first), then by lastUsedAt (round-robin)
     const accounts = await db.select().from(whatsappAccounts)
       .where(and(
         eq(whatsappAccounts.adminId, adminId),
         eq(whatsappAccounts.status, "connected")
       ))
-      .orderBy(whatsappAccounts.lastUsedAt);
+      .orderBy(desc(whatsappAccounts.priority), whatsappAccounts.lastUsedAt);
     
     if (accounts.length === 0) return undefined;
     
@@ -3224,8 +3224,8 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
         account.messagesSentToday = 0;
       }
       
-      // Check if under daily limit (e.g., 1000 messages per day per account)
-      if (account.messagesSentToday < 1000) {
+      // Check if under daily limit (use account's configured limit)
+      if (account.messagesSentToday < account.dailyLimit) {
         return account;
       }
     }

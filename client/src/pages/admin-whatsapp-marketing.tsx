@@ -27,6 +27,19 @@ interface WhatsAppStatus {
   lastConnected?: string;
 }
 
+interface WhatsAppAccount {
+  id: string;
+  adminId: string;
+  label: string;
+  phoneNumber: string | null;
+  status: string;
+  dailyLimit: number;
+  messagesCountToday: number;
+  priority: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 interface WhatsAppSequence {
   id: string;
   adminId: string;
@@ -99,7 +112,7 @@ const convertDHMToMinutes = (days: number, hours: number, minutes: number, timin
 
 export default function AdminWhatsAppMarketing() {
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState("connection");
+  const [activeTab, setActiveTab] = useState("accounts");
   const [selectedWebinarId, setSelectedWebinarId] = useState<string>("");
   
   const [showNewSequenceDialog, setShowNewSequenceDialog] = useState(false);
@@ -131,10 +144,37 @@ export default function AdminWhatsAppMarketing() {
   const [testMessage, setTestMessage] = useState("");
   const [showMergeTagsInfo, setShowMergeTagsInfo] = useState(false);
 
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
+  const [showNewAccountDialog, setShowNewAccountDialog] = useState(false);
+  const [editingAccount, setEditingAccount] = useState<WhatsAppAccount | null>(null);
+  const [newAccount, setNewAccount] = useState({
+    label: "",
+    dailyLimit: 100,
+    priority: 0,
+  });
+
   const qrRefreshInterval = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const { data: accounts, isLoading: loadingAccounts } = useQuery<WhatsAppAccount[]>({
+    queryKey: ["/api/whatsapp/accounts"],
+  });
+
+  useEffect(() => {
+    if (accounts && accounts.length > 0 && !selectedAccountId) {
+      setSelectedAccountId(accounts[0].id);
+    }
+  }, [accounts, selectedAccountId]);
+
   const { data: status, isLoading: loadingStatus } = useQuery<WhatsAppStatus>({
-    queryKey: ["/api/whatsapp/status"],
+    queryKey: ["/api/whatsapp/status", selectedAccountId],
+    queryFn: async () => {
+      if (!selectedAccountId) return { status: "disconnected" };
+      const res = await fetch(`/api/whatsapp/status?accountId=${selectedAccountId}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("adminToken")}` }
+      });
+      return res.json();
+    },
+    enabled: !!selectedAccountId,
     refetchInterval: (query) => {
       const data = query.state.data as WhatsAppStatus | undefined;
       if (data?.status === "connecting" || data?.status === "qr_ready") {
@@ -200,12 +240,13 @@ export default function AdminWhatsAppMarketing() {
   }, [editingSequence?.id]);
 
   const connectMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/whatsapp/connect");
+    mutationFn: async (accountId: string) => {
+      const res = await apiRequest("POST", "/api/whatsapp/connect", { accountId });
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/status"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/accounts"] });
     },
     onError: (error: any) => {
       toast({ title: "Erro", description: error.message, variant: "destructive" });
@@ -213,21 +254,71 @@ export default function AdminWhatsAppMarketing() {
   });
 
   const disconnectMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/whatsapp/disconnect");
+    mutationFn: async (accountId: string) => {
+      const res = await apiRequest("POST", "/api/whatsapp/disconnect", { accountId });
       return res.json();
     },
     onSuccess: () => {
       toast({ title: "Desconectado do WhatsApp" });
       queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/status"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/accounts"] });
     },
     onError: (error: any) => {
       toast({ title: "Erro", description: error.message, variant: "destructive" });
     },
   });
 
+  const createAccountMutation = useMutation({
+    mutationFn: async (data: { label: string; dailyLimit: number; priority: number }) => {
+      const res = await apiRequest("POST", "/api/whatsapp/accounts", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Conta WhatsApp criada com sucesso" });
+      queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/accounts"] });
+      setShowNewAccountDialog(false);
+      setNewAccount({ label: "", dailyLimit: 100, priority: 0 });
+    },
+    onError: (error: any) => {
+      toast({ title: "Erro ao criar conta", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateAccountMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: { label?: string; dailyLimit?: number; priority?: number } }) => {
+      const res = await apiRequest("PATCH", `/api/whatsapp/accounts/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Conta atualizada com sucesso" });
+      queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/accounts"] });
+      setEditingAccount(null);
+    },
+    onError: (error: any) => {
+      toast({ title: "Erro ao atualizar conta", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteAccountMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("DELETE", `/api/whatsapp/accounts/${id}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Conta excluída com sucesso" });
+      queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/accounts"] });
+      if (selectedAccountId && accounts) {
+        const remaining = accounts.filter(a => a.id !== selectedAccountId);
+        setSelectedAccountId(remaining.length > 0 ? remaining[0].id : null);
+      }
+    },
+    onError: (error: any) => {
+      toast({ title: "Erro ao excluir conta", description: error.message, variant: "destructive" });
+    },
+  });
+
   const sendTestMutation = useMutation({
-    mutationFn: async (data: { phone: string; message: string }) => {
+    mutationFn: async (data: { phone: string; message: string; accountId: string }) => {
       const res = await apiRequest("POST", "/api/whatsapp/send-test", data);
       return res.json();
     },
@@ -547,7 +638,11 @@ export default function AdminWhatsAppMarketing() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid grid-cols-4 w-full max-w-xl">
+          <TabsList className="grid grid-cols-5 w-full max-w-3xl">
+            <TabsTrigger value="accounts" data-testid="tab-accounts">
+              <SiWhatsapp className="w-4 h-4 mr-2" />
+              Contas
+            </TabsTrigger>
             <TabsTrigger value="connection" data-testid="tab-connection">
               <Smartphone className="w-4 h-4 mr-2" />
               Conexão
@@ -566,93 +661,290 @@ export default function AdminWhatsAppMarketing() {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="connection" className="space-y-6">
+          <TabsContent value="accounts" className="space-y-6">
+            <div className="flex items-center justify-between gap-4">
+              <h2 className="text-lg font-semibold">Minhas Contas WhatsApp</h2>
+              <Button onClick={() => setShowNewAccountDialog(true)} data-testid="button-new-account">
+                <Plus className="w-4 h-4 mr-2" />
+                Nova Conta
+              </Button>
+            </div>
+
+            {loadingAccounts ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : accounts && accounts.length > 0 ? (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {accounts.map((account) => (
+                  <Card 
+                    key={account.id} 
+                    className={`cursor-pointer transition-all ${selectedAccountId === account.id ? 'ring-2 ring-primary' : ''}`}
+                    onClick={() => setSelectedAccountId(account.id)}
+                    data-testid={`card-account-${account.id}`}
+                  >
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <CardTitle className="text-base">{account.label}</CardTitle>
+                        <Badge 
+                          variant={account.status === "connected" ? "default" : "secondary"}
+                          className={account.status === "connected" ? "bg-green-500/10 text-green-500 border-green-500/20" : ""}
+                        >
+                          {account.status === "connected" ? (
+                            <><Wifi className="w-3 h-3 mr-1" />Conectado</>
+                          ) : (
+                            <><WifiOff className="w-3 h-3 mr-1" />Desconectado</>
+                          )}
+                        </Badge>
+                      </div>
+                      {account.phoneNumber && (
+                        <CardDescription>{account.phoneNumber}</CardDescription>
+                      )}
+                    </CardHeader>
+                    <CardContent className="pb-3">
+                      <div className="space-y-2 text-sm text-muted-foreground">
+                        <div className="flex justify-between">
+                          <span>Mensagens hoje:</span>
+                          <span className="font-medium">{account.messagesCountToday} / {account.dailyLimit}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Prioridade:</span>
+                          <span className="font-medium">{account.priority}</span>
+                        </div>
+                      </div>
+                    </CardContent>
+                    <CardFooter className="pt-0 gap-2 flex-wrap">
+                      {account.status === "connected" ? (
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            disconnectMutation.mutate(account.id);
+                          }}
+                          disabled={disconnectMutation.isPending}
+                          data-testid={`button-disconnect-${account.id}`}
+                        >
+                          {disconnectMutation.isPending ? (
+                            <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                          ) : (
+                            <WifiOff className="w-3 h-3 mr-1" />
+                          )}
+                          Desconectar
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedAccountId(account.id);
+                            setActiveTab("connection");
+                          }}
+                          data-testid={`button-connect-${account.id}`}
+                        >
+                          <QrCode className="w-3 h-3 mr-1" />
+                          Conectar
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingAccount(account);
+                        }}
+                        data-testid={`button-edit-account-${account.id}`}
+                      >
+                        <Edit className="w-3 h-3" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-destructive"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm("Tem certeza que deseja excluir esta conta? Ela será desconectada primeiro.")) {
+                            deleteAccountMutation.mutate(account.id);
+                          }
+                        }}
+                        disabled={deleteAccountMutation.isPending}
+                        data-testid={`button-delete-account-${account.id}`}
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center py-12">
+                  <SiWhatsapp className="w-12 h-12 text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground mb-4">
+                    Nenhuma conta WhatsApp configurada ainda
+                  </p>
+                  <Button onClick={() => setShowNewAccountDialog(true)}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Criar primeira conta
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <QrCode className="w-5 h-5" />
-                  Conexão WhatsApp
-                </CardTitle>
+                <CardTitle>Sistema de Round-Robin</CardTitle>
                 <CardDescription>
-                  Conecte seu WhatsApp escaneando o QR Code com o aplicativo
+                  O sistema distribui automaticamente as mensagens entre suas contas conectadas
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-6">
-                {loadingStatus ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-                  </div>
-                ) : status?.status === "connected" ? (
-                  <div className="text-center space-y-4">
-                    <div className="w-24 h-24 mx-auto bg-green-500/10 rounded-full flex items-center justify-center">
-                      <CheckCircle className="w-12 h-12 text-green-500" />
-                    </div>
+              <CardContent className="space-y-4">
+                <div className="grid gap-4">
+                  <div className="flex gap-3">
+                    <div className="w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center text-green-500 font-bold">1</div>
                     <div>
-                      <p className="text-lg font-medium text-green-500">WhatsApp Conectado</p>
-                      {status.phoneNumber && (
-                        <p className="text-muted-foreground">{status.phoneNumber}</p>
-                      )}
+                      <p className="font-medium">Crie múltiplas contas</p>
+                      <p className="text-sm text-muted-foreground">Adicione várias contas WhatsApp para distribuir a carga</p>
                     </div>
-                    <Button 
-                      variant="destructive" 
-                      onClick={() => disconnectMutation.mutate()}
-                      disabled={disconnectMutation.isPending}
-                      data-testid="button-disconnect"
-                    >
-                      {disconnectMutation.isPending ? (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      ) : (
-                        <WifiOff className="w-4 h-4 mr-2" />
-                      )}
-                      Desconectar
-                    </Button>
                   </div>
-                ) : status?.status === "qr_ready" && status.qrCode ? (
-                  <div className="text-center space-y-4">
-                    <p className="text-muted-foreground">
-                      Escaneie o QR Code com o WhatsApp no seu celular
-                    </p>
-                    <div className="bg-white p-4 rounded-lg inline-block">
-                      <img 
-                        src={status.qrCode} 
-                        alt="QR Code WhatsApp" 
-                        className="w-64 h-64"
-                        data-testid="img-qrcode"
-                      />
+                  <div className="flex gap-3">
+                    <div className="w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center text-green-500 font-bold">2</div>
+                    <div>
+                      <p className="font-medium">Configure limites diários</p>
+                      <p className="text-sm text-muted-foreground">Defina quantas mensagens cada conta pode enviar por dia</p>
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      O QR Code atualiza automaticamente a cada 30 segundos
-                    </p>
                   </div>
-                ) : status?.status === "connecting" ? (
-                  <div className="text-center space-y-4">
-                    <Loader2 className="w-12 h-12 mx-auto animate-spin text-muted-foreground" />
-                    <p className="text-muted-foreground">Gerando QR Code...</p>
-                  </div>
-                ) : (
-                  <div className="text-center space-y-4">
-                    <div className="w-24 h-24 mx-auto bg-muted rounded-full flex items-center justify-center">
-                      <Smartphone className="w-12 h-12 text-muted-foreground" />
+                  <div className="flex gap-3">
+                    <div className="w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center text-green-500 font-bold">3</div>
+                    <div>
+                      <p className="font-medium">Distribuição automática</p>
+                      <p className="text-sm text-muted-foreground">As mensagens serão enviadas alternando entre as contas conectadas</p>
                     </div>
-                    <p className="text-muted-foreground">
-                      Clique no botão abaixo para gerar o QR Code e conectar seu WhatsApp
-                    </p>
-                    <Button 
-                      onClick={() => connectMutation.mutate()}
-                      disabled={connectMutation.isPending}
-                      data-testid="button-connect"
-                    >
-                      {connectMutation.isPending ? (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      ) : (
-                        <QrCode className="w-4 h-4 mr-2" />
-                      )}
-                      Conectar WhatsApp
-                    </Button>
                   </div>
-                )}
+                </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="connection" className="space-y-6">
+            {!selectedAccountId ? (
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center py-12">
+                  <SiWhatsapp className="w-12 h-12 text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground mb-4">
+                    Selecione ou crie uma conta WhatsApp primeiro
+                  </p>
+                  <Button onClick={() => setActiveTab("accounts")}>
+                    Ir para Contas
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <>
+                <div className="flex items-center gap-4 mb-4">
+                  <Label>Conta selecionada:</Label>
+                  <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
+                    <SelectTrigger className="w-64" data-testid="select-account">
+                      <SelectValue placeholder="Selecione uma conta" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {accounts?.map((account) => (
+                        <SelectItem key={account.id} value={account.id}>
+                          {account.label} {account.status === "connected" ? "(Conectado)" : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <QrCode className="w-5 h-5" />
+                      Conexão WhatsApp - {accounts?.find(a => a.id === selectedAccountId)?.label}
+                    </CardTitle>
+                    <CardDescription>
+                      Conecte seu WhatsApp escaneando o QR Code com o aplicativo
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    {loadingStatus ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : status?.status === "connected" ? (
+                      <div className="text-center space-y-4">
+                        <div className="w-24 h-24 mx-auto bg-green-500/10 rounded-full flex items-center justify-center">
+                          <CheckCircle className="w-12 h-12 text-green-500" />
+                        </div>
+                        <div>
+                          <p className="text-lg font-medium text-green-500">WhatsApp Conectado</p>
+                          {status.phoneNumber && (
+                            <p className="text-muted-foreground">{status.phoneNumber}</p>
+                          )}
+                        </div>
+                        <Button 
+                          variant="destructive" 
+                          onClick={() => selectedAccountId && disconnectMutation.mutate(selectedAccountId)}
+                          disabled={disconnectMutation.isPending}
+                          data-testid="button-disconnect"
+                        >
+                          {disconnectMutation.isPending ? (
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          ) : (
+                            <WifiOff className="w-4 h-4 mr-2" />
+                          )}
+                          Desconectar
+                        </Button>
+                      </div>
+                    ) : status?.status === "qr_ready" && status.qrCode ? (
+                      <div className="text-center space-y-4">
+                        <p className="text-muted-foreground">
+                          Escaneie o QR Code com o WhatsApp no seu celular
+                        </p>
+                        <div className="bg-white p-4 rounded-lg inline-block">
+                          <img 
+                            src={status.qrCode} 
+                            alt="QR Code WhatsApp" 
+                            className="w-64 h-64"
+                            data-testid="img-qrcode"
+                          />
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          O QR Code atualiza automaticamente a cada 30 segundos
+                        </p>
+                      </div>
+                    ) : status?.status === "connecting" ? (
+                      <div className="text-center space-y-4">
+                        <Loader2 className="w-12 h-12 mx-auto animate-spin text-muted-foreground" />
+                        <p className="text-muted-foreground">Gerando QR Code...</p>
+                      </div>
+                    ) : (
+                      <div className="text-center space-y-4">
+                        <div className="w-24 h-24 mx-auto bg-muted rounded-full flex items-center justify-center">
+                          <Smartphone className="w-12 h-12 text-muted-foreground" />
+                        </div>
+                        <p className="text-muted-foreground">
+                          Clique no botão abaixo para gerar o QR Code e conectar seu WhatsApp
+                        </p>
+                        <Button 
+                          onClick={() => selectedAccountId && connectMutation.mutate(selectedAccountId)}
+                          disabled={connectMutation.isPending}
+                          data-testid="button-connect"
+                        >
+                          {connectMutation.isPending ? (
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          ) : (
+                            <QrCode className="w-4 h-4 mr-2" />
+                          )}
+                          Conectar WhatsApp
+                        </Button>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </>
+            )}
 
             <Card>
               <CardHeader>
@@ -951,8 +1243,8 @@ export default function AdminWhatsAppMarketing() {
                       />
                     </div>
                     <Button
-                      onClick={() => sendTestMutation.mutate({ phone: testPhone, message: testMessage })}
-                      disabled={sendTestMutation.isPending || !testPhone || !testMessage}
+                      onClick={() => selectedAccountId && sendTestMutation.mutate({ phone: testPhone, message: testMessage, accountId: selectedAccountId })}
+                      disabled={sendTestMutation.isPending || !testPhone || !testMessage || !selectedAccountId}
                       data-testid="button-send-test"
                     >
                       {sendTestMutation.isPending ? (
@@ -1553,6 +1845,130 @@ export default function AdminWhatsAppMarketing() {
                 {updateSequenceMutation.isPending && (
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 )}
+                Salvar Alterações
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={showNewAccountDialog} onOpenChange={setShowNewAccountDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Nova Conta WhatsApp</DialogTitle>
+              <DialogDescription>
+                Adicione uma nova conta WhatsApp para distribuir mensagens
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="account-label">Nome da Conta</Label>
+                <Input
+                  id="account-label"
+                  placeholder="Ex: Conta Principal"
+                  value={newAccount.label}
+                  onChange={(e) => setNewAccount({ ...newAccount, label: e.target.value })}
+                  data-testid="input-account-label"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="account-limit">Limite Diário de Mensagens</Label>
+                <Input
+                  id="account-limit"
+                  type="number"
+                  min={1}
+                  value={newAccount.dailyLimit}
+                  onChange={(e) => setNewAccount({ ...newAccount, dailyLimit: parseInt(e.target.value) || 100 })}
+                  data-testid="input-account-limit"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="account-priority">Prioridade</Label>
+                <Input
+                  id="account-priority"
+                  type="number"
+                  min={0}
+                  value={newAccount.priority}
+                  onChange={(e) => setNewAccount({ ...newAccount, priority: parseInt(e.target.value) || 0 })}
+                  data-testid="input-account-priority"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Contas com maior prioridade serão usadas primeiro
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowNewAccountDialog(false)}>
+                Cancelar
+              </Button>
+              <Button 
+                onClick={() => createAccountMutation.mutate(newAccount)}
+                disabled={createAccountMutation.isPending || !newAccount.label}
+                data-testid="button-create-account"
+              >
+                {createAccountMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Criar Conta
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={!!editingAccount} onOpenChange={(open) => !open && setEditingAccount(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Editar Conta WhatsApp</DialogTitle>
+            </DialogHeader>
+            {editingAccount && (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-account-label">Nome da Conta</Label>
+                  <Input
+                    id="edit-account-label"
+                    value={editingAccount.label}
+                    onChange={(e) => setEditingAccount({ ...editingAccount, label: e.target.value })}
+                    data-testid="input-edit-account-label"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-account-limit">Limite Diário de Mensagens</Label>
+                  <Input
+                    id="edit-account-limit"
+                    type="number"
+                    min={1}
+                    value={editingAccount.dailyLimit}
+                    onChange={(e) => setEditingAccount({ ...editingAccount, dailyLimit: parseInt(e.target.value) || 100 })}
+                    data-testid="input-edit-account-limit"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-account-priority">Prioridade</Label>
+                  <Input
+                    id="edit-account-priority"
+                    type="number"
+                    min={0}
+                    value={editingAccount.priority}
+                    onChange={(e) => setEditingAccount({ ...editingAccount, priority: parseInt(e.target.value) || 0 })}
+                    data-testid="input-edit-account-priority"
+                  />
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditingAccount(null)}>
+                Cancelar
+              </Button>
+              <Button 
+                onClick={() => editingAccount && updateAccountMutation.mutate({ 
+                  id: editingAccount.id, 
+                  data: { 
+                    label: editingAccount.label, 
+                    dailyLimit: editingAccount.dailyLimit, 
+                    priority: editingAccount.priority 
+                  } 
+                })}
+                disabled={updateAccountMutation.isPending}
+                data-testid="button-save-account"
+              >
+                {updateAccountMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                 Salvar Alterações
               </Button>
             </DialogFooter>
