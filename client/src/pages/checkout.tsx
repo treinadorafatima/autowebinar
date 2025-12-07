@@ -25,6 +25,7 @@ interface Plano {
   webinarLimit: number;
   uploadLimit?: number;
   storageLimit?: number;
+  whatsappAccountLimit?: number;
   gateway: string;
   beneficios: string;
   destaque: boolean;
@@ -623,6 +624,14 @@ export default function Checkout() {
                               <SiWhatsapp className="w-3 h-3 text-green-400" />
                             </div>
                             <span className="text-slate-300">WhatsApp Marketing</span>
+                          </div>
+                          <div className="flex items-center gap-3 text-sm">
+                            <div className="w-5 h-5 rounded-full bg-green-500/20 flex items-center justify-center">
+                              <SiWhatsapp className="w-3 h-3 text-green-400" />
+                            </div>
+                            <span className="text-slate-300">
+                              {(plano.whatsappAccountLimit ?? 2) >= 999 ? 'Conexões WhatsApp ilimitadas' : `${plano.whatsappAccountLimit ?? 2} conexões WhatsApp`}
+                            </span>
                           </div>
                           <div className="flex items-center gap-3 text-sm">
                             <div className="w-5 h-5 rounded-full bg-orange-500/20 flex items-center justify-center">
