@@ -41,8 +41,20 @@ import {
   Package,
   Filter,
   XCircle,
-  AlertTriangle
+  AlertTriangle,
+  ChevronDown,
+  ChevronUp,
+  Calendar,
+  CreditCard,
+  History,
+  TestTube2,
+  UserX
 } from "lucide-react";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 interface User {
   id: string;
@@ -80,6 +92,11 @@ export default function AdminUsersPage() {
   const [deletingComplete, setDeletingComplete] = useState(false);
   const [filterExpired, setFilterExpired] = useState(false);
   const [filterActive, setFilterActive] = useState<boolean | null>(null); // null = todos, true = ativos, false = inativos
+  const [filterPlano, setFilterPlano] = useState<string | null>(null); // null = todos, "trial" = teste, planoId = plano específico
+  const [filterTrialActive, setFilterTrialActive] = useState(false);
+  const [filterTrialExpired, setFilterTrialExpired] = useState(false);
+  const [filterInactive, setFilterInactive] = useState(false);
+  const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set());
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [formData, setFormData] = useState({
     name: "",
@@ -444,6 +461,37 @@ export default function AdminUsersPage() {
   const inactiveCount = allRegularUsers.filter(u => !u.isActive).length;
   const expiredCount = allRegularUsers.filter(u => isExpired(u.accessExpiresAt)).length;
   
+  // Contadores por plano
+  const trialActiveCount = allRegularUsers.filter(u => u.planoId === "trial" && !isExpired(u.accessExpiresAt)).length;
+  const trialExpiredCount = allRegularUsers.filter(u => u.planoId === "trial" && isExpired(u.accessExpiresAt)).length;
+  
+  // Contadores por cada plano
+  const planoCounts = planos.reduce((acc, plano) => {
+    acc[plano.id] = allRegularUsers.filter(u => u.planoId === plano.id).length;
+    return acc;
+  }, {} as Record<string, number>);
+  
+  // Helper para obter nome do plano
+  function getPlanoNome(planoId: string | null | undefined): string {
+    if (!planoId) return "Sem plano";
+    if (planoId === "trial") return "Teste Grátis";
+    const plano = planos.find(p => p.id === planoId);
+    return plano?.nome || "Plano desconhecido";
+  }
+  
+  // Toggle expand user
+  function toggleUserExpand(userId: string) {
+    setExpandedUsers(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(userId)) {
+        newSet.delete(userId);
+      } else {
+        newSet.add(userId);
+      }
+      return newSet;
+    });
+  }
+  
   // Aplicar filtros
   let regularUsers = allRegularUsers;
   if (filterExpired) {
@@ -454,6 +502,18 @@ export default function AdminUsersPage() {
   } else if (filterActive === false) {
     regularUsers = regularUsers.filter(u => !u.isActive);
   }
+  if (filterPlano) {
+    regularUsers = regularUsers.filter(u => u.planoId === filterPlano);
+  }
+  if (filterTrialActive) {
+    regularUsers = regularUsers.filter(u => u.planoId === "trial" && !isExpired(u.accessExpiresAt));
+  }
+  if (filterTrialExpired) {
+    regularUsers = regularUsers.filter(u => u.planoId === "trial" && isExpired(u.accessExpiresAt));
+  }
+  if (filterInactive) {
+    regularUsers = regularUsers.filter(u => !u.isActive);
+  }
   
   const superadmins = users.filter(u => u.role === "superadmin");
   
@@ -461,9 +521,26 @@ export default function AdminUsersPage() {
   function clearFilters() {
     setFilterExpired(false);
     setFilterActive(null);
+    setFilterPlano(null);
+    setFilterTrialActive(false);
+    setFilterTrialExpired(false);
+    setFilterInactive(false);
   }
   
-  const hasActiveFilters = filterExpired || filterActive !== null;
+  // Descrição do filtro ativo
+  function getFilterDescription(): string {
+    if (filterPlano) {
+      return getPlanoNome(filterPlano);
+    }
+    if (filterTrialActive) return "Teste Ativo";
+    if (filterTrialExpired) return "Teste Expirado";
+    if (filterInactive) return "Inativos";
+    if (filterActive === true) return "Ativos";
+    if (filterExpired) return "Expirados";
+    return "";
+  }
+  
+  const hasActiveFilters = filterExpired || filterActive !== null || filterPlano !== null || filterTrialActive || filterTrialExpired || filterInactive;
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
@@ -564,6 +641,103 @@ export default function AdminUsersPage() {
         </Card>
       </div>
 
+      {/* Filtros Avançados */}
+      <Card className="bg-muted/30">
+        <CardContent className="p-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4" />
+              <span className="text-sm font-medium">Filtrar por:</span>
+            </div>
+            
+            {/* Dropdown Plano */}
+            <Select 
+              value={filterPlano || "all"} 
+              onValueChange={(v) => {
+                clearFilters();
+                if (v !== "all") setFilterPlano(v);
+              }}
+            >
+              <SelectTrigger className="w-[180px] h-8" data-testid="select-filter-plano">
+                <SelectValue placeholder="Plano" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os Planos</SelectItem>
+                <SelectItem value="trial">
+                  <span className="flex items-center gap-2">
+                    <TestTube2 className="w-3 h-3" />
+                    Teste Grátis ({trialActiveCount + trialExpiredCount})
+                  </span>
+                </SelectItem>
+                {planos.map((plano) => (
+                  <SelectItem key={plano.id} value={plano.id}>
+                    <span className="flex items-center gap-2">
+                      <Package className="w-3 h-3" />
+                      {plano.nome} ({planoCounts[plano.id] || 0})
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Separator orientation="vertical" className="h-6" />
+
+            {/* Badges de filtro rápido */}
+            <Badge 
+              variant={filterTrialActive ? "default" : "outline"}
+              className="cursor-pointer hover-elevate gap-1"
+              onClick={() => {
+                clearFilters();
+                setFilterTrialActive(true);
+              }}
+              data-testid="badge-filter-trial-active"
+            >
+              <TestTube2 className="w-3 h-3" />
+              Teste Ativo ({trialActiveCount})
+            </Badge>
+
+            <Badge 
+              variant={filterTrialExpired ? "default" : "outline"}
+              className="cursor-pointer hover-elevate gap-1 bg-amber-500/10 border-amber-500/30 text-amber-700 dark:text-amber-400"
+              onClick={() => {
+                clearFilters();
+                setFilterTrialExpired(true);
+              }}
+              data-testid="badge-filter-trial-expired"
+            >
+              <Clock className="w-3 h-3" />
+              Teste Expirado ({trialExpiredCount})
+            </Badge>
+
+            <Badge 
+              variant={filterInactive ? "default" : "outline"}
+              className="cursor-pointer hover-elevate gap-1 bg-red-500/10 border-red-500/30 text-red-700 dark:text-red-400"
+              onClick={() => {
+                clearFilters();
+                setFilterInactive(true);
+              }}
+              data-testid="badge-filter-inactive"
+            >
+              <UserX className="w-3 h-3" />
+              Inativos ({inactiveCount})
+            </Badge>
+
+            {hasActiveFilters && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearFilters}
+                className="h-7 px-2 text-xs gap-1"
+                data-testid="button-clear-all-filters"
+              >
+                <XCircle className="w-3 h-3" />
+                Limpar Filtros
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Superadmins */}
       {superadmins.length > 0 && (
         <Card>
@@ -616,9 +790,7 @@ export default function AdminUsersPage() {
               <div className="flex items-center gap-2">
                 <Badge variant="secondary" className="gap-1">
                   <Filter className="w-3 h-3" />
-                  {filterActive === true && "Ativos"}
-                  {filterExpired && "Expirados"}
-                  {` (${regularUsers.length})`}
+                  {getFilterDescription()} ({regularUsers.length})
                 </Badge>
                 <Button
                   variant="ghost"
@@ -657,7 +829,11 @@ export default function AdminUsersPage() {
             <ScrollArea className="max-h-[400px]">
               <div className="space-y-3">
                 {regularUsers.map((user, index) => (
-                  <div key={user.id}>
+                  <Collapsible 
+                    key={user.id} 
+                    open={expandedUsers.has(user.id)}
+                    onOpenChange={() => toggleUserExpand(user.id)}
+                  >
                     <div
                       className="flex items-center justify-between p-4 rounded-lg border hover-elevate"
                       data-testid={`user-item-${user.id}`}
@@ -667,11 +843,30 @@ export default function AdminUsersPage() {
                           <Users className="w-5 h-5 text-white" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <p className="font-semibold truncate">{user.name || "Sem nome"}</p>
                             {!user.isActive && (
                               <Badge variant="outline" className="text-xs">Inativo</Badge>
                             )}
+                            {/* Badge do Plano */}
+                            <Badge 
+                              variant="outline" 
+                              className={`text-xs ${
+                                user.planoId === "trial" 
+                                  ? 'bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/30'
+                                  : user.planoId 
+                                    ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30'
+                                    : 'bg-gray-500/10 text-gray-700 dark:text-gray-400 border-gray-500/30'
+                              }`}
+                            >
+                              {user.planoId === "trial" ? (
+                                <><TestTube2 className="w-3 h-3 mr-1" />Teste</>
+                              ) : user.planoId ? (
+                                <><CreditCard className="w-3 h-3 mr-1" />{getPlanoNome(user.planoId)}</>
+                              ) : (
+                                <><Package className="w-3 h-3 mr-1" />Sem plano</>
+                              )}
+                            </Badge>
                           </div>
                           <p className="text-sm text-muted-foreground truncate">{user.email}</p>
                           <div className="flex items-center gap-2 mt-1 flex-wrap">
@@ -752,10 +947,77 @@ export default function AdminUsersPage() {
                         >
                           <AlertTriangle className="w-4 h-4 text-destructive" />
                         </Button>
+                        <CollapsibleTrigger asChild>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            data-testid={`button-expand-${user.id}`}
+                            title="Ver histórico"
+                          >
+                            {expandedUsers.has(user.id) ? (
+                              <ChevronUp className="w-4 h-4" />
+                            ) : (
+                              <ChevronDown className="w-4 h-4" />
+                            )}
+                          </Button>
+                        </CollapsibleTrigger>
                       </div>
                     </div>
+                    
+                    {/* Histórico Expandível */}
+                    <CollapsibleContent>
+                      <div className="mt-2 ml-14 p-3 rounded-lg bg-muted/50 border border-dashed space-y-2">
+                        <div className="flex items-center gap-2 text-sm">
+                          <History className="w-4 h-4 text-muted-foreground" />
+                          <span className="font-medium">Histórico do Cliente</span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                          <div className="flex items-center gap-2">
+                            <Calendar className="w-3 h-3 text-muted-foreground" />
+                            <span className="text-muted-foreground">Cadastro:</span>
+                            <span>{new Date(user.createdAt).toLocaleDateString('pt-BR')}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <CreditCard className="w-3 h-3 text-muted-foreground" />
+                            <span className="text-muted-foreground">Plano:</span>
+                            <span>{getPlanoNome(user.planoId)}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Clock className="w-3 h-3 text-muted-foreground" />
+                            <span className="text-muted-foreground">
+                              {isExpired(user.accessExpiresAt) ? "Expirou:" : "Renovação:"}
+                            </span>
+                            <span>
+                              {user.accessExpiresAt 
+                                ? new Date(user.accessExpiresAt).toLocaleDateString('pt-BR') 
+                                : "Sem data"}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm pt-1 border-t border-dashed">
+                          {user.isActive ? (
+                            <Badge variant="outline" className="text-xs bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/30">
+                              <CheckCircle2 className="w-3 h-3 mr-1" />
+                              Acesso Ativo
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-xs bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30">
+                              <XCircle className="w-3 h-3 mr-1" />
+                              Acesso Bloqueado
+                            </Badge>
+                          )}
+                          {isExpired(user.accessExpiresAt) && (
+                            <Badge variant="outline" className="text-xs bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30">
+                              <AlertCircle className="w-3 h-3 mr-1" />
+                              Plano Expirado
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    </CollapsibleContent>
+                    
                     {index < regularUsers.length - 1 && <Separator className="my-1" />}
-                  </div>
+                  </Collapsible>
                 ))}
               </div>
             </ScrollArea>
