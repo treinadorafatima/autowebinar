@@ -393,6 +393,7 @@ export const checkoutPlanos = pgTable("checkout_planos", {
   webinarLimit: integer("webinar_limit").notNull().default(5), // Limite de webinars no plano
   uploadLimit: integer("upload_limit").notNull().default(999), // Uploads ilimitados
   storageLimit: integer("storage_limit").notNull().default(5), // Limite de armazenamento em GB
+  whatsappAccountLimit: integer("whatsapp_account_limit").notNull().default(2), // Limite de contas WhatsApp
   ativo: boolean("ativo").notNull().default(true),
   gateway: text("gateway").notNull().default("mercadopago"), // 'mercadopago' ou 'stripe'
   tipoCobranca: text("tipo_cobranca").notNull().default("unico"), // 'unico' ou 'recorrente'

@@ -2449,6 +2449,7 @@ export class DatabaseStorage implements IStorage {
       webinarLimit: plano.webinarLimit ?? 5,
       uploadLimit: plano.uploadLimit ?? 5,
       storageLimit: plano.storageLimit ?? 5,
+      whatsappAccountLimit: plano.whatsappAccountLimit ?? 2,
       ativo: plano.ativo ?? true,
       gateway: plano.gateway ?? "mercadopago",
       tipoCobranca: plano.tipoCobranca ?? "unico",
@@ -2774,12 +2775,13 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
     const defaultPlanos = [
       {
         id: crypto.randomUUID(),
-        nome: "Starter",
+        nome: "Essencial",
         descricao: "Ideal para começar",
         preco: 9700,
         prazoDias: 30,
         webinarLimit: 3,
         uploadLimit: 3,
+        whatsappAccountLimit: 2,
         ativo: true,
         gateway: "mercadopago",
         tipoCobranca: "unico",
@@ -2789,6 +2791,7 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
         beneficios: JSON.stringify([
           "Chat simulado",
           "Agendamento automático",
+          "2 contas WhatsApp",
           "Suporte por email"
         ]),
         destaque: false,
@@ -2796,12 +2799,13 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
       },
       {
         id: crypto.randomUUID(),
-        nome: "Profissional",
+        nome: "Avançado",
         descricao: "Para quem quer escalar",
         preco: 19700,
         prazoDias: 30,
         webinarLimit: 10,
         uploadLimit: 10,
+        whatsappAccountLimit: 5,
         ativo: true,
         gateway: "mercadopago",
         tipoCobranca: "unico",
@@ -2809,9 +2813,10 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
         frequenciaTipo: "months",
         disponivelRenovacao: false,
         beneficios: JSON.stringify([
-          "Tudo do Starter",
+          "Tudo do Essencial",
           "Ofertas cronometradas",
           "Designer IA",
+          "5 contas WhatsApp",
           "Replay automático",
           "Suporte prioritário"
         ]),
@@ -2820,12 +2825,13 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
       },
       {
         id: crypto.randomUUID(),
-        nome: "Enterprise",
+        nome: "Elite",
         descricao: "Sem limites",
         preco: 49700,
         prazoDias: 30,
         webinarLimit: 999,
         uploadLimit: 999,
+        whatsappAccountLimit: 999,
         ativo: true,
         gateway: "mercadopago",
         tipoCobranca: "unico",
@@ -2833,9 +2839,10 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
         frequenciaTipo: "months",
         disponivelRenovacao: false,
         beneficios: JSON.stringify([
-          "Tudo do Profissional",
+          "Tudo do Avançado",
           "Webinars ilimitados",
           "Uploads ilimitados",
+          "Contas WhatsApp ilimitadas",
           "Domínio customizado",
           "API de integração",
           "Gerente de conta dedicado"
