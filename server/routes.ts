@@ -7878,6 +7878,14 @@ Seja conversacional e objetivo.`;
                     isActive: false,
                   });
                   console.log(`[MP Webhook] Deactivated admin ${pagamento.email} due to subscription cancellation`);
+                  
+                  // Send plan expired email
+                  const plano = await storage.getCheckoutPlanoById(pagamento.planoId);
+                  import("./email").then(({ sendPlanExpiredEmail }) => {
+                    sendPlanExpiredEmail(pagamento.email, pagamento.nome, plano?.nome || "Seu Plano").catch(err => {
+                      console.error(`[MP Webhook] Error sending plan expired email:`, err);
+                    });
+                  });
                 }
               }
             }
@@ -8116,6 +8124,13 @@ Seja conversacional e objetivo.`;
                   isActive: true,
                 });
                 updateData.adminId = admin.id;
+                
+                // Send payment confirmation email for existing users
+                import("./email").then(({ sendPaymentConfirmedEmail }) => {
+                  sendPaymentConfirmedEmail(pagamento.email, pagamento.nome, plano.nome, expirationDate).catch(err => {
+                    console.error(`[Stripe Webhook] Error sending confirmation email:`, err);
+                  });
+                });
               } else {
                 const tempPassword = Math.random().toString(36).slice(-8);
                 const bcrypt = await import('bcryptjs');
@@ -8184,6 +8199,13 @@ Seja conversacional e objetivo.`;
                   planoId: plano.id,
                 });
                 updateData.adminId = admin.id;
+                
+                // Send payment confirmation email for existing users
+                import("./email").then(({ sendPaymentConfirmedEmail }) => {
+                  sendPaymentConfirmedEmail(pagamento.email, pagamento.nome, plano.nome, expirationDate).catch(err => {
+                    console.error(`[Stripe Webhook] Error sending confirmation email:`, err);
+                  });
+                });
               } else {
                 const tempPassword = Math.random().toString(36).slice(-8);
                 const bcrypt = await import('bcryptjs');
@@ -8324,7 +8346,49 @@ Seja conversacional e objetivo.`;
                 isActive: false,
               });
               console.log(`[Stripe Webhook] Deactivated admin: ${pagamento.email}`);
+              
+              // Send plan expired email
+              const plano = await storage.getCheckoutPlanoById(pagamento.planoId);
+              import("./email").then(({ sendPlanExpiredEmail }) => {
+                sendPlanExpiredEmail(pagamento.email, pagamento.nome, plano?.nome || "Seu Plano").catch(err => {
+                  console.error(`[Stripe Webhook] Error sending plan expired email:`, err);
+                });
+              });
             }
+          }
+        }
+      }
+
+      // Handle invoice.payment_failed (subscription payment failure)
+      if (event.type === 'invoice.payment_failed') {
+        const invoice = event.data.object;
+        const subscriptionId = invoice.subscription;
+        const pagamentoId = invoice.subscription_details?.metadata?.pagamentoId || 
+                           invoice.metadata?.pagamentoId;
+        
+        console.log(`[Stripe Webhook] Invoice payment failed for subscription: ${subscriptionId}`);
+        
+        if (pagamentoId) {
+          const pagamento = await storage.getCheckoutPagamentoById(pagamentoId);
+          if (pagamento) {
+            const plano = await storage.getCheckoutPlanoById(pagamento.planoId);
+            const failureMessage = invoice.last_finalization_error?.message || 
+                                   invoice.last_payment_error?.message || 
+                                   "Cartão recusado ou limite insuficiente";
+            
+            // Send payment failed email
+            import("./email").then(({ sendPaymentFailedEmail }) => {
+              sendPaymentFailedEmail(
+                pagamento.email, 
+                pagamento.nome, 
+                plano?.nome || "Seu Plano",
+                failureMessage
+              ).catch(err => {
+                console.error(`[Stripe Webhook] Error sending payment failed email:`, err);
+              });
+            });
+            
+            console.log(`[Stripe Webhook] Sent payment failed email to ${pagamento.email}`);
           }
         }
       }
