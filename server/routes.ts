@@ -8460,6 +8460,7 @@ Seja conversacional e objetivo.`;
           webinarLimit: plano.webinarLimit,
           uploadLimit: plano.uploadLimit,
           storageLimit: plano.storageLimit || 5,
+          whatsappAccountLimit: plano.whatsappAccountLimit ?? 2,
           tipoCobranca: plano.tipoCobranca,
           frequencia: plano.frequencia || 1,
           frequenciaTipo: plano.frequenciaTipo || "months",
