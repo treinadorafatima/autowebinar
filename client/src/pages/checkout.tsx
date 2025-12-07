@@ -899,7 +899,6 @@ export default function Checkout() {
                         placeholder="(00) 00000-0000"
                         className="bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400 h-12"
                         maxLength={15}
-                        disabled={step === "payment"}
                       />
                     </div>
                   </div>
