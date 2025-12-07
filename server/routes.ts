@@ -7179,6 +7179,13 @@ Seja conversacional e objetivo.`;
             planoId: plano.id,
           });
           updateData.adminId = admin.id;
+          
+          // Send payment confirmation email for existing users
+          import("./email").then(({ sendPaymentConfirmedEmail }) => {
+            sendPaymentConfirmedEmail(pagamento.email, pagamento.nome, plano.nome, expirationDate).catch(err => {
+              console.error(`[MP Payment] Error sending confirmation email:`, err);
+            });
+          });
         } else {
           // Create new admin with temporary password
           const tempPassword = Math.random().toString(36).slice(-8);
@@ -7421,6 +7428,13 @@ Seja conversacional e objetivo.`;
               proximoPagamento: expirationDate,
             });
           }
+          
+          // Send payment confirmation email for existing users
+          import("./email").then(({ sendPaymentConfirmedEmail }) => {
+            sendPaymentConfirmedEmail(pagamento.email, pagamento.nome, plano.nome, expirationDate).catch(err => {
+              console.error(`[MP Subscription] Error sending confirmation email:`, err);
+            });
+          });
         } else {
           // Create new admin with temporary password
           const tempPassword = Math.random().toString(36).slice(-8);
