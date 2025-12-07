@@ -206,6 +206,7 @@ export default function AdminWhatsAppMarketing() {
     planName: string;
     canCreate: boolean;
     remaining: number;
+    isSuperadmin?: boolean;
   }
 
   const { data: accountLimit } = useQuery<AccountLimitInfo>({
@@ -936,7 +937,9 @@ export default function AdminWhatsAppMarketing() {
                 <h2 className="text-lg font-semibold">Minhas Contas WhatsApp</h2>
                 {accountLimit && (
                   <Badge variant="outline" className="text-muted-foreground" data-testid="badge-account-limit">
-                    {accountLimit.currentCount}/{accountLimit.limit === 999 ? "∞" : accountLimit.limit} contas
+                    {accountLimit.isSuperadmin || accountLimit.limit >= 999 
+                      ? `${accountLimit.currentCount} contas (Ilimitado)` 
+                      : `${accountLimit.currentCount}/${accountLimit.limit} contas`}
                   </Badge>
                 )}
               </div>
