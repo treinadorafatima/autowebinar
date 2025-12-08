@@ -511,20 +511,35 @@ ${APP_NAME}
   }
 }
 
-export async function sendPaymentFailedEmail(to: string, name: string, planName: string, reason: string): Promise<boolean> {
+export async function sendPaymentFailedEmail(to: string, name: string, planName: string, reason: string, planoId?: string): Promise<boolean> {
   try {
     const { client, fromEmail } = getResendClient();
+    
+    // Build checkout URL with pre-filled email and name
+    const checkoutParams = new URLSearchParams({
+      email: to,
+      nome: name,
+      renovacao: "true"
+    });
+    const checkoutUrl = planoId 
+      ? `${APP_URL}/checkout/${planoId}?${checkoutParams.toString()}`
+      : `${APP_URL}/checkout?${checkoutParams.toString()}`;
     
     const text = `
 Ola ${name},
 
-Nao conseguimos processar a renovacao automatica do seu plano ${planName}.
+A renovacao do seu plano ${planName} nao foi aprovada e seu acesso foi temporariamente suspenso.
 
 Motivo: ${reason || "Cartao recusado ou limite insuficiente"}
 
-Para evitar a suspensao da sua conta, atualize seu metodo de pagamento ou faca uma renovacao manual.
+Nao se preocupe! Seus dados e webinarios estao seguros. Assim que regularizar o pagamento, seu acesso sera reativado automaticamente.
 
-Atualizar pagamento: ${APP_URL}/admin/assinatura
+O que voce pode fazer:
+- Verificar o limite disponivel no seu cartao
+- Atualizar o metodo de pagamento
+- Entrar em contato com seu banco para liberar a transacao
+
+Regularizar agora: ${checkoutUrl}
 
 Se precisar de ajuda, entre em contato com nosso suporte.
 
@@ -538,7 +553,7 @@ ${APP_NAME}
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Problema no Pagamento - ${APP_NAME}</title>
+  <title>Pagamento nao aprovado - ${APP_NAME}</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background-color: #f4f4f5;">
   <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f5;">
@@ -546,8 +561,8 @@ ${APP_NAME}
       <td style="padding: 40px 20px;">
         <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden;">
           <tr>
-            <td style="background-color: #f59e0b; padding: 30px; text-align: center;">
-              <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 600;">Problema no Pagamento</h1>
+            <td style="background-color: #dc2626; padding: 30px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 600;">Pagamento Nao Aprovado</h1>
             </td>
           </tr>
           <tr>
@@ -556,31 +571,49 @@ ${APP_NAME}
                 Ola <strong>${name}</strong>,
               </p>
               <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
-                Nao conseguimos processar a renovacao automatica do seu plano <strong>${planName}</strong>.
+                A renovacao do seu plano <strong>${planName}</strong> nao foi aprovada e seu acesso foi temporariamente suspenso.
               </p>
               
-              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 25px 0; background-color: #fffbeb; border-radius: 6px;">
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 25px 0; background-color: #fef2f2; border-radius: 6px; border-left: 4px solid #dc2626;">
                 <tr>
                   <td style="padding: 16px;">
-                    <p style="margin: 0 0 8px; color: #92400e; font-weight: 600; font-size: 14px;">
+                    <p style="margin: 0 0 8px; color: #991b1b; font-weight: 600; font-size: 14px;">
                       Motivo:
                     </p>
-                    <p style="margin: 0; color: #92400e; font-size: 14px; line-height: 1.6;">
+                    <p style="margin: 0; color: #991b1b; font-size: 14px; line-height: 1.6;">
                       ${reason || "Cartao recusado ou limite insuficiente"}
                     </p>
                   </td>
                 </tr>
               </table>
               
-              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
-                Para evitar a suspensao da sua conta, atualize seu metodo de pagamento ou faca uma renovacao manual.
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 25px 0; background-color: #ecfdf5; border-radius: 6px;">
+                <tr>
+                  <td style="padding: 16px;">
+                    <p style="margin: 0 0 8px; color: #047857; font-weight: 600; font-size: 14px;">
+                      Nao se preocupe!
+                    </p>
+                    <p style="margin: 0; color: #047857; font-size: 14px; line-height: 1.6;">
+                      Seus dados e webinarios estao seguros. Assim que regularizar o pagamento, seu acesso sera <strong>reativado automaticamente</strong>.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+              
+              <p style="margin: 0 0 12px; color: #374151; font-size: 16px; line-height: 1.6; font-weight: 600;">
+                O que voce pode fazer:
               </p>
+              <ul style="margin: 0 0 25px; padding-left: 20px; color: #374151; font-size: 15px; line-height: 1.8;">
+                <li>Verificar o limite disponivel no seu cartao</li>
+                <li>Atualizar o metodo de pagamento</li>
+                <li>Entrar em contato com seu banco para liberar a transacao</li>
+              </ul>
               
               <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                 <tr>
                   <td style="text-align: center; padding: 25px 0;">
-                    <a href="${APP_URL}/admin/assinatura" style="display: inline-block; background-color: #3b82f6; color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 6px; font-weight: 600; font-size: 16px;">
-                      Atualizar Pagamento
+                    <a href="${checkoutUrl}" style="display: inline-block; background-color: #10b981; color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 6px; font-weight: 600; font-size: 16px;">
+                      Regularizar Pagamento
                     </a>
                   </td>
                 </tr>
@@ -610,7 +643,7 @@ ${APP_NAME}
       from: fromEmail,
       replyTo: REPLY_TO_EMAIL,
       to: [to],
-      subject: `Problema no pagamento - ${APP_NAME}`,
+      subject: `Acao necessaria: pagamento nao aprovado - ${APP_NAME}`,
       html,
       text,
     });

@@ -8015,7 +8015,7 @@ Seja conversacional e objetivo.`;
                 });
                 console.log(`[MP Webhook] BLOCKED admin ${pagamento.email} due to payment rejection: ${payment.status_detail}`);
                 
-                // Send payment failed email
+                // Send payment failed email with direct checkout link
                 const plano = await storage.getCheckoutPlanoById(pagamento.planoId);
                 const errorInfo = getMercadoPagoErrorMessage(payment.status_detail);
                 import("./email").then(({ sendPaymentFailedEmail }) => {
@@ -8023,7 +8023,8 @@ Seja conversacional e objetivo.`;
                     pagamento.email, 
                     pagamento.nome, 
                     plano?.nome || "Seu Plano",
-                    `${errorInfo.message} ${errorInfo.action}`
+                    `${errorInfo.message} ${errorInfo.action}`,
+                    pagamento.planoId
                   ).catch(err => {
                     console.error(`[MP Webhook] Error sending payment failed email:`, err);
                   });
@@ -8422,13 +8423,14 @@ Seja conversacional e objetivo.`;
               statusDetail: failureMessage,
             });
             
-            // Send payment failed email
+            // Send payment failed email with direct checkout link
             import("./email").then(({ sendPaymentFailedEmail }) => {
               sendPaymentFailedEmail(
                 pagamento.email, 
                 pagamento.nome, 
                 plano?.nome || "Seu Plano",
-                failureMessage
+                failureMessage,
+                pagamento.planoId
               ).catch(err => {
                 console.error(`[Stripe Webhook] Error sending payment failed email:`, err);
               });
