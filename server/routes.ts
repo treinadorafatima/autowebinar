@@ -8006,6 +8006,31 @@ Seja conversacional e objetivo.`;
               }
             }
 
+            // BLOQUEAR ACESSO quando pagamento for rejeitado (renovação falhou)
+            if (payment.status === 'rejected') {
+              const admin = await storage.getAdminByEmail(pagamento.email);
+              if (admin) {
+                await storage.updateAdmin(admin.id, {
+                  isActive: false,
+                });
+                console.log(`[MP Webhook] BLOCKED admin ${pagamento.email} due to payment rejection: ${payment.status_detail}`);
+                
+                // Send payment failed email
+                const plano = await storage.getCheckoutPlanoById(pagamento.planoId);
+                const errorInfo = getMercadoPagoErrorMessage(payment.status_detail);
+                import("./email").then(({ sendPaymentFailedEmail }) => {
+                  sendPaymentFailedEmail(
+                    pagamento.email, 
+                    pagamento.nome, 
+                    plano?.nome || "Seu Plano",
+                    `${errorInfo.message} ${errorInfo.action}`
+                  ).catch(err => {
+                    console.error(`[MP Webhook] Error sending payment failed email:`, err);
+                  });
+                });
+              }
+            }
+
             await storage.updateCheckoutPagamento(pagamentoId, updateData);
             console.log(`[MP Webhook] Updated payment ${pagamentoId} to status: ${payment.status}`);
           }
@@ -8365,6 +8390,7 @@ Seja conversacional e objetivo.`;
       }
 
       // Handle invoice.payment_failed (subscription payment failure)
+      // BLOQUEIA ACESSO IMEDIATAMENTE quando renovação falhar
       if (event.type === 'invoice.payment_failed') {
         const invoice = event.data.object;
         const subscriptionId = invoice.subscription;
@@ -8380,6 +8406,21 @@ Seja conversacional e objetivo.`;
             const failureMessage = invoice.last_finalization_error?.message || 
                                    invoice.last_payment_error?.message || 
                                    "Cartão recusado ou limite insuficiente";
+            
+            // BLOQUEAR ACESSO IMEDIATAMENTE
+            const admin = await storage.getAdminByEmail(pagamento.email);
+            if (admin) {
+              await storage.updateAdmin(admin.id, {
+                isActive: false,
+              });
+              console.log(`[Stripe Webhook] BLOCKED admin ${pagamento.email} due to payment failure`);
+            }
+            
+            // Update payment status
+            await storage.updateCheckoutPagamento(pagamentoId, {
+              status: 'payment_failed',
+              statusDetail: failureMessage,
+            });
             
             // Send payment failed email
             import("./email").then(({ sendPaymentFailedEmail }) => {
