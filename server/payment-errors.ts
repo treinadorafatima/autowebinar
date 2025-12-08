@@ -5,6 +5,68 @@
 
 // Códigos de erro do Mercado Pago - status_detail
 export const MERCADOPAGO_ERROR_MESSAGES: Record<string, { message: string; action: string; retryable: boolean }> = {
+  // Erros de validação do cartão (CC_VAL_*)
+  'cc_val_43': {
+    message: 'Seu cartão está bloqueado para compras online.',
+    action: 'Desbloqueie as compras online no app do seu banco ou entre em contato com a central de atendimento.',
+    retryable: true,
+  },
+  'CC_VAL_43': {
+    message: 'Seu cartão está bloqueado para compras online.',
+    action: 'Desbloqueie as compras online no app do seu banco ou entre em contato com a central de atendimento.',
+    retryable: true,
+  },
+  'cc_val_51': {
+    message: 'Limite de crédito insuficiente.',
+    action: 'Verifique seu limite disponível no app do banco ou use outro cartão.',
+    retryable: true,
+  },
+  'CC_VAL_51': {
+    message: 'Limite de crédito insuficiente.',
+    action: 'Verifique seu limite disponível no app do banco ou use outro cartão.',
+    retryable: true,
+  },
+  'cc_val_14': {
+    message: 'Número do cartão inválido.',
+    action: 'Confira o número do cartão e digite novamente.',
+    retryable: true,
+  },
+  'CC_VAL_14': {
+    message: 'Número do cartão inválido.',
+    action: 'Confira o número do cartão e digite novamente.',
+    retryable: true,
+  },
+  'cc_val_54': {
+    message: 'Cartão vencido.',
+    action: 'Verifique a data de validade ou use outro cartão.',
+    retryable: false,
+  },
+  'CC_VAL_54': {
+    message: 'Cartão vencido.',
+    action: 'Verifique a data de validade ou use outro cartão.',
+    retryable: false,
+  },
+  'cc_val_57': {
+    message: 'Transação não permitida para este cartão.',
+    action: 'Este cartão não aceita compras online. Use outro cartão ou entre em contato com seu banco.',
+    retryable: true,
+  },
+  'CC_VAL_57': {
+    message: 'Transação não permitida para este cartão.',
+    action: 'Este cartão não aceita compras online. Use outro cartão ou entre em contato com seu banco.',
+    retryable: true,
+  },
+  'cc_val_62': {
+    message: 'Cartão com restrição.',
+    action: 'Entre em contato com seu banco para verificar o status do cartão.',
+    retryable: true,
+  },
+  'CC_VAL_62': {
+    message: 'Cartão com restrição.',
+    action: 'Entre em contato com seu banco para verificar o status do cartão.',
+    retryable: true,
+  },
+  
   // Erros de cartão de crédito
   'cc_rejected_bad_filled_card_number': {
     message: 'O número do cartão está incorreto.',
@@ -104,8 +166,8 @@ export const MERCADOPAGO_ERROR_MESSAGES: Record<string, { message: string; actio
   },
   // Fallback para erros desconhecidos
   'default': {
-    message: 'Não foi possível processar o pagamento.',
-    action: 'Por favor, tente novamente ou use outro método de pagamento.',
+    message: 'Pagamento não aprovado.',
+    action: 'Verifique os dados do cartão, o limite disponível e se as compras online estão liberadas. Se o problema persistir, entre em contato com seu banco ou tente outro cartão.',
     retryable: true,
   },
 };
@@ -339,8 +401,8 @@ export const STRIPE_ERROR_MESSAGES: Record<string, { message: string; action: st
   },
   // Fallback
   'default': {
-    message: 'O pagamento foi recusado.',
-    action: 'Por favor, tente novamente ou use outro cartão.',
+    message: 'Pagamento não aprovado.',
+    action: 'Verifique os dados do cartão, o limite disponível e se as compras online estão liberadas. Se o problema persistir, entre em contato com seu banco ou tente outro cartão.',
     retryable: true,
   },
 };
