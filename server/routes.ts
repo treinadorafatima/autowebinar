@@ -203,11 +203,45 @@ function normalizeString(str: string): string {
 }
 
 /**
- * Verifica se o plano do admin permite acesso a features de IA (transcrição, designer IA, gerador de mensagens)
- * Apenas planos Avançado, Elite (e nomes legados como Pro, Profissional, Ilimitado) têm acesso
+ * Verifica se o plano do admin permite acesso a features de IA
+ * Usa os campos de feature flags do plano (featureAI, featureTranscricao, etc.)
+ * Para retrocompatibilidade, também verifica pelo nome do plano se os campos não existem
  * Superadmins sempre têm acesso
  */
 async function isAIPlanAllowed(admin: { planoId: string | null; role?: string }): Promise<boolean> {
+  return isFeatureAllowed(admin, 'featureAI');
+}
+
+/**
+ * Verifica se o plano permite transcrição de vídeo
+ */
+async function isTranscricaoAllowed(admin: { planoId: string | null; role?: string }): Promise<boolean> {
+  return isFeatureAllowed(admin, 'featureTranscricao');
+}
+
+/**
+ * Verifica se o plano permite Designer IA
+ */
+async function isDesignerIAAllowed(admin: { planoId: string | null; role?: string }): Promise<boolean> {
+  return isFeatureAllowed(admin, 'featureDesignerIA');
+}
+
+/**
+ * Verifica se o plano permite Gerador de Mensagens
+ */
+async function isGeradorMensagensAllowed(admin: { planoId: string | null; role?: string }): Promise<boolean> {
+  return isFeatureAllowed(admin, 'featureGeradorMensagens');
+}
+
+/**
+ * Função base para verificar permissão de features
+ * @param admin - Objeto admin com planoId e role
+ * @param featureKey - Chave da feature a verificar (featureAI, featureTranscricao, etc.)
+ */
+async function isFeatureAllowed(
+  admin: { planoId: string | null; role?: string }, 
+  featureKey: 'featureAI' | 'featureTranscricao' | 'featureDesignerIA' | 'featureGeradorMensagens'
+): Promise<boolean> {
   // Superadmins sempre têm acesso
   if (admin.role === "superadmin") return true;
   
@@ -221,17 +255,23 @@ async function isAIPlanAllowed(admin: { planoId: string | null; role?: string })
     const plano = await storage.getCheckoutPlanoById(admin.planoId);
     if (!plano) return false;
     
-    // Normaliza o nome do plano (remove acentos, lowercase)
-    const normalizedPlanName = normalizeString(plano.nome);
+    // Verifica se o plano tem o campo de feature definido explicitamente
+    // Se o campo for true/false, usa o valor explícito
+    // Se o campo for null/undefined, usa fallback baseado no nome do plano
+    const featureValue = (plano as any)[featureKey];
     
-    // Planos que permitem IA (já normalizados, sem acentos)
-    // Inclui: Avançado, Elite, Pro, Profissional, Ilimitado, Enterprise, Premium
-    // E variantes como "Avançado Mensal", "Elite Anual", etc.
+    // Valor explícito definido pelo admin - usa diretamente
+    if (featureValue === true) return true;
+    if (featureValue === false) return false;
+    
+    // Fallback para retrocompatibilidade (quando valor é null/undefined)
+    // Verifica pelo nome do plano para manter acesso de planos existentes
+    const normalizedPlanName = normalizeString(plano.nome);
     const aiAllowedKeywords = ["avancado", "elite", "pro", "profissional", "ilimitado", "enterprise", "premium"];
     
     return aiAllowedKeywords.some(keyword => normalizedPlanName.includes(keyword));
   } catch (error) {
-    console.error("Erro ao verificar permissão de IA do plano:", error);
+    console.error(`Erro ao verificar permissão de ${featureKey}:`, error);
     return false;
   }
 }
@@ -3713,10 +3753,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Seu plano expirou. Renove para continuar." });
       }
 
-      // Check if plan allows AI features (only Avançado/Elite)
-      if (!(await isAIPlanAllowed(admin))) {
+      // Check if plan allows Designer IA feature
+      if (!(await isDesignerIAAllowed(admin))) {
         return res.status(403).json({ 
-          error: "O Designer IA está disponível apenas para planos Avançado e Elite. Faça upgrade para acessar.",
+          error: "O Designer IA está disponível apenas para planos com este recurso ativado. Faça upgrade para acessar.",
           needsUpgrade: true
         });
       }
@@ -4322,10 +4362,10 @@ IMPORTANTE: Se o usuário pedir algo específico, sugira imediatamente. Se for v
         return res.status(403).json({ error: "Seu plano expirou. Renove para continuar." });
       }
 
-      // Check if plan allows AI features (only Avançado/Elite)
-      if (!(await isAIPlanAllowed(admin))) {
+      // Check if plan allows message generator feature
+      if (!(await isGeradorMensagensAllowed(admin))) {
         return res.status(403).json({ 
-          error: "O gerador de mensagens com IA está disponível apenas para planos Avançado e Elite. Faça upgrade para acessar.",
+          error: "O gerador de mensagens com IA está disponível apenas para planos com este recurso ativado. Faça upgrade para acessar.",
           needsUpgrade: true
         });
       }
@@ -4545,10 +4585,10 @@ Inclua CTA clara (ex: link ou "Confirma presença?").`;
         return res.status(403).json({ error: "Seu plano expirou. Renove para continuar." });
       }
 
-      // Check if plan allows AI features (only Avançado/Elite)
-      if (!(await isAIPlanAllowed(admin))) {
+      // Check if plan allows transcription feature
+      if (!(await isTranscricaoAllowed(admin))) {
         return res.status(403).json({ 
-          error: "A transcrição automática está disponível apenas para planos Avançado e Elite. Faça upgrade para acessar.",
+          error: "A transcrição automática está disponível apenas para planos com este recurso ativado. Faça upgrade para acessar.",
           needsUpgrade: true
         });
       }
@@ -4829,10 +4869,10 @@ Inclua CTA clara (ex: link ou "Confirma presença?").`;
         return res.status(403).json({ error: "Seu plano expirou. Renove para continuar." });
       }
 
-      // Check if plan allows AI features (only Avançado/Elite)
-      if (!(await isAIPlanAllowed(admin))) {
+      // Check if plan allows transcription feature
+      if (!(await isTranscricaoAllowed(admin))) {
         return res.status(403).json({ 
-          error: "A transcrição automática está disponível apenas para planos Avançado e Elite. Faça upgrade para acessar.",
+          error: "A transcrição automática está disponível apenas para planos com este recurso ativado. Faça upgrade para acessar.",
           needsUpgrade: true
         });
       }
@@ -4993,10 +5033,10 @@ Inclua CTA clara (ex: link ou "Confirma presença?").`;
         return res.status(403).json({ error: "Seu plano expirou. Renove para continuar." });
       }
 
-      // Check if plan allows AI features (only Avançado/Elite)
-      if (!(await isAIPlanAllowed(admin))) {
+      // Check if plan allows message generator feature
+      if (!(await isGeradorMensagensAllowed(admin))) {
         return res.status(403).json({ 
-          error: "O gerador de mensagens com IA está disponível apenas para planos Avançado e Elite. Faça upgrade para acessar.",
+          error: "O gerador de mensagens com IA está disponível apenas para planos com este recurso ativado. Faça upgrade para acessar.",
           needsUpgrade: true
         });
       }

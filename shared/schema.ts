@@ -395,6 +395,13 @@ export const checkoutPlanos = pgTable("checkout_planos", {
   uploadLimit: integer("upload_limit").notNull().default(999), // Uploads ilimitados
   storageLimit: integer("storage_limit").notNull().default(5), // Limite de armazenamento em GB
   whatsappAccountLimit: integer("whatsapp_account_limit").notNull().default(2), // Limite de contas WhatsApp
+  // Feature flags - controle granular de recursos por plano
+  // null = usar fallback baseado no nome do plano (retrocompatibilidade)
+  // true/false = valor explícito definido pelo admin
+  featureAI: boolean("feature_ai"), // Acesso a todas as features de IA (null = fallback)
+  featureTranscricao: boolean("feature_transcricao"), // Transcrição de vídeo com IA (null = fallback)
+  featureDesignerIA: boolean("feature_designer_ia"), // Designer IA para personalização (null = fallback)
+  featureGeradorMensagens: boolean("feature_gerador_mensagens"), // Gerador de mensagens com IA (null = fallback)
   ativo: boolean("ativo").notNull().default(true),
   gateway: text("gateway").notNull().default("mercadopago"), // 'mercadopago' ou 'stripe'
   tipoCobranca: text("tipo_cobranca").notNull().default("unico"), // 'unico' ou 'recorrente'

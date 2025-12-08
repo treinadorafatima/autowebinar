@@ -44,6 +44,10 @@ interface Plano {
   uploadLimit: number;
   storageLimit: number;
   whatsappAccountLimit: number;
+  featureAI: boolean;
+  featureTranscricao: boolean;
+  featureDesignerIA: boolean;
+  featureGeradorMensagens: boolean;
   ativo: boolean;
   gateway: string;
   tipoCobranca: string;
@@ -67,6 +71,10 @@ const defaultPlano: Partial<Plano> = {
   uploadLimit: 999,
   storageLimit: 5,
   whatsappAccountLimit: 2,
+  featureAI: false,
+  featureTranscricao: false,
+  featureDesignerIA: false,
+  featureGeradorMensagens: false,
   ativo: true,
   gateway: "mercadopago",
   tipoCobranca: "unico",
@@ -594,6 +602,76 @@ export default function AdminCheckoutPlanos() {
                     })
                   }
                 />
+              </div>
+
+              <div className="space-y-4">
+                <div className="border rounded-lg p-4 bg-muted/30">
+                  <h4 className="font-medium mb-3 text-sm">Recursos de IA</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          id="featureAI"
+                          checked={editingPlano.featureAI ?? false}
+                          onCheckedChange={(checked) =>
+                            setEditingPlano({ 
+                              ...editingPlano, 
+                              featureAI: checked,
+                              featureTranscricao: checked,
+                              featureDesignerIA: checked,
+                              featureGeradorMensagens: checked,
+                            })
+                          }
+                          data-testid="switch-plano-feature-ai"
+                        />
+                        <Label htmlFor="featureAI">Todas IA</Label>
+                      </div>
+                      <p className="text-xs text-muted-foreground">Ativa todas as features de IA</p>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          id="featureTranscricao"
+                          checked={editingPlano.featureTranscricao ?? false}
+                          onCheckedChange={(checked) =>
+                            setEditingPlano({ ...editingPlano, featureTranscricao: checked })
+                          }
+                          data-testid="switch-plano-feature-transcricao"
+                        />
+                        <Label htmlFor="featureTranscricao">Transcrição</Label>
+                      </div>
+                      <p className="text-xs text-muted-foreground">Transcrição de vídeo</p>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          id="featureDesignerIA"
+                          checked={editingPlano.featureDesignerIA ?? false}
+                          onCheckedChange={(checked) =>
+                            setEditingPlano({ ...editingPlano, featureDesignerIA: checked })
+                          }
+                          data-testid="switch-plano-feature-designer-ia"
+                        />
+                        <Label htmlFor="featureDesignerIA">Designer IA</Label>
+                      </div>
+                      <p className="text-xs text-muted-foreground">Personalização com IA</p>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          id="featureGeradorMensagens"
+                          checked={editingPlano.featureGeradorMensagens ?? false}
+                          onCheckedChange={(checked) =>
+                            setEditingPlano({ ...editingPlano, featureGeradorMensagens: checked })
+                          }
+                          data-testid="switch-plano-feature-gerador-mensagens"
+                        />
+                        <Label htmlFor="featureGeradorMensagens">Gerador Mensagens</Label>
+                      </div>
+                      <p className="text-xs text-muted-foreground">Gerar mensagens com IA</p>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div className="space-y-4">
