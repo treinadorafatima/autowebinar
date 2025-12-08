@@ -196,6 +196,47 @@ function isAdminPlanActive(admin: { accessExpiresAt: Date | null; role?: string 
 }
 
 /**
+ * Remove acentos de uma string para comparação case-insensitive
+ */
+function normalizeString(str: string): string {
+  return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+}
+
+/**
+ * Verifica se o plano do admin permite acesso a features de IA (transcrição, designer IA, gerador de mensagens)
+ * Apenas planos Avançado, Elite (e nomes legados como Pro, Profissional, Ilimitado) têm acesso
+ * Superadmins sempre têm acesso
+ */
+async function isAIPlanAllowed(admin: { planoId: string | null; role?: string }): Promise<boolean> {
+  // Superadmins sempre têm acesso
+  if (admin.role === "superadmin") return true;
+  
+  // Se não tem plano, não pode usar features de IA
+  if (!admin.planoId) return false;
+  
+  // Trial não tem acesso a features de IA
+  if (admin.planoId === "trial") return false;
+  
+  try {
+    const plano = await storage.getCheckoutPlanoById(admin.planoId);
+    if (!plano) return false;
+    
+    // Normaliza o nome do plano (remove acentos, lowercase)
+    const normalizedPlanName = normalizeString(plano.nome);
+    
+    // Planos que permitem IA (já normalizados, sem acentos)
+    // Inclui: Avançado, Elite, Pro, Profissional, Ilimitado, Enterprise, Premium
+    // E variantes como "Avançado Mensal", "Elite Anual", etc.
+    const aiAllowedKeywords = ["avancado", "elite", "pro", "profissional", "ilimitado", "enterprise", "premium"];
+    
+    return aiAllowedKeywords.some(keyword => normalizedPlanName.includes(keyword));
+  } catch (error) {
+    console.error("Erro ao verificar permissão de IA do plano:", error);
+    return false;
+  }
+}
+
+/**
  * Helper para detectar a URL pública do servidor
  * Prioridade:
  * 1. Variável de ambiente PUBLIC_BASE_URL (para override explícito em produção)
@@ -3672,6 +3713,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Seu plano expirou. Renove para continuar." });
       }
 
+      // Check if plan allows AI features (only Avançado/Elite)
+      if (!(await isAIPlanAllowed(admin))) {
+        return res.status(403).json({ 
+          error: "O Designer IA está disponível apenas para planos Avançado e Elite. Faça upgrade para acessar.",
+          needsUpgrade: true
+        });
+      }
+
       // Determine which AI provider to use
       let apiKey: string | undefined;
       let baseUrl: string | undefined;
@@ -4273,6 +4322,14 @@ IMPORTANTE: Se o usuário pedir algo específico, sugira imediatamente. Se for v
         return res.status(403).json({ error: "Seu plano expirou. Renove para continuar." });
       }
 
+      // Check if plan allows AI features (only Avançado/Elite)
+      if (!(await isAIPlanAllowed(admin))) {
+        return res.status(403).json({ 
+          error: "O gerador de mensagens com IA está disponível apenas para planos Avançado e Elite. Faça upgrade para acessar.",
+          needsUpgrade: true
+        });
+      }
+
       const webinar = await storage.getWebinarById(req.params.webinarId);
       if (!webinar) {
         return res.status(404).json({ error: "Webinar not found" });
@@ -4486,6 +4543,14 @@ Inclua CTA clara (ex: link ou "Confirma presença?").`;
       // Check if plan is expired (superadmins are exempt)
       if (!isAdminPlanActive(admin)) {
         return res.status(403).json({ error: "Seu plano expirou. Renove para continuar." });
+      }
+
+      // Check if plan allows AI features (only Avançado/Elite)
+      if (!(await isAIPlanAllowed(admin))) {
+        return res.status(403).json({ 
+          error: "A transcrição automática está disponível apenas para planos Avançado e Elite. Faça upgrade para acessar.",
+          needsUpgrade: true
+        });
       }
 
       // Check if video belongs to admin
@@ -4760,8 +4825,16 @@ Inclua CTA clara (ex: link ou "Confirma presença?").`;
       }
 
       // Check if plan is expired
-      if (admin.accessExpiresAt && new Date(admin.accessExpiresAt) < new Date()) {
+      if (!isAdminPlanActive(admin)) {
         return res.status(403).json({ error: "Seu plano expirou. Renove para continuar." });
+      }
+
+      // Check if plan allows AI features (only Avançado/Elite)
+      if (!(await isAIPlanAllowed(admin))) {
+        return res.status(403).json({ 
+          error: "A transcrição automática está disponível apenas para planos Avançado e Elite. Faça upgrade para acessar.",
+          needsUpgrade: true
+        });
       }
 
       const webinar = await storage.getWebinarById(req.params.webinarId);
@@ -4913,6 +4986,19 @@ Inclua CTA clara (ex: link ou "Confirma presença?").`;
       const admin = await storage.getAdminByEmail(email);
       if (!admin) {
         return res.status(401).json({ error: "Admin not found" });
+      }
+
+      // Check if plan is expired
+      if (!isAdminPlanActive(admin)) {
+        return res.status(403).json({ error: "Seu plano expirou. Renove para continuar." });
+      }
+
+      // Check if plan allows AI features (only Avançado/Elite)
+      if (!(await isAIPlanAllowed(admin))) {
+        return res.status(403).json({ 
+          error: "O gerador de mensagens com IA está disponível apenas para planos Avançado e Elite. Faça upgrade para acessar.",
+          needsUpgrade: true
+        });
       }
 
       const webinar = await storage.getWebinarById(req.params.webinarId);
