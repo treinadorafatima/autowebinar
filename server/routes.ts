@@ -7267,6 +7267,10 @@ Seja conversacional e objetivo.`;
 
       // Create preapproval with card_token for transparent checkout
       // IMPORTANT: status: "authorized" is required for card_token subscriptions
+      // start_date = now ensures immediate first payment
+      const now = new Date();
+      const startDate = now.toISOString();
+      
       const preapprovalRequest: any = {
         reason: plano.nome,
         external_reference: pagamentoId,
@@ -7278,6 +7282,7 @@ Seja conversacional e objetivo.`;
           frequency_type: frequencyType,
           transaction_amount: plano.preco / 100,
           currency_id: 'BRL',
+          start_date: startDate,
         },
         back_url: `${baseUrl}/pagamento/sucesso?id=${pagamentoId}&tipo=assinatura`,
         notification_url: `${baseUrl}/webhook/mercadopago`,
