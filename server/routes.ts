@@ -9383,6 +9383,343 @@ Seja conversacional e objetivo.`;
     }
   });
 
+  // ============================================
+  // AFFILIATE SYSTEM ROUTES
+  // ============================================
+
+  // Get affiliate config (super admin only)
+  app.get("/api/affiliate-config", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) return res.status(401).json({ error: "Unauthorized" });
+
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin || admin.role !== "superadmin") {
+        return res.status(403).json({ error: "Apenas super admin pode acessar" });
+      }
+
+      const config = await storage.getAffiliateConfig();
+      res.json(config || { defaultCommissionPercent: 30, minWithdrawal: 5000, holdDays: 7, autoPayEnabled: true });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Update affiliate config (super admin only)
+  app.patch("/api/affiliate-config", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) return res.status(401).json({ error: "Unauthorized" });
+
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin || admin.role !== "superadmin") {
+        return res.status(403).json({ error: "Apenas super admin pode atualizar" });
+      }
+
+      const config = await storage.upsertAffiliateConfig(req.body);
+      res.json(config);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // List all affiliates (super admin only)
+  app.get("/api/affiliates", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) return res.status(401).json({ error: "Unauthorized" });
+
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin || admin.role !== "superadmin") {
+        return res.status(403).json({ error: "Apenas super admin pode listar afiliados" });
+      }
+
+      const affiliates = await storage.listAffiliates();
+      const affiliatesWithAdmin = await Promise.all(
+        affiliates.map(async (aff) => {
+          const adminData = await storage.getAdminById(aff.adminId);
+          return { ...aff, admin: adminData ? { id: adminData.id, name: adminData.name, email: adminData.email } : null };
+        })
+      );
+      res.json(affiliatesWithAdmin);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Get current user's affiliate info (for affiliate dashboard)
+  app.get("/api/affiliate/me", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) return res.status(401).json({ error: "Unauthorized" });
+
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin) return res.status(404).json({ error: "Admin não encontrado" });
+
+      const affiliate = await storage.getAffiliateByAdminId(admin.id);
+      if (!affiliate) return res.status(404).json({ error: "Você não é um afiliado" });
+
+      const stats = await storage.getAffiliateStats(affiliate.id);
+      const links = await storage.listAffiliateLinksByAffiliate(affiliate.id);
+      
+      res.json({ ...affiliate, stats, links });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Get affiliate by ID (super admin only)
+  app.get("/api/affiliates/:id", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) return res.status(401).json({ error: "Unauthorized" });
+
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin || admin.role !== "superadmin") {
+        return res.status(403).json({ error: "Apenas super admin pode acessar" });
+      }
+
+      const affiliate = await storage.getAffiliateById(req.params.id);
+      if (!affiliate) return res.status(404).json({ error: "Afiliado não encontrado" });
+
+      const adminData = await storage.getAdminById(affiliate.adminId);
+      const stats = await storage.getAffiliateStats(affiliate.id);
+      const links = await storage.listAffiliateLinksByAffiliate(affiliate.id);
+      
+      res.json({ ...affiliate, admin: adminData ? { id: adminData.id, name: adminData.name, email: adminData.email } : null, stats, links });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Create affiliate (super admin only)
+  app.post("/api/affiliates", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) return res.status(401).json({ error: "Unauthorized" });
+
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin || admin.role !== "superadmin") {
+        return res.status(403).json({ error: "Apenas super admin pode criar afiliados" });
+      }
+
+      const { adminId, commissionPercent, commissionFixed, status } = req.body;
+      if (!adminId) return res.status(400).json({ error: "adminId é obrigatório" });
+
+      const existingAffiliate = await storage.getAffiliateByAdminId(adminId);
+      if (existingAffiliate) return res.status(400).json({ error: "Este usuário já é um afiliado" });
+
+      const affiliate = await storage.createAffiliate({
+        adminId,
+        commissionPercent: commissionPercent || 30,
+        commissionFixed: commissionFixed || null,
+        status: status || "pending",
+      });
+
+      res.json(affiliate);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Update affiliate (super admin only)
+  app.patch("/api/affiliates/:id", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) return res.status(401).json({ error: "Unauthorized" });
+
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin || admin.role !== "superadmin") {
+        return res.status(403).json({ error: "Apenas super admin pode atualizar" });
+      }
+
+      const affiliate = await storage.updateAffiliate(req.params.id, req.body);
+      if (!affiliate) return res.status(404).json({ error: "Afiliado não encontrado" });
+
+      res.json(affiliate);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Delete affiliate (super admin only)
+  app.delete("/api/affiliates/:id", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) return res.status(401).json({ error: "Unauthorized" });
+
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin || admin.role !== "superadmin") {
+        return res.status(403).json({ error: "Apenas super admin pode deletar" });
+      }
+
+      await storage.deleteAffiliate(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // List affiliate links
+  app.get("/api/affiliates/:id/links", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) return res.status(401).json({ error: "Unauthorized" });
+
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin) return res.status(401).json({ error: "Unauthorized" });
+
+      const affiliate = await storage.getAffiliateById(req.params.id);
+      if (!affiliate) return res.status(404).json({ error: "Afiliado não encontrado" });
+
+      if (admin.role !== "superadmin" && affiliate.adminId !== admin.id) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+
+      const links = await storage.listAffiliateLinksByAffiliate(req.params.id);
+      res.json(links);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Create affiliate link
+  app.post("/api/affiliates/:id/links", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) return res.status(401).json({ error: "Unauthorized" });
+
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin) return res.status(401).json({ error: "Unauthorized" });
+
+      const affiliate = await storage.getAffiliateById(req.params.id);
+      if (!affiliate) return res.status(404).json({ error: "Afiliado não encontrado" });
+
+      if (admin.role !== "superadmin" && affiliate.adminId !== admin.id) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+
+      const { code, targetUrl, planoId } = req.body;
+      if (!code) return res.status(400).json({ error: "Código é obrigatório" });
+
+      const existingLink = await storage.getAffiliateLinkByCode(code);
+      if (existingLink) return res.status(400).json({ error: "Este código já está em uso" });
+
+      const link = await storage.createAffiliateLink({
+        affiliateId: req.params.id,
+        code,
+        targetUrl: targetUrl || null,
+        planoId: planoId || null,
+      });
+
+      res.json(link);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Delete affiliate link
+  app.delete("/api/affiliate-links/:id", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) return res.status(401).json({ error: "Unauthorized" });
+
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin) return res.status(401).json({ error: "Unauthorized" });
+
+      const link = await storage.getAffiliateLinkById(req.params.id);
+      if (!link) return res.status(404).json({ error: "Link não encontrado" });
+
+      const affiliate = await storage.getAffiliateById(link.affiliateId);
+      if (!affiliate) return res.status(404).json({ error: "Afiliado não encontrado" });
+
+      if (admin.role !== "superadmin" && affiliate.adminId !== admin.id) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+
+      await storage.deleteAffiliateLink(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Track affiliate link click (public endpoint)
+  app.get("/api/affiliate-links/:code/track", async (req, res) => {
+    try {
+      const link = await storage.getAffiliateLinkByCode(req.params.code);
+      if (!link || !link.isActive) {
+        return res.redirect("/checkout");
+      }
+
+      await storage.incrementAffiliateLinkClicks(link.id);
+
+      const redirectUrl = link.targetUrl || (link.planoId ? `/checkout?plano=${link.planoId}&ref=${link.code}` : `/checkout?ref=${link.code}`);
+      res.redirect(redirectUrl);
+    } catch (error: any) {
+      res.redirect("/checkout");
+    }
+  });
+
+  // Get affiliate sales
+  app.get("/api/affiliates/:id/sales", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) return res.status(401).json({ error: "Unauthorized" });
+
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin) return res.status(401).json({ error: "Unauthorized" });
+
+      const affiliate = await storage.getAffiliateById(req.params.id);
+      if (!affiliate) return res.status(404).json({ error: "Afiliado não encontrado" });
+
+      if (admin.role !== "superadmin" && affiliate.adminId !== admin.id) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+
+      const sales = await storage.listAffiliateSalesByAffiliate(req.params.id);
+      res.json(sales);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Get affiliate stats
+  app.get("/api/affiliates/:id/stats", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) return res.status(401).json({ error: "Unauthorized" });
+
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin) return res.status(401).json({ error: "Unauthorized" });
+
+      const affiliate = await storage.getAffiliateById(req.params.id);
+      if (!affiliate) return res.status(404).json({ error: "Afiliado não encontrado" });
+
+      if (admin.role !== "superadmin" && affiliate.adminId !== admin.id) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+
+      const stats = await storage.getAffiliateStats(req.params.id);
+      res.json(stats);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
   // Register Email Marketing routes
   registerEmailMarketingRoutes(app);
 

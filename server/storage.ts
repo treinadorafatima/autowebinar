@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type WebinarConfig, type WebinarConfigInsert, type Admin, type AdminInsert, type UploadedVideo, type UploadedVideoInsert, type Comment, type CommentInsert, type Webinar, type WebinarInsert, type Setting, type SettingInsert, type ViewerSession, type WebinarScript, type WebinarScriptInsert, type AiConfig, type AiConfigInsert, type AiMemory, type AiMemoryInsert, type CheckoutPlano, type CheckoutPlanoInsert, type CheckoutPagamento, type CheckoutPagamentoInsert, type CheckoutConfig, type CheckoutConfigInsert, type CheckoutAssinatura, type CheckoutAssinaturaInsert, type AiChat, type AiChatInsert, type AiMessageChat, type AiMessageChatInsert, type VideoTranscription, type VideoTranscriptionInsert, type AdminEmailCredential, type AdminEmailCredentialInsert, type EmailSequence, type EmailSequenceInsert, type ScheduledEmail, type ScheduledEmailInsert, type LeadFormConfig, type LeadFormConfigInsert, type WhatsappAccount, type WhatsappAccountInsert, type WhatsappSession, type WhatsappSessionInsert, type WhatsappSequence, type WhatsappSequenceInsert, type ScheduledWhatsappMessage, type ScheduledWhatsappMessageInsert, type MediaFile, type MediaFileInsert, type LeadMessage, type LeadMessageInsert, type Lead, type WhatsappBroadcast, type WhatsappBroadcastInsert, type WhatsappBroadcastRecipient, type WhatsappBroadcastRecipientInsert, admins, webinarConfigs, users, uploadedVideos, comments, webinars as webinarsTable, settings, viewerSessions, webinarScripts, aiConfigs, aiMemories, checkoutPlanos, checkoutPagamentos, checkoutConfigs, checkoutAssinaturas, aiChats, aiMessageChats, videoTranscriptions, adminEmailCredentials, emailSequences, scheduledEmails, leadFormConfigs, whatsappAccounts, whatsappSessions, whatsappSequences, scheduledWhatsappMessages, mediaFiles, webinarViewLogs, leads, leadMessages, whatsappBroadcasts, whatsappBroadcastRecipients } from "@shared/schema";
+import { type User, type InsertUser, type WebinarConfig, type WebinarConfigInsert, type Admin, type AdminInsert, type UploadedVideo, type UploadedVideoInsert, type Comment, type CommentInsert, type Webinar, type WebinarInsert, type Setting, type SettingInsert, type ViewerSession, type WebinarScript, type WebinarScriptInsert, type AiConfig, type AiConfigInsert, type AiMemory, type AiMemoryInsert, type CheckoutPlano, type CheckoutPlanoInsert, type CheckoutPagamento, type CheckoutPagamentoInsert, type CheckoutConfig, type CheckoutConfigInsert, type CheckoutAssinatura, type CheckoutAssinaturaInsert, type AiChat, type AiChatInsert, type AiMessageChat, type AiMessageChatInsert, type VideoTranscription, type VideoTranscriptionInsert, type AdminEmailCredential, type AdminEmailCredentialInsert, type EmailSequence, type EmailSequenceInsert, type ScheduledEmail, type ScheduledEmailInsert, type LeadFormConfig, type LeadFormConfigInsert, type WhatsappAccount, type WhatsappAccountInsert, type WhatsappSession, type WhatsappSessionInsert, type WhatsappSequence, type WhatsappSequenceInsert, type ScheduledWhatsappMessage, type ScheduledWhatsappMessageInsert, type MediaFile, type MediaFileInsert, type LeadMessage, type LeadMessageInsert, type Lead, type WhatsappBroadcast, type WhatsappBroadcastInsert, type WhatsappBroadcastRecipient, type WhatsappBroadcastRecipientInsert, type Affiliate, type AffiliateInsert, type AffiliateLink, type AffiliateLinkInsert, type AffiliateSale, type AffiliateSaleInsert, type AffiliateConfig, type AffiliateConfigInsert, admins, webinarConfigs, users, uploadedVideos, comments, webinars as webinarsTable, settings, viewerSessions, webinarScripts, aiConfigs, aiMemories, checkoutPlanos, checkoutPagamentos, checkoutConfigs, checkoutAssinaturas, aiChats, aiMessageChats, videoTranscriptions, adminEmailCredentials, emailSequences, scheduledEmails, leadFormConfigs, whatsappAccounts, whatsappSessions, whatsappSequences, scheduledWhatsappMessages, mediaFiles, webinarViewLogs, leads, leadMessages, whatsappBroadcasts, whatsappBroadcastRecipients, affiliates, affiliateLinks, affiliateSales, affiliateConfig } from "@shared/schema";
 import * as crypto from "crypto";
 import { randomUUID } from "crypto";
 import { db } from "./db";
@@ -317,6 +317,32 @@ export interface IStorage {
   // Leads filtering for broadcasts
   listLeadsWithWhatsappByWebinar(webinarId: string, filters?: { dateStart?: string; dateEnd?: string; sessionDate?: string }): Promise<Lead[]>;
   getDistinctSessionDatesByWebinar(webinarId: string): Promise<string[]>;
+  // Affiliate System
+  listAffiliates(): Promise<Affiliate[]>;
+  getAffiliateById(id: string): Promise<Affiliate | undefined>;
+  getAffiliateByAdminId(adminId: string): Promise<Affiliate | undefined>;
+  createAffiliate(data: AffiliateInsert): Promise<Affiliate>;
+  updateAffiliate(id: string, data: Partial<AffiliateInsert>): Promise<Affiliate | undefined>;
+  deleteAffiliate(id: string): Promise<void>;
+  // Affiliate Links
+  listAffiliateLinksByAffiliate(affiliateId: string): Promise<AffiliateLink[]>;
+  getAffiliateLinkById(id: string): Promise<AffiliateLink | undefined>;
+  getAffiliateLinkByCode(code: string): Promise<AffiliateLink | undefined>;
+  createAffiliateLink(data: AffiliateLinkInsert): Promise<AffiliateLink>;
+  updateAffiliateLink(id: string, data: Partial<AffiliateLinkInsert>): Promise<AffiliateLink | undefined>;
+  deleteAffiliateLink(id: string): Promise<void>;
+  incrementAffiliateLinkClicks(id: string): Promise<void>;
+  // Affiliate Sales
+  listAffiliateSalesByAffiliate(affiliateId: string): Promise<AffiliateSale[]>;
+  getAffiliateSaleById(id: string): Promise<AffiliateSale | undefined>;
+  getAffiliateSaleByPagamentoId(pagamentoId: string): Promise<AffiliateSale | undefined>;
+  createAffiliateSale(data: AffiliateSaleInsert): Promise<AffiliateSale>;
+  updateAffiliateSale(id: string, data: Partial<AffiliateSaleInsert>): Promise<AffiliateSale | undefined>;
+  // Affiliate Config
+  getAffiliateConfig(): Promise<AffiliateConfig | undefined>;
+  upsertAffiliateConfig(data: Partial<AffiliateConfigInsert>): Promise<AffiliateConfig>;
+  // Affiliate Stats
+  getAffiliateStats(affiliateId: string): Promise<{ totalSales: number; totalCommission: number; pendingCommission: number; paidCommission: number }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3913,6 +3939,211 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
       }
     }
     return Array.from(dates).sort().reverse();
+  }
+
+  // ============================================
+  // AFFILIATE SYSTEM IMPLEMENTATION
+  // ============================================
+
+  async listAffiliates(): Promise<Affiliate[]> {
+    return db.select().from(affiliates).orderBy(desc(affiliates.createdAt));
+  }
+
+  async getAffiliateById(id: string): Promise<Affiliate | undefined> {
+    const result = await db.select().from(affiliates).where(eq(affiliates.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getAffiliateByAdminId(adminId: string): Promise<Affiliate | undefined> {
+    const result = await db.select().from(affiliates).where(eq(affiliates.adminId, adminId)).limit(1);
+    return result[0];
+  }
+
+  async createAffiliate(data: AffiliateInsert): Promise<Affiliate> {
+    const id = randomUUID();
+    const affiliate: Affiliate = {
+      ...data,
+      id,
+      status: data.status ?? "pending",
+      commissionPercent: data.commissionPercent ?? 30,
+      commissionFixed: data.commissionFixed ?? null,
+      mpUserId: data.mpUserId ?? null,
+      mpAccessToken: data.mpAccessToken ?? null,
+      mpRefreshToken: data.mpRefreshToken ?? null,
+      mpTokenExpiresAt: data.mpTokenExpiresAt ?? null,
+      mpConnectedAt: data.mpConnectedAt ?? null,
+      totalEarnings: data.totalEarnings ?? 0,
+      pendingAmount: data.pendingAmount ?? 0,
+      paidAmount: data.paidAmount ?? 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    await db.insert(affiliates).values(affiliate);
+    return affiliate;
+  }
+
+  async updateAffiliate(id: string, data: Partial<AffiliateInsert>): Promise<Affiliate | undefined> {
+    const result = await db.update(affiliates)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(affiliates.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteAffiliate(id: string): Promise<void> {
+    await db.delete(affiliates).where(eq(affiliates.id, id));
+  }
+
+  // Affiliate Links
+
+  async listAffiliateLinksByAffiliate(affiliateId: string): Promise<AffiliateLink[]> {
+    return db.select().from(affiliateLinks)
+      .where(eq(affiliateLinks.affiliateId, affiliateId))
+      .orderBy(desc(affiliateLinks.createdAt));
+  }
+
+  async getAffiliateLinkById(id: string): Promise<AffiliateLink | undefined> {
+    const result = await db.select().from(affiliateLinks).where(eq(affiliateLinks.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getAffiliateLinkByCode(code: string): Promise<AffiliateLink | undefined> {
+    const result = await db.select().from(affiliateLinks).where(eq(affiliateLinks.code, code)).limit(1);
+    return result[0];
+  }
+
+  async createAffiliateLink(data: AffiliateLinkInsert): Promise<AffiliateLink> {
+    const id = randomUUID();
+    const link: AffiliateLink = {
+      ...data,
+      id,
+      targetUrl: data.targetUrl ?? null,
+      planoId: data.planoId ?? null,
+      clicks: data.clicks ?? 0,
+      conversions: data.conversions ?? 0,
+      isActive: data.isActive ?? true,
+      createdAt: new Date(),
+    };
+    await db.insert(affiliateLinks).values(link);
+    return link;
+  }
+
+  async updateAffiliateLink(id: string, data: Partial<AffiliateLinkInsert>): Promise<AffiliateLink | undefined> {
+    const result = await db.update(affiliateLinks)
+      .set(data)
+      .where(eq(affiliateLinks.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteAffiliateLink(id: string): Promise<void> {
+    await db.delete(affiliateLinks).where(eq(affiliateLinks.id, id));
+  }
+
+  async incrementAffiliateLinkClicks(id: string): Promise<void> {
+    await db.update(affiliateLinks)
+      .set({ clicks: sql`${affiliateLinks.clicks} + 1` })
+      .where(eq(affiliateLinks.id, id));
+  }
+
+  // Affiliate Sales
+
+  async listAffiliateSalesByAffiliate(affiliateId: string): Promise<AffiliateSale[]> {
+    return db.select().from(affiliateSales)
+      .where(eq(affiliateSales.affiliateId, affiliateId))
+      .orderBy(desc(affiliateSales.createdAt));
+  }
+
+  async getAffiliateSaleById(id: string): Promise<AffiliateSale | undefined> {
+    const result = await db.select().from(affiliateSales).where(eq(affiliateSales.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getAffiliateSaleByPagamentoId(pagamentoId: string): Promise<AffiliateSale | undefined> {
+    const result = await db.select().from(affiliateSales).where(eq(affiliateSales.pagamentoId, pagamentoId)).limit(1);
+    return result[0];
+  }
+
+  async createAffiliateSale(data: AffiliateSaleInsert): Promise<AffiliateSale> {
+    const id = randomUUID();
+    const sale: AffiliateSale = {
+      ...data,
+      id,
+      affiliateLinkId: data.affiliateLinkId ?? null,
+      status: data.status ?? "pending",
+      mpTransferId: data.mpTransferId ?? null,
+      paidAt: data.paidAt ?? null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    await db.insert(affiliateSales).values(sale);
+    return sale;
+  }
+
+  async updateAffiliateSale(id: string, data: Partial<AffiliateSaleInsert>): Promise<AffiliateSale | undefined> {
+    const result = await db.update(affiliateSales)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(affiliateSales.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // Affiliate Config
+
+  async getAffiliateConfig(): Promise<AffiliateConfig | undefined> {
+    const result = await db.select().from(affiliateConfig).where(eq(affiliateConfig.id, "default")).limit(1);
+    return result[0];
+  }
+
+  async upsertAffiliateConfig(data: Partial<AffiliateConfigInsert>): Promise<AffiliateConfig> {
+    const existing = await this.getAffiliateConfig();
+    
+    if (existing) {
+      const result = await db.update(affiliateConfig)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(affiliateConfig.id, "default"))
+        .returning();
+      return result[0];
+    } else {
+      const config: AffiliateConfig = {
+        id: "default",
+        defaultCommissionPercent: data.defaultCommissionPercent ?? 30,
+        minWithdrawal: data.minWithdrawal ?? 5000,
+        holdDays: data.holdDays ?? 7,
+        autoPayEnabled: data.autoPayEnabled ?? true,
+        mpAppId: data.mpAppId ?? null,
+        mpAppSecret: data.mpAppSecret ?? null,
+        updatedAt: new Date(),
+      };
+      await db.insert(affiliateConfig).values(config);
+      return config;
+    }
+  }
+
+  // Affiliate Stats
+
+  async getAffiliateStats(affiliateId: string): Promise<{ totalSales: number; totalCommission: number; pendingCommission: number; paidCommission: number }> {
+    const sales = await db.select().from(affiliateSales).where(eq(affiliateSales.affiliateId, affiliateId));
+    
+    let totalSales = 0;
+    let totalCommission = 0;
+    let pendingCommission = 0;
+    let paidCommission = 0;
+    
+    for (const sale of sales) {
+      if (sale.status !== 'refunded' && sale.status !== 'cancelled') {
+        totalSales += sale.saleAmount;
+        totalCommission += sale.commissionAmount;
+        
+        if (sale.status === 'pending' || sale.status === 'approved') {
+          pendingCommission += sale.commissionAmount;
+        } else if (sale.status === 'paid') {
+          paidCommission += sale.commissionAmount;
+        }
+      }
+    }
+    
+    return { totalSales, totalCommission, pendingCommission, paidCommission };
   }
 }
 
