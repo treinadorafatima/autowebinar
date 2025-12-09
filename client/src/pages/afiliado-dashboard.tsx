@@ -184,7 +184,17 @@ export default function AfiliadoDashboardPage() {
   });
 
   const handleConnectMercadoPago = () => {
-    window.location.href = `/api/affiliates/oauth/authorize`;
+    const token = localStorage.getItem("affiliateToken");
+    if (!token) {
+      toast({
+        title: "Erro",
+        description: "Sessão expirada. Faça login novamente.",
+        variant: "destructive",
+      });
+      setLocation("/afiliado/login");
+      return;
+    }
+    window.location.href = `/api/affiliates/oauth/authorize?token=${encodeURIComponent(token)}`;
   };
 
   const handleLogout = () => {

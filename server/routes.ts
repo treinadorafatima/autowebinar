@@ -9977,7 +9977,8 @@ Seja conversacional e objetivo.`;
   // Start OAuth flow - redirects affiliate to Mercado Pago authorization
   app.get("/api/affiliates/oauth/authorize", async (req, res) => {
     try {
-      const token = req.headers.authorization?.split(" ")[1];
+      // Accept token from query param (for redirect) or header
+      const token = (req.query.token as string) || req.headers.authorization?.split(" ")[1];
       const email = await validateSession(token || "");
       if (!email) return res.status(401).json({ error: "Unauthorized" });
 
