@@ -350,6 +350,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
   await storage.initializeDefaultAiConfig();
   await storage.initializeDefaultPlanos();
 
+  /**
+   * Helper function to create affiliate sale when payment is approved
+   * Called from webhooks (MP and Stripe) when payment is confirmed
+   */
+  async function processAffiliateSale(pagamento: any, plano: any): Promise<void> {
+    try {
+      if (!pagamento.affiliateLinkCode) return;
+      
+      const link = await storage.getAffiliateLinkByCode(pagamento.affiliateLinkCode);
+      if (!link) {
+        console.log(`[Affiliate] Link not found for code: ${pagamento.affiliateLinkCode}`);
+        return;
+      }
+      
+      const affiliate = await storage.getAffiliateById(link.affiliateId);
+      if (!affiliate || !affiliate.isActive) {
+        console.log(`[Affiliate] Affiliate not active or not found: ${link.affiliateId}`);
+        return;
+      }
+      
+      // Get commission config to calculate commission
+      const config = await storage.getAffiliateConfig();
+      const commissionPercent = affiliate.commissionPercent || config?.defaultCommissionPercent || 10;
+      
+      // Calculate commission (valor is in centavos)
+      const commissionAmount = Math.floor(pagamento.valor * (commissionPercent / 100));
+      
+      // Check if sale already exists for this payment (use dedicated function)
+      const existingSale = await storage.getAffiliateSaleByPagamentoId(pagamento.id);
+      
+      if (existingSale) {
+        console.log(`[Affiliate] Sale already exists for pagamento: ${pagamento.id}`);
+        return;
+      }
+      
+      // Create affiliate sale
+      await storage.createAffiliateSale({
+        affiliateId: affiliate.id,
+        linkId: link.id,
+        pagamentoId: pagamento.id,
+        saleAmount: pagamento.valor,
+        commissionAmount,
+        commissionPercent,
+        status: "pending", // Pending until paid to affiliate
+      });
+      
+      // Increment conversions on the link
+      await storage.incrementAffiliateLinkConversions(link.id);
+      
+      console.log(`[Affiliate] Sale created - affiliateId: ${affiliate.id}, pagamentoId: ${pagamento.id}, commission: ${commissionAmount} (${commissionPercent}%)`);
+    } catch (error) {
+      console.error("[Affiliate] Error processing affiliate sale:", error);
+    }
+  }
+
   // Auth API
   app.post("/api/auth/login", async (req, res) => {
     try {
@@ -6777,7 +6832,7 @@ Seja conversacional e objetivo.`;
   app.post("/api/checkout/iniciar/:planoId", async (req, res) => {
     try {
       const { planoId } = req.params;
-      const { nome, email, cpf, documento, tipoDocumento, telefone } = req.body;
+      const { nome, email, cpf, documento, tipoDocumento, telefone, affiliateRef } = req.body;
 
       if (!nome || !email) {
         return res.status(400).json({ error: "Nome e email são obrigatórios" });
@@ -6790,6 +6845,13 @@ Seja conversacional e objetivo.`;
 
       // Support both legacy cpf field and new documento/tipoDocumento fields
       const documentoValue = documento || cpf || null;
+      
+      // Get affiliate ref from cookie, body, or query
+      const affiliateLinkCode = affiliateRef || req.cookies?.affiliate_ref || (req.query.ref as string) || null;
+      
+      if (affiliateLinkCode) {
+        console.log(`[Affiliate] Checkout initiated with affiliate code: ${affiliateLinkCode}`);
+      }
 
       // Create payment record
       const pagamento = await storage.createCheckoutPagamento({
@@ -6800,6 +6862,7 @@ Seja conversacional e objetivo.`;
         planoId,
         valor: plano.preco,
         status: 'checkout_iniciado',
+        affiliateLinkCode,
       });
 
       // For Stripe, create Payment Intent or Subscription automatically for transparent checkout
@@ -8140,6 +8203,9 @@ Seja conversacional e objetivo.`;
                     });
                   });
                 }
+                
+                // Process affiliate sale if applicable
+                await processAffiliateSale(pagamento, plano);
               }
             }
 
@@ -8324,6 +8390,9 @@ Seja conversacional e objetivo.`;
                   });
                 });
               }
+              
+              // Process affiliate sale if applicable
+              await processAffiliateSale(pagamento, plano);
             }
 
             await storage.updateCheckoutPagamento(pagamentoId, updateData);
@@ -8402,6 +8471,9 @@ Seja conversacional e objetivo.`;
                   });
                 });
               }
+              
+              // Process affiliate sale if applicable
+              await processAffiliateSale(pagamento, plano);
             }
 
             await storage.updateCheckoutPagamento(pagamentoId, updateData);
@@ -9664,6 +9736,16 @@ Seja conversacional e objetivo.`;
       }
 
       await storage.incrementAffiliateLinkClicks(link.id);
+
+      // Set cookie for 30 days to track affiliate attribution
+      res.cookie("affiliate_ref", link.code, {
+        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+      });
+      
+      console.log(`[Affiliate] Tracking click for code: ${link.code}, affiliateId: ${link.affiliateId}`);
 
       const redirectUrl = link.targetUrl || (link.planoId ? `/checkout?plano=${link.planoId}&ref=${link.code}` : `/checkout?ref=${link.code}`);
       res.redirect(redirectUrl);

@@ -332,6 +332,7 @@ export interface IStorage {
   updateAffiliateLink(id: string, data: Partial<AffiliateLinkInsert>): Promise<AffiliateLink | undefined>;
   deleteAffiliateLink(id: string): Promise<void>;
   incrementAffiliateLinkClicks(id: string): Promise<void>;
+  incrementAffiliateLinkConversions(id: string): Promise<void>;
   // Affiliate Sales
   listAffiliateSalesByAffiliate(affiliateId: string): Promise<AffiliateSale[]>;
   getAffiliateSaleById(id: string): Promise<AffiliateSale | undefined>;
@@ -4043,6 +4044,12 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
   async incrementAffiliateLinkClicks(id: string): Promise<void> {
     await db.update(affiliateLinks)
       .set({ clicks: sql`${affiliateLinks.clicks} + 1` })
+      .where(eq(affiliateLinks.id, id));
+  }
+
+  async incrementAffiliateLinkConversions(id: string): Promise<void> {
+    await db.update(affiliateLinks)
+      .set({ conversions: sql`${affiliateLinks.conversions} + 1` })
       .where(eq(affiliateLinks.id, id));
   }
 

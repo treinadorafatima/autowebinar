@@ -450,6 +450,8 @@ export const checkoutPagamentos = pgTable("checkout_pagamentos", {
   userFriendlyError: text("user_friendly_error"), // Mensagem amigável para o usuário
   failureAttempts: integer("failure_attempts").default(0), // Número de tentativas falhas
   lastFailureAt: timestamp("last_failure_at"), // Data/hora da última falha
+  // Campos para tracking de afiliados
+  affiliateLinkCode: text("affiliate_link_code"), // Código do link de afiliado usado
   criadoEm: timestamp("criado_em").defaultNow(),
   atualizadoEm: timestamp("atualizado_em").defaultNow(),
 });
