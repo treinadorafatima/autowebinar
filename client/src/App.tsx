@@ -39,6 +39,7 @@ import ResetPasswordPage from "@/pages/reset-password";
 import AdminEmailMarketingPage from "@/pages/admin-email-marketing";
 import AdminWhatsAppMarketingPage from "@/pages/admin-whatsapp-marketing";
 import AdminLeadsPage from "@/pages/admin-leads";
+import AdminUpgradePage from "@/pages/admin-upgrade";
 import NotFound from "@/pages/not-found";
 
 function HomePage() {
@@ -121,6 +122,7 @@ function AdminRoutes() {
         <Route path="/admin/email-marketing" component={AdminEmailMarketingPage} />
         <Route path="/admin/whatsapp-marketing" component={AdminWhatsAppMarketingPage} />
         <Route path="/admin/leads" component={AdminLeadsPage} />
+        <Route path="/admin/upgrade" component={AdminUpgradePage} />
         <Route component={NotFound} />
       </Switch>
     </AdminLayout>
