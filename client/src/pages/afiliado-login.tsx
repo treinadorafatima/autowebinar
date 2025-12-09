@@ -134,7 +134,15 @@ export default function AfiliadoLoginPage() {
               </form>
             </Form>
 
-            <div className="mt-6 text-center text-sm text-muted-foreground">
+            <div className="mt-4 text-center">
+              <Link href="/afiliado/forgot-password">
+                <span className="text-sm text-muted-foreground hover:text-primary hover:underline cursor-pointer" data-testid="link-forgot-password">
+                  Esqueceu sua senha?
+                </span>
+              </Link>
+            </div>
+
+            <div className="mt-4 text-center text-sm text-muted-foreground">
               Ainda não tem conta?{" "}
               <Link href="/afiliado/cadastro">
                 <span className="text-primary hover:underline cursor-pointer" data-testid="link-cadastro">

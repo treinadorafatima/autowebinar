@@ -1005,3 +1005,444 @@ ${APP_NAME}
     return false;
   }
 }
+
+// ============================================
+// AFFILIATE EMAIL FUNCTIONS
+// ============================================
+
+const AFFILIATE_LOGIN_URL = `${APP_URL}/afiliado/login`;
+
+export async function sendAffiliateApprovedEmail(to: string, name: string): Promise<boolean> {
+  try {
+    const { client, fromEmail } = getResendClient();
+    
+    const text = `
+Ola ${name},
+
+Parabens! Seu cadastro no programa de afiliados do ${APP_NAME} foi aprovado!
+
+Agora voce pode:
+- Acessar seu painel de afiliado
+- Gerar seus links de divulgacao
+- Acompanhar suas vendas e comissoes
+- Solicitar saques de seus ganhos
+
+Acesse seu painel: ${AFFILIATE_LOGIN_URL}
+
+Boas vendas!
+
+---
+${APP_NAME} - Programa de Afiliados
+    `.trim();
+    
+    const html = `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cadastro Aprovado - ${APP_NAME}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background-color: #f4f4f5;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f5;">
+    <tr>
+      <td style="padding: 40px 20px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden;">
+          <tr>
+            <td style="background-color: #10b981; padding: 30px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 600;">Cadastro Aprovado!</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 40px 30px;">
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Ola <strong>${name}</strong>,
+              </p>
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Parabens! Seu cadastro no programa de afiliados do ${APP_NAME} foi aprovado!
+              </p>
+              
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 30px 0; background-color: #ecfdf5; border-radius: 6px;">
+                <tr>
+                  <td style="padding: 20px;">
+                    <p style="margin: 0 0 12px; color: #047857; font-weight: 600; font-size: 14px;">Agora voce pode:</p>
+                    <p style="margin: 0; color: #374151; font-size: 14px; line-height: 1.8;">
+                      - Acessar seu painel de afiliado<br>
+                      - Gerar seus links de divulgacao<br>
+                      - Acompanhar suas vendas e comissoes<br>
+                      - Solicitar saques de seus ganhos
+                    </p>
+                  </td>
+                </tr>
+              </table>
+              
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                <tr>
+                  <td style="text-align: center; padding: 20px 0;">
+                    <a href="${AFFILIATE_LOGIN_URL}" style="display: inline-block; background-color: #10b981; color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 6px; font-weight: 600; font-size: 16px;">
+                      Acessar Meu Painel
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              
+              <p style="margin: 30px 0 0; color: #6b7280; font-size: 14px; line-height: 1.6;">
+                Boas vendas!
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color: #f8fafc; padding: 20px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0; color: #9ca3af; font-size: 12px;">
+                ${APP_NAME} - Programa de Afiliados
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `;
+
+    const result = await client.emails.send({
+      from: fromEmail,
+      replyTo: REPLY_TO_EMAIL,
+      to: [to],
+      subject: `Cadastro aprovado - Programa de Afiliados ${APP_NAME}`,
+      html,
+      text,
+    });
+
+    console.log(`[email] Email de afiliado aprovado enviado para ${to}`, result);
+    return true;
+  } catch (error) {
+    console.error(`[email] Erro ao enviar email de afiliado aprovado para ${to}:`, error);
+    return false;
+  }
+}
+
+export async function sendAffiliatePendingEmail(to: string, name: string): Promise<boolean> {
+  try {
+    const { client, fromEmail } = getResendClient();
+    
+    const text = `
+Ola ${name},
+
+Recebemos seu cadastro no programa de afiliados do ${APP_NAME}!
+
+Seu cadastro esta em analise e em breve voce recebera uma resposta.
+
+Enquanto isso, prepare-se para comecar a divulgar e ganhar comissoes!
+
+Se tiver alguma duvida, entre em contato conosco.
+
+---
+${APP_NAME} - Programa de Afiliados
+    `.trim();
+    
+    const html = `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cadastro Recebido - ${APP_NAME}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background-color: #f4f4f5;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f5;">
+    <tr>
+      <td style="padding: 40px 20px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden;">
+          <tr>
+            <td style="background-color: #3b82f6; padding: 30px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 600;">Cadastro Recebido!</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 40px 30px;">
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Ola <strong>${name}</strong>,
+              </p>
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Recebemos seu cadastro no programa de afiliados do ${APP_NAME}!
+              </p>
+              
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 30px 0; background-color: #fef3c7; border-radius: 6px;">
+                <tr>
+                  <td style="padding: 20px;">
+                    <p style="margin: 0; color: #92400e; font-size: 14px; line-height: 1.6;">
+                      <strong>Status:</strong> Em analise<br><br>
+                      Seu cadastro esta sendo analisado e em breve voce recebera uma resposta por e-mail.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+              
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Enquanto isso, prepare-se para comecar a divulgar e ganhar comissoes!
+              </p>
+              
+              <p style="margin: 30px 0 0; color: #6b7280; font-size: 14px; line-height: 1.6;">
+                Se tiver alguma duvida, entre em contato conosco.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color: #f8fafc; padding: 20px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0; color: #9ca3af; font-size: 12px;">
+                ${APP_NAME} - Programa de Afiliados
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `;
+
+    const result = await client.emails.send({
+      from: fromEmail,
+      replyTo: REPLY_TO_EMAIL,
+      to: [to],
+      subject: `Cadastro recebido - Programa de Afiliados ${APP_NAME}`,
+      html,
+      text,
+    });
+
+    console.log(`[email] Email de cadastro pendente enviado para ${to}`, result);
+    return true;
+  } catch (error) {
+    console.error(`[email] Erro ao enviar email de cadastro pendente para ${to}:`, error);
+    return false;
+  }
+}
+
+export async function sendAffiliateSaleEmail(to: string, name: string, saleAmount: number, commissionAmount: number): Promise<boolean> {
+  try {
+    const { client, fromEmail } = getResendClient();
+    
+    const saleFormatted = (saleAmount / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    const commissionFormatted = (commissionAmount / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    
+    const text = `
+Ola ${name},
+
+Voce acaba de fazer uma nova venda! Parabens!
+
+Detalhes da venda:
+- Valor da venda: ${saleFormatted}
+- Sua comissao: ${commissionFormatted}
+
+A comissao ja foi adicionada ao seu saldo e estara disponivel para saque em breve.
+
+Acesse seu painel para ver mais detalhes: ${AFFILIATE_LOGIN_URL}
+
+Continue divulgando e vendendo!
+
+---
+${APP_NAME} - Programa de Afiliados
+    `.trim();
+    
+    const html = `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nova Venda - ${APP_NAME}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background-color: #f4f4f5;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f5;">
+    <tr>
+      <td style="padding: 40px 20px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden;">
+          <tr>
+            <td style="background-color: #10b981; padding: 30px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 600;">Nova Venda Realizada!</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 40px 30px;">
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Ola <strong>${name}</strong>,
+              </p>
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Voce acaba de fazer uma nova venda! Parabens!
+              </p>
+              
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 30px 0; background-color: #ecfdf5; border-radius: 6px; border: 2px solid #10b981;">
+                <tr>
+                  <td style="padding: 20px;">
+                    <p style="margin: 0 0 12px; color: #047857; font-weight: 600; font-size: 14px;">Detalhes da Venda:</p>
+                    <p style="margin: 0 0 8px; color: #374151; font-size: 15px; line-height: 1.8;">
+                      <strong>Valor da venda:</strong> ${saleFormatted}
+                    </p>
+                    <p style="margin: 0; color: #374151; font-size: 15px; line-height: 1.8;">
+                      <strong>Sua comissao:</strong> <span style="background-color: #d1fae5; padding: 4px 12px; border-radius: 4px; font-size: 16px; font-weight: 600; color: #047857;">${commissionFormatted}</span>
+                    </p>
+                  </td>
+                </tr>
+              </table>
+              
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                A comissao ja foi adicionada ao seu saldo e estara disponivel para saque em breve.
+              </p>
+              
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                <tr>
+                  <td style="text-align: center; padding: 20px 0;">
+                    <a href="${AFFILIATE_LOGIN_URL}" style="display: inline-block; background-color: #10b981; color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 6px; font-weight: 600; font-size: 16px;">
+                      Ver Meu Painel
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              
+              <p style="margin: 30px 0 0; color: #6b7280; font-size: 14px; line-height: 1.6;">
+                Continue divulgando e vendendo!
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color: #f8fafc; padding: 20px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0; color: #9ca3af; font-size: 12px;">
+                ${APP_NAME} - Programa de Afiliados
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `;
+
+    const result = await client.emails.send({
+      from: fromEmail,
+      replyTo: REPLY_TO_EMAIL,
+      to: [to],
+      subject: `Nova venda: ${commissionFormatted} de comissao - ${APP_NAME}`,
+      html,
+      text,
+    });
+
+    console.log(`[email] Email de nova venda enviado para ${to}`, result);
+    return true;
+  } catch (error) {
+    console.error(`[email] Erro ao enviar email de nova venda para ${to}:`, error);
+    return false;
+  }
+}
+
+export async function sendAffiliatePasswordResetEmail(to: string, name: string, resetToken: string): Promise<boolean> {
+  try {
+    const { client, fromEmail } = getResendClient();
+    const resetUrl = `${APP_URL}/afiliado/reset-password?token=${resetToken}`;
+    
+    const text = `
+Ola ${name},
+
+Recebemos uma solicitacao para redefinir a senha da sua conta de afiliado no ${APP_NAME}.
+
+Para criar uma nova senha, acesse o link abaixo:
+${resetUrl}
+
+IMPORTANTE: Este link e valido por 1 hora. Se voce nao solicitou a redefinicao de senha, ignore este email.
+
+---
+${APP_NAME} - Programa de Afiliados
+Este e um email automatico, por favor nao responda.
+    `.trim();
+    
+    const html = `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Recuperacao de Senha - ${APP_NAME}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background-color: #f4f4f5;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f5;">
+    <tr>
+      <td style="padding: 40px 20px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden;">
+          <tr>
+            <td style="background-color: #7c3aed; padding: 30px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 600;">Recuperacao de Senha</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 40px 30px;">
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Ola <strong>${name}</strong>,
+              </p>
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Recebemos uma solicitacao para redefinir a senha da sua conta de afiliado no ${APP_NAME}.
+              </p>
+              <p style="margin: 0 0 30px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Clique no botao abaixo para criar uma nova senha:
+              </p>
+              
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                <tr>
+                  <td style="text-align: center; padding: 20px 0;">
+                    <a href="${resetUrl}" style="display: inline-block; background-color: #7c3aed; color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 6px; font-weight: 600; font-size: 16px;">
+                      Redefinir Minha Senha
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 30px 0; background-color: #fef3c7; border-radius: 6px;">
+                <tr>
+                  <td style="padding: 16px;">
+                    <p style="margin: 0; color: #92400e; font-size: 14px; line-height: 1.6;">
+                      <strong>Importante:</strong> Este link e valido por 1 hora. Se voce nao solicitou a redefinicao de senha, ignore este email.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+              
+              <p style="margin: 0; color: #6b7280; font-size: 13px; line-height: 1.6;">
+                Se o botao nao funcionar, copie e cole este link no seu navegador:<br>
+                <a href="${resetUrl}" style="color: #7c3aed; word-break: break-all;">${resetUrl}</a>
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color: #f8fafc; padding: 20px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0; color: #9ca3af; font-size: 12px;">
+                ${APP_NAME} - Este e um email automatico.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `;
+
+    const result = await client.emails.send({
+      from: fromEmail,
+      replyTo: REPLY_TO_EMAIL,
+      to: [to],
+      subject: `Recuperacao de Senha - Afiliado ${APP_NAME}`,
+      html,
+      text,
+    });
+
+    console.log(`[email] Email de recuperacao de senha de afiliado enviado para ${to}`, result);
+    return true;
+  } catch (error) {
+    console.error(`[email] Erro ao enviar email de recuperacao de afiliado para ${to}:`, error);
+    return false;
+  }
+}

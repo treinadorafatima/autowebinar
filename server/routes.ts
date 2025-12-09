@@ -380,7 +380,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const affiliate = await storage.getAffiliateById(link.affiliateId);
-      if (!affiliate || !affiliate.isActive) {
+      if (!affiliate || affiliate.status !== "active") {
         console.log(`[Affiliate] Affiliate not active or not found: ${link.affiliateId}`);
         return;
       }
@@ -424,6 +424,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.incrementAffiliateLinkConversions(link.id);
       
       console.log(`[Affiliate] Sale created - affiliateId: ${affiliate.id}, pagamentoId: ${pagamento.id}, commission: ${commissionAmount} (${commissionPercent}%), newPendingAmount: ${newPendingAmount}`);
+      
+      // Send sale notification email to affiliate (non-blocking)
+      const affiliateAdmin = await storage.getAdminById(affiliate.adminId);
+      if (affiliateAdmin) {
+        import("./email").then(({ sendAffiliateSaleEmail }) => {
+          sendAffiliateSaleEmail(
+            affiliateAdmin.email, 
+            affiliateAdmin.name || "Afiliado", 
+            pagamento.valor, 
+            commissionAmount
+          ).catch(err => {
+            console.error("[Affiliate] Erro ao enviar email de venda:", err);
+          });
+        });
+      }
     } catch (error) {
       console.error("[Affiliate] Error processing affiliate sale:", error);
     }
@@ -9662,6 +9677,21 @@ Seja conversacional e objetivo.`;
         ? "Cadastro realizado com sucesso! Você já pode acessar sua conta."
         : "Cadastro realizado! Aguarde a aprovação do administrador.";
 
+      // Send confirmation email (non-blocking)
+      if (autoApprove) {
+        import("./email").then(({ sendAffiliateApprovedEmail }) => {
+          sendAffiliateApprovedEmail(email, name).catch(err => {
+            console.error("[affiliate] Erro ao enviar email de aprovação:", err);
+          });
+        });
+      } else {
+        import("./email").then(({ sendAffiliatePendingEmail }) => {
+          sendAffiliatePendingEmail(email, name).catch(err => {
+            console.error("[affiliate] Erro ao enviar email de cadastro pendente:", err);
+          });
+        });
+      }
+
       res.json({ 
         success: true, 
         message,
@@ -9670,6 +9700,171 @@ Seja conversacional e objetivo.`;
       });
     } catch (error: any) {
       res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Affiliate forgot password (público)
+  app.post("/api/affiliates/forgot-password", async (req, res) => {
+    try {
+      const { email } = req.body;
+      
+      if (!email) {
+        return res.status(400).json({ error: "E-mail é obrigatório" });
+      }
+
+      const admin = await storage.getAdminByEmail(email.toLowerCase());
+      
+      // Always return success to avoid email enumeration
+      if (!admin) {
+        return res.json({ 
+          success: true, 
+          message: "Se o e-mail estiver cadastrado, você receberá as instruções para redefinir sua senha." 
+        });
+      }
+
+      // Check if this admin is an affiliate
+      const affiliate = await storage.getAffiliateByAdminId(admin.id);
+      if (!affiliate) {
+        return res.json({ 
+          success: true, 
+          message: "Se o e-mail estiver cadastrado, você receberá as instruções para redefinir sua senha." 
+        });
+      }
+
+      const resetToken = Math.random().toString(36).substring(2) + Date.now().toString(36) + Math.random().toString(36).substring(2);
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+      const { passwordResetTokens } = await import("@shared/schema");
+      await db.insert(passwordResetTokens).values({
+        id: Math.random().toString(36).substring(2) + Date.now().toString(36),
+        email: email.toLowerCase(),
+        token: resetToken,
+        expiresAt,
+      });
+
+      const { sendAffiliatePasswordResetEmail } = await import("./email");
+      await sendAffiliatePasswordResetEmail(email.toLowerCase(), admin.name || "Afiliado", resetToken);
+
+      console.log(`[affiliate] Token de recuperação criado para ${email}`);
+
+      res.json({ 
+        success: true, 
+        message: "Se o e-mail estiver cadastrado, você receberá as instruções para redefinir sua senha." 
+      });
+    } catch (error: any) {
+      console.error("[affiliate] Erro ao solicitar recuperação de senha:", error);
+      res.status(500).json({ error: "Erro ao processar solicitação" });
+    }
+  });
+
+  // Affiliate verify reset token (público)
+  app.get("/api/affiliates/verify-reset-token/:token", async (req, res) => {
+    try {
+      const { token } = req.params;
+      
+      if (!token) {
+        return res.status(400).json({ valid: false, error: "Token não fornecido" });
+      }
+
+      const { passwordResetTokens } = await import("@shared/schema");
+      const result = await db
+        .select()
+        .from(passwordResetTokens)
+        .where(eq(passwordResetTokens.token, token))
+        .limit(1);
+
+      if (result.length === 0) {
+        return res.json({ valid: false, error: "Token inválido" });
+      }
+
+      const resetToken = result[0];
+      
+      if (resetToken.usedAt) {
+        return res.json({ valid: false, error: "Este link já foi utilizado" });
+      }
+
+      if (new Date(resetToken.expiresAt) < new Date()) {
+        return res.json({ valid: false, error: "Este link expirou. Solicite uma nova recuperação de senha." });
+      }
+
+      // Verify this email belongs to an affiliate
+      const admin = await storage.getAdminByEmail(resetToken.email);
+      if (!admin) {
+        return res.json({ valid: false, error: "Token inválido" });
+      }
+
+      const affiliate = await storage.getAffiliateByAdminId(admin.id);
+      if (!affiliate) {
+        return res.json({ valid: false, error: "Token inválido" });
+      }
+
+      res.json({ valid: true, email: resetToken.email });
+    } catch (error: any) {
+      console.error("[affiliate] Erro ao verificar token:", error);
+      res.status(500).json({ valid: false, error: "Erro ao verificar token" });
+    }
+  });
+
+  // Affiliate reset password (público)
+  app.post("/api/affiliates/reset-password", async (req, res) => {
+    try {
+      const { token, password } = req.body;
+      
+      if (!token || !password) {
+        return res.status(400).json({ error: "Token e nova senha são obrigatórios" });
+      }
+
+      if (password.length < 6) {
+        return res.status(400).json({ error: "A senha deve ter pelo menos 6 caracteres" });
+      }
+
+      const { passwordResetTokens } = await import("@shared/schema");
+      const result = await db
+        .select()
+        .from(passwordResetTokens)
+        .where(eq(passwordResetTokens.token, token))
+        .limit(1);
+
+      if (result.length === 0) {
+        return res.status(400).json({ error: "Token inválido" });
+      }
+
+      const resetToken = result[0];
+      
+      if (resetToken.usedAt) {
+        return res.status(400).json({ error: "Este link já foi utilizado" });
+      }
+
+      if (new Date(resetToken.expiresAt) < new Date()) {
+        return res.status(400).json({ error: "Este link expirou. Solicite uma nova recuperação de senha." });
+      }
+
+      // Verify this email belongs to an affiliate
+      const admin = await storage.getAdminByEmail(resetToken.email);
+      if (!admin) {
+        return res.status(400).json({ error: "Usuário não encontrado" });
+      }
+
+      const affiliate = await storage.getAffiliateByAdminId(admin.id);
+      if (!affiliate) {
+        return res.status(400).json({ error: "Usuário não é um afiliado" });
+      }
+
+      // Update password
+      const hashedPassword = await bcrypt.hash(password, 10);
+      await storage.updateAdmin(admin.id, { password: hashedPassword });
+
+      // Mark token as used
+      await db.update(passwordResetTokens)
+        .set({ usedAt: new Date() })
+        .where(eq(passwordResetTokens.id, resetToken.id));
+
+      console.log(`[affiliate] Senha redefinida para ${resetToken.email}`);
+
+      res.json({ success: true, message: "Senha redefinida com sucesso!" });
+    } catch (error: any) {
+      console.error("[affiliate] Erro ao redefinir senha:", error);
+      res.status(500).json({ error: "Erro ao redefinir senha" });
     }
   });
 
@@ -9741,8 +9936,27 @@ Seja conversacional e objetivo.`;
         return res.status(403).json({ error: "Apenas super admin pode atualizar" });
       }
 
+      // Get current affiliate to check status change
+      const currentAffiliate = await storage.getAffiliateById(req.params.id);
+      if (!currentAffiliate) return res.status(404).json({ error: "Afiliado não encontrado" });
+      
+      const wasNotActive = currentAffiliate.status !== "active";
+      const willBeActive = req.body.status === "active";
+
       const affiliate = await storage.updateAffiliate(req.params.id, req.body);
       if (!affiliate) return res.status(404).json({ error: "Afiliado não encontrado" });
+
+      // Send approval email if status changed to active
+      if (wasNotActive && willBeActive) {
+        const affiliateAdmin = await storage.getAdminById(affiliate.adminId);
+        if (affiliateAdmin) {
+          import("./email").then(({ sendAffiliateApprovedEmail }) => {
+            sendAffiliateApprovedEmail(affiliateAdmin.email, affiliateAdmin.name || "Afiliado").catch(err => {
+              console.error("[affiliate] Erro ao enviar email de aprovação:", err);
+            });
+          });
+        }
+      }
 
       res.json(affiliate);
     } catch (error: any) {
