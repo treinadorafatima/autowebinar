@@ -10176,8 +10176,8 @@ Seja conversacional e objetivo.`;
         const affiliate = await storage.getAffiliateById(sale.affiliateId);
         if (affiliate) {
           await storage.updateAffiliate(affiliate.id, {
-            pendingAmount: Math.max(0, affiliate.pendingAmount - sale.commissionAmount),
-            paidAmount: affiliate.paidAmount + sale.commissionAmount,
+            pendingAmount: Math.max(0, (affiliate.pendingAmount || 0) - sale.commissionAmount),
+            paidAmount: (affiliate.paidAmount || 0) + sale.commissionAmount,
           });
         }
       }
@@ -10186,8 +10186,8 @@ Seja conversacional e objetivo.`;
         const affiliate = await storage.getAffiliateById(sale.affiliateId);
         if (affiliate) {
           await storage.updateAffiliate(affiliate.id, {
-            totalEarnings: Math.max(0, affiliate.totalEarnings - sale.commissionAmount),
-            pendingAmount: Math.max(0, affiliate.pendingAmount - sale.commissionAmount),
+            totalEarnings: Math.max(0, (affiliate.totalEarnings || 0) - sale.commissionAmount),
+            pendingAmount: Math.max(0, (affiliate.pendingAmount || 0) - sale.commissionAmount),
           });
         }
       }
@@ -10216,10 +10216,22 @@ Seja conversacional e objetivo.`;
       }
 
       const affiliates = await storage.listAffiliates();
+      
+      // Preload all admins to avoid N+1 queries
+      const allAdmins = await storage.getAllAdmins();
+      const adminMap = new Map(allAdmins.map(a => [a.id, a]));
+      
       const allSales = [];
       for (const aff of affiliates) {
         const sales = await storage.listAffiliateSalesByAffiliate(aff.id);
-        allSales.push(...sales.map(s => ({ ...s, affiliate: aff })));
+        // Buscar dados do admin vinculado ao afiliado para obter name/email
+        const affiliateAdmin = aff.adminId ? adminMap.get(aff.adminId) : null;
+        const affiliateWithAdminData = {
+          ...aff,
+          name: affiliateAdmin?.name || (aff.adminId ? "Admin Removido" : "Afiliado sem conta"),
+          email: affiliateAdmin?.email || (aff.adminId ? "email@removido" : ""),
+        };
+        allSales.push(...sales.map(s => ({ ...s, affiliate: affiliateWithAdminData })));
       }
 
       res.json(allSales);

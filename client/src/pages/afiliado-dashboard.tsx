@@ -30,8 +30,12 @@ import {
   CheckCircle,
   Clock,
   XCircle,
-  BarChart3
+  BarChart3,
+  Settings,
+  Wallet,
+  Unlink
 } from "lucide-react";
+import { SiMercadopago } from "react-icons/si";
 
 const newLinkSchema = z.object({
   planoId: z.string().min(1, "Selecione um plano"),
@@ -77,6 +81,9 @@ interface Affiliate {
   cpf: string;
   commissionPercent: number;
   isActive: boolean;
+  mpUserId?: string | null;
+  mpConnectedAt?: string | null;
+  mpTokenExpiresAt?: string | null;
 }
 
 interface Plano {
@@ -155,10 +162,48 @@ export default function AfiliadoDashboardPage() {
     },
   });
 
+  const disconnectMpMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", `/api/affiliates/oauth/disconnect`);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Desconectado!",
+        description: "Sua conta do Mercado Pago foi desconectada.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/affiliate/me"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro ao desconectar",
+        description: error.message || "Não foi possível desconectar.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleConnectMercadoPago = () => {
+    window.location.href = `/api/affiliates/oauth/authorize`;
+  };
+
   const handleLogout = () => {
     localStorage.removeItem("affiliateToken");
     localStorage.removeItem("affiliateId");
     setLocation("/afiliado/login");
+  };
+
+  const getMpConnectionStatus = () => {
+    if (!affiliate?.mpUserId || !affiliate?.mpConnectedAt) {
+      return { connected: false, label: "Não conectado", expired: false };
+    }
+    if (affiliate?.mpTokenExpiresAt) {
+      const expiresAt = new Date(affiliate.mpTokenExpiresAt);
+      if (expiresAt < new Date()) {
+        return { connected: true, label: "Expirado", expired: true };
+      }
+    }
+    return { connected: true, label: "Conectado", expired: false };
   };
 
   const copyToClipboard = (text: string) => {
@@ -310,6 +355,10 @@ export default function AfiliadoDashboardPage() {
             <TabsTrigger value="sales" data-testid="tab-sales">
               <DollarSign className="h-4 w-4 mr-2" />
               Vendas
+            </TabsTrigger>
+            <TabsTrigger value="account" data-testid="tab-account">
+              <Settings className="h-4 w-4 mr-2" />
+              Conta
             </TabsTrigger>
           </TabsList>
 
@@ -500,6 +549,131 @@ export default function AfiliadoDashboardPage() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="account">
+            <div className="grid gap-6 md:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Wallet className="h-5 w-5" />
+                    Mercado Pago
+                  </CardTitle>
+                  <CardDescription>
+                    Conecte sua conta do Mercado Pago para receber suas comissões automaticamente
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {isLoadingAffiliate ? (
+                    <Skeleton className="h-20 w-full" />
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between p-4 border rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-[#009ee3]/10 rounded-full flex items-center justify-center">
+                            <SiMercadopago className="h-5 w-5 text-[#009ee3]" />
+                          </div>
+                          <div>
+                            <p className="font-medium">Status da Conexão</p>
+                            <div className="flex items-center gap-2">
+                              {getMpConnectionStatus().connected ? (
+                                getMpConnectionStatus().expired ? (
+                                  <Badge variant="destructive">
+                                    <XCircle className="h-3 w-3 mr-1" />
+                                    Token Expirado
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="default" className="bg-green-500">
+                                    <CheckCircle className="h-3 w-3 mr-1" />
+                                    Conectado
+                                  </Badge>
+                                )
+                              ) : (
+                                <Badge variant="secondary">
+                                  <Clock className="h-3 w-3 mr-1" />
+                                  Não Conectado
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {getMpConnectionStatus().connected && affiliate?.mpConnectedAt && (
+                        <p className="text-sm text-muted-foreground">
+                          Conectado desde: {formatDate(affiliate.mpConnectedAt)}
+                        </p>
+                      )}
+
+                      <div className="flex gap-2">
+                        {!getMpConnectionStatus().connected || getMpConnectionStatus().expired ? (
+                          <Button
+                            onClick={handleConnectMercadoPago}
+                            className="bg-[#009ee3] hover:bg-[#007bb5]"
+                            data-testid="button-connect-mp"
+                          >
+                            <SiMercadopago className="h-4 w-4 mr-2" />
+                            Conectar Mercado Pago
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            onClick={() => disconnectMpMutation.mutate()}
+                            disabled={disconnectMpMutation.isPending}
+                            data-testid="button-disconnect-mp"
+                          >
+                            {disconnectMpMutation.isPending ? (
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            ) : (
+                              <Unlink className="h-4 w-4 mr-2" />
+                            )}
+                            Desconectar
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <User className="h-5 w-5" />
+                    Informações da Conta
+                  </CardTitle>
+                  <CardDescription>
+                    Seus dados cadastrais como afiliado
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {isLoadingAffiliate ? (
+                    <Skeleton className="h-32 w-full" />
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="flex justify-between border-b pb-2">
+                        <span className="text-muted-foreground">Nome</span>
+                        <span className="font-medium">{affiliate?.name}</span>
+                      </div>
+                      <div className="flex justify-between border-b pb-2">
+                        <span className="text-muted-foreground">Email</span>
+                        <span className="font-medium">{affiliate?.email}</span>
+                      </div>
+                      <div className="flex justify-between border-b pb-2">
+                        <span className="text-muted-foreground">Comissão</span>
+                        <span className="font-medium">{affiliate?.commissionPercent || 0}%</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Status</span>
+                        <Badge variant={affiliate?.isActive ? "default" : "secondary"}>
+                          {affiliate?.isActive ? "Ativo" : "Inativo"}
+                        </Badge>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
         </Tabs>
       </main>

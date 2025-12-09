@@ -61,7 +61,12 @@ import {
   Loader2,
   ShoppingCart,
   Wallet,
+  Settings,
+  Copy,
+  Link as LinkIcon,
+  Percent,
 } from "lucide-react";
+import { CardDescription } from "@/components/ui/card";
 
 interface Affiliate {
   id: string;
@@ -95,6 +100,12 @@ interface AffiliateSale {
   paidAt: string | null;
   createdAt: string;
   affiliate?: Affiliate;
+}
+
+interface AffiliateConfig {
+  defaultCommissionPercent: number;
+  mpAppId: string | null;
+  mpAppSecret: string | null;
 }
 
 const saleStatusLabels: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
@@ -141,9 +152,29 @@ export default function AdminAffiliatesPage() {
   const [editStatus, setEditStatus] = useState<string>("active");
   const [isPayDialogOpen, setIsPayDialogOpen] = useState(false);
   const [saleToPayId, setSaleToPayId] = useState<string | null>(null);
+  const [configCommission, setConfigCommission] = useState<number>(10);
 
   const { data: affiliates = [], isLoading } = useQuery<Affiliate[]>({
     queryKey: ["/api/affiliates"],
+  });
+
+  const { data: config, isLoading: isLoadingConfig } = useQuery<AffiliateConfig>({
+    queryKey: ["/api/affiliate-config"],
+    enabled: activeTab === "settings",
+  });
+
+  const updateConfigMutation = useMutation({
+    mutationFn: async (data: Partial<AffiliateConfig>) => {
+      const res = await apiRequest("POST", "/api/affiliate-config", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/affiliate-config"] });
+      toast({ title: "Configurações salvas com sucesso" });
+    },
+    onError: () => {
+      toast({ title: "Erro ao salvar configurações", variant: "destructive" });
+    },
   });
 
   const { data: sales = [], isLoading: isLoadingSales } = useQuery<AffiliateSale[]>({
@@ -347,6 +378,10 @@ export default function AdminAffiliatesPage() {
           <TabsTrigger value="sales" data-testid="tab-sales">
             <ShoppingCart className="h-4 w-4 mr-2" />
             Vendas
+          </TabsTrigger>
+          <TabsTrigger value="settings" data-testid="tab-settings">
+            <Settings className="h-4 w-4 mr-2" />
+            Configurações
           </TabsTrigger>
         </TabsList>
 
@@ -687,6 +722,91 @@ export default function AdminAffiliatesPage() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="settings" className="space-y-6 mt-4">
+          <div className="grid gap-6 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <LinkIcon className="h-5 w-5" />
+                  Link de Convite
+                </CardTitle>
+                <CardDescription>
+                  Compartilhe este link para convidar novos afiliados
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex gap-2">
+                  <Input
+                    readOnly
+                    value={`${window.location.origin}/afiliado/cadastro`}
+                    className="font-mono text-sm"
+                    data-testid="input-invite-link"
+                  />
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => {
+                      navigator.clipboard.writeText(`${window.location.origin}/afiliado/cadastro`);
+                      toast({ title: "Link copiado!" });
+                    }}
+                    data-testid="button-copy-invite"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Novos afiliados podem se cadastrar usando este link
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Percent className="h-5 w-5" />
+                  Comissão Padrão
+                </CardTitle>
+                <CardDescription>
+                  Define a comissão padrão para novos afiliados
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoadingConfig ? (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={configCommission}
+                        onChange={(e) => setConfigCommission(Math.max(0, Math.min(100, parseInt(e.target.value) || 0)))}
+                        className="w-24"
+                        data-testid="input-default-commission"
+                      />
+                      <span className="text-muted-foreground">%</span>
+                    </div>
+                    <Button
+                      onClick={() => updateConfigMutation.mutate({ defaultCommissionPercent: configCommission })}
+                      disabled={updateConfigMutation.isPending}
+                      data-testid="button-save-commission"
+                    >
+                      {updateConfigMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                      Salvar Comissão
+                    </Button>
+                    <p className="text-sm text-muted-foreground">
+                      Atual: {config?.defaultCommissionPercent || 10}%
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
 
