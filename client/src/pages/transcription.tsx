@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -25,6 +26,17 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { FeatureBlocked } from "@/components/feature-blocked";
+
+interface SubscriptionData {
+  admin: { id: string; role?: string };
+  plano: {
+    featureAI?: boolean;
+    featureDesignerIA?: boolean;
+    featureGeradorMensagens?: boolean;
+    featureTranscricao?: boolean;
+  } | null;
+}
 
 interface UploadedVideo {
   id: string;
@@ -80,13 +92,22 @@ export default function TranscriptionPage() {
   const [scriptTitle, setScriptTitle] = useState("");
   const [savingScript, setSavingScript] = useState(false);
 
+  const { data: subscription, isLoading: isLoadingSubscription } = useQuery<SubscriptionData>({
+    queryKey: ["/api/admin/subscription"],
+  });
+
+  const isSuperadmin = subscription?.admin?.role === "superadmin";
+  const hasTranscricaoAccess = isSuperadmin || subscription?.plano?.featureTranscricao === true;
+
   useEffect(() => {
     if (!token) {
       setLocation("/login");
       return;
     }
-    fetchData();
-  }, [token]);
+    if (!isLoadingSubscription && hasTranscricaoAccess) {
+      fetchData();
+    }
+  }, [token, isLoadingSubscription, hasTranscricaoAccess]);
 
   useEffect(() => {
     if (pollingVideoId) {
@@ -96,6 +117,24 @@ export default function TranscriptionPage() {
       return () => clearInterval(interval);
     }
   }, [pollingVideoId]);
+
+  if (isLoadingSubscription) {
+    return (
+      <div className="p-6 space-y-4">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
+
+  if (!hasTranscricaoAccess) {
+    return (
+      <FeatureBlocked
+        featureName="Transcrição de Vídeo com IA"
+        description="A Transcrição de Vídeo com IA está disponível apenas para planos com esse recurso ativado. Faça upgrade para transcrever seus vídeos automaticamente."
+      />
+    );
+  }
 
   async function fetchData() {
     setLoading(true);

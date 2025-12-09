@@ -13,6 +13,18 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Loader2, Send, Save, Download, Trash2, Sparkles, Wand2, FileText, Plus, MessageSquare, MoreVertical, Pencil } from "lucide-react";
 import { Document, Packer, Paragraph, TextRun, HeadingLevel } from "docx";
 import { saveAs } from "file-saver";
+import { FeatureBlocked } from "@/components/feature-blocked";
+import { Skeleton } from "@/components/ui/skeleton";
+
+interface SubscriptionData {
+  admin: { id: string; role?: string };
+  plano: {
+    featureAI?: boolean;
+    featureDesignerIA?: boolean;
+    featureGeradorMensagens?: boolean;
+    featureTranscricao?: boolean;
+  } | null;
+}
 
 interface Message {
   id: string;
@@ -136,6 +148,10 @@ export default function ScriptCreatorPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  const { data: subscription, isLoading: isLoadingSubscription } = useQuery<SubscriptionData>({
+    queryKey: ["/api/admin/subscription"],
+  });
+
   const { data: webinars = [] } = useQuery<Webinar[]>({
     queryKey: ["/api/webinars"],
   });
@@ -148,6 +164,27 @@ export default function ScriptCreatorPage() {
   const { data: chatHistory = [], isLoading: isLoadingChats } = useQuery<AiChat[]>({
     queryKey: ["/api/ai/chats"],
   });
+
+  const isSuperadmin = subscription?.admin?.role === "superadmin";
+  const hasDesignerIAAccess = isSuperadmin || subscription?.plano?.featureDesignerIA === true;
+
+  if (isLoadingSubscription) {
+    return (
+      <div className="p-6 space-y-4">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
+
+  if (!hasDesignerIAAccess) {
+    return (
+      <FeatureBlocked
+        featureName="Roteirizador com IA"
+        description="O Roteirizador com IA está disponível apenas para planos com esse recurso ativado. Faça upgrade para criar roteiros personalizados com inteligência artificial."
+      />
+    );
+  }
 
   // Create new chat mutation
   const createChatMutation = useMutation({

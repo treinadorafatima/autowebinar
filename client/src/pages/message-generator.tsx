@@ -15,6 +15,18 @@ import { Loader2, Send, Copy, Download, Mail, MessageCircle, Sparkles, Wand2, Fi
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Document, Packer, Paragraph, TextRun, HeadingLevel } from "docx";
 import { saveAs } from "file-saver";
+import { FeatureBlocked } from "@/components/feature-blocked";
+import { Skeleton } from "@/components/ui/skeleton";
+
+interface SubscriptionData {
+  admin: { id: string; role?: string };
+  plano: {
+    featureAI?: boolean;
+    featureDesignerIA?: boolean;
+    featureGeradorMensagens?: boolean;
+    featureTranscricao?: boolean;
+  } | null;
+}
 
 interface Message {
   id: string;
@@ -118,6 +130,10 @@ export default function MessageGeneratorPage() {
   const [newChatTitle, setNewChatTitle] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const { data: subscription, isLoading: isLoadingSubscription } = useQuery<SubscriptionData>({
+    queryKey: ["/api/admin/subscription"],
+  });
 
   const { data: webinars = [] } = useQuery<Webinar[]>({
     queryKey: ["/api/webinars"],
@@ -238,6 +254,27 @@ export default function MessageGeneratorPage() {
       }
     };
   }, [messages, generatedEmail, generatedWhatsapp, currentChatId]);
+
+  const isSuperadmin = subscription?.admin?.role === "superadmin";
+  const hasGeradorMensagensAccess = isSuperadmin || subscription?.plano?.featureGeradorMensagens === true;
+
+  if (isLoadingSubscription) {
+    return (
+      <div className="p-6 space-y-4">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
+
+  if (!hasGeradorMensagensAccess) {
+    return (
+      <FeatureBlocked
+        featureName="Gerador de Mensagens com IA"
+        description="O Gerador de Mensagens com IA está disponível apenas para planos com esse recurso ativado. Faça upgrade para gerar emails e mensagens de WhatsApp automaticamente."
+      />
+    );
+  }
 
   const resetChat = () => {
     setCurrentChatId(null);

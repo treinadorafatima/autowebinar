@@ -8876,6 +8876,10 @@ Seja conversacional e objetivo.`;
           tipoCobranca: plano.tipoCobranca,
           frequencia: plano.frequencia || 1,
           frequenciaTipo: plano.frequenciaTipo || "months",
+          featureAI: plano.featureAI ?? false,
+          featureTranscricao: plano.featureTranscricao ?? false,
+          featureDesignerIA: plano.featureDesignerIA ?? false,
+          featureGeradorMensagens: plano.featureGeradorMensagens ?? false,
         } : null,
         assinatura: assinatura ? {
           id: assinatura.id,
