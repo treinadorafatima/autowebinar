@@ -73,10 +73,6 @@ import { CardDescription } from "@/components/ui/card";
 interface Affiliate {
   id: string;
   adminId: string;
-  name: string;
-  email: string;
-  whatsapp: string | null;
-  cpf: string | null;
   status: string;
   commissionPercent: number;
   commissionFixed: number | null;
@@ -87,6 +83,11 @@ interface Affiliate {
   mpConnectedAt: string | null;
   mpTokenExpiresAt: string | null;
   createdAt: string;
+  admin?: {
+    id: string;
+    name: string;
+    email: string;
+  } | null;
 }
 
 interface AffiliateSale {
@@ -101,7 +102,8 @@ interface AffiliateSale {
   mpTransferId: string | null;
   paidAt: string | null;
   createdAt: string;
-  affiliate?: Affiliate;
+  affiliateName?: string;
+  affiliateEmail?: string;
 }
 
 interface AffiliateConfig {
@@ -257,8 +259,8 @@ export default function AdminAffiliatesPage() {
 
   const filteredAffiliates = affiliates.filter((affiliate) => {
     const matchesSearch =
-      affiliate.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      affiliate.email?.toLowerCase().includes(searchTerm.toLowerCase());
+      affiliate.admin?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      affiliate.admin?.email?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === "all" || affiliate.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -503,8 +505,8 @@ export default function AdminAffiliatesPage() {
                       <TableRow key={affiliate.id} data-testid={`row-affiliate-${affiliate.id}`}>
                         <TableCell>
                           <div>
-                            <div className="font-medium">{affiliate.name}</div>
-                            <div className="text-sm text-muted-foreground">{affiliate.email}</div>
+                            <div className="font-medium">{affiliate.admin?.name || "Sem nome"}</div>
+                            <div className="text-sm text-muted-foreground">{affiliate.admin?.email || "-"}</div>
                           </div>
                         </TableCell>
                         <TableCell>
@@ -683,8 +685,8 @@ export default function AdminAffiliatesPage() {
                           <TableRow key={sale.id} data-testid={`row-sale-${sale.id}`}>
                             <TableCell>
                               <div>
-                                <div className="font-medium">{sale.affiliate?.name || "-"}</div>
-                                <div className="text-sm text-muted-foreground">{sale.affiliate?.email || "-"}</div>
+                                <div className="font-medium">{sale.affiliateName || "-"}</div>
+                                <div className="text-sm text-muted-foreground">{sale.affiliateEmail || "-"}</div>
                               </div>
                             </TableCell>
                             <TableCell>{formatCurrency(sale.saleAmount)}</TableCell>
@@ -964,19 +966,11 @@ export default function AdminAffiliatesPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="text-muted-foreground">Nome</Label>
-                  <p className="font-medium">{selectedAffiliate.name}</p>
+                  <p className="font-medium">{selectedAffiliate.admin?.name || "-"}</p>
                 </div>
                 <div>
                   <Label className="text-muted-foreground">Email</Label>
-                  <p className="font-medium">{selectedAffiliate.email}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">WhatsApp</Label>
-                  <p className="font-medium">{selectedAffiliate.whatsapp || "-"}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">CPF</Label>
-                  <p className="font-medium">{selectedAffiliate.cpf || "-"}</p>
+                  <p className="font-medium">{selectedAffiliate.admin?.email || "-"}</p>
                 </div>
                 <div>
                   <Label className="text-muted-foreground">Status</Label>
@@ -1078,7 +1072,7 @@ export default function AdminAffiliatesPage() {
             <AlertDialogTitle>Remover Afiliado</AlertDialogTitle>
             <AlertDialogDescription>
               Tem certeza que deseja remover o afiliado{" "}
-              <span className="font-semibold">{affiliateToDelete?.name}</span>? Esta ação não pode
+              <span className="font-semibold">{affiliateToDelete?.admin?.name || "este afiliado"}</span>? Esta ação não pode
               ser desfeita e todos os dados do afiliado serão perdidos.
             </AlertDialogDescription>
           </AlertDialogHeader>
