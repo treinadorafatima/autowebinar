@@ -80,7 +80,7 @@ interface Affiliate {
   email: string;
   cpf: string;
   commissionPercent: number;
-  isActive: boolean;
+  status: string;
   mpUserId?: string | null;
   mpConnectedAt?: string | null;
   mpTokenExpiresAt?: string | null;
@@ -127,7 +127,7 @@ export default function AfiliadoDashboardPage() {
   });
 
   const { data: planos } = useQuery<Plano[]>({
-    queryKey: ["/api/checkout/planos/public"],
+    queryKey: ["/api/checkout/planos/ativos"],
   });
 
   const form = useForm<NewLinkFormData>({
@@ -675,8 +675,8 @@ export default function AfiliadoDashboardPage() {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Status</span>
-                        <Badge variant={affiliate?.isActive ? "default" : "secondary"}>
-                          {affiliate?.isActive ? "Ativo" : "Inativo"}
+                        <Badge variant={affiliate?.status === 'active' ? "default" : "secondary"}>
+                          {affiliate?.status === 'active' ? "Ativo" : "Pendente"}
                         </Badge>
                       </div>
                     </div>
