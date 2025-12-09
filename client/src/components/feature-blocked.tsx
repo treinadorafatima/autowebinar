@@ -23,9 +23,9 @@ export function FeatureBlocked({ featureName, description }: FeatureBlockedProps
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="p-4 rounded-lg bg-gradient-to-r from-violet-500/10 via-purple-500/10 to-emerald-500/10 border border-violet-500/20" data-testid="section-upgrade-benefits">
-            <div className="flex items-center gap-2 mb-2">
+            <div className="flex items-center gap-2 mb-3">
               <Sparkles className="h-4 w-4 text-violet-500" />
-              <span className="text-sm font-medium" data-testid="text-upgrade-title">Recursos incluídos no upgrade:</span>
+              <span className="text-sm font-medium" data-testid="text-upgrade-title">Disponível no plano Avançado ou superior</span>
             </div>
             <ul className="text-sm text-muted-foreground space-y-1">
               <li data-testid="text-benefit-designer">Designer IA para criar páginas</li>
@@ -36,10 +36,10 @@ export function FeatureBlocked({ featureName, description }: FeatureBlockedProps
           </div>
           
           <div className="flex flex-col gap-2">
-            <Link href="/admin/subscription">
-              <Button className="w-full" data-testid="button-view-plans">
+            <Link href="/admin/upgrade">
+              <Button className="w-full" data-testid="button-upgrade-plan">
                 <Sparkles className="h-4 w-4 mr-2" />
-                Ver Planos Disponíveis
+                Fazer Upgrade do Plano
               </Button>
             </Link>
             <Link href="/admin">
