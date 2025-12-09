@@ -10004,7 +10004,7 @@ Seja conversacional e objetivo.`;
       authUrl.searchParams.set("redirect_uri", redirectUri);
       authUrl.searchParams.set("state", state);
 
-      res.json({ authUrl: authUrl.toString() });
+      res.redirect(authUrl.toString());
     } catch (error: any) {
       console.error("[affiliate-oauth] Error starting OAuth:", error);
       res.status(400).json({ error: error.message });
