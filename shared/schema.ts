@@ -690,13 +690,25 @@ export type LeadFormConfigInsert = z.infer<typeof leadFormConfigInsertSchema>;
 // ============================================
 
 // WhatsApp Accounts - Multiple accounts per admin for round-robin sending
+// Suporta dois providers: 'baileys' (QR Code) ou 'cloud_api' (API Oficial Meta)
 export const whatsappAccounts = pgTable("whatsapp_accounts", {
   id: text("id").primaryKey(),
   adminId: text("admin_id").notNull(), // FK para admins (sem unique - múltiplas contas)
   label: text("label").notNull(), // Nome/apelido da conta (ex: "Conta Principal", "Conta 2")
   phoneNumber: text("phone_number"), // Número conectado
   status: text("status").notNull().default("disconnected"), // 'disconnected', 'connecting', 'qr_ready', 'connected', 'banned'
-  qrCode: text("qr_code"), // QR code atual para conexão
+  qrCode: text("qr_code"), // QR code atual para conexão (apenas Baileys)
+  
+  // Provider: 'baileys' (padrão) ou 'cloud_api' (API oficial Meta)
+  provider: text("provider").notNull().default("baileys"), // 'baileys' | 'cloud_api'
+  
+  // Campos para Cloud API (API Oficial Meta) - criptografados
+  cloudApiAccessToken: text("cloud_api_access_token"), // Token de acesso da API (criptografado)
+  cloudApiPhoneNumberId: text("cloud_api_phone_number_id"), // Phone Number ID do Meta
+  cloudApiBusinnessAccountId: text("cloud_api_business_account_id"), // Business Account ID
+  cloudApiWebhookVerifyToken: text("cloud_api_webhook_verify_token"), // Token para verificação de webhook
+  cloudApiVersion: text("cloud_api_version").default("v20.0"), // Versão da API (v20.0, v23.0, etc)
+  
   lastConnectedAt: timestamp("last_connected_at"),
   lastUsedAt: timestamp("last_used_at"), // Última vez que foi usada para envio (round-robin)
   priority: integer("priority").notNull().default(0), // Prioridade para ordenação
