@@ -383,7 +383,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Get commission config to calculate commission
       const config = await storage.getAffiliateConfig();
-      const commissionPercent = affiliate.commissionPercent || config?.defaultCommissionPercent || 10;
+      // Use nullish coalescing to allow 0% commission (0 is falsy but valid)
+      const commissionPercent = affiliate.commissionPercent ?? config?.defaultCommissionPercent ?? 10;
       
       // Calculate commission (valor is in centavos)
       const commissionAmount = Math.floor(pagamento.valor * (commissionPercent / 100));
@@ -407,10 +408,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: "pending", // Pending until paid to affiliate
       });
       
+      // Update affiliate balance (add to pending and total earnings)
+      const newPendingAmount = (affiliate.pendingAmount || 0) + commissionAmount;
+      const newTotalEarnings = (affiliate.totalEarnings || 0) + commissionAmount;
+      await storage.updateAffiliate(affiliate.id, {
+        pendingAmount: newPendingAmount,
+        totalEarnings: newTotalEarnings,
+      });
+      
       // Increment conversions on the link
       await storage.incrementAffiliateLinkConversions(link.id);
       
-      console.log(`[Affiliate] Sale created - affiliateId: ${affiliate.id}, pagamentoId: ${pagamento.id}, commission: ${commissionAmount} (${commissionPercent}%)`);
+      console.log(`[Affiliate] Sale created - affiliateId: ${affiliate.id}, pagamentoId: ${pagamento.id}, commission: ${commissionAmount} (${commissionPercent}%), newPendingAmount: ${newPendingAmount}`);
     } catch (error) {
       console.error("[Affiliate] Error processing affiliate sale:", error);
     }
@@ -7426,6 +7435,9 @@ Seja conversacional e objetivo.`;
             });
           });
         }
+        
+        // Process affiliate sale if applicable (updates affiliate balance)
+        await processAffiliateSale(pagamento, plano);
       }
 
       await storage.updateCheckoutPagamento(pagamentoId, updateData);

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -58,6 +59,8 @@ import {
   Trash2,
   Search,
   Loader2,
+  ShoppingCart,
+  Wallet,
 } from "lucide-react";
 
 interface Affiliate {
@@ -78,6 +81,29 @@ interface Affiliate {
   mpTokenExpiresAt: string | null;
   createdAt: string;
 }
+
+interface AffiliateSale {
+  id: string;
+  affiliateId: string;
+  linkId: string;
+  pagamentoId: string;
+  saleAmount: number;
+  commissionAmount: number;
+  commissionPercent: number;
+  status: string;
+  mpTransferId: string | null;
+  paidAt: string | null;
+  createdAt: string;
+  affiliate?: Affiliate;
+}
+
+const saleStatusLabels: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+  pending: { label: "Pendente", variant: "outline" },
+  approved: { label: "Aprovado", variant: "secondary" },
+  paid: { label: "Pago", variant: "default" },
+  refunded: { label: "Reembolsado", variant: "destructive" },
+  cancelled: { label: "Cancelado", variant: "destructive" },
+};
 
 const statusLabels: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   pending: { label: "Pendente", variant: "outline" },
@@ -101,8 +127,10 @@ function getMpConnectionStatus(affiliate: Affiliate): { label: string; variant: 
 
 export default function AdminAffiliatesPage() {
   const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState("affiliates");
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [saleStatusFilter, setSaleStatusFilter] = useState<string>("all");
   const [selectedAffiliate, setSelectedAffiliate] = useState<Affiliate | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
@@ -111,9 +139,16 @@ export default function AdminAffiliatesPage() {
   const [editCommissionPercent, setEditCommissionPercent] = useState<number>(30);
   const [editCommissionFixed, setEditCommissionFixed] = useState<string>("");
   const [editStatus, setEditStatus] = useState<string>("active");
+  const [isPayDialogOpen, setIsPayDialogOpen] = useState(false);
+  const [saleToPayId, setSaleToPayId] = useState<string | null>(null);
 
   const { data: affiliates = [], isLoading } = useQuery<Affiliate[]>({
     queryKey: ["/api/affiliates"],
+  });
+
+  const { data: sales = [], isLoading: isLoadingSales } = useQuery<AffiliateSale[]>({
+    queryKey: ["/api/affiliate-sales"],
+    enabled: activeTab === "sales",
   });
 
   const updateAffiliateMutation = useMutation({
@@ -146,6 +181,38 @@ export default function AdminAffiliatesPage() {
     },
   });
 
+  const markSalePaidMutation = useMutation({
+    mutationFn: async (saleId: string) => {
+      const res = await apiRequest("PATCH", `/api/affiliate-sales/${saleId}`, { status: "paid" });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/affiliate-sales"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/affiliates"] });
+      toast({ title: "Comissão marcada como paga" });
+      setIsPayDialogOpen(false);
+      setSaleToPayId(null);
+    },
+    onError: () => {
+      toast({ title: "Erro ao marcar comissão como paga", variant: "destructive" });
+    },
+  });
+
+  const cancelSaleMutation = useMutation({
+    mutationFn: async (saleId: string) => {
+      const res = await apiRequest("PATCH", `/api/affiliate-sales/${saleId}`, { status: "cancelled" });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/affiliate-sales"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/affiliates"] });
+      toast({ title: "Comissão cancelada" });
+    },
+    onError: () => {
+      toast({ title: "Erro ao cancelar comissão", variant: "destructive" });
+    },
+  });
+
   const filteredAffiliates = affiliates.filter((affiliate) => {
     const matchesSearch =
       affiliate.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -153,6 +220,30 @@ export default function AdminAffiliatesPage() {
     const matchesStatus = statusFilter === "all" || affiliate.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
+
+  const filteredSales = sales.filter((sale) => {
+    const matchesStatus = saleStatusFilter === "all" || sale.status === saleStatusFilter;
+    return matchesStatus;
+  });
+
+  const salesStats = {
+    total: sales.length,
+    pending: sales.filter((s) => s.status === "pending").length,
+    paid: sales.filter((s) => s.status === "paid").length,
+    totalPending: sales.filter((s) => s.status === "pending").reduce((sum, s) => sum + s.commissionAmount, 0),
+    totalPaid: sales.filter((s) => s.status === "paid").reduce((sum, s) => sum + s.commissionAmount, 0),
+  };
+
+  const handleMarkAsPaid = (saleId: string) => {
+    setSaleToPayId(saleId);
+    setIsPayDialogOpen(true);
+  };
+
+  const handleConfirmPay = () => {
+    if (saleToPayId) {
+      markSalePaidMutation.mutate(saleToPayId);
+    }
+  };
 
   const stats = {
     total: affiliates.length,
@@ -247,18 +338,31 @@ export default function AdminAffiliatesPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
-            <CardTitle className="text-sm font-medium">Total de Afiliados</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold" data-testid="text-total-affiliates">
-              {stats.total}
-            </div>
-          </CardContent>
-        </Card>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="affiliates" data-testid="tab-affiliates">
+            <Users className="h-4 w-4 mr-2" />
+            Afiliados
+          </TabsTrigger>
+          <TabsTrigger value="sales" data-testid="tab-sales">
+            <ShoppingCart className="h-4 w-4 mr-2" />
+            Vendas
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="affiliates" className="space-y-6 mt-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+                <CardTitle className="text-sm font-medium">Total de Afiliados</CardTitle>
+                <Users className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold" data-testid="text-total-affiliates">
+                  {stats.total}
+                </div>
+              </CardContent>
+            </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
             <CardTitle className="text-sm font-medium">Afiliados Ativos</CardTitle>
@@ -432,6 +536,177 @@ export default function AdminAffiliatesPage() {
           </div>
         </CardContent>
       </Card>
+        </TabsContent>
+
+        <TabsContent value="sales" className="space-y-6 mt-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+                <CardTitle className="text-sm font-medium">Total de Vendas</CardTitle>
+                <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold" data-testid="text-total-sales">
+                  {salesStats.total}
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+                <CardTitle className="text-sm font-medium">Pendentes</CardTitle>
+                <Clock className="h-4 w-4 text-yellow-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-yellow-600" data-testid="text-pending-sales">
+                  {salesStats.pending}
+                </div>
+                <p className="text-xs text-muted-foreground">{formatCurrency(salesStats.totalPending)}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+                <CardTitle className="text-sm font-medium">Pagas</CardTitle>
+                <Check className="h-4 w-4 text-green-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-600" data-testid="text-paid-sales">
+                  {salesStats.paid}
+                </div>
+                <p className="text-xs text-muted-foreground">{formatCurrency(salesStats.totalPaid)}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+                <CardTitle className="text-sm font-medium">Total Pago</CardTitle>
+                <Wallet className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold" data-testid="text-total-paid-amount">
+                  {formatCurrency(salesStats.totalPaid)}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Lista de Comissões</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col sm:flex-row gap-4 mb-4">
+                <Select value={saleStatusFilter} onValueChange={setSaleStatusFilter}>
+                  <SelectTrigger className="w-full sm:w-[180px]" data-testid="select-sale-status-filter">
+                    <SelectValue placeholder="Filtrar por status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="pending">Pendentes</SelectItem>
+                    <SelectItem value="paid">Pagas</SelectItem>
+                    <SelectItem value="cancelled">Canceladas</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {isLoadingSales ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : (
+                <div className="rounded-md border overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Afiliado</TableHead>
+                        <TableHead>Valor da Venda</TableHead>
+                        <TableHead>Comissão</TableHead>
+                        <TableHead>%</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Data</TableHead>
+                        <TableHead className="text-right">Ações</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredSales.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                            Nenhuma comissão encontrada
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        filteredSales.map((sale) => (
+                          <TableRow key={sale.id} data-testid={`row-sale-${sale.id}`}>
+                            <TableCell>
+                              <div>
+                                <div className="font-medium">{sale.affiliate?.name || "-"}</div>
+                                <div className="text-sm text-muted-foreground">{sale.affiliate?.email || "-"}</div>
+                              </div>
+                            </TableCell>
+                            <TableCell>{formatCurrency(sale.saleAmount)}</TableCell>
+                            <TableCell className="font-medium">{formatCurrency(sale.commissionAmount)}</TableCell>
+                            <TableCell>{sale.commissionPercent}%</TableCell>
+                            <TableCell>
+                              <Badge variant={saleStatusLabels[sale.status]?.variant || "outline"}>
+                                {saleStatusLabels[sale.status]?.label || sale.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{formatDate(sale.createdAt)}</TableCell>
+                            <TableCell className="text-right">
+                              {sale.status === "pending" && (
+                                <div className="flex justify-end gap-2">
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleMarkAsPaid(sale.id)}
+                                    data-testid={`button-pay-${sale.id}`}
+                                  >
+                                    <Check className="h-4 w-4 mr-1" />
+                                    Pagar
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => cancelSaleMutation.mutate(sale.id)}
+                                    data-testid={`button-cancel-${sale.id}`}
+                                  >
+                                    <X className="h-4 w-4 mr-1" />
+                                    Cancelar
+                                  </Button>
+                                </div>
+                              )}
+                              {sale.status === "paid" && sale.paidAt && (
+                                <span className="text-xs text-muted-foreground">
+                                  Pago em {formatDate(sale.paidAt)}
+                                </span>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      <AlertDialog open={isPayDialogOpen} onOpenChange={setIsPayDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar Pagamento</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja marcar esta comissão como paga? Esta ação indica que você transferiu o valor para o afiliado.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmPay} data-testid="button-confirm-pay">
+              {markSalePaidMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Confirmar Pagamento
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent>
