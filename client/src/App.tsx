@@ -40,6 +40,7 @@ import AdminEmailMarketingPage from "@/pages/admin-email-marketing";
 import AdminWhatsAppMarketingPage from "@/pages/admin-whatsapp-marketing";
 import AdminLeadsPage from "@/pages/admin-leads";
 import AdminUpgradePage from "@/pages/admin-upgrade";
+import AdminAffiliatesPage from "@/pages/admin-affiliates";
 import AfiliadoCadastroPage from "@/pages/afiliado-cadastro";
 import AfiliadoLoginPage from "@/pages/afiliado-login";
 import AfiliadoDashboardPage from "@/pages/afiliado-dashboard";
@@ -127,6 +128,7 @@ function AdminRoutes() {
         <Route path="/admin/whatsapp-marketing" component={AdminWhatsAppMarketingPage} />
         <Route path="/admin/leads" component={AdminLeadsPage} />
         <Route path="/admin/upgrade" component={AdminUpgradePage} />
+        <Route path="/admin/affiliates" component={AdminAffiliatesPage} />
         <Route component={NotFound} />
       </Switch>
     </AdminLayout>

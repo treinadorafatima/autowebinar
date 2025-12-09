@@ -121,6 +121,12 @@ const adminMenuItems = [
     superadminOnly: true,
   },
   {
+    title: "Afiliados",
+    url: "/admin/affiliates",
+    icon: Zap,
+    superadminOnly: true,
+  },
+  {
     title: "Configurações IA",
     url: "/admin/settings",
     icon: Settings,
