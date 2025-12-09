@@ -17,6 +17,7 @@ const cadastroSchema = z.object({
   name: z.string().min(3, "Nome deve ter pelo menos 3 caracteres"),
   email: z.string().email("E-mail inválido"),
   cpf: z.string().min(11, "CPF inválido").max(14, "CPF inválido"),
+  whatsapp: z.string().min(10, "WhatsApp deve ter DDD + número").max(15, "WhatsApp inválido"),
   password: z.string().min(6, "Senha deve ter pelo menos 6 caracteres"),
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
@@ -36,6 +37,7 @@ export default function AfiliadoCadastroPage() {
       name: "",
       email: "",
       cpf: "",
+      whatsapp: "",
       password: "",
       confirmPassword: "",
     },
@@ -47,6 +49,7 @@ export default function AfiliadoCadastroPage() {
         name: data.name,
         email: data.email,
         cpf: data.cpf,
+        whatsapp: data.whatsapp,
         password: data.password,
       });
       return response.json();
@@ -156,6 +159,28 @@ export default function AfiliadoCadastroPage() {
                             field.onChange(formatCPF(e.target.value));
                           }}
                           maxLength={14}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="whatsapp"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>WhatsApp (DDD + Número)</FormLabel>
+                      <FormControl>
+                        <Input 
+                          placeholder="11999999999"
+                          data-testid="input-whatsapp"
+                          {...field}
+                          onChange={(e) => {
+                            field.onChange(e.target.value.replace(/\D/g, ""));
+                          }}
+                          maxLength={11}
                         />
                       </FormControl>
                       <FormMessage />

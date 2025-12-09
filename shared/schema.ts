@@ -878,6 +878,7 @@ export const affiliates = pgTable("affiliates", {
   id: text("id").primaryKey(),
   adminId: text("admin_id").notNull(), // FK para admins (o afiliado é um admin)
   status: text("status").notNull().default("pending"), // 'pending', 'active', 'suspended', 'inactive'
+  whatsapp: text("whatsapp"), // DDD + WhatsApp do afiliado
   commissionPercent: integer("commission_percent").notNull().default(30), // Percentual de comissão
   commissionFixed: integer("commission_fixed"), // Valor fixo opcional (centavos)
   mpUserId: text("mp_user_id"), // ID do usuário no Mercado Pago

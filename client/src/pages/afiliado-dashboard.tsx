@@ -79,6 +79,7 @@ interface Affiliate {
   name: string;
   email: string;
   cpf: string;
+  whatsapp?: string | null;
   commissionPercent: number;
   status: string;
   mpUserId?: string | null;
@@ -668,6 +669,10 @@ export default function AfiliadoDashboardPage() {
                       <div className="flex justify-between border-b pb-2">
                         <span className="text-muted-foreground">Email</span>
                         <span className="font-medium">{affiliate?.email}</span>
+                      </div>
+                      <div className="flex justify-between border-b pb-2">
+                        <span className="text-muted-foreground">WhatsApp</span>
+                        <span className="font-medium">{affiliate?.whatsapp || "Não informado"}</span>
                       </div>
                       <div className="flex justify-between border-b pb-2">
                         <span className="text-muted-foreground">Comissão</span>

@@ -9565,7 +9565,13 @@ Seja conversacional e objetivo.`;
       const stats = await storage.getAffiliateStats(affiliate.id);
       const links = await storage.listAffiliateLinksByAffiliate(affiliate.id);
       
-      res.json({ ...affiliate, stats, links });
+      res.json({ 
+        ...affiliate, 
+        name: admin.name,
+        email: admin.email,
+        stats, 
+        links 
+      });
     } catch (error: any) {
       res.status(400).json({ error: error.message });
     }
@@ -9618,7 +9624,7 @@ Seja conversacional e objetivo.`;
   // Auto-cadastro de afiliado (público)
   app.post("/api/affiliates/register", async (req, res) => {
     try {
-      const { name, email, cpf, password } = req.body;
+      const { name, email, cpf, password, whatsapp } = req.body;
       if (!name || !email || !password) {
         return res.status(400).json({ error: "Nome, e-mail e senha são obrigatórios" });
       }
@@ -9649,6 +9655,7 @@ Seja conversacional e objetivo.`;
         adminId: newAdmin.id,
         commissionPercent: defaultCommission,
         status: autoApprove ? "active" : "pending",
+        whatsapp: whatsapp || null,
       });
 
       const message = autoApprove 
