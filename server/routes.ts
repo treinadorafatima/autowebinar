@@ -10025,14 +10025,29 @@ Seja conversacional e objetivo.`;
       }
 
       const { code, targetUrl, planoId } = req.body;
-      if (!code) return res.status(400).json({ error: "Código é obrigatório" });
+      
+      // Auto-generate code if not provided
+      let finalCode = code;
+      if (!finalCode) {
+        // Generate unique code based on random string
+        const randomPart = Math.random().toString(36).substring(2, 10).toUpperCase();
+        finalCode = `ref${randomPart}`;
+      }
 
-      const existingLink = await storage.getAffiliateLinkByCode(code);
-      if (existingLink) return res.status(400).json({ error: "Este código já está em uso" });
+      const existingLink = await storage.getAffiliateLinkByCode(finalCode);
+      if (existingLink) {
+        // If auto-generated code exists, try again with different random
+        if (!code) {
+          const retryRandom = Math.random().toString(36).substring(2, 10).toUpperCase();
+          finalCode = `ref${retryRandom}`;
+        } else {
+          return res.status(400).json({ error: "Este código já está em uso" });
+        }
+      }
 
       const link = await storage.createAffiliateLink({
         affiliateId: req.params.id,
-        code,
+        code: finalCode,
         targetUrl: targetUrl || null,
         planoId: planoId || null,
       });
