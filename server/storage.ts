@@ -4118,6 +4118,7 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
         minWithdrawal: data.minWithdrawal ?? 5000,
         holdDays: data.holdDays ?? 7,
         autoPayEnabled: data.autoPayEnabled ?? true,
+        autoApprove: data.autoApprove ?? false,
         mpAppId: data.mpAppId ?? null,
         mpAppSecret: data.mpAppSecret ?? null,
         updatedAt: new Date(),

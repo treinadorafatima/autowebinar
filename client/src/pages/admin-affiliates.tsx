@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,6 +39,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -65,6 +66,7 @@ import {
   Copy,
   Link as LinkIcon,
   Percent,
+  UserCheck,
 } from "lucide-react";
 import { CardDescription } from "@/components/ui/card";
 
@@ -104,6 +106,7 @@ interface AffiliateSale {
 
 interface AffiliateConfig {
   defaultCommissionPercent: number;
+  autoApprove: boolean;
   mpAppId: string | null;
   mpAppSecret: string | null;
 }
@@ -153,6 +156,7 @@ export default function AdminAffiliatesPage() {
   const [isPayDialogOpen, setIsPayDialogOpen] = useState(false);
   const [saleToPayId, setSaleToPayId] = useState<string | null>(null);
   const [configCommission, setConfigCommission] = useState<number>(10);
+  const [autoApprove, setAutoApprove] = useState<boolean>(false);
 
   const { data: affiliates = [], isLoading } = useQuery<Affiliate[]>({
     queryKey: ["/api/affiliates"],
@@ -163,9 +167,16 @@ export default function AdminAffiliatesPage() {
     enabled: activeTab === "settings",
   });
 
+  useEffect(() => {
+    if (config) {
+      setConfigCommission(config.defaultCommissionPercent || 10);
+      setAutoApprove(config.autoApprove || false);
+    }
+  }, [config]);
+
   const updateConfigMutation = useMutation({
     mutationFn: async (data: Partial<AffiliateConfig>) => {
-      const res = await apiRequest("POST", "/api/affiliate-config", data);
+      const res = await apiRequest("PATCH", "/api/affiliate-config", data);
       return res.json();
     },
     onSuccess: () => {
@@ -802,6 +813,48 @@ export default function AdminAffiliatesPage() {
                     <p className="text-sm text-muted-foreground">
                       Atual: {config?.defaultCommissionPercent || 10}%
                     </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <UserCheck className="h-5 w-5" />
+                  Aprovação de Afiliados
+                </CardTitle>
+                <CardDescription>
+                  Escolha se novos afiliados são aprovados automaticamente
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoadingConfig ? (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-4">
+                      <Switch
+                        checked={autoApprove}
+                        onCheckedChange={(checked) => {
+                          setAutoApprove(checked);
+                          updateConfigMutation.mutate({ autoApprove: checked });
+                        }}
+                        data-testid="switch-auto-approve"
+                      />
+                      <div>
+                        <Label className="text-base">
+                          {autoApprove ? "Aprovação Automática" : "Aprovação Manual"}
+                        </Label>
+                        <p className="text-sm text-muted-foreground">
+                          {autoApprove 
+                            ? "Novos afiliados serão aprovados automaticamente" 
+                            : "Você precisará aprovar cada afiliado manualmente"}
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 )}
               </CardContent>

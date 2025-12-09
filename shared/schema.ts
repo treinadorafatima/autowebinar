@@ -939,6 +939,7 @@ export const affiliateConfig = pgTable("affiliate_config", {
   minWithdrawal: integer("min_withdrawal").notNull().default(5000), // Mínimo para saque (R$ 50,00)
   holdDays: integer("hold_days").notNull().default(7), // Dias para reter comissão
   autoPayEnabled: boolean("auto_pay_enabled").notNull().default(true), // Split automático
+  autoApprove: boolean("auto_approve").notNull().default(false), // Aprovação automática de afiliados
   mpAppId: text("mp_app_id"), // App ID do MP para OAuth
   mpAppSecret: text("mp_app_secret"), // App Secret (criptografado)
   updatedAt: timestamp("updated_at").defaultNow(),

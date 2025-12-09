@@ -9629,6 +9629,11 @@ Seja conversacional e objetivo.`;
         return res.status(400).json({ error: "Este e-mail já está em uso" });
       }
 
+      // Buscar configuração para verificar se aprovação é automática
+      const config = await storage.getAffiliateConfig();
+      const autoApprove = config?.autoApprove ?? false;
+      const defaultCommission = config?.defaultCommissionPercent ?? 30;
+
       const hashedPassword = await bcrypt.hash(password, 10);
       const newAdmin = await storage.createAdmin({
         name,
@@ -9639,14 +9644,19 @@ Seja conversacional e objetivo.`;
 
       const affiliate = await storage.createAffiliate({
         adminId: newAdmin.id,
-        commissionPercent: 30,
-        status: "pending",
+        commissionPercent: defaultCommission,
+        status: autoApprove ? "active" : "pending",
       });
+
+      const message = autoApprove 
+        ? "Cadastro realizado com sucesso! Você já pode acessar sua conta."
+        : "Cadastro realizado! Aguarde a aprovação do administrador.";
 
       res.json({ 
         success: true, 
-        message: "Cadastro realizado! Aguarde a aprovação do administrador.",
-        affiliateId: affiliate.id 
+        message,
+        affiliateId: affiliate.id,
+        autoApproved: autoApprove
       });
     } catch (error: any) {
       res.status(400).json({ error: error.message });
