@@ -40,6 +40,10 @@ import AdminEmailMarketingPage from "@/pages/admin-email-marketing";
 import AdminWhatsAppMarketingPage from "@/pages/admin-whatsapp-marketing";
 import AdminLeadsPage from "@/pages/admin-leads";
 import AdminUpgradePage from "@/pages/admin-upgrade";
+import AfiliadoCadastroPage from "@/pages/afiliado-cadastro";
+import AfiliadoLoginPage from "@/pages/afiliado-login";
+import AfiliadoDashboardPage from "@/pages/afiliado-dashboard";
+import AffiliateRedirectPage from "@/pages/affiliate-redirect";
 import NotFound from "@/pages/not-found";
 
 function HomePage() {
@@ -157,6 +161,10 @@ function Router() {
       <Route path="/pagamento/sucesso">{() => <PagamentoResultado tipo="sucesso" />}</Route>
       <Route path="/pagamento/pendente">{() => <PagamentoResultado tipo="pendente" />}</Route>
       <Route path="/pagamento/erro">{() => <PagamentoResultado tipo="erro" />}</Route>
+      <Route path="/afiliado/cadastro" component={AfiliadoCadastroPage} />
+      <Route path="/afiliado/login" component={AfiliadoLoginPage} />
+      <Route path="/afiliado/dashboard" component={AfiliadoDashboardPage} />
+      <Route path="/r/:code" component={AffiliateRedirectPage} />
       <Route component={NotFound} />
     </Switch>
   );

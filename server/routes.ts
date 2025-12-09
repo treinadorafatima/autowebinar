@@ -138,6 +138,17 @@ async function createSession(email: string): Promise<string> {
 async function validateSession(token: string): Promise<string | null> {
   if (!token) return null;
   try {
+    // Primeiro tenta verificar como JWT
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET) as { email: string };
+      if (decoded && decoded.email) {
+        return decoded.email;
+      }
+    } catch (jwtError) {
+      // Não é um JWT válido, tenta verificar na tabela de sessões
+    }
+
+    // Fallback para verificar na tabela de sessões
     const result = await db
       .select()
       .from(sessionsTable)
@@ -9539,6 +9550,91 @@ Seja conversacional e objetivo.`;
       const links = await storage.listAffiliateLinksByAffiliate(affiliate.id);
       
       res.json({ ...affiliate, stats, links });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Login de afiliado (público)
+  app.post("/api/affiliates/login", async (req, res) => {
+    try {
+      const { email, password } = req.body;
+      if (!email || !password) {
+        return res.status(400).json({ error: "E-mail e senha são obrigatórios" });
+      }
+
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin) {
+        return res.status(401).json({ error: "E-mail ou senha incorretos" });
+      }
+
+      const isValid = await bcrypt.compare(password, admin.password);
+      if (!isValid) {
+        return res.status(401).json({ error: "E-mail ou senha incorretos" });
+      }
+
+      const affiliate = await storage.getAffiliateByAdminId(admin.id);
+      if (!affiliate) {
+        return res.status(403).json({ error: "Você não está registrado como afiliado" });
+      }
+
+      if (affiliate.status !== "active") {
+        return res.status(403).json({ error: "Sua conta de afiliado está " + (affiliate.status === "pending" ? "pendente de aprovação" : "suspensa") });
+      }
+
+      const token = jwt.sign({ email: admin.email }, JWT_SECRET, { expiresIn: "24h" });
+
+      res.json({ 
+        token, 
+        affiliate: { 
+          id: affiliate.id, 
+          name: admin.name, 
+          email: admin.email,
+          commissionPercent: affiliate.commissionPercent,
+          status: affiliate.status
+        } 
+      });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Auto-cadastro de afiliado (público)
+  app.post("/api/affiliates/register", async (req, res) => {
+    try {
+      const { name, email, cpf, password } = req.body;
+      if (!name || !email || !password) {
+        return res.status(400).json({ error: "Nome, e-mail e senha são obrigatórios" });
+      }
+
+      const existingAdmin = await storage.getAdminByEmail(email);
+      if (existingAdmin) {
+        const existingAffiliate = await storage.getAffiliateByAdminId(existingAdmin.id);
+        if (existingAffiliate) {
+          return res.status(400).json({ error: "Este e-mail já está cadastrado como afiliado" });
+        }
+        return res.status(400).json({ error: "Este e-mail já está em uso" });
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const newAdmin = await storage.createAdmin({
+        name,
+        email,
+        password: hashedPassword,
+        role: "affiliate",
+      });
+
+      const affiliate = await storage.createAffiliate({
+        adminId: newAdmin.id,
+        commissionPercent: 30,
+        status: "pending",
+      });
+
+      res.json({ 
+        success: true, 
+        message: "Cadastro realizado! Aguarde a aprovação do administrador.",
+        affiliateId: affiliate.id 
+      });
     } catch (error: any) {
       res.status(400).json({ error: error.message });
     }
