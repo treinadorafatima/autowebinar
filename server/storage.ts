@@ -344,6 +344,8 @@ export interface IStorage {
   upsertAffiliateConfig(data: Partial<AffiliateConfigInsert>): Promise<AffiliateConfig>;
   // Affiliate Stats
   getAffiliateStats(affiliateId: string): Promise<{ totalSales: number; totalCommission: number; pendingCommission: number; paidCommission: number }>;
+  // Affiliate Leads
+  listLeadsByAffiliateLinkCodes(codes: string[]): Promise<Lead[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -4152,6 +4154,16 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
     }
     
     return { totalSales, totalCommission, pendingCommission, paidCommission };
+  }
+
+  // Affiliate Leads
+
+  async listLeadsByAffiliateLinkCodes(codes: string[]): Promise<Lead[]> {
+    if (codes.length === 0) return [];
+    return db.select()
+      .from(leads)
+      .where(sql`${leads.affiliateLinkCode} = ANY(ARRAY[${sql.join(codes.map(c => sql`${c}`), sql`, `)}]::text[])`)
+      .orderBy(desc(leads.capturedAt));
   }
 }
 

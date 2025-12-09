@@ -10160,6 +10160,35 @@ Seja conversacional e objetivo.`;
     }
   });
 
+  // Get affiliate leads (leads captured via affiliate links)
+  app.get("/api/affiliates/:id/leads", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) return res.status(401).json({ error: "Unauthorized" });
+
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin) return res.status(401).json({ error: "Unauthorized" });
+
+      const affiliate = await storage.getAffiliateById(req.params.id);
+      if (!affiliate) return res.status(404).json({ error: "Afiliado não encontrado" });
+
+      if (admin.role !== "superadmin" && affiliate.adminId !== admin.id) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+
+      // Get all links for this affiliate
+      const links = await storage.listAffiliateLinksByAffiliate(req.params.id);
+      const codes = links.map(link => link.code);
+      
+      // Get leads that used any of these affiliate link codes
+      const affiliateLeads = await storage.listLeadsByAffiliateLinkCodes(codes);
+      res.json(affiliateLeads);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
   // ============================================
   // AFFILIATE OAUTH MERCADO PAGO
   // ============================================

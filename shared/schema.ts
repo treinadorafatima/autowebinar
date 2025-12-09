@@ -303,6 +303,8 @@ export const leads = pgTable("leads", {
   source: text("source").notNull().default("registration"), // 'registration' (página de inscrição) or 'room' (entrou direto na sala)
   joinedAt: timestamp("joined_at"), // When the lead entered the webinar room
   sequenceTriggered: boolean("sequence_triggered").notNull().default(false), // If email/whatsapp sequences were triggered
+  // Affiliate tracking
+  affiliateLinkCode: text("affiliate_link_code"), // Code of affiliate link used
 });
 
 export type Lead = typeof leads.$inferSelect;

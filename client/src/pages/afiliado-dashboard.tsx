@@ -33,12 +33,14 @@ import {
   BarChart3,
   Settings,
   Wallet,
-  Unlink
+  Unlink,
+  Users
 } from "lucide-react";
 import { SiMercadopago } from "react-icons/si";
 
 const newLinkSchema = z.object({
-  planoId: z.string().min(1, "Selecione um plano"),
+  linkType: z.string().min(1, "Selecione o tipo de link"),
+  planoId: z.string().optional(),
 });
 
 type NewLinkFormData = z.infer<typeof newLinkSchema>;
@@ -93,6 +95,19 @@ interface Plano {
   preco: number;
 }
 
+interface AffiliateLead {
+  id: string;
+  name: string;
+  email: string | null;
+  whatsapp: string | null;
+  city: string | null;
+  state: string | null;
+  status: string;
+  source: string;
+  capturedAt: string;
+  affiliateLinkCode: string | null;
+}
+
 export default function AfiliadoDashboardPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -131,9 +146,15 @@ export default function AfiliadoDashboardPage() {
     queryKey: ["/api/checkout/planos/ativos"],
   });
 
+  const { data: affiliateLeads, isLoading: isLoadingLeads } = useQuery<AffiliateLead[]>({
+    queryKey: ["/api/affiliates", affiliateId, "leads"],
+    enabled: !!affiliateId,
+  });
+
   const form = useForm<NewLinkFormData>({
     resolver: zodResolver(newLinkSchema),
     defaultValues: {
+      linkType: "",
       planoId: "",
     },
   });
