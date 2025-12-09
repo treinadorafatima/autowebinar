@@ -866,3 +866,82 @@ export const whatsappBroadcastRecipients = pgTable("whatsapp_broadcast_recipient
 export type WhatsappBroadcastRecipient = typeof whatsappBroadcastRecipients.$inferSelect;
 export const whatsappBroadcastRecipientInsertSchema = createInsertSchema(whatsappBroadcastRecipients).omit({ id: true, createdAt: true });
 export type WhatsappBroadcastRecipientInsert = z.infer<typeof whatsappBroadcastRecipientInsertSchema>;
+
+// ============================================
+// AFFILIATE SYSTEM TABLES
+// ============================================
+
+// Affiliates table - registered affiliates (each affiliate is linked to an admin account)
+export const affiliates = pgTable("affiliates", {
+  id: text("id").primaryKey(),
+  adminId: text("admin_id").notNull(), // FK para admins (o afiliado é um admin)
+  status: text("status").notNull().default("pending"), // 'pending', 'active', 'suspended', 'inactive'
+  commissionPercent: integer("commission_percent").notNull().default(30), // Percentual de comissão
+  commissionFixed: integer("commission_fixed"), // Valor fixo opcional (centavos)
+  mpUserId: text("mp_user_id"), // ID do usuário no Mercado Pago
+  mpAccessToken: text("mp_access_token"), // Token OAuth do MP (criptografado)
+  mpRefreshToken: text("mp_refresh_token"), // Refresh token do MP
+  mpTokenExpiresAt: timestamp("mp_token_expires_at"), // Expiração do token
+  mpConnectedAt: timestamp("mp_connected_at"), // Data de conexão com MP
+  totalEarnings: integer("total_earnings").notNull().default(0), // Total ganho (centavos)
+  pendingAmount: integer("pending_amount").notNull().default(0), // Valor pendente (centavos)
+  paidAmount: integer("paid_amount").notNull().default(0), // Valor pago (centavos)
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type Affiliate = typeof affiliates.$inferSelect;
+export const affiliateInsertSchema = createInsertSchema(affiliates).omit({ id: true, createdAt: true, updatedAt: true });
+export type AffiliateInsert = z.infer<typeof affiliateInsertSchema>;
+
+// Affiliate Links table - unique tracking links for affiliates
+export const affiliateLinks = pgTable("affiliate_links", {
+  id: text("id").primaryKey(),
+  affiliateId: text("affiliate_id").notNull(), // FK para affiliates
+  code: text("code").notNull().unique(), // Código único do link (ex: "joao123")
+  targetUrl: text("target_url"), // URL de destino (null = checkout geral)
+  planoId: text("plano_id"), // FK para plano específico (opcional)
+  clicks: integer("clicks").notNull().default(0),
+  conversions: integer("conversions").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type AffiliateLink = typeof affiliateLinks.$inferSelect;
+export const affiliateLinkInsertSchema = createInsertSchema(affiliateLinks).omit({ id: true, createdAt: true });
+export type AffiliateLinkInsert = z.infer<typeof affiliateLinkInsertSchema>;
+
+// Affiliate Sales table - tracks sales attributed to affiliates
+export const affiliateSales = pgTable("affiliate_sales", {
+  id: text("id").primaryKey(),
+  affiliateId: text("affiliate_id").notNull(), // FK para affiliates
+  affiliateLinkId: text("affiliate_link_id"), // FK para affiliate_links
+  pagamentoId: text("pagamento_id").notNull(), // FK para checkout_pagamentos
+  saleAmount: integer("sale_amount").notNull(), // Valor da venda (centavos)
+  commissionAmount: integer("commission_amount").notNull(), // Valor da comissão (centavos)
+  status: text("status").notNull().default("pending"), // 'pending', 'approved', 'paid', 'refunded', 'cancelled'
+  mpTransferId: text("mp_transfer_id"), // ID da transferência no MP (quando pago)
+  paidAt: timestamp("paid_at"), // Data do pagamento
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type AffiliateSale = typeof affiliateSales.$inferSelect;
+export const affiliateSaleInsertSchema = createInsertSchema(affiliateSales).omit({ id: true, createdAt: true, updatedAt: true });
+export type AffiliateSaleInsert = z.infer<typeof affiliateSaleInsertSchema>;
+
+// Affiliate Config table - global configuration for the affiliate system
+export const affiliateConfig = pgTable("affiliate_config", {
+  id: text("id").primaryKey().default("default"),
+  defaultCommissionPercent: integer("default_commission_percent").notNull().default(30),
+  minWithdrawal: integer("min_withdrawal").notNull().default(5000), // Mínimo para saque (R$ 50,00)
+  holdDays: integer("hold_days").notNull().default(7), // Dias para reter comissão
+  autoPayEnabled: boolean("auto_pay_enabled").notNull().default(true), // Split automático
+  mpAppId: text("mp_app_id"), // App ID do MP para OAuth
+  mpAppSecret: text("mp_app_secret"), // App Secret (criptografado)
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type AffiliateConfig = typeof affiliateConfig.$inferSelect;
+export const affiliateConfigInsertSchema = createInsertSchema(affiliateConfig).omit({ updatedAt: true });
+export type AffiliateConfigInsert = z.infer<typeof affiliateConfigInsertSchema>;
