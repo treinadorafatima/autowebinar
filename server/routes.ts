@@ -122,6 +122,8 @@ interface MulterRequest extends Request {
   file?: Express.Multer.File;
 }
 
+const JWT_SECRET = process.env.JWT_SECRET || "autowebinar-jwt-secret-2024";
+
 async function createSession(email: string): Promise<string> {
   const token = Math.random().toString(36).substring(2) + Date.now().toString(36);
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 dias
