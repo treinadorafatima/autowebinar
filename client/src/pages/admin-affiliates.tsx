@@ -67,6 +67,8 @@ import {
   Link as LinkIcon,
   Percent,
   UserCheck,
+  CreditCard,
+  CheckCircle,
 } from "lucide-react";
 import { CardDescription } from "@/components/ui/card";
 
@@ -159,6 +161,8 @@ export default function AdminAffiliatesPage() {
   const [saleToPayId, setSaleToPayId] = useState<string | null>(null);
   const [configCommission, setConfigCommission] = useState<number>(10);
   const [autoApprove, setAutoApprove] = useState<boolean>(false);
+  const [mpAppId, setMpAppId] = useState<string>("");
+  const [mpAppSecret, setMpAppSecret] = useState<string>("");
 
   const { data: affiliates = [], isLoading } = useQuery<Affiliate[]>({
     queryKey: ["/api/affiliates"],
@@ -173,6 +177,8 @@ export default function AdminAffiliatesPage() {
     if (config) {
       setConfigCommission(config.defaultCommissionPercent || 10);
       setAutoApprove(config.autoApprove || false);
+      setMpAppId(config.mpAppId || "");
+      setMpAppSecret(config.mpAppSecret || "");
     }
   }, [config]);
 
@@ -862,6 +868,65 @@ export default function AdminAffiliatesPage() {
               </CardContent>
             </Card>
           </div>
+
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CreditCard className="h-5 w-5" />
+                Mercado Pago OAuth (Afiliados)
+              </CardTitle>
+              <CardDescription>
+                Configure as credenciais do Mercado Pago para permitir que afiliados conectem suas contas.
+                Você precisa criar um aplicativo no Mercado Pago Developers.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoadingConfig ? (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>App ID</Label>
+                    <Input
+                      value={mpAppId}
+                      onChange={(e) => setMpAppId(e.target.value)}
+                      placeholder="Seu App ID do Mercado Pago"
+                      data-testid="input-mp-app-id"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Encontre em: Mercado Pago Developers → Suas integrações → Credenciais
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>App Secret</Label>
+                    <Input
+                      type="password"
+                      value={mpAppSecret}
+                      onChange={(e) => setMpAppSecret(e.target.value)}
+                      placeholder="Seu App Secret do Mercado Pago"
+                      data-testid="input-mp-app-secret"
+                    />
+                  </div>
+                  <Button
+                    onClick={() => updateConfigMutation.mutate({ mpAppId, mpAppSecret })}
+                    disabled={updateConfigMutation.isPending}
+                    data-testid="button-save-mp-oauth"
+                  >
+                    {updateConfigMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    Salvar Credenciais
+                  </Button>
+                  {config?.mpAppId && (
+                    <p className="text-sm text-green-600 flex items-center gap-1">
+                      <CheckCircle className="h-4 w-4" />
+                      OAuth configurado
+                    </p>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 
