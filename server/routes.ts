@@ -9720,6 +9720,324 @@ Seja conversacional e objetivo.`;
     }
   });
 
+  // ============================================
+  // AFFILIATE OAUTH MERCADO PAGO
+  // ============================================
+
+  // OAuth state store with HMAC verification (in-memory, expires after 10 minutes)
+  const oauthStateStore = new Map<string, { affiliateId: string; adminId: string; expiresAt: number }>();
+
+  function generateOAuthState(affiliateId: string, adminId: string): string {
+    const nonce = crypto.randomBytes(16).toString("hex");
+    const payload = JSON.stringify({ affiliateId, adminId, nonce });
+    const secret = process.env.SESSION_SECRET || "autowebinar-oauth-secret-key";
+    const signature = crypto.createHmac("sha256", secret).update(payload).digest("hex");
+    const state = Buffer.from(JSON.stringify({ payload, signature })).toString("base64url");
+    oauthStateStore.set(nonce, { affiliateId, adminId, expiresAt: Date.now() + 10 * 60 * 1000 });
+    return state;
+  }
+
+  function verifyOAuthState(state: string): { affiliateId: string; adminId: string } | null {
+    try {
+      const decoded = JSON.parse(Buffer.from(state, "base64url").toString());
+      const { payload, signature } = decoded;
+      const secret = process.env.SESSION_SECRET || "autowebinar-oauth-secret-key";
+      const expectedSig = crypto.createHmac("sha256", secret).update(payload).digest("hex");
+      if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSig))) {
+        return null;
+      }
+      const data = JSON.parse(payload);
+      const stored = oauthStateStore.get(data.nonce);
+      if (!stored || stored.expiresAt < Date.now()) {
+        oauthStateStore.delete(data.nonce);
+        return null;
+      }
+      if (stored.affiliateId !== data.affiliateId || stored.adminId !== data.adminId) {
+        return null;
+      }
+      oauthStateStore.delete(data.nonce);
+      return { affiliateId: data.affiliateId, adminId: data.adminId };
+    } catch {
+      return null;
+    }
+  }
+
+  // Cleanup expired OAuth states every 5 minutes
+  setInterval(() => {
+    const now = Date.now();
+    for (const [nonce, data] of oauthStateStore.entries()) {
+      if (data.expiresAt < now) oauthStateStore.delete(nonce);
+    }
+  }, 5 * 60 * 1000);
+
+  // Start OAuth flow - redirects affiliate to Mercado Pago authorization
+  app.get("/api/affiliates/oauth/authorize", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) return res.status(401).json({ error: "Unauthorized" });
+
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin) return res.status(401).json({ error: "Unauthorized" });
+
+      const affiliate = await storage.getAffiliateByAdminId(admin.id);
+      if (!affiliate) return res.status(404).json({ error: "Você não é um afiliado" });
+
+      const config = await storage.getAffiliateConfig();
+      if (!config?.mpAppId) {
+        return res.status(400).json({ error: "OAuth não configurado. Contate o administrador." });
+      }
+
+      const baseUrl = getPublicBaseUrl(req);
+      const redirectUri = `${baseUrl}/api/affiliates/oauth/callback`;
+      const state = generateOAuthState(affiliate.id, admin.id);
+
+      const authUrl = new URL("https://auth.mercadopago.com.br/authorization");
+      authUrl.searchParams.set("client_id", config.mpAppId);
+      authUrl.searchParams.set("response_type", "code");
+      authUrl.searchParams.set("platform_id", "mp");
+      authUrl.searchParams.set("redirect_uri", redirectUri);
+      authUrl.searchParams.set("state", state);
+
+      res.json({ authUrl: authUrl.toString() });
+    } catch (error: any) {
+      console.error("[affiliate-oauth] Error starting OAuth:", error);
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // OAuth callback - receives code from Mercado Pago and exchanges for tokens
+  app.get("/api/affiliates/oauth/callback", async (req, res) => {
+    try {
+      const { code, state } = req.query;
+
+      if (!code || !state) {
+        return res.redirect("/admin/afiliado?error=missing_params");
+      }
+
+      const stateData = verifyOAuthState(state as string);
+      if (!stateData) {
+        console.warn("[affiliate-oauth] Invalid or expired state parameter");
+        return res.redirect("/admin/afiliado?error=invalid_state");
+      }
+
+      const affiliate = await storage.getAffiliateById(stateData.affiliateId);
+      if (!affiliate) {
+        return res.redirect("/admin/afiliado?error=affiliate_not_found");
+      }
+
+      if (affiliate.adminId !== stateData.adminId) {
+        console.warn("[affiliate-oauth] Admin ID mismatch in state");
+        return res.redirect("/admin/afiliado?error=invalid_state");
+      }
+
+      const config = await storage.getAffiliateConfig();
+      if (!config?.mpAppId || !config?.mpAppSecret) {
+        return res.redirect("/admin/afiliado?error=oauth_not_configured");
+      }
+
+      const baseUrl = getPublicBaseUrl(req);
+      const redirectUri = `${baseUrl}/api/affiliates/oauth/callback`;
+
+      const tokenResponse = await fetch("https://api.mercadopago.com/oauth/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          grant_type: "authorization_code",
+          client_id: config.mpAppId,
+          client_secret: config.mpAppSecret,
+          code: code as string,
+          redirect_uri: redirectUri,
+        }),
+      });
+
+      if (!tokenResponse.ok) {
+        const errorText = await tokenResponse.text();
+        console.error("[affiliate-oauth] Token exchange failed:", errorText);
+        return res.redirect("/admin/afiliado?error=token_exchange_failed");
+      }
+
+      const tokenData = await tokenResponse.json();
+
+      const expiresAt = new Date(Date.now() + (tokenData.expires_in || 21600) * 1000);
+
+      await storage.updateAffiliate(affiliate.id, {
+        mpUserId: tokenData.user_id?.toString(),
+        mpAccessToken: tokenData.access_token,
+        mpRefreshToken: tokenData.refresh_token,
+        mpTokenExpiresAt: expiresAt,
+        mpConnectedAt: new Date(),
+        status: "active",
+      });
+
+      console.log(`[affiliate-oauth] Connected MP for affiliate ${affiliate.id}, user_id: ${tokenData.user_id}`);
+
+      res.redirect("/admin/afiliado?success=mp_connected");
+    } catch (error: any) {
+      console.error("[affiliate-oauth] Callback error:", error);
+      res.redirect("/admin/afiliado?error=unknown");
+    }
+  });
+
+  // Disconnect Mercado Pago account
+  app.post("/api/affiliates/oauth/disconnect", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) return res.status(401).json({ error: "Unauthorized" });
+
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin) return res.status(401).json({ error: "Unauthorized" });
+
+      const affiliate = await storage.getAffiliateByAdminId(admin.id);
+      if (!affiliate) return res.status(404).json({ error: "Você não é um afiliado" });
+
+      await storage.updateAffiliate(affiliate.id, {
+        mpUserId: null,
+        mpAccessToken: null,
+        mpRefreshToken: null,
+        mpTokenExpiresAt: null,
+        mpConnectedAt: null,
+      });
+
+      res.json({ success: true, message: "Conta Mercado Pago desconectada" });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // ============================================
+  // AFFILIATE SALES MANAGEMENT
+  // ============================================
+
+  // Create affiliate sale (internal - called by checkout system)
+  app.post("/api/affiliate-sales", async (req, res) => {
+    try {
+      const affiliateSaleSchema = z.object({
+        affiliateId: z.string().min(1),
+        affiliateLinkId: z.string().optional(),
+        pagamentoId: z.string().min(1),
+        saleAmount: z.number().int().positive(),
+        commissionAmount: z.number().int().nonnegative(),
+        status: z.enum(["pending", "approved", "paid", "refunded", "cancelled"]).optional(),
+      });
+
+      const validatedData = affiliateSaleSchema.parse(req.body);
+
+      const sale = await storage.createAffiliateSale(validatedData);
+
+      const affiliate = await storage.getAffiliateById(validatedData.affiliateId);
+      if (affiliate) {
+        await storage.updateAffiliate(affiliate.id, {
+          totalEarnings: affiliate.totalEarnings + validatedData.commissionAmount,
+          pendingAmount: affiliate.pendingAmount + validatedData.commissionAmount,
+        });
+      }
+
+      if (validatedData.affiliateLinkId) {
+        const link = await storage.getAffiliateLinkById(validatedData.affiliateLinkId);
+        if (link) {
+          await storage.updateAffiliateLink(link.id, {
+            conversions: link.conversions + 1,
+          });
+        }
+      }
+
+      console.log(`[affiliate-sale] Created sale ${sale.id} for affiliate ${validatedData.affiliateId}, commission: ${validatedData.commissionAmount}`);
+
+      res.json(sale);
+    } catch (error: any) {
+      if (error.name === "ZodError") {
+        return res.status(400).json({ error: "Dados inválidos", details: error.errors });
+      }
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Update affiliate sale status
+  app.patch("/api/affiliate-sales/:id", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) return res.status(401).json({ error: "Unauthorized" });
+
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin || admin.role !== "superadmin") {
+        return res.status(403).json({ error: "Apenas super admins podem atualizar vendas" });
+      }
+
+      const updateSchema = z.object({
+        status: z.enum(["pending", "approved", "paid", "refunded", "cancelled"]).optional(),
+        mpTransferId: z.string().optional(),
+        paidAt: z.string().datetime().optional(),
+      });
+
+      const validatedData = updateSchema.parse(req.body);
+
+      const sale = await storage.getAffiliateSaleById(req.params.id);
+      if (!sale) return res.status(404).json({ error: "Venda não encontrada" });
+
+      const oldStatus = sale.status;
+      const newStatus = validatedData.status || oldStatus;
+
+      if (newStatus === "paid" && oldStatus !== "paid") {
+        validatedData.paidAt = new Date().toISOString();
+
+        const affiliate = await storage.getAffiliateById(sale.affiliateId);
+        if (affiliate) {
+          await storage.updateAffiliate(affiliate.id, {
+            pendingAmount: Math.max(0, affiliate.pendingAmount - sale.commissionAmount),
+            paidAmount: affiliate.paidAmount + sale.commissionAmount,
+          });
+        }
+      }
+
+      if ((newStatus === "refunded" || newStatus === "cancelled") && oldStatus === "pending") {
+        const affiliate = await storage.getAffiliateById(sale.affiliateId);
+        if (affiliate) {
+          await storage.updateAffiliate(affiliate.id, {
+            totalEarnings: Math.max(0, affiliate.totalEarnings - sale.commissionAmount),
+            pendingAmount: Math.max(0, affiliate.pendingAmount - sale.commissionAmount),
+          });
+        }
+      }
+
+      const updated = await storage.updateAffiliateSale(req.params.id, validatedData);
+
+      res.json(updated);
+    } catch (error: any) {
+      if (error.name === "ZodError") {
+        return res.status(400).json({ error: "Dados inválidos", details: error.errors });
+      }
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // List all affiliate sales (super admin only)
+  app.get("/api/affiliate-sales", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) return res.status(401).json({ error: "Unauthorized" });
+
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin || admin.role !== "superadmin") {
+        return res.status(403).json({ error: "Apenas super admins podem listar todas as vendas" });
+      }
+
+      const affiliates = await storage.listAffiliates();
+      const allSales = [];
+      for (const aff of affiliates) {
+        const sales = await storage.listAffiliateSalesByAffiliate(aff.id);
+        allSales.push(...sales.map(s => ({ ...s, affiliate: aff })));
+      }
+
+      res.json(allSales);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
   // Register Email Marketing routes
   registerEmailMarketingRoutes(app);
 
