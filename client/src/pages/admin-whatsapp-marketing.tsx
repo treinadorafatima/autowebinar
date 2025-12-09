@@ -37,6 +37,12 @@ interface WhatsAppAccount {
   dailyLimit: number;
   messagesSentToday: number;
   priority: number;
+  provider: "baileys" | "cloud_api";
+  cloudApiAccessToken?: string | null;
+  cloudApiPhoneNumberId?: string | null;
+  cloudApiBusinnessAccountId?: string | null;
+  cloudApiWebhookVerifyToken?: string | null;
+  cloudApiVersion?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -197,6 +203,18 @@ export default function AdminWhatsAppMarketing() {
   });
   const [previewLeads, setPreviewLeads] = useState<BroadcastPreview | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
+
+  // Cloud API states
+  const [showCloudApiDialog, setShowCloudApiDialog] = useState(false);
+  const [cloudApiConfig, setCloudApiConfig] = useState({
+    accessToken: "",
+    phoneNumberId: "",
+    businessAccountId: "",
+    webhookVerifyToken: "",
+    apiVersion: "v20.0",
+  });
+  const [validatingCloudApi, setValidatingCloudApi] = useState(false);
+  const [cloudApiValidation, setCloudApiValidation] = useState<{ valid: boolean; phoneNumber?: string; displayName?: string; error?: string } | null>(null);
 
   const qrRefreshInterval = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -416,6 +434,79 @@ export default function AdminWhatsAppMarketing() {
       toast({ title: "Erro ao excluir conta", description: error.message, variant: "destructive" });
     },
   });
+
+  const configureCloudApiMutation = useMutation({
+    mutationFn: async ({ id, config }: { id: string; config: typeof cloudApiConfig }) => {
+      const res = await apiRequest("POST", `/api/whatsapp/accounts/${id}/cloud-api`, config);
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Erro ao configurar Cloud API");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Cloud API configurada com sucesso" });
+      queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/accounts"] });
+      setShowCloudApiDialog(false);
+      setCloudApiConfig({ accessToken: "", phoneNumberId: "", businessAccountId: "", webhookVerifyToken: "", apiVersion: "v20.0" });
+      setCloudApiValidation(null);
+    },
+    onError: (error: any) => {
+      toast({ title: "Erro ao configurar Cloud API", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const switchProviderMutation = useMutation({
+    mutationFn: async ({ id, provider }: { id: string; provider: "baileys" | "cloud_api" }) => {
+      const res = await apiRequest("PATCH", `/api/whatsapp/accounts/${id}/provider`, { provider });
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Erro ao trocar provider");
+      }
+      return res.json();
+    },
+    onSuccess: (_, variables) => {
+      toast({ title: `Alterado para ${variables.provider === "cloud_api" ? "Cloud API (Meta)" : "Baileys (QR Code)"}` });
+      queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/status"] });
+    },
+    onError: (error: any) => {
+      toast({ title: "Erro ao trocar provider", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleValidateCloudApi = async () => {
+    if (!cloudApiConfig.accessToken || !cloudApiConfig.phoneNumberId) {
+      toast({ title: "Preencha o Access Token e Phone Number ID", variant: "destructive" });
+      return;
+    }
+    setValidatingCloudApi(true);
+    try {
+      const res = await fetch("/api/whatsapp/validate-cloud-api", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("adminToken")}`,
+        },
+        body: JSON.stringify({
+          accessToken: cloudApiConfig.accessToken,
+          phoneNumberId: cloudApiConfig.phoneNumberId,
+          apiVersion: cloudApiConfig.apiVersion,
+        }),
+      });
+      const data = await res.json();
+      setCloudApiValidation(data);
+      if (data.valid) {
+        toast({ title: "Credenciais válidas!", description: `Número: ${data.phoneNumber}` });
+      } else {
+        toast({ title: "Credenciais inválidas", description: data.error, variant: "destructive" });
+      }
+    } catch (error: any) {
+      toast({ title: "Erro ao validar", description: error.message, variant: "destructive" });
+    } finally {
+      setValidatingCloudApi(false);
+    }
+  };
 
   const sendTestMutation = useMutation({
     mutationFn: async (data: { phone: string; message: string; accountId: string }) => {
@@ -993,6 +1084,16 @@ export default function AdminWhatsAppMarketing() {
                     </CardHeader>
                     <CardContent className="pb-3">
                       <div className="space-y-2 text-sm text-muted-foreground">
+                        <div className="flex justify-between items-center">
+                          <span>Provider:</span>
+                          <Badge 
+                            variant="outline" 
+                            className={account.provider === "cloud_api" ? "bg-blue-500/10 text-blue-500 border-blue-500/20" : "bg-purple-500/10 text-purple-500 border-purple-500/20"}
+                            data-testid={`badge-provider-${account.id}`}
+                          >
+                            {account.provider === "cloud_api" ? "Cloud API (Meta)" : "Baileys (QR)"}
+                          </Badge>
+                        </div>
                         <div className="flex justify-between">
                           <span>Mensagens hoje:</span>
                           <span className="font-medium">{account.messagesSentToday} / {account.dailyLimit}</span>
@@ -1131,108 +1232,219 @@ export default function AdminWhatsAppMarketing() {
               </Card>
             ) : (
               <>
-                <div className="flex items-center gap-4 mb-4">
-                  <Label>Conta selecionada:</Label>
-                  <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
-                    <SelectTrigger className="w-64" data-testid="select-account">
-                      <SelectValue placeholder="Selecione uma conta" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {accounts?.map((account) => (
-                        <SelectItem key={account.id} value={account.id}>
-                          {account.label} {account.status === "connected" ? "(Conectado)" : ""}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <div className="flex items-center gap-4 mb-4 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <Label>Conta:</Label>
+                    <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
+                      <SelectTrigger className="w-64" data-testid="select-account">
+                        <SelectValue placeholder="Selecione uma conta" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {accounts?.map((account) => (
+                          <SelectItem key={account.id} value={account.id}>
+                            {account.label} {account.status === "connected" ? "(Conectado)" : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label>Método:</Label>
+                    <Select 
+                      value={accounts?.find(a => a.id === selectedAccountId)?.provider || "baileys"}
+                      onValueChange={(value: "baileys" | "cloud_api") => {
+                        if (selectedAccountId) {
+                          switchProviderMutation.mutate({ id: selectedAccountId, provider: value });
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="w-48" data-testid="select-provider">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="baileys">QR Code (Baileys)</SelectItem>
+                        <SelectItem value="cloud_api">API Oficial (Meta)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <QrCode className="w-5 h-5" />
-                      Conexão WhatsApp - {accounts?.find(a => a.id === selectedAccountId)?.label}
-                    </CardTitle>
-                    <CardDescription>
-                      Conecte seu WhatsApp escaneando o QR Code com o aplicativo
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    {loadingStatus ? (
-                      <div className="flex items-center justify-center py-8">
-                        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-                      </div>
-                    ) : status?.status === "connected" ? (
-                      <div className="text-center space-y-4">
-                        <div className="w-24 h-24 mx-auto bg-green-500/10 rounded-full flex items-center justify-center">
-                          <CheckCircle className="w-12 h-12 text-green-500" />
-                        </div>
-                        <div>
-                          <p className="text-lg font-medium text-green-500">WhatsApp Conectado</p>
-                          {status.phoneNumber && (
-                            <p className="text-muted-foreground">{status.phoneNumber}</p>
-                          )}
-                        </div>
-                        <Button 
-                          variant="destructive" 
-                          onClick={() => selectedAccountId && disconnectMutation.mutate(selectedAccountId)}
-                          disabled={disconnectMutation.isPending}
-                          data-testid="button-disconnect"
-                        >
-                          {disconnectMutation.isPending ? (
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                {(() => {
+                  const selectedAccount = accounts?.find(a => a.id === selectedAccountId);
+                  const isCloudApi = selectedAccount?.provider === "cloud_api";
+                  
+                  if (isCloudApi) {
+                    const hasCloudApiConfig = selectedAccount?.cloudApiAccessToken && selectedAccount?.cloudApiPhoneNumberId;
+                    
+                    return (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2">
+                            <SiWhatsapp className="w-5 h-5 text-green-500" />
+                            Cloud API (Meta) - {selectedAccount?.label}
+                          </CardTitle>
+                          <CardDescription>
+                            Conecte usando a API oficial do WhatsApp Business da Meta
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                          {hasCloudApiConfig ? (
+                            <div className="text-center space-y-4">
+                              <div className="w-24 h-24 mx-auto bg-green-500/10 rounded-full flex items-center justify-center">
+                                <CheckCircle className="w-12 h-12 text-green-500" />
+                              </div>
+                              <div>
+                                <p className="text-lg font-medium text-green-500">Cloud API Configurada</p>
+                                {selectedAccount?.phoneNumber && (
+                                  <p className="text-muted-foreground">{selectedAccount.phoneNumber}</p>
+                                )}
+                                <Badge variant="outline" className="mt-2">
+                                  API Version: {selectedAccount?.cloudApiVersion || "v20.0"}
+                                </Badge>
+                              </div>
+                              <div className="flex items-center justify-center gap-2">
+                                <Button 
+                                  variant="outline"
+                                  onClick={() => {
+                                    setCloudApiConfig({
+                                      accessToken: "",
+                                      phoneNumberId: selectedAccount?.cloudApiPhoneNumberId || "",
+                                      businessAccountId: selectedAccount?.cloudApiBusinnessAccountId || "",
+                                      webhookVerifyToken: selectedAccount?.cloudApiWebhookVerifyToken || "",
+                                      apiVersion: selectedAccount?.cloudApiVersion || "v20.0",
+                                    });
+                                    setShowCloudApiDialog(true);
+                                  }}
+                                  data-testid="button-edit-cloud-api"
+                                >
+                                  <Edit className="w-4 h-4 mr-2" />
+                                  Editar Configuração
+                                </Button>
+                              </div>
+                            </div>
                           ) : (
-                            <WifiOff className="w-4 h-4 mr-2" />
+                            <div className="text-center space-y-4">
+                              <div className="w-24 h-24 mx-auto bg-muted rounded-full flex items-center justify-center">
+                                <SiWhatsapp className="w-12 h-12 text-muted-foreground" />
+                              </div>
+                              <div>
+                                <p className="font-medium">Configure suas credenciais da Cloud API</p>
+                                <p className="text-sm text-muted-foreground mt-1">
+                                  Você precisará do Access Token e Phone Number ID do Meta Business
+                                </p>
+                              </div>
+                              <Button 
+                                onClick={() => {
+                                  setCloudApiConfig({
+                                    accessToken: "",
+                                    phoneNumberId: "",
+                                    businessAccountId: "",
+                                    webhookVerifyToken: "",
+                                    apiVersion: "v20.0",
+                                  });
+                                  setShowCloudApiDialog(true);
+                                }}
+                                data-testid="button-configure-cloud-api"
+                              >
+                                <Plus className="w-4 h-4 mr-2" />
+                                Configurar Cloud API
+                              </Button>
+                            </div>
                           )}
-                          Desconectar
-                        </Button>
-                      </div>
-                    ) : status?.status === "qr_ready" && status.qrCode ? (
-                      <div className="text-center space-y-4">
-                        <p className="text-muted-foreground">
-                          Escaneie o QR Code com o WhatsApp no seu celular
-                        </p>
-                        <div className="bg-white p-4 rounded-lg inline-block">
-                          <img 
-                            src={status.qrCode} 
-                            alt="QR Code WhatsApp" 
-                            className="w-64 h-64"
-                            data-testid="img-qrcode"
-                          />
-                        </div>
-                        <p className="text-sm text-muted-foreground">
-                          O QR Code atualiza automaticamente a cada 30 segundos
-                        </p>
-                      </div>
-                    ) : status?.status === "connecting" ? (
-                      <div className="text-center space-y-4">
-                        <Loader2 className="w-12 h-12 mx-auto animate-spin text-muted-foreground" />
-                        <p className="text-muted-foreground">Gerando QR Code...</p>
-                      </div>
-                    ) : (
-                      <div className="text-center space-y-4">
-                        <div className="w-24 h-24 mx-auto bg-muted rounded-full flex items-center justify-center">
-                          <Smartphone className="w-12 h-12 text-muted-foreground" />
-                        </div>
-                        <p className="text-muted-foreground">
-                          Clique no botão abaixo para gerar o QR Code e conectar seu WhatsApp
-                        </p>
-                        <Button 
-                          onClick={() => selectedAccountId && connectMutation.mutate(selectedAccountId)}
-                          disabled={connectMutation.isPending}
-                          data-testid="button-connect"
-                        >
-                          {connectMutation.isPending ? (
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          ) : (
-                            <QrCode className="w-4 h-4 mr-2" />
-                          )}
-                          Conectar WhatsApp
-                        </Button>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
+                        </CardContent>
+                      </Card>
+                    );
+                  }
+                  
+                  return (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <QrCode className="w-5 h-5" />
+                          Conexão WhatsApp - {selectedAccount?.label}
+                        </CardTitle>
+                        <CardDescription>
+                          Conecte seu WhatsApp escaneando o QR Code com o aplicativo
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-6">
+                        {loadingStatus ? (
+                          <div className="flex items-center justify-center py-8">
+                            <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+                          </div>
+                        ) : status?.status === "connected" ? (
+                          <div className="text-center space-y-4">
+                            <div className="w-24 h-24 mx-auto bg-green-500/10 rounded-full flex items-center justify-center">
+                              <CheckCircle className="w-12 h-12 text-green-500" />
+                            </div>
+                            <div>
+                              <p className="text-lg font-medium text-green-500">WhatsApp Conectado</p>
+                              {status.phoneNumber && (
+                                <p className="text-muted-foreground">{status.phoneNumber}</p>
+                              )}
+                            </div>
+                            <Button 
+                              variant="destructive" 
+                              onClick={() => selectedAccountId && disconnectMutation.mutate(selectedAccountId)}
+                              disabled={disconnectMutation.isPending}
+                              data-testid="button-disconnect"
+                            >
+                              {disconnectMutation.isPending ? (
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              ) : (
+                                <WifiOff className="w-4 h-4 mr-2" />
+                              )}
+                              Desconectar
+                            </Button>
+                          </div>
+                        ) : status?.status === "qr_ready" && status.qrCode ? (
+                          <div className="text-center space-y-4">
+                            <p className="text-muted-foreground">
+                              Escaneie o QR Code com o WhatsApp no seu celular
+                            </p>
+                            <div className="bg-white p-4 rounded-lg inline-block">
+                              <img 
+                                src={status.qrCode} 
+                                alt="QR Code WhatsApp" 
+                                className="w-64 h-64"
+                                data-testid="img-qrcode"
+                              />
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                              O QR Code atualiza automaticamente a cada 30 segundos
+                            </p>
+                          </div>
+                        ) : status?.status === "connecting" ? (
+                          <div className="text-center space-y-4">
+                            <Loader2 className="w-12 h-12 mx-auto animate-spin text-muted-foreground" />
+                            <p className="text-muted-foreground">Gerando QR Code...</p>
+                          </div>
+                        ) : (
+                          <div className="text-center space-y-4">
+                            <div className="w-24 h-24 mx-auto bg-muted rounded-full flex items-center justify-center">
+                              <Smartphone className="w-12 h-12 text-muted-foreground" />
+                            </div>
+                            <p className="text-muted-foreground">
+                              Clique no botão abaixo para gerar o QR Code e conectar seu WhatsApp
+                            </p>
+                            <Button 
+                              onClick={() => selectedAccountId && connectMutation.mutate(selectedAccountId)}
+                              disabled={connectMutation.isPending}
+                              data-testid="button-connect"
+                            >
+                              {connectMutation.isPending ? (
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              ) : (
+                                <QrCode className="w-4 h-4 mr-2" />
+                              )}
+                              Conectar WhatsApp
+                            </Button>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })()}
               </>
             )}
 
@@ -2648,6 +2860,135 @@ export default function AdminWhatsAppMarketing() {
               >
                 {updateAccountMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                 Salvar Alterações
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={showCloudApiDialog} onOpenChange={(open) => {
+          setShowCloudApiDialog(open);
+          if (!open) {
+            setCloudApiValidation(null);
+          }
+        }}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <SiWhatsapp className="w-5 h-5 text-green-500" />
+                Configurar Cloud API (Meta)
+              </DialogTitle>
+              <DialogDescription>
+                Configure as credenciais da API oficial do WhatsApp da Meta. 
+                Isso permite enviar mensagens sem precisar de QR Code.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
+                <p className="text-sm text-blue-500">
+                  Para obter as credenciais, acesse o 
+                  <a href="https://developers.facebook.com/apps" target="_blank" rel="noopener noreferrer" className="underline ml-1">
+                    Facebook Developers
+                  </a> e configure seu aplicativo WhatsApp Business.
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="cloud-api-token">Access Token *</Label>
+                <Input
+                  id="cloud-api-token"
+                  type="password"
+                  placeholder="Token de acesso da API"
+                  value={cloudApiConfig.accessToken}
+                  onChange={(e) => setCloudApiConfig({ ...cloudApiConfig, accessToken: e.target.value })}
+                  data-testid="input-cloud-api-token"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="cloud-api-phone-id">Phone Number ID *</Label>
+                <Input
+                  id="cloud-api-phone-id"
+                  placeholder="ID do número de telefone"
+                  value={cloudApiConfig.phoneNumberId}
+                  onChange={(e) => setCloudApiConfig({ ...cloudApiConfig, phoneNumberId: e.target.value })}
+                  data-testid="input-cloud-api-phone-id"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="cloud-api-business-id">Business Account ID (Opcional)</Label>
+                <Input
+                  id="cloud-api-business-id"
+                  placeholder="ID da conta comercial"
+                  value={cloudApiConfig.businessAccountId}
+                  onChange={(e) => setCloudApiConfig({ ...cloudApiConfig, businessAccountId: e.target.value })}
+                  data-testid="input-cloud-api-business-id"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="cloud-api-version">Versão da API</Label>
+                <Select 
+                  value={cloudApiConfig.apiVersion} 
+                  onValueChange={(value) => setCloudApiConfig({ ...cloudApiConfig, apiVersion: value })}
+                >
+                  <SelectTrigger data-testid="select-cloud-api-version">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="v20.0">v20.0 (Recomendado)</SelectItem>
+                    <SelectItem value="v19.0">v19.0</SelectItem>
+                    <SelectItem value="v18.0">v18.0</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {cloudApiValidation && (
+                <div className={`p-3 rounded-lg ${cloudApiValidation.valid ? 'bg-green-500/10 border border-green-500/20' : 'bg-red-500/10 border border-red-500/20'}`}>
+                  {cloudApiValidation.valid ? (
+                    <div className="flex items-center gap-2 text-green-500">
+                      <CheckCircle className="w-4 h-4" />
+                      <div>
+                        <p className="font-medium">Credenciais válidas!</p>
+                        <p className="text-sm">Número: {cloudApiValidation.phoneNumber}</p>
+                        {cloudApiValidation.displayName && (
+                          <p className="text-sm">Nome: {cloudApiValidation.displayName}</p>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 text-red-500">
+                      <XCircle className="w-4 h-4" />
+                      <div>
+                        <p className="font-medium">Credenciais inválidas</p>
+                        <p className="text-sm">{cloudApiValidation.error}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            <DialogFooter className="gap-2">
+              <Button 
+                variant="outline" 
+                onClick={handleValidateCloudApi}
+                disabled={validatingCloudApi || !cloudApiConfig.accessToken || !cloudApiConfig.phoneNumberId}
+                data-testid="button-validate-cloud-api"
+              >
+                {validatingCloudApi && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Validar Credenciais
+              </Button>
+              <Button 
+                onClick={() => {
+                  if (selectedAccountId) {
+                    configureCloudApiMutation.mutate({ id: selectedAccountId, config: cloudApiConfig });
+                  }
+                }}
+                disabled={configureCloudApiMutation.isPending || !cloudApiValidation?.valid}
+                data-testid="button-save-cloud-api"
+              >
+                {configureCloudApiMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Salvar e Ativar
               </Button>
             </DialogFooter>
           </DialogContent>

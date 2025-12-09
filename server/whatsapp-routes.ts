@@ -508,6 +508,108 @@ export function registerWhatsAppRoutes(app: Express) {
   });
 
   // ============================================
+  // CLOUD API CONFIGURATION
+  // ============================================
+
+  // Configure Cloud API credentials for an account
+  app.post("/api/whatsapp/accounts/:id/cloud-api", async (req: Request, res: Response) => {
+    try {
+      const { admin, error, errorCode } = await validateSessionAndGetAdmin(req);
+      if (!admin) {
+        return res.status(errorCode || 401).json({ error: error || "Não autenticado" });
+      }
+
+      const ownership = await validateAccountOwnership(req.params.id, admin.id);
+      if (!ownership.valid) {
+        return res.status(403).json({ error: ownership.error });
+      }
+
+      const { accessToken, phoneNumberId, businessAccountId, webhookVerifyToken, apiVersion } = req.body;
+      
+      if (!accessToken || !phoneNumberId) {
+        return res.status(400).json({ error: "accessToken e phoneNumberId são obrigatórios" });
+      }
+
+      const updated = await storage.updateWhatsappAccount(req.params.id, {
+        provider: "cloud_api",
+        cloudApiAccessToken: accessToken,
+        cloudApiPhoneNumberId: phoneNumberId,
+        cloudApiBusinnessAccountId: businessAccountId || null,
+        cloudApiWebhookVerifyToken: webhookVerifyToken || null,
+        cloudApiVersion: apiVersion || "v20.0",
+      });
+
+      res.json({ success: true, account: updated });
+    } catch (error: any) {
+      console.error("[whatsapp-api] Error configuring Cloud API:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Validate Cloud API credentials
+  app.post("/api/whatsapp/validate-cloud-api", async (req: Request, res: Response) => {
+    try {
+      const { admin, error, errorCode } = await validateSessionAndGetAdmin(req);
+      if (!admin) {
+        return res.status(errorCode || 401).json({ error: error || "Não autenticado" });
+      }
+
+      const { accessToken, phoneNumberId, apiVersion } = req.body;
+      
+      if (!accessToken || !phoneNumberId) {
+        return res.status(400).json({ error: "accessToken e phoneNumberId são obrigatórios" });
+      }
+
+      const { validateCloudApiCredentials } = await import("./whatsapp-cloud-service");
+      const result = await validateCloudApiCredentials({
+        accessToken,
+        phoneNumberId,
+        apiVersion: apiVersion || "v20.0",
+      });
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("[whatsapp-api] Error validating Cloud API:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Switch account provider (baileys or cloud_api)
+  app.patch("/api/whatsapp/accounts/:id/provider", async (req: Request, res: Response) => {
+    try {
+      const { admin, error, errorCode } = await validateSessionAndGetAdmin(req);
+      if (!admin) {
+        return res.status(errorCode || 401).json({ error: error || "Não autenticado" });
+      }
+
+      const ownership = await validateAccountOwnership(req.params.id, admin.id);
+      if (!ownership.valid) {
+        return res.status(403).json({ error: ownership.error });
+      }
+
+      const { provider } = req.body;
+      
+      if (!provider || !["baileys", "cloud_api"].includes(provider)) {
+        return res.status(400).json({ error: "Provider deve ser 'baileys' ou 'cloud_api'" });
+      }
+
+      // Disconnect current connection when switching providers
+      await disconnectWhatsApp(req.params.id, admin.id);
+
+      const updated = await storage.updateWhatsappAccount(req.params.id, {
+        provider,
+        status: "disconnected",
+        phoneNumber: null,
+      });
+
+      res.json({ success: true, account: updated });
+    } catch (error: any) {
+      console.error("[whatsapp-api] Error switching provider:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ============================================
   // WHATSAPP BROADCASTS (ENVIOS EM MASSA)
   // ============================================
 

@@ -506,6 +506,17 @@ export async function getWhatsAppStatus(accountId: string): Promise<{
   phoneNumber?: string;
   qrExpired?: boolean;
 }> {
+  const account = await storage.getWhatsappAccountById(accountId);
+  
+  if (account?.provider === "cloud_api") {
+    const { getCloudApiStatus } = await import("./whatsapp-cloud-service");
+    const cloudStatus = await getCloudApiStatus(accountId);
+    return {
+      status: cloudStatus.connected ? "connected" : "disconnected",
+      phoneNumber: cloudStatus.phoneNumber,
+    };
+  }
+  
   const conn = connections.get(accountId);
   
   if (conn) {
@@ -577,6 +588,14 @@ export async function sendWhatsAppMessage(
   phone: string,
   message: string
 ): Promise<{ success: boolean; error?: string; queued?: boolean }> {
+  const account = await storage.getWhatsappAccountById(accountId);
+  
+  if (account?.provider === "cloud_api") {
+    const { sendCloudApiTextMessage } = await import("./whatsapp-cloud-service");
+    const result = await sendCloudApiTextMessage(accountId, phone, message);
+    return { success: result.success, error: result.error };
+  }
+  
   let conn = connections.get(accountId);
   
   if (!conn) {
@@ -1130,4 +1149,209 @@ export function startHealthCheckInterval(): void {
   }, HEALTH_CHECK_INTERVAL_MS);
   
   console.log(`[whatsapp] Health check started (interval: ${HEALTH_CHECK_INTERVAL_MS}ms)`);
+}
+
+// ============================================
+// PROVIDER PATTERN - Routes to Baileys or Cloud API
+// ============================================
+
+import {
+  sendCloudApiTextMessage,
+  sendCloudApiMediaMessage,
+  getCloudApiStatus,
+  CloudApiMessage,
+  CloudApiSendResult,
+} from "./whatsapp-cloud-service";
+
+export type WhatsAppProvider = "baileys" | "cloud_api";
+
+export interface UnifiedSendResult {
+  success: boolean;
+  messageId?: string;
+  error?: string;
+  queued?: boolean;
+}
+
+export interface UnifiedStatus {
+  status: string;
+  qrCode?: string;
+  phoneNumber?: string;
+  qrExpired?: boolean;
+  displayName?: string;
+  provider?: WhatsAppProvider;
+}
+
+export async function sendMessageByProvider(
+  accountId: string,
+  phone: string,
+  message: string
+): Promise<UnifiedSendResult> {
+  const account = await storage.getWhatsappAccountById(accountId);
+  
+  if (!account) {
+    return { success: false, error: "Conta não encontrada" };
+  }
+  
+  const provider = (account.provider || "baileys") as WhatsAppProvider;
+  
+  if (provider === "cloud_api") {
+    const result = await sendCloudApiTextMessage(accountId, phone, message);
+    return {
+      success: result.success,
+      messageId: result.messageId,
+      error: result.error,
+    };
+  }
+  
+  // Default: Baileys
+  const result = await sendWhatsAppMessage(accountId, phone, message);
+  return {
+    success: result.success,
+    error: result.error,
+    queued: result.queued,
+  };
+}
+
+export async function sendMediaMessageByProvider(
+  accountId: string,
+  phone: string,
+  media: MediaMessage
+): Promise<UnifiedSendResult> {
+  const account = await storage.getWhatsappAccountById(accountId);
+  
+  if (!account) {
+    return { success: false, error: "Conta não encontrada" };
+  }
+  
+  const provider = (account.provider || "baileys") as WhatsAppProvider;
+  
+  if (provider === "cloud_api") {
+    const cloudMedia: CloudApiMessage = {
+      type: media.type,
+      mediaUrl: media.url,
+      caption: media.caption,
+      fileName: media.fileName,
+    };
+    const result = await sendCloudApiMediaMessage(accountId, phone, cloudMedia);
+    return {
+      success: result.success,
+      messageId: result.messageId,
+      error: result.error,
+    };
+  }
+  
+  // Default: Baileys
+  const result = await sendWhatsAppMediaMessage(accountId, phone, media);
+  return {
+    success: result.success,
+    error: result.error,
+  };
+}
+
+export async function getStatusByProvider(accountId: string): Promise<UnifiedStatus> {
+  const account = await storage.getWhatsappAccountById(accountId);
+  
+  if (!account) {
+    return { status: "disconnected" };
+  }
+  
+  const provider = (account.provider || "baileys") as WhatsAppProvider;
+  
+  if (provider === "cloud_api") {
+    const result = await getCloudApiStatus(accountId);
+    return {
+      status: result.connected ? "connected" : "disconnected",
+      phoneNumber: result.phoneNumber,
+      displayName: result.displayName,
+      provider: "cloud_api",
+    };
+  }
+  
+  // Default: Baileys
+  const result = await getWhatsAppStatus(accountId);
+  return {
+    ...result,
+    provider: "baileys",
+  };
+}
+
+export async function initConnectionByProvider(
+  accountId: string,
+  adminId: string
+): Promise<{
+  success: boolean;
+  status: string;
+  qrCode?: string;
+  phoneNumber?: string;
+  displayName?: string;
+  error?: string;
+  provider?: WhatsAppProvider;
+}> {
+  const account = await storage.getWhatsappAccountById(accountId);
+  
+  if (!account) {
+    return { success: false, status: "error", error: "Conta não encontrada" };
+  }
+  
+  const provider = (account.provider || "baileys") as WhatsAppProvider;
+  
+  if (provider === "cloud_api") {
+    // Cloud API doesn't need QR code connection - just validate credentials
+    const status = await getCloudApiStatus(accountId);
+    
+    if (status.connected) {
+      // Update account status in database
+      await storage.updateWhatsappAccount(accountId, {
+        status: "connected",
+        phoneNumber: status.phoneNumber || null,
+      });
+      
+      return {
+        success: true,
+        status: "connected",
+        phoneNumber: status.phoneNumber,
+        displayName: status.displayName,
+        provider: "cloud_api",
+      };
+    }
+    
+    return {
+      success: false,
+      status: "disconnected",
+      error: status.error || "Credenciais inválidas ou não configuradas",
+      provider: "cloud_api",
+    };
+  }
+  
+  // Default: Baileys
+  const result = await initWhatsAppConnection(accountId, adminId);
+  return {
+    ...result,
+    provider: "baileys",
+  };
+}
+
+export async function disconnectByProvider(
+  accountId: string,
+  adminId: string
+): Promise<boolean> {
+  const account = await storage.getWhatsappAccountById(accountId);
+  
+  if (!account) {
+    return false;
+  }
+  
+  const provider = (account.provider || "baileys") as WhatsAppProvider;
+  
+  if (provider === "cloud_api") {
+    // Cloud API doesn't have persistent connections, just update status
+    await storage.updateWhatsappAccount(accountId, {
+      status: "disconnected",
+      phoneNumber: null,
+    });
+    return true;
+  }
+  
+  // Default: Baileys
+  return disconnectWhatsApp(accountId, adminId);
 }
