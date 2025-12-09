@@ -260,16 +260,27 @@ async function isFeatureAllowed(
     // Se o campo for null/undefined, usa fallback baseado no nome do plano
     const featureValue = (plano as any)[featureKey];
     
+    // Log de debug para diagnóstico
+    console.log(`[feature-check] Plan: ${plano.nome}, PlanoId: ${plano.id}, Key: ${featureKey}, Value: ${featureValue}, Type: ${typeof featureValue}`);
+    
     // Valor explícito definido pelo admin - usa diretamente
-    if (featureValue === true) return true;
-    if (featureValue === false) return false;
+    if (featureValue === true) {
+      console.log(`[feature-check] Resultado: PERMITIDO (valor explícito true)`);
+      return true;
+    }
+    if (featureValue === false) {
+      console.log(`[feature-check] Resultado: BLOQUEADO (valor explícito false)`);
+      return false;
+    }
     
     // Fallback para retrocompatibilidade (quando valor é null/undefined)
     // Verifica pelo nome do plano para manter acesso de planos existentes
     const normalizedPlanName = normalizeString(plano.nome);
     const aiAllowedKeywords = ["avancado", "elite", "pro", "profissional", "ilimitado", "enterprise", "premium"];
     
-    return aiAllowedKeywords.some(keyword => normalizedPlanName.includes(keyword));
+    const fallbackResult = aiAllowedKeywords.some(keyword => normalizedPlanName.includes(keyword));
+    console.log(`[feature-check] Resultado: ${fallbackResult ? 'PERMITIDO' : 'BLOQUEADO'} (fallback pelo nome: ${normalizedPlanName})`);
+    return fallbackResult;
   } catch (error) {
     console.error(`Erro ao verificar permissão de ${featureKey}:`, error);
     return false;
