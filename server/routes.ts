@@ -1,6 +1,7 @@
 import type { Express, Request } from "express";
 import { createServer, type Server } from "http";
 import crypto from "crypto";
+import bcrypt from "bcryptjs";
 import { createReadStream, existsSync, mkdirSync, renameSync, unlinkSync, statSync, readFileSync, writeFileSync } from "fs";
 import { pipeline } from "stream/promises";
 import path from "path";
