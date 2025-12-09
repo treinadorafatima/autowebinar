@@ -143,7 +143,7 @@ export default function AdminUpgradePage() {
                   </CardDescription>
                   <div className="pt-4">
                     <span className="text-4xl font-bold" data-testid={`text-plan-price-${plano.id}`}>
-                      R$ {plano.preco.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      R$ {(plano.preco / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                     <span className="text-muted-foreground">
                       /{plano.tipoCobranca === 'recorrente' ? 'mês' : 'único'}
