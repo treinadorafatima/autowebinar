@@ -183,7 +183,7 @@ export default function AfiliadoDashboardPage() {
     },
   });
 
-  const handleConnectMercadoPago = () => {
+  const handleConnectMercadoPago = async () => {
     const token = localStorage.getItem("affiliateToken");
     if (!token) {
       toast({
@@ -194,7 +194,25 @@ export default function AfiliadoDashboardPage() {
       setLocation("/afiliado/login");
       return;
     }
-    window.location.href = `/api/affiliates/oauth/authorize?token=${encodeURIComponent(token)}`;
+    try {
+      const response = await fetch(`/api/affiliates/oauth/authorize?token=${encodeURIComponent(token)}`);
+      const data = await response.json();
+      if (data.authUrl) {
+        window.location.href = data.authUrl;
+      } else if (data.error) {
+        toast({
+          title: "Erro",
+          description: data.error,
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao conectar com Mercado Pago",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleLogout = () => {
