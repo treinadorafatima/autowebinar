@@ -313,7 +313,7 @@ export default function AdminAffiliatesPage() {
   const handleEdit = (affiliate: Affiliate) => {
     setSelectedAffiliate(affiliate);
     setEditCommissionPercent(affiliate.commissionPercent || 30);
-    setEditCommissionFixed(affiliate.commissionFixed?.toString() || "");
+    setEditCommissionFixed(affiliate.commissionFixed ? (affiliate.commissionFixed / 100).toFixed(2) : "");
     setEditStatus(affiliate.status);
     setIsEditDialogOpen(true);
   };
@@ -322,7 +322,7 @@ export default function AdminAffiliatesPage() {
     if (!selectedAffiliate) return;
     
     const percent = Math.max(0, Math.min(100, editCommissionPercent));
-    const fixed = editCommissionFixed ? Math.max(0, parseInt(editCommissionFixed)) : null;
+    const fixed = editCommissionFixed ? Math.max(0, Math.round(parseFloat(editCommissionFixed) * 100)) : null;
     
     updateAffiliateMutation.mutate({
       id: selectedAffiliate.id,
@@ -919,22 +919,23 @@ export default function AdminAffiliatesPage() {
               <p className="text-xs text-muted-foreground">Valor entre 0 e 100</p>
             </div>
             <div className="space-y-2">
-              <Label>Comissão Fixa (centavos, opcional)</Label>
+              <Label>Comissão Fixa (R$, opcional)</Label>
               <Input
                 type="number"
                 value={editCommissionFixed}
                 onChange={(e) => {
                   const val = e.target.value;
-                  if (val === "" || parseInt(val) >= 0) {
+                  if (val === "" || parseFloat(val) >= 0) {
                     setEditCommissionFixed(val);
                   }
                 }}
-                placeholder="0"
+                placeholder="0.00"
                 min={0}
+                step="0.01"
                 data-testid="input-edit-commission-fixed"
               />
               <p className="text-xs text-muted-foreground">
-                Valor em centavos. Ex: 1000 = R$ 10,00
+                Valor em reais. Ex: 10,00 = R$ 10,00
               </p>
             </div>
           </div>
