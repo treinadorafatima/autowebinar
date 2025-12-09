@@ -1448,36 +1448,161 @@ export default function AdminWhatsAppMarketing() {
               </>
             )}
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Como funciona?</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid gap-4">
-                  <div className="flex gap-3">
-                    <div className="w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center text-green-500 font-bold">1</div>
-                    <div>
-                      <p className="font-medium">Conecte seu WhatsApp</p>
-                      <p className="text-sm text-muted-foreground">Escaneie o QR Code com o aplicativo do WhatsApp</p>
+            {(() => {
+              const selectedAccount = accounts?.find(a => a.id === selectedAccountId);
+              const isCloudApi = selectedAccount?.provider === "cloud_api";
+              
+              if (isCloudApi) {
+                return (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Info className="w-5 h-5 text-blue-500" />
+                        Como configurar a API Oficial (Meta)
+                      </CardTitle>
+                      <CardDescription>
+                        Passo a passo para conectar usando o WhatsApp Cloud API
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid gap-4">
+                        <div className="flex gap-3">
+                          <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500 font-bold shrink-0">1</div>
+                          <div>
+                            <p className="font-medium">Acesse o Meta for Developers</p>
+                            <p className="text-sm text-muted-foreground">
+                              Vá para <a href="https://developers.facebook.com" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">developers.facebook.com</a> e faça login com sua conta do Facebook
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex gap-3">
+                          <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500 font-bold shrink-0">2</div>
+                          <div>
+                            <p className="font-medium">Crie um App</p>
+                            <p className="text-sm text-muted-foreground">
+                              Clique em "Criar App" → Selecione "Negócios" → Dê um nome ao app → Clique em "Criar App"
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex gap-3">
+                          <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500 font-bold shrink-0">3</div>
+                          <div>
+                            <p className="font-medium">Adicione o produto WhatsApp</p>
+                            <p className="text-sm text-muted-foreground">
+                              No dashboard do app, encontre "WhatsApp" na lista de produtos e clique em "Configurar"
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex gap-3">
+                          <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500 font-bold shrink-0">4</div>
+                          <div>
+                            <p className="font-medium">Configure o WhatsApp Business</p>
+                            <p className="text-sm text-muted-foreground">
+                              Crie ou vincule uma conta WhatsApp Business (WABA). Você pode usar um número de teste gratuito para começar.
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex gap-3">
+                          <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500 font-bold shrink-0">5</div>
+                          <div>
+                            <p className="font-medium">Obtenha as credenciais</p>
+                            <p className="text-sm text-muted-foreground">
+                              Na página "Primeiros Passos", você encontrará:
+                            </p>
+                            <ul className="text-sm text-muted-foreground list-disc list-inside mt-1 space-y-1">
+                              <li><span className="font-medium text-foreground">Phone Number ID</span> - ID do número de telefone</li>
+                              <li><span className="font-medium text-foreground">Access Token</span> - Token de acesso (clique em "Gerar token")</li>
+                              <li><span className="font-medium text-foreground">Business Account ID</span> - ID da conta comercial (opcional)</li>
+                            </ul>
+                          </div>
+                        </div>
+                        <div className="flex gap-3">
+                          <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500 font-bold shrink-0">6</div>
+                          <div>
+                            <p className="font-medium">Configure aqui no sistema</p>
+                            <p className="text-sm text-muted-foreground">
+                              Clique em "Configurar Cloud API" acima e cole as credenciais. Clique em "Validar" para verificar se está tudo correto.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4 mt-4">
+                        <div className="flex gap-2">
+                          <Info className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                          <div className="text-sm">
+                            <p className="font-medium text-amber-600 dark:text-amber-400">Importante sobre o Token de Acesso</p>
+                            <p className="text-muted-foreground mt-1">
+                              O token temporário expira em 24 horas. Para produção, gere um token permanente em Configurações do App → Básico → Token de Acesso do Sistema.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              }
+              
+              return (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Info className="w-5 h-5 text-green-500" />
+                      Como funciona o QR Code (Baileys)
+                    </CardTitle>
+                    <CardDescription>
+                      Passo a passo para conectar via QR Code
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid gap-4">
+                      <div className="flex gap-3">
+                        <div className="w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center text-green-500 font-bold shrink-0">1</div>
+                        <div>
+                          <p className="font-medium">Conecte seu WhatsApp</p>
+                          <p className="text-sm text-muted-foreground">Clique em "Conectar WhatsApp" para gerar o QR Code</p>
+                        </div>
+                      </div>
+                      <div className="flex gap-3">
+                        <div className="w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center text-green-500 font-bold shrink-0">2</div>
+                        <div>
+                          <p className="font-medium">Escaneie o QR Code</p>
+                          <p className="text-sm text-muted-foreground">
+                            No WhatsApp do celular, vá em Configurações → Aparelhos conectados → Conectar aparelho → Escaneie o código
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex gap-3">
+                        <div className="w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center text-green-500 font-bold shrink-0">3</div>
+                        <div>
+                          <p className="font-medium">Crie sequências de mensagens</p>
+                          <p className="text-sm text-muted-foreground">Configure mensagens automáticas para antes, durante e após o webinar</p>
+                        </div>
+                      </div>
+                      <div className="flex gap-3">
+                        <div className="w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center text-green-500 font-bold shrink-0">4</div>
+                        <div>
+                          <p className="font-medium">Envio automático</p>
+                          <p className="text-sm text-muted-foreground">As mensagens são enviadas automaticamente nos horários configurados</p>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex gap-3">
-                    <div className="w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center text-green-500 font-bold">2</div>
-                    <div>
-                      <p className="font-medium">Crie sequências de mensagens</p>
-                      <p className="text-sm text-muted-foreground">Configure mensagens automáticas para antes, durante e após o webinar</p>
+                    
+                    <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4 mt-4">
+                      <div className="flex gap-2">
+                        <Info className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                        <div className="text-sm">
+                          <p className="font-medium text-amber-600 dark:text-amber-400">Atenção</p>
+                          <p className="text-muted-foreground mt-1">
+                            Este método usa uma API não-oficial. Para maior estabilidade e para evitar bloqueios, recomendamos a API Oficial (Meta).
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex gap-3">
-                    <div className="w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center text-green-500 font-bold">3</div>
-                    <div>
-                      <p className="font-medium">Envio automático</p>
-                      <p className="text-sm text-muted-foreground">As mensagens são enviadas automaticamente nos horários configurados</p>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                  </CardContent>
+                </Card>
+              );
+            })()}
           </TabsContent>
 
           <TabsContent value="sequences" className="space-y-6">
