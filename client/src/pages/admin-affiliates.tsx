@@ -923,6 +923,33 @@ export default function AdminAffiliatesPage() {
                       OAuth configurado
                     </p>
                   )}
+                  
+                  <div className="mt-4 p-3 bg-muted rounded-md">
+                    <Label className="text-sm font-medium">URL de Redirecionamento (Redirect URI)</Label>
+                    <p className="text-xs text-muted-foreground mb-2">
+                      Copie e configure esta URL no Mercado Pago Developers
+                    </p>
+                    <div className="flex gap-2">
+                      <Input
+                        readOnly
+                        value={`${import.meta.env.VITE_PUBLIC_BASE_URL || window.location.origin}/api/affiliates/oauth/callback`}
+                        className="font-mono text-xs"
+                        data-testid="input-redirect-uri"
+                      />
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => {
+                          const url = `${import.meta.env.VITE_PUBLIC_BASE_URL || window.location.origin}/api/affiliates/oauth/callback`;
+                          navigator.clipboard.writeText(url);
+                          toast({ title: "URL copiada!" });
+                        }}
+                        data-testid="button-copy-redirect-uri"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               )}
             </CardContent>
