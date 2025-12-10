@@ -520,7 +520,7 @@ export default function AfiliadoDashboardPage() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Link</TableHead>
-                        <TableHead>Plano</TableHead>
+                        <TableHead>Destino</TableHead>
                         <TableHead className="text-center">Cliques</TableHead>
                         <TableHead className="text-center">Conversões</TableHead>
                         <TableHead>Status</TableHead>
@@ -528,12 +528,29 @@ export default function AfiliadoDashboardPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {links.map((link) => (
+                      {links.map((link) => {
+                        const getLinkDestination = () => {
+                          if (link.planoId && link.planoName) {
+                            return `Plano: ${link.planoName}`;
+                          }
+                          if (link.targetUrl === "/" || link.targetUrl === "") {
+                            return "Homepage";
+                          }
+                          if (link.targetUrl === "/checkout/trial") {
+                            return "Teste Gratuito";
+                          }
+                          if (link.targetUrl) {
+                            return link.targetUrl;
+                          }
+                          return "Geral";
+                        };
+                        
+                        return (
                         <TableRow key={link.id} data-testid={`row-link-${link.id}`}>
                           <TableCell className="font-mono text-sm">
                             {link.code}
                           </TableCell>
-                          <TableCell>{link.planoName || "Geral"}</TableCell>
+                          <TableCell>{getLinkDestination()}</TableCell>
                           <TableCell className="text-center">{link.clicks}</TableCell>
                           <TableCell className="text-center">{link.conversions}</TableCell>
                           <TableCell>
@@ -562,7 +579,8 @@ export default function AfiliadoDashboardPage() {
                             </div>
                           </TableCell>
                         </TableRow>
-                      ))}
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 ) : (
