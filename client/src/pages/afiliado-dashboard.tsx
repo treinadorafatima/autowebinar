@@ -41,6 +41,7 @@ import { SiMercadopago } from "react-icons/si";
 const newLinkSchema = z.object({
   linkType: z.string().min(1, "Selecione o tipo de link"),
   planoId: z.string().optional(),
+  targetUrl: z.string().optional(),
 });
 
 type NewLinkFormData = z.infer<typeof newLinkSchema>;
@@ -156,14 +157,27 @@ export default function AfiliadoDashboardPage() {
     defaultValues: {
       linkType: "",
       planoId: "",
+      targetUrl: "",
     },
   });
 
+  const watchedLinkType = form.watch("linkType");
+
   const createLinkMutation = useMutation({
     mutationFn: async (data: NewLinkFormData) => {
-      const response = await apiRequest("POST", `/api/affiliates/${affiliateId}/links`, {
-        planoId: parseInt(data.planoId),
-      });
+      const payload: { planoId?: number; targetUrl?: string; linkType: string } = {
+        linkType: data.linkType,
+      };
+      
+      if (data.linkType === "plano" && data.planoId) {
+        payload.planoId = parseInt(data.planoId);
+      } else if (data.linkType === "homepage") {
+        payload.targetUrl = "/";
+      } else if (data.linkType === "trial") {
+        payload.targetUrl = "/checkout/trial";
+      }
+      
+      const response = await apiRequest("POST", `/api/affiliates/${affiliateId}/links`, payload);
       return response.json();
     },
     onSuccess: () => {
@@ -388,6 +402,10 @@ export default function AfiliadoDashboardPage() {
               <DollarSign className="h-4 w-4 mr-2" />
               Vendas
             </TabsTrigger>
+            <TabsTrigger value="leads" data-testid="tab-leads">
+              <Users className="h-4 w-4 mr-2" />
+              Leads
+            </TabsTrigger>
             <TabsTrigger value="account" data-testid="tab-account">
               <Settings className="h-4 w-4 mr-2" />
               Conta
@@ -414,35 +432,61 @@ export default function AfiliadoDashboardPage() {
                     <DialogHeader>
                       <DialogTitle>Criar Novo Link</DialogTitle>
                       <DialogDescription>
-                        Selecione o plano que deseja promover
+                        Escolha o tipo de link que deseja criar
                       </DialogDescription>
                     </DialogHeader>
                     <Form {...form}>
-                      <form onSubmit={form.handleSubmit((data) => createLinkMutation.mutate(data))}>
+                      <form onSubmit={form.handleSubmit((data) => createLinkMutation.mutate(data))} className="space-y-4">
                         <FormField
                           control={form.control}
-                          name="planoId"
+                          name="linkType"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Plano</FormLabel>
+                              <FormLabel>Tipo de Link</FormLabel>
                               <Select onValueChange={field.onChange} value={field.value}>
                                 <FormControl>
-                                  <SelectTrigger data-testid="select-plano">
-                                    <SelectValue placeholder="Selecione um plano" />
+                                  <SelectTrigger data-testid="select-link-type">
+                                    <SelectValue placeholder="Selecione o tipo de link" />
                                   </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
-                                  {planos?.map((plano) => (
-                                    <SelectItem key={plano.id} value={plano.id.toString()}>
-                                      {plano.nome} - {formatCurrency(plano.preco)}
-                                    </SelectItem>
-                                  ))}
+                                  <SelectItem value="homepage">Homepage (Página Inicial)</SelectItem>
+                                  <SelectItem value="trial">Teste Gratuito</SelectItem>
+                                  <SelectItem value="plano">Plano Específico</SelectItem>
                                 </SelectContent>
                               </Select>
                               <FormMessage />
                             </FormItem>
                           )}
                         />
+                        
+                        {watchedLinkType === "plano" && (
+                          <FormField
+                            control={form.control}
+                            name="planoId"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Plano</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                  <FormControl>
+                                    <SelectTrigger data-testid="select-plano">
+                                      <SelectValue placeholder="Selecione um plano" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    {planos?.map((plano) => (
+                                      <SelectItem key={plano.id} value={plano.id.toString()}>
+                                        {plano.nome} - {formatCurrency(plano.preco)}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        )}
+                        
                         <DialogFooter className="mt-6">
                           <Button
                             type="button"
@@ -451,7 +495,7 @@ export default function AfiliadoDashboardPage() {
                           >
                             Cancelar
                           </Button>
-                          <Button type="submit" disabled={createLinkMutation.isPending} data-testid="button-create-link">
+                          <Button type="submit" disabled={createLinkMutation.isPending || !watchedLinkType} data-testid="button-create-link">
                             {createLinkMutation.isPending ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
                             ) : (
@@ -577,6 +621,63 @@ export default function AfiliadoDashboardPage() {
                     <DollarSign className="h-12 w-12 mx-auto mb-4 opacity-50" />
                     <p>Nenhuma venda registrada ainda.</p>
                     <p className="text-sm">Compartilhe seus links e comece a ganhar comissões!</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="leads">
+            <Card>
+              <CardHeader>
+                <CardTitle>Leads Capturados</CardTitle>
+                <CardDescription>
+                  Pessoas que acessaram através dos seus links de afiliado
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoadingLeads ? (
+                  <div className="space-y-2">
+                    {[1, 2, 3].map((i) => (
+                      <Skeleton key={i} className="h-16 w-full" />
+                    ))}
+                  </div>
+                ) : affiliateLeads && affiliateLeads.length > 0 ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Data</TableHead>
+                        <TableHead>Nome</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>WhatsApp</TableHead>
+                        <TableHead>Cidade/Estado</TableHead>
+                        <TableHead>Link</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {affiliateLeads.map((lead) => (
+                        <TableRow key={lead.id} data-testid={`row-lead-${lead.id}`}>
+                          <TableCell>{formatDate(lead.capturedAt)}</TableCell>
+                          <TableCell className="font-medium">{lead.name}</TableCell>
+                          <TableCell className="text-muted-foreground">{lead.email || "-"}</TableCell>
+                          <TableCell className="text-muted-foreground">{lead.whatsapp || "-"}</TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {lead.city && lead.state ? `${lead.city}, ${lead.state}` : lead.city || lead.state || "-"}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="font-mono text-xs">
+                              {lead.affiliateLinkCode || "-"}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>Nenhum lead capturado ainda.</p>
+                    <p className="text-sm">Compartilhe seus links para começar a capturar leads!</p>
                   </div>
                 )}
               </CardContent>
