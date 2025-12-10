@@ -8972,6 +8972,7 @@ Seja conversacional e objetivo.`;
           id: admin.id,
           name: admin.name,
           email: admin.email,
+          role: admin.role,
           webinarLimit: admin.webinarLimit,
           uploadLimit: admin.uploadLimit,
           accessExpiresAt: admin.accessExpiresAt?.toISOString() || null,
