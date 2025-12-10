@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 declare global {
@@ -8,22 +8,32 @@ declare global {
   }
 }
 
-interface PixelConfig {
-  facebookPixelId?: string;
-  googleAdsConversionId?: string;
+interface UsePixelOptions {
+  affiliateCode?: string | null;
 }
 
-export function usePixel() {
+export function usePixel(options?: UsePixelOptions) {
+  const { affiliateCode } = options || {};
+  const initializedPixels = useRef<Set<string>>(new Set());
+
   const { data: configs } = useQuery<Record<string, string>>({
     queryKey: ["/api/checkout/config/public"],
     staleTime: 1000 * 60 * 5,
   });
 
-  const facebookPixelId = configs?.FACEBOOK_PIXEL_ID;
-  const googleAdsId = configs?.GOOGLE_ADS_CONVERSION_ID;
+  const { data: affiliatePixelData } = useQuery<{ metaPixelId: string | null }>({
+    queryKey: ["/api/affiliate-pixel", affiliateCode],
+    enabled: !!affiliateCode,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const globalPixelId = configs?.FACEBOOK_PIXEL_ID;
+  const affiliatePixelId = affiliatePixelData?.metaPixelId;
+
+  const pixelIds = [globalPixelId, affiliatePixelId].filter(Boolean) as string[];
 
   useEffect(() => {
-    if (!facebookPixelId) return;
+    if (pixelIds.length === 0) return;
 
     if (!window.fbq) {
       const n = (window.fbq = function (...args: any[]) {
@@ -41,9 +51,15 @@ export function usePixel() {
       document.head.appendChild(script);
     }
 
-    window.fbq("init", facebookPixelId);
+    pixelIds.forEach((pixelId) => {
+      if (!initializedPixels.current.has(pixelId)) {
+        window.fbq("init", pixelId);
+        initializedPixels.current.add(pixelId);
+      }
+    });
+
     window.fbq("track", "PageView");
-  }, [facebookPixelId]);
+  }, [pixelIds.join(",")]);
 
   const trackEvent = useCallback(
     (
@@ -51,7 +67,7 @@ export function usePixel() {
       params?: Record<string, any>,
       options?: { serverSide?: boolean }
     ) => {
-      if (facebookPixelId && window.fbq) {
+      if (pixelIds.length > 0 && window.fbq) {
         window.fbq("track", eventName, params);
       }
 
@@ -59,25 +75,53 @@ export function usePixel() {
         fetch("/api/pixel/track", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ eventName, params }),
+          body: JSON.stringify({ 
+            eventName, 
+            params,
+            affiliateCode,
+          }),
         }).catch(console.error);
       }
     },
-    [facebookPixelId]
+    [pixelIds.join(","), affiliateCode]
   );
 
   const trackPageView = useCallback(() => {
-    if (facebookPixelId && window.fbq) {
+    if (pixelIds.length > 0 && window.fbq) {
       window.fbq("track", "PageView");
     }
-  }, [facebookPixelId]);
+  }, [pixelIds.join(",")]);
+
+  const trackViewContent = useCallback(
+    (params: { 
+      content_name?: string; 
+      content_ids?: string[]; 
+      value?: number;
+      content_type?: string;
+    }) => {
+      trackEvent("ViewContent", {
+        ...params,
+        currency: "BRL",
+        content_type: params.content_type || "product",
+      });
+    },
+    [trackEvent]
+  );
 
   const trackInitiateCheckout = useCallback(
-    (params: { value?: number; currency?: string; content_name?: string }) => {
+    (params: { 
+      value?: number; 
+      currency?: string; 
+      content_name?: string;
+      content_ids?: string[];
+      num_items?: number;
+    }) => {
       trackEvent("InitiateCheckout", {
         value: params.value,
         currency: params.currency || "BRL",
         content_name: params.content_name,
+        content_ids: params.content_ids,
+        num_items: params.num_items || 1,
       });
     },
     [trackEvent]
@@ -90,6 +134,7 @@ export function usePixel() {
       content_name?: string;
       content_ids?: string[];
       pagamentoId?: string;
+      num_items?: number;
     }) => {
       trackEvent(
         "Purchase",
@@ -98,6 +143,7 @@ export function usePixel() {
           currency: params.currency || "BRL",
           content_name: params.content_name,
           content_ids: params.content_ids,
+          num_items: params.num_items || 1,
         },
         { serverSide: true }
       );
@@ -112,23 +158,15 @@ export function usePixel() {
     [trackEvent]
   );
 
-  const trackViewContent = useCallback(
-    (params: { content_name?: string; content_ids?: string[]; value?: number }) => {
-      trackEvent("ViewContent", {
-        ...params,
-        currency: "BRL",
-      });
-    },
-    [trackEvent]
-  );
-
   return {
     trackEvent,
     trackPageView,
+    trackViewContent,
     trackInitiateCheckout,
     trackPurchase,
     trackLead,
-    trackViewContent,
-    isConfigured: !!facebookPixelId,
+    isConfigured: pixelIds.length > 0,
+    hasGlobalPixel: !!globalPixelId,
+    hasAffiliatePixel: !!affiliatePixelId,
   };
 }
