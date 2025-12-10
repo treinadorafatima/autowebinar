@@ -34,8 +34,10 @@ import {
   Settings,
   Wallet,
   Unlink,
-  Users
+  Users,
+  Trash2
 } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { SiMercadopago } from "react-icons/si";
 
 const newLinkSchema = z.object({
@@ -113,6 +115,7 @@ export default function AfiliadoDashboardPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [isNewLinkDialogOpen, setIsNewLinkDialogOpen] = useState(false);
+  const [linkToDelete, setLinkToDelete] = useState<AffiliateLink | null>(null);
 
   const affiliateId = localStorage.getItem("affiliateId");
   const affiliateToken = localStorage.getItem("affiliateToken");
@@ -195,6 +198,29 @@ export default function AfiliadoDashboardPage() {
         description: error.message || "Não foi possível criar o link.",
         variant: "destructive",
       });
+    },
+  });
+
+  const deleteLinkMutation = useMutation({
+    mutationFn: async (linkId: number) => {
+      const response = await apiRequest("DELETE", `/api/affiliate-links/${linkId}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Link excluído!",
+        description: "O link foi removido com sucesso.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/affiliates", affiliateId, "links"] });
+      setLinkToDelete(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro ao excluir link",
+        description: error.message || "Não foi possível excluir o link.",
+        variant: "destructive",
+      });
+      setLinkToDelete(null);
     },
   });
 
@@ -576,6 +602,15 @@ export default function AfiliadoDashboardPage() {
                               >
                                 <ExternalLink className="h-4 w-4" />
                               </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setLinkToDelete(link)}
+                                data-testid={`button-delete-${link.id}`}
+                                className="text-destructive hover:text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -832,6 +867,33 @@ export default function AfiliadoDashboardPage() {
           </TabsContent>
         </Tabs>
       </main>
+
+      <AlertDialog open={!!linkToDelete} onOpenChange={(open) => !open && setLinkToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Link</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir o link <strong className="text-foreground">{linkToDelete?.code}</strong>?
+              Esta ação não pode ser desfeita e você perderá o histórico de cliques e conversões deste link.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => linkToDelete && deleteLinkMutation.mutate(linkToDelete.id)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteLinkMutation.isPending}
+              data-testid="button-confirm-delete"
+            >
+              {deleteLinkMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                "Excluir"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
