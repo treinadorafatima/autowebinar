@@ -9592,6 +9592,50 @@ Seja conversacional e objetivo.`;
     }
   });
 
+  // Update affiliate's own settings (Meta Pixel ID)
+  app.patch("/api/affiliate/me", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) return res.status(401).json({ error: "Unauthorized" });
+
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin) return res.status(404).json({ error: "Admin não encontrado" });
+
+      const affiliate = await storage.getAffiliateByAdminId(admin.id);
+      if (!affiliate) return res.status(404).json({ error: "Você não é um afiliado" });
+
+      // Only allow updating metaPixelId
+      const { metaPixelId } = req.body;
+      const updatedAffiliate = await storage.updateAffiliate(affiliate.id, {
+        metaPixelId: metaPixelId || null,
+      });
+
+      res.json(updatedAffiliate);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Get affiliate pixel ID by link code (public - for checkout tracking)
+  app.get("/api/affiliate-pixel/:code", async (req, res) => {
+    try {
+      const link = await storage.getAffiliateLinkByCode(req.params.code);
+      if (!link || !link.isActive) {
+        return res.json({ metaPixelId: null });
+      }
+
+      const affiliate = await storage.getAffiliateById(link.affiliateId);
+      if (!affiliate || affiliate.status !== "active") {
+        return res.json({ metaPixelId: null });
+      }
+
+      res.json({ metaPixelId: affiliate.metaPixelId || null });
+    } catch (error: any) {
+      res.json({ metaPixelId: null });
+    }
+  });
+
   // Login de afiliado (público)
   app.post("/api/affiliates/login", async (req, res) => {
     try {
