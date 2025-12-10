@@ -142,7 +142,13 @@ export default function Checkout() {
   const emailFromUrl = urlParams.get("email") || "";
   const nomeFromUrl = urlParams.get("nome") || "";
   const isRenovacao = urlParams.get("renovacao") === "true";
-  const affiliateCode = urlParams.get("ref") || null;
+  
+  // Get affiliate code from URL param or cookie for persistent tracking
+  const getAffiliateCookie = () => {
+    const match = document.cookie.match(/(?:^|;\s*)affiliate_ref=([^;]*)/);
+    return match ? decodeURIComponent(match[1]) : null;
+  };
+  const affiliateCode = urlParams.get("ref") || getAffiliateCookie();
   
   // Initialize pixel tracking with affiliate code for dual-pixel support
   const { trackViewContent, trackInitiateCheckout, trackAddPaymentInfo, trackPurchase, trackLead } = usePixel({ affiliateCode });
