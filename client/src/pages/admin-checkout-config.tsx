@@ -21,6 +21,7 @@ export default function AdminCheckoutConfig() {
   const [showValues, setShowValues] = useState<Record<string, boolean>>({});
   const [loadingValues, setLoadingValues] = useState<Record<string, boolean>>({});
   const [cachedValues, setCachedValues] = useState<Record<string, string>>({});
+  const [activeTab, setActiveTab] = useState("mercadopago");
 
   const { data: configs, isLoading } = useQuery<ConfigItem[]>({
     queryKey: ["/api/checkout/config"],
@@ -201,7 +202,7 @@ export default function AdminCheckoutConfig() {
         </p>
       </div>
 
-      <Tabs defaultValue="mercadopago" className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="mercadopago" className="flex items-center gap-2" data-testid="tab-mercadopago">
             <SiMercadopago className="w-4 h-4" />
@@ -372,54 +373,56 @@ export default function AdminCheckoutConfig() {
         </TabsContent>
       </Tabs>
 
-      <Card className="mt-6">
-        <CardHeader>
-          <CardTitle>URLs de Webhook</CardTitle>
-          <CardDescription>
-            Configure estas URLs nos painéis dos gateways de pagamento para receber notificações.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>Mercado Pago Webhook URL</Label>
-            <div className="flex items-center gap-2">
-              <code className="flex-1 p-2 bg-muted rounded text-sm" data-testid="text-webhook-mp">
-                {window.location.origin}/webhook/mercadopago
-              </code>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  navigator.clipboard.writeText(`${window.location.origin}/webhook/mercadopago`);
-                  toast({ title: "URL copiada!" });
-                }}
-                data-testid="button-copy-webhook-mp"
-              >
-                Copiar
-              </Button>
+      {(activeTab === "mercadopago" || activeTab === "stripe") && (
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle>URLs de Webhook</CardTitle>
+            <CardDescription>
+              Configure estas URLs nos painéis dos gateways de pagamento para receber notificações.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Mercado Pago Webhook URL</Label>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 p-2 bg-muted rounded text-sm" data-testid="text-webhook-mp">
+                  {window.location.origin}/webhook/mercadopago
+                </code>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    navigator.clipboard.writeText(`${window.location.origin}/webhook/mercadopago`);
+                    toast({ title: "URL copiada!" });
+                  }}
+                  data-testid="button-copy-webhook-mp"
+                >
+                  Copiar
+                </Button>
+              </div>
             </div>
-          </div>
-          <div className="space-y-2">
-            <Label>Stripe Webhook URL</Label>
-            <div className="flex items-center gap-2">
-              <code className="flex-1 p-2 bg-muted rounded text-sm" data-testid="text-webhook-stripe">
-                {window.location.origin}/webhook/stripe
-              </code>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  navigator.clipboard.writeText(`${window.location.origin}/webhook/stripe`);
-                  toast({ title: "URL copiada!" });
-                }}
-                data-testid="button-copy-webhook-stripe"
-              >
-                Copiar
-              </Button>
+            <div className="space-y-2">
+              <Label>Stripe Webhook URL</Label>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 p-2 bg-muted rounded text-sm" data-testid="text-webhook-stripe">
+                  {window.location.origin}/webhook/stripe
+                </code>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    navigator.clipboard.writeText(`${window.location.origin}/webhook/stripe`);
+                    toast({ title: "URL copiada!" });
+                  }}
+                  data-testid="button-copy-webhook-stripe"
+                >
+                  Copiar
+                </Button>
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
