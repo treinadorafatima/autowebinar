@@ -174,7 +174,7 @@ export default function AfiliadoDashboardPage() {
       } else if (data.linkType === "homepage") {
         payload.targetUrl = "/";
       } else if (data.linkType === "trial") {
-        payload.targetUrl = "/checkout/trial";
+        payload.targetUrl = "/teste-gratis";
       }
       
       const response = await apiRequest("POST", `/api/affiliates/${affiliateId}/links`, payload);
@@ -536,7 +536,7 @@ export default function AfiliadoDashboardPage() {
                           if (link.targetUrl === "/" || link.targetUrl === "") {
                             return "Homepage";
                           }
-                          if (link.targetUrl === "/checkout/trial") {
+                          if (link.targetUrl === "/teste-gratis") {
                             return "Teste Gratuito";
                           }
                           if (link.targetUrl) {
