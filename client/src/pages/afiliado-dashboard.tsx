@@ -90,6 +90,7 @@ interface Affiliate {
   mpUserId?: string | null;
   mpConnectedAt?: string | null;
   mpTokenExpiresAt?: string | null;
+  metaPixelId?: string | null;
 }
 
 interface Plano {
@@ -116,6 +117,7 @@ export default function AfiliadoDashboardPage() {
   const { toast } = useToast();
   const [isNewLinkDialogOpen, setIsNewLinkDialogOpen] = useState(false);
   const [linkToDelete, setLinkToDelete] = useState<AffiliateLink | null>(null);
+  const [metaPixelInput, setMetaPixelInput] = useState("");
 
   const affiliateId = localStorage.getItem("affiliateId");
   const affiliateToken = localStorage.getItem("affiliateToken");
@@ -244,6 +246,33 @@ export default function AfiliadoDashboardPage() {
       });
     },
   });
+
+  const updateMetaPixelMutation = useMutation({
+    mutationFn: async (metaPixelId: string) => {
+      const response = await apiRequest("PATCH", `/api/affiliate/me`, { metaPixelId });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Meta Pixel salvo!",
+        description: "Seu ID do Meta Pixel foi atualizado.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/affiliate/me"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro ao salvar",
+        description: error.message || "Não foi possível salvar o Meta Pixel.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  useEffect(() => {
+    if (affiliate?.metaPixelId) {
+      setMetaPixelInput(affiliate.metaPixelId);
+    }
+  }, [affiliate?.metaPixelId]);
 
   const handleConnectMercadoPago = () => {
     const token = localStorage.getItem("affiliateToken");
@@ -864,6 +893,57 @@ export default function AfiliadoDashboardPage() {
                 </CardContent>
               </Card>
             </div>
+
+            <Card className="mt-6">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5" />
+                  Meta Pixel (Facebook Ads)
+                </CardTitle>
+                <CardDescription>
+                  Configure seu Meta Pixel para rastrear conversões dos seus links de afiliado
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-3">
+                      Ao configurar seu Meta Pixel, todas as vendas feitas através dos seus links 
+                      serão rastreadas automaticamente com os eventos PageView, ViewContent, 
+                      InitiateCheckout e Purchase.
+                    </p>
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="ID do Meta Pixel (ex: 123456789012345)"
+                        value={metaPixelInput}
+                        onChange={(e) => setMetaPixelInput(e.target.value)}
+                        className="max-w-sm"
+                        data-testid="input-meta-pixel"
+                      />
+                      <Button
+                        onClick={() => updateMetaPixelMutation.mutate(metaPixelInput)}
+                        disabled={updateMetaPixelMutation.isPending}
+                        data-testid="button-save-pixel"
+                      >
+                        {updateMetaPixelMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          "Salvar"
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                  {affiliate?.metaPixelId && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                      <span className="text-muted-foreground">
+                        Pixel configurado: <span className="font-mono">{affiliate.metaPixelId}</span>
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </main>
