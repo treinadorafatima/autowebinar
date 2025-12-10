@@ -91,6 +91,7 @@ interface Affiliate {
   mpConnectedAt?: string | null;
   mpTokenExpiresAt?: string | null;
   metaPixelId?: string | null;
+  metaAccessToken?: string | null;
 }
 
 interface Plano {
@@ -118,6 +119,7 @@ export default function AfiliadoDashboardPage() {
   const [isNewLinkDialogOpen, setIsNewLinkDialogOpen] = useState(false);
   const [linkToDelete, setLinkToDelete] = useState<AffiliateLink | null>(null);
   const [metaPixelInput, setMetaPixelInput] = useState("");
+  const [metaAccessTokenInput, setMetaAccessTokenInput] = useState("");
 
   const affiliateId = localStorage.getItem("affiliateId");
   const affiliateToken = localStorage.getItem("affiliateToken");
@@ -272,7 +274,31 @@ export default function AfiliadoDashboardPage() {
     if (affiliate?.metaPixelId) {
       setMetaPixelInput(affiliate.metaPixelId);
     }
-  }, [affiliate?.metaPixelId]);
+    if (affiliate?.metaAccessToken) {
+      setMetaAccessTokenInput(affiliate.metaAccessToken);
+    }
+  }, [affiliate?.metaPixelId, affiliate?.metaAccessToken]);
+
+  const updateMetaAccessTokenMutation = useMutation({
+    mutationFn: async (metaAccessToken: string) => {
+      const response = await apiRequest("PATCH", `/api/affiliate/me`, { metaAccessToken });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Access Token salvo!",
+        description: "Seu token de API de Conversões foi atualizado.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/affiliate/me"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro ao salvar",
+        description: error.message || "Não foi possível salvar o Access Token.",
+        variant: "destructive",
+      });
+    },
+  });
 
   const handleConnectMercadoPago = () => {
     const token = localStorage.getItem("affiliateToken");
@@ -941,6 +967,43 @@ export default function AfiliadoDashboardPage() {
                       </span>
                     </div>
                   )}
+                  
+                  <div className="border-t pt-4 mt-4">
+                    <p className="text-sm font-medium mb-2">API de Conversões (Opcional)</p>
+                    <p className="text-sm text-muted-foreground mb-3">
+                      Para melhor rastreamento de conversões, adicione seu Access Token da API de Conversões do Meta.
+                      Isso permite enviar eventos server-side para maior precisão.
+                    </p>
+                    <div className="flex gap-2">
+                      <Input
+                        type="password"
+                        placeholder="Access Token da API de Conversões"
+                        value={metaAccessTokenInput}
+                        onChange={(e) => setMetaAccessTokenInput(e.target.value)}
+                        className="flex-1"
+                        data-testid="input-meta-access-token"
+                      />
+                      <Button
+                        onClick={() => updateMetaAccessTokenMutation.mutate(metaAccessTokenInput)}
+                        disabled={updateMetaAccessTokenMutation.isPending}
+                        data-testid="button-save-access-token"
+                      >
+                        {updateMetaAccessTokenMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          "Salvar"
+                        )}
+                      </Button>
+                    </div>
+                    {affiliate?.metaAccessToken && (
+                      <div className="flex items-center gap-2 text-sm mt-2">
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                        <span className="text-muted-foreground">
+                          Access Token configurado
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </CardContent>
             </Card>

@@ -3968,8 +3968,11 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
       ...data,
       id,
       status: data.status ?? "pending",
+      whatsapp: data.whatsapp ?? null,
       commissionPercent: data.commissionPercent ?? 30,
       commissionFixed: data.commissionFixed ?? null,
+      metaPixelId: data.metaPixelId ?? null,
+      metaAccessToken: data.metaAccessToken ?? null,
       mpUserId: data.mpUserId ?? null,
       mpAccessToken: data.mpAccessToken ?? null,
       mpRefreshToken: data.mpRefreshToken ?? null,
@@ -3999,10 +4002,24 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
 
   // Affiliate Links
 
-  async listAffiliateLinksByAffiliate(affiliateId: string): Promise<AffiliateLink[]> {
-    return db.select().from(affiliateLinks)
+  async listAffiliateLinksByAffiliate(affiliateId: string): Promise<(AffiliateLink & { planoName?: string | null })[]> {
+    const links = await db.select().from(affiliateLinks)
       .where(eq(affiliateLinks.affiliateId, affiliateId))
       .orderBy(desc(affiliateLinks.createdAt));
+    
+    const linksWithPlanoName = await Promise.all(
+      links.map(async (link) => {
+        if (link.planoId) {
+          const plano = await db.select().from(checkoutPlanos)
+            .where(eq(checkoutPlanos.id, link.planoId))
+            .limit(1);
+          return { ...link, planoName: plano[0]?.nome ?? undefined };
+        }
+        return { ...link, planoName: undefined };
+      })
+    );
+    
+    return linksWithPlanoName;
   }
 
   async getAffiliateLinkById(id: string): Promise<AffiliateLink | undefined> {

@@ -896,6 +896,7 @@ export const affiliates = pgTable("affiliates", {
   commissionPercent: integer("commission_percent").notNull().default(30), // Percentual de comissão
   commissionFixed: integer("commission_fixed"), // Valor fixo opcional (centavos)
   metaPixelId: text("meta_pixel_id"), // Meta Pixel ID do afiliado para rastreamento
+  metaAccessToken: text("meta_access_token"), // Meta Conversions API Access Token
   mpUserId: text("mp_user_id"), // ID do usuário no Mercado Pago
   mpAccessToken: text("mp_access_token"), // Token OAuth do MP (criptografado)
   mpRefreshToken: text("mp_refresh_token"), // Refresh token do MP

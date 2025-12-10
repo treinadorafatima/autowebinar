@@ -6819,48 +6819,91 @@ Seja conversacional e objetivo.`;
   // Track pixel event server-side (for Conversions API)
   app.post("/api/pixel/track", async (req, res) => {
     try {
-      const { eventName, params } = req.body;
+      const { eventName, params, affiliateCode, userData } = req.body;
       
-      const pixelId = await storage.getCheckoutConfig('FACEBOOK_PIXEL_ID');
-      const accessToken = await storage.getCheckoutConfig('FACEBOOK_ACCESS_TOKEN');
-      
-      if (!pixelId || !accessToken) {
-        return res.json({ success: false, reason: "Pixel or Access Token not configured" });
-      }
-
       // Get client info for deduplication
       const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
       const userAgent = req.headers['user-agent'];
       const eventId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-      // Send to Facebook Conversions API
-      const eventData = {
-        data: [{
-          event_name: eventName,
-          event_time: Math.floor(Date.now() / 1000),
-          event_id: eventId,
-          action_source: "website",
-          user_data: {
-            client_ip_address: clientIp,
-            client_user_agent: userAgent,
-          },
-          custom_data: params || {},
-        }],
+      // Helper function to SHA-256 hash values as required by Meta Conversions API
+      const hashValue = (value: string) => crypto.createHash('sha256').update(value).digest('hex');
+
+      // Build user_data with advanced matching (SHA-256 hashed as required by Meta)
+      const userDataPayload: Record<string, any> = {
+        client_ip_address: clientIp,
+        client_user_agent: userAgent,
       };
+      if (userData?.email) userDataPayload.em = [hashValue(userData.email.toLowerCase().trim())];
+      if (userData?.phone) userDataPayload.ph = [hashValue(userData.phone.replace(/\D/g, ''))];
+      if (userData?.name) {
+        const nameParts = userData.name.trim().split(' ');
+        if (nameParts[0]) userDataPayload.fn = [hashValue(nameParts[0].toLowerCase())];
+        if (nameParts.length > 1) userDataPayload.ln = [hashValue(nameParts[nameParts.length - 1].toLowerCase())];
+      }
 
-      const response = await fetch(
-        `https://graph.facebook.com/v18.0/${pixelId}/events?access_token=${accessToken}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(eventData),
-        }
-      );
+      const results: { global?: any; affiliate?: any } = {};
 
-      const result = await response.json();
-      console.log("[Pixel API] Event sent:", eventName, result);
+      // Send to global pixel if configured
+      const globalPixelId = await storage.getCheckoutConfig('FACEBOOK_PIXEL_ID');
+      const globalAccessToken = await storage.getCheckoutConfig('FACEBOOK_ACCESS_TOKEN');
       
-      res.json({ success: true, eventId });
+      if (globalPixelId && globalAccessToken) {
+        const eventData = {
+          data: [{
+            event_name: eventName,
+            event_time: Math.floor(Date.now() / 1000),
+            event_id: eventId,
+            action_source: "website",
+            user_data: userDataPayload,
+            custom_data: params || {},
+          }],
+        };
+
+        const response = await fetch(
+          `https://graph.facebook.com/v18.0/${globalPixelId}/events?access_token=${globalAccessToken}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(eventData),
+          }
+        );
+        results.global = await response.json();
+        console.log("[Pixel API] Global event sent:", eventName, results.global);
+      }
+
+      // Send to affiliate pixel if configured
+      if (affiliateCode) {
+        const link = await storage.getAffiliateLinkByCode(affiliateCode);
+        if (link) {
+          const affiliate = await storage.getAffiliateById(link.affiliateId);
+          if (affiliate?.metaPixelId && affiliate?.metaAccessToken && affiliate.status === "active") {
+            const affiliateEventData = {
+              data: [{
+                event_name: eventName,
+                event_time: Math.floor(Date.now() / 1000),
+                event_id: `${eventId}_aff`,
+                action_source: "website",
+                user_data: userDataPayload,
+                custom_data: params || {},
+              }],
+            };
+
+            const affiliateResponse = await fetch(
+              `https://graph.facebook.com/v18.0/${affiliate.metaPixelId}/events?access_token=${affiliate.metaAccessToken}`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(affiliateEventData),
+              }
+            );
+            results.affiliate = await affiliateResponse.json();
+            console.log("[Pixel API] Affiliate event sent:", eventName, results.affiliate);
+          }
+        }
+      }
+      
+      res.json({ success: true, eventId, results });
     } catch (error: any) {
       console.error("[Pixel API] Error:", error);
       res.json({ success: false, error: error.message });
@@ -9606,11 +9649,13 @@ Seja conversacional e objetivo.`;
       const affiliate = await storage.getAffiliateByAdminId(admin.id);
       if (!affiliate) return res.status(404).json({ error: "Você não é um afiliado" });
 
-      // Only allow updating metaPixelId
-      const { metaPixelId } = req.body;
-      const updatedAffiliate = await storage.updateAffiliate(affiliate.id, {
-        metaPixelId: metaPixelId || null,
-      });
+      // Only allow updating metaPixelId and metaAccessToken
+      const { metaPixelId, metaAccessToken } = req.body;
+      const updateData: Record<string, any> = {};
+      if (metaPixelId !== undefined) updateData.metaPixelId = metaPixelId || null;
+      if (metaAccessToken !== undefined) updateData.metaAccessToken = metaAccessToken || null;
+      
+      const updatedAffiliate = await storage.updateAffiliate(affiliate.id, updateData);
 
       res.json(updatedAffiliate);
     } catch (error: any) {
