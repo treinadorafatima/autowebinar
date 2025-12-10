@@ -897,11 +897,14 @@ export const affiliates = pgTable("affiliates", {
   commissionFixed: integer("commission_fixed"), // Valor fixo opcional (centavos)
   metaPixelId: text("meta_pixel_id"), // Meta Pixel ID do afiliado para rastreamento
   metaAccessToken: text("meta_access_token"), // Meta Conversions API Access Token
-  mpUserId: text("mp_user_id"), // ID do usuário no Mercado Pago
+  mpUserId: text("mp_user_id"), // ID do usuário no Mercado Pago (collector_id para split)
   mpAccessToken: text("mp_access_token"), // Token OAuth do MP (criptografado)
   mpRefreshToken: text("mp_refresh_token"), // Refresh token do MP
   mpTokenExpiresAt: timestamp("mp_token_expires_at"), // Expiração do token
   mpConnectedAt: timestamp("mp_connected_at"), // Data de conexão com MP
+  stripeConnectAccountId: text("stripe_connect_account_id"), // ID da conta Stripe Connect do afiliado
+  stripeConnectStatus: text("stripe_connect_status").default("pending"), // 'pending', 'connected', 'disabled'
+  stripeConnectedAt: timestamp("stripe_connected_at"), // Data de conexão com Stripe Connect
   totalEarnings: integer("total_earnings").notNull().default(0), // Total ganho (centavos)
   pendingAmount: integer("pending_amount").notNull().default(0), // Valor pendente (centavos)
   paidAmount: integer("paid_amount").notNull().default(0), // Valor pago (centavos)
@@ -938,8 +941,11 @@ export const affiliateSales = pgTable("affiliate_sales", {
   pagamentoId: text("pagamento_id").notNull(), // FK para checkout_pagamentos
   saleAmount: integer("sale_amount").notNull(), // Valor da venda (centavos)
   commissionAmount: integer("commission_amount").notNull(), // Valor da comissão (centavos)
+  commissionPercent: integer("commission_percent"), // Percentual de comissão usado
   status: text("status").notNull().default("pending"), // 'pending', 'approved', 'paid', 'refunded', 'cancelled'
-  mpTransferId: text("mp_transfer_id"), // ID da transferência no MP (quando pago)
+  splitMethod: text("split_method"), // 'mp_marketplace', 'stripe_connect', 'manual'
+  mpTransferId: text("mp_transfer_id"), // ID da transferência no MP (quando pago via split)
+  stripeTransferId: text("stripe_transfer_id"), // ID da transferência no Stripe Connect
   paidAt: timestamp("paid_at"), // Data do pagamento
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
