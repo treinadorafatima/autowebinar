@@ -145,7 +145,7 @@ export default function Checkout() {
   const affiliateCode = urlParams.get("ref") || null;
   
   // Initialize pixel tracking with affiliate code for dual-pixel support
-  const { trackViewContent, trackInitiateCheckout, trackPurchase } = usePixel({ affiliateCode });
+  const { trackViewContent, trackInitiateCheckout, trackAddPaymentInfo, trackPurchase, trackLead } = usePixel({ affiliateCode });
   
   const [formData, setFormData] = useState({
     nome: nomeFromUrl,
@@ -303,9 +303,17 @@ export default function Checkout() {
     
     if (isDocComplete && isPhoneComplete) {
       hasAutoStartedRef.current = true;
+      // Track Lead event when auto-starting checkout
+      trackLead({
+        content_name: selectedPlano?.nome,
+        value: selectedPlano ? selectedPlano.preco / 100 : undefined,
+        email: formData.email,
+        phone: formData.telefone,
+        name: formData.nome,
+      });
       iniciarMutation.mutate();
     }
-  }, [formData.documento, formData.tipoDocumento, formData.nome, formData.email, formData.telefone, step, selectedPlano, iniciarMutation]);
+  }, [formData.documento, formData.tipoDocumento, formData.nome, formData.email, formData.telefone, step, selectedPlano, iniciarMutation, trackLead]);
 
   const processarPagamentoMpMutation = useMutation({
     mutationFn: async (paymentData: any) => {
@@ -406,23 +414,41 @@ export default function Checkout() {
     },
   });
 
-  const handleMpSubmit = useCallback(async (formData: any) => {
+  const handleMpSubmit = useCallback(async (mpFormData: any) => {
     setIsProcessingPayment(true);
+    // Track AddPaymentInfo when user submits payment
+    trackAddPaymentInfo({
+      value: selectedPlano ? selectedPlano.preco / 100 : undefined,
+      content_name: selectedPlano?.nome,
+      payment_type: mpFormData?.payment_method_id || 'mercadopago',
+      email: formData.email,
+      phone: formData.telefone,
+      name: formData.nome,
+    });
     try {
-      await processarPagamentoMpMutation.mutateAsync(formData);
+      await processarPagamentoMpMutation.mutateAsync(mpFormData);
     } finally {
       setIsProcessingPayment(false);
     }
-  }, [processarPagamentoMpMutation]);
+  }, [processarPagamentoMpMutation, trackAddPaymentInfo, selectedPlano, formData]);
 
   const handleCardPaymentSubmit = useCallback(async (cardData: any) => {
     setIsProcessingPayment(true);
+    // Track AddPaymentInfo when user submits card payment
+    trackAddPaymentInfo({
+      value: selectedPlano ? selectedPlano.preco / 100 : undefined,
+      content_name: selectedPlano?.nome,
+      payment_type: 'credit_card',
+      email: formData.email,
+      phone: formData.telefone,
+      name: formData.nome,
+    });
     try {
       await processarAssinaturaRecorrenteMutation.mutateAsync(cardData);
     } finally {
       setIsProcessingPayment(false);
     }
-  }, [processarAssinaturaRecorrenteMutation]);
+  }, [processarAssinaturaRecorrenteMutation, trackAddPaymentInfo, selectedPlano, formData]);
 
   const handleMpReady = useCallback(() => {
     console.log('[MercadoPago] Payment Brick ready');
@@ -518,6 +544,15 @@ export default function Checkout() {
       });
       return;
     }
+    
+    // Track Lead event when form is submitted with user data
+    trackLead({
+      content_name: selectedPlano?.nome,
+      value: selectedPlano ? selectedPlano.preco / 100 : undefined,
+      email: formData.email,
+      phone: formData.telefone,
+      name: formData.nome,
+    });
     
     iniciarMutation.mutate();
   };

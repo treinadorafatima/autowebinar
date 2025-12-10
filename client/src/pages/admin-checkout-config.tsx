@@ -335,9 +335,14 @@ export default function AdminCheckoutConfig() {
                 <ul className="space-y-1 text-muted-foreground">
                   <li><span className="font-mono text-xs bg-background px-1 rounded">PageView</span> - Ao carregar a página</li>
                   <li><span className="font-mono text-xs bg-background px-1 rounded">ViewContent</span> - Ao ver um plano</li>
+                  <li><span className="font-mono text-xs bg-background px-1 rounded">Lead</span> - Ao preencher dados pessoais</li>
                   <li><span className="font-mono text-xs bg-background px-1 rounded">InitiateCheckout</span> - Ao iniciar pagamento</li>
+                  <li><span className="font-mono text-xs bg-background px-1 rounded">AddPaymentInfo</span> - Ao inserir dados do cartão</li>
                   <li><span className="font-mono text-xs bg-background px-1 rounded">Purchase</span> - Pagamento aprovado (frontend + API)</li>
                 </ul>
+                <p className="mt-3 text-xs text-muted-foreground">
+                  Os dados do usuário (email, telefone, nome) são enviados para melhor correspondência.
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -386,6 +391,9 @@ export default function AdminCheckoutConfig() {
                 <p className="font-medium mb-2">Eventos rastreados:</p>
                 <ul className="space-y-1 text-muted-foreground">
                   <li><span className="font-mono text-xs bg-background px-1 rounded">page_view</span> - Ao carregar a página</li>
+                  <li><span className="font-mono text-xs bg-background px-1 rounded">generate_lead</span> - Ao preencher dados pessoais</li>
+                  <li><span className="font-mono text-xs bg-background px-1 rounded">begin_checkout</span> - Ao iniciar pagamento</li>
+                  <li><span className="font-mono text-xs bg-background px-1 rounded">add_payment_info</span> - Ao inserir dados do cartão</li>
                   <li><span className="font-mono text-xs bg-background px-1 rounded">conversion</span> - Pagamento aprovado (usando o Label configurado)</li>
                 </ul>
               </div>
