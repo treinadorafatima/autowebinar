@@ -474,7 +474,7 @@ export default function AfiliadoDashboardPage() {
         </div>
 
         <Tabs defaultValue="links" className="space-y-4">
-          <TabsList>
+          <TabsList className="flex-wrap">
             <TabsTrigger value="links" data-testid="tab-links">
               <LinkIcon className="h-4 w-4 mr-2" />
               Meus Links
@@ -486,6 +486,14 @@ export default function AfiliadoDashboardPage() {
             <TabsTrigger value="leads" data-testid="tab-leads">
               <Users className="h-4 w-4 mr-2" />
               Leads
+            </TabsTrigger>
+            <TabsTrigger value="saque" data-testid="tab-saque">
+              <Wallet className="h-4 w-4 mr-2" />
+              Saque
+            </TabsTrigger>
+            <TabsTrigger value="tracking" data-testid="tab-tracking">
+              <BarChart3 className="h-4 w-4 mr-2" />
+              Rastrear Vendas
             </TabsTrigger>
             <TabsTrigger value="account" data-testid="tab-account">
               <Settings className="h-4 w-4 mr-2" />
@@ -792,51 +800,53 @@ export default function AfiliadoDashboardPage() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="account">
-            <div className="grid gap-6 md:grid-cols-2">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Wallet className="h-5 w-5" />
-                    Mercado Pago - Pagamentos Automáticos
-                  </CardTitle>
-                  <CardDescription>
-                    Conecte sua conta do Mercado Pago para receber suas comissões automaticamente
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {isLoadingAffiliate ? (
-                    <Skeleton className="h-20 w-full" />
-                  ) : (
-                    <div className="space-y-4">
-                      <div className="p-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
-                        <div className="flex items-start gap-3">
-                          <DollarSign className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
-                          <div>
-                            <p className="font-medium text-blue-900 dark:text-blue-100 mb-1">
-                              Pagamentos Automáticos
-                            </p>
-                            <p className="text-sm text-blue-700 dark:text-blue-300">
-                              Suas comissões serão transferidas automaticamente para sua conta do Mercado Pago 
-                              após a confirmação de cada venda. Não é necessário solicitar saque!
-                            </p>
-                          </div>
+          <TabsContent value="saque">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Wallet className="h-5 w-5" />
+                  Receber Comissões via Mercado Pago
+                </CardTitle>
+                <CardDescription>
+                  Conecte sua conta do Mercado Pago para receber suas comissões automaticamente quando uma venda for confirmada
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoadingAffiliate ? (
+                  <Skeleton className="h-20 w-full" />
+                ) : (
+                  <div className="space-y-6">
+                    <div className="p-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
+                      <div className="flex items-start gap-3">
+                        <DollarSign className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <p className="font-medium text-blue-900 dark:text-blue-100 mb-2">
+                            Como funciona o recebimento de comissões?
+                          </p>
+                          <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-2">
+                            <li>1. Conecte sua conta do Mercado Pago abaixo</li>
+                            <li>2. Quando alguém comprar através do seu link, você ganha uma comissão</li>
+                            <li>3. Após a confirmação do pagamento, a comissão é transferida automaticamente para seu Mercado Pago</li>
+                            <li>4. Você pode transferir do Mercado Pago para sua conta bancária quando quiser</li>
+                          </ul>
                         </div>
                       </div>
+                    </div>
 
-                      <div className="flex items-center justify-between p-4 border rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-[#009ee3]/10 rounded-full flex items-center justify-center">
-                            <SiMercadopago className="h-5 w-5 text-[#009ee3]" />
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="p-4 border rounded-lg">
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className="w-12 h-12 bg-[#009ee3]/10 rounded-full flex items-center justify-center">
+                            <SiMercadopago className="h-6 w-6 text-[#009ee3]" />
                           </div>
                           <div>
-                            <p className="font-medium">Status da Conexão</p>
-                            <div className="flex items-center gap-2">
+                            <p className="font-medium">Status da Conta</p>
+                            <div className="flex items-center gap-2 mt-1">
                               {getMpConnectionStatus().connected ? (
                                 getMpConnectionStatus().expired ? (
                                   <Badge variant="destructive">
                                     <XCircle className="h-3 w-3 mr-1" />
-                                    Token Expirado
+                                    Conexão Expirada
                                   </Badge>
                                 ) : (
                                   <Badge variant="default" className="bg-green-500">
@@ -853,231 +863,302 @@ export default function AfiliadoDashboardPage() {
                             </div>
                           </div>
                         </div>
-                      </div>
-
-                      {getMpConnectionStatus().connected && affiliate?.mpConnectedAt && (
-                        <p className="text-sm text-muted-foreground">
-                          Conectado desde: {formatDate(affiliate.mpConnectedAt)}
-                        </p>
-                      )}
-
-                      {(!getMpConnectionStatus().connected || getMpConnectionStatus().expired) && (
-                        <div className="p-4 bg-muted/50 rounded-lg space-y-3">
-                          <p className="font-medium text-sm">Como conectar sua conta:</p>
-                          <ol className="text-sm text-muted-foreground space-y-2 list-decimal list-inside">
-                            <li>
-                              <strong>Tenha uma conta no Mercado Pago:</strong> Se ainda não tem, crie gratuitamente em{" "}
-                              <a 
-                                href="https://www.mercadopago.com.br" 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="text-[#009ee3] hover:underline"
-                                data-testid="link-mercadopago-site"
-                              >
-                                mercadopago.com.br
-                              </a>
-                            </li>
-                            <li>
-                              <strong>Clique em "Conectar Mercado Pago":</strong> Você será redirecionado para o site oficial do Mercado Pago
-                            </li>
-                            <li>
-                              <strong>Faça login na sua conta:</strong> Use seu email e senha do Mercado Pago
-                            </li>
-                            <li>
-                              <strong>Autorize a conexão:</strong> Permita que recebamos suas comissões em sua conta
-                            </li>
-                            <li>
-                              <strong>Pronto!</strong> Suas comissões serão depositadas automaticamente
-                            </li>
-                          </ol>
-                        </div>
-                      )}
-
-                      <div className="flex gap-2">
-                        {!getMpConnectionStatus().connected || getMpConnectionStatus().expired ? (
-                          <Button
-                            onClick={handleConnectMercadoPago}
-                            className="bg-[#009ee3] hover:bg-[#007bb5]"
-                            data-testid="button-connect-mp"
-                          >
-                            <SiMercadopago className="h-4 w-4 mr-2" />
-                            Conectar Mercado Pago
-                          </Button>
-                        ) : (
-                          <Button
-                            variant="outline"
-                            onClick={() => disconnectMpMutation.mutate()}
-                            disabled={disconnectMpMutation.isPending}
-                            data-testid="button-disconnect-mp"
-                          >
-                            {disconnectMpMutation.isPending ? (
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            ) : (
-                              <Unlink className="h-4 w-4 mr-2" />
-                            )}
-                            Desconectar
-                          </Button>
+                        
+                        {getMpConnectionStatus().connected && affiliate?.mpConnectedAt && (
+                          <p className="text-sm text-muted-foreground">
+                            Conectado desde: {formatDate(affiliate.mpConnectedAt)}
+                          </p>
                         )}
                       </div>
 
-                      {getMpConnectionStatus().connected && !getMpConnectionStatus().expired && (
-                        <div className="p-4 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg">
-                          <div className="flex items-start gap-3">
-                            <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+                      <div className="p-4 border rounded-lg">
+                        <p className="font-medium mb-2">Resumo de Comissões</p>
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Total ganho:</span>
+                            <span className="font-medium text-green-600">{formatCurrency(stats?.totalCommission || 0)}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Pendente:</span>
+                            <span className="font-medium">{formatCurrency(stats?.pendingCommission || 0)}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Já pago:</span>
+                            <span className="font-medium">{formatCurrency(stats?.paidCommission || 0)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {(!getMpConnectionStatus().connected || getMpConnectionStatus().expired) && (
+                      <div className="p-4 bg-muted/50 rounded-lg space-y-4">
+                        <p className="font-semibold">Passo a passo para conectar sua conta:</p>
+                        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                          <div className="flex items-start gap-3 p-3 bg-background rounded-md border">
+                            <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
+                              <span className="font-bold text-primary">1</span>
+                            </div>
                             <div>
-                              <p className="font-medium text-green-900 dark:text-green-100 mb-1">
-                                Tudo certo!
+                              <p className="font-medium text-sm">Crie uma conta gratuita</p>
+                              <p className="text-xs text-muted-foreground">
+                                Se ainda não tem, acesse{" "}
+                                <a 
+                                  href="https://www.mercadopago.com.br" 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="text-[#009ee3] hover:underline"
+                                  data-testid="link-mercadopago-site"
+                                >
+                                  mercadopago.com.br
+                                </a>
                               </p>
-                              <p className="text-sm text-green-700 dark:text-green-300">
-                                Sua conta está conectada e pronta para receber pagamentos automáticos. 
-                                Cada venda confirmada terá a comissão transferida diretamente para você.
+                            </div>
+                          </div>
+                          <div className="flex items-start gap-3 p-3 bg-background rounded-md border">
+                            <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
+                              <span className="font-bold text-primary">2</span>
+                            </div>
+                            <div>
+                              <p className="font-medium text-sm">Clique no botão abaixo</p>
+                              <p className="text-xs text-muted-foreground">
+                                Você será redirecionado para o Mercado Pago
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-start gap-3 p-3 bg-background rounded-md border">
+                            <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
+                              <span className="font-bold text-primary">3</span>
+                            </div>
+                            <div>
+                              <p className="font-medium text-sm">Autorize a conexão</p>
+                              <p className="text-xs text-muted-foreground">
+                                Faça login e permita receber pagamentos
                               </p>
                             </div>
                           </div>
                         </div>
+                      </div>
+                    )}
+
+                    <div className="flex gap-2">
+                      {!getMpConnectionStatus().connected || getMpConnectionStatus().expired ? (
+                        <Button
+                          onClick={handleConnectMercadoPago}
+                          className="bg-[#009ee3] hover:bg-[#007bb5]"
+                          data-testid="button-connect-mp"
+                        >
+                          <SiMercadopago className="h-4 w-4 mr-2" />
+                          Conectar Mercado Pago
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          onClick={() => disconnectMpMutation.mutate()}
+                          disabled={disconnectMpMutation.isPending}
+                          data-testid="button-disconnect-mp"
+                        >
+                          {disconnectMpMutation.isPending ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          ) : (
+                            <Unlink className="h-4 w-4 mr-2" />
+                          )}
+                          Desconectar
+                        </Button>
                       )}
                     </div>
-                  )}
-                </CardContent>
-              </Card>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <User className="h-5 w-5" />
-                    Informações da Conta
-                  </CardTitle>
-                  <CardDescription>
-                    Seus dados cadastrais como afiliado
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {isLoadingAffiliate ? (
-                    <Skeleton className="h-32 w-full" />
-                  ) : (
-                    <div className="space-y-3">
-                      <div className="flex justify-between border-b pb-2">
-                        <span className="text-muted-foreground">Nome</span>
-                        <span className="font-medium">{affiliate?.name}</span>
-                      </div>
-                      <div className="flex justify-between border-b pb-2">
-                        <span className="text-muted-foreground">Email</span>
-                        <span className="font-medium">{affiliate?.email}</span>
-                      </div>
-                      <div className="flex justify-between border-b pb-2">
-                        <span className="text-muted-foreground">WhatsApp</span>
-                        <span className="font-medium">{affiliate?.whatsapp || "Não informado"}</span>
-                      </div>
-                      <div className="flex justify-between border-b pb-2">
-                        <span className="text-muted-foreground">Comissão</span>
-                        <span className="font-medium">{affiliate?.commissionPercent || 0}%</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Status</span>
-                        <Badge 
-                          variant={
-                            affiliate?.status === 'active' ? "default" : 
-                            affiliate?.status === 'suspended' ? "destructive" : 
-                            "secondary"
-                          }
-                        >
-                          {affiliate?.status === 'active' ? "Ativo" : 
-                           affiliate?.status === 'suspended' ? "Suspenso" : 
-                           affiliate?.status === 'inactive' ? "Inativo" : 
-                           "Pendente"}
-                        </Badge>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-
-            <Card className="mt-6">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5" />
-                  Meta Pixel (Facebook Ads)
-                </CardTitle>
-                <CardDescription>
-                  Configure seu Meta Pixel para rastrear conversões dos seus links de afiliado
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-3">
-                      Ao configurar seu Meta Pixel, todas as vendas feitas através dos seus links 
-                      serão rastreadas automaticamente com os eventos PageView, ViewContent, 
-                      InitiateCheckout e Purchase.
-                    </p>
-                    <div className="flex gap-2">
-                      <Input
-                        placeholder="ID do Meta Pixel (ex: 123456789012345)"
-                        value={metaPixelInput}
-                        onChange={(e) => setMetaPixelInput(e.target.value)}
-                        className="max-w-sm"
-                        data-testid="input-meta-pixel"
-                      />
-                      <Button
-                        onClick={() => updateMetaPixelMutation.mutate(metaPixelInput)}
-                        disabled={updateMetaPixelMutation.isPending}
-                        data-testid="button-save-pixel"
-                      >
-                        {updateMetaPixelMutation.isPending ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          "Salvar"
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-                  {affiliate?.metaPixelId && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                      <span className="text-muted-foreground">
-                        Pixel configurado: <span className="font-mono">{affiliate.metaPixelId}</span>
-                      </span>
-                    </div>
-                  )}
-                  
-                  <div className="border-t pt-4 mt-4">
-                    <p className="text-sm font-medium mb-2">API de Conversões (Opcional)</p>
-                    <p className="text-sm text-muted-foreground mb-3">
-                      Para melhor rastreamento de conversões, adicione seu Access Token da API de Conversões do Meta.
-                      Isso permite enviar eventos server-side para maior precisão.
-                    </p>
-                    <div className="flex gap-2">
-                      <Input
-                        type="password"
-                        placeholder="Access Token da API de Conversões"
-                        value={metaAccessTokenInput}
-                        onChange={(e) => setMetaAccessTokenInput(e.target.value)}
-                        className="flex-1"
-                        data-testid="input-meta-access-token"
-                      />
-                      <Button
-                        onClick={() => updateMetaAccessTokenMutation.mutate(metaAccessTokenInput)}
-                        disabled={updateMetaAccessTokenMutation.isPending}
-                        data-testid="button-save-access-token"
-                      >
-                        {updateMetaAccessTokenMutation.isPending ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          "Salvar"
-                        )}
-                      </Button>
-                    </div>
-                    {affiliate?.metaAccessToken && (
-                      <div className="flex items-center gap-2 text-sm mt-2">
-                        <CheckCircle className="h-4 w-4 text-green-500" />
-                        <span className="text-muted-foreground">
-                          Access Token configurado
-                        </span>
+                    {getMpConnectionStatus().connected && !getMpConnectionStatus().expired && (
+                      <div className="p-4 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg">
+                        <div className="flex items-start gap-3">
+                          <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+                          <div>
+                            <p className="font-medium text-green-900 dark:text-green-100 mb-1">
+                              Tudo configurado!
+                            </p>
+                            <p className="text-sm text-green-700 dark:text-green-300">
+                              Sua conta está conectada. Quando uma venda for confirmada através dos seus links, 
+                              a comissão será transferida automaticamente para sua conta do Mercado Pago.
+                              Você pode sacar para sua conta bancária diretamente no app do Mercado Pago.
+                            </p>
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="tracking">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5" />
+                  Rastreamento de Vendas (Meta Pixel)
+                </CardTitle>
+                <CardDescription>
+                  Configure seu Meta Pixel para rastrear todas as conversões dos seus links de afiliado e otimizar suas campanhas de anúncios
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  <div className="p-4 bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 rounded-lg">
+                    <div className="flex items-start gap-3">
+                      <BarChart3 className="h-5 w-5 text-purple-600 dark:text-purple-400 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="font-medium text-purple-900 dark:text-purple-100 mb-2">
+                          Por que rastrear suas vendas?
+                        </p>
+                        <ul className="text-sm text-purple-700 dark:text-purple-300 space-y-1">
+                          <li>Saiba quantas pessoas viram sua página (PageView)</li>
+                          <li>Acompanhe quem visualizou os produtos (ViewContent)</li>
+                          <li>Veja quantos iniciaram o checkout (InitiateCheckout)</li>
+                          <li>Rastreie todas as vendas concluídas (Purchase)</li>
+                          <li>Otimize seus anúncios do Facebook/Instagram com dados reais</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-4">
+                      <div>
+                        <p className="font-medium mb-2">ID do Meta Pixel</p>
+                        <p className="text-sm text-muted-foreground mb-3">
+                          Encontre seu Pixel ID no Gerenciador de Eventos do Meta Ads.
+                        </p>
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder="Ex: 123456789012345"
+                            value={metaPixelInput}
+                            onChange={(e) => setMetaPixelInput(e.target.value)}
+                            data-testid="input-meta-pixel"
+                          />
+                          <Button
+                            onClick={() => updateMetaPixelMutation.mutate(metaPixelInput)}
+                            disabled={updateMetaPixelMutation.isPending}
+                            data-testid="button-save-pixel"
+                          >
+                            {updateMetaPixelMutation.isPending ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              "Salvar"
+                            )}
+                          </Button>
+                        </div>
+                        {affiliate?.metaPixelId && (
+                          <div className="flex items-center gap-2 text-sm mt-2">
+                            <CheckCircle className="h-4 w-4 text-green-500" />
+                            <span className="text-muted-foreground">
+                              Pixel ativo: <span className="font-mono">{affiliate.metaPixelId}</span>
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div>
+                        <p className="font-medium mb-2">API de Conversões (Opcional)</p>
+                        <p className="text-sm text-muted-foreground mb-3">
+                          Melhora a precisão do rastreamento com eventos server-side.
+                        </p>
+                        <div className="flex gap-2">
+                          <Input
+                            type="password"
+                            placeholder="Access Token"
+                            value={metaAccessTokenInput}
+                            onChange={(e) => setMetaAccessTokenInput(e.target.value)}
+                            data-testid="input-meta-access-token"
+                          />
+                          <Button
+                            onClick={() => updateMetaAccessTokenMutation.mutate(metaAccessTokenInput)}
+                            disabled={updateMetaAccessTokenMutation.isPending}
+                            data-testid="button-save-access-token"
+                          >
+                            {updateMetaAccessTokenMutation.isPending ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              "Salvar"
+                            )}
+                          </Button>
+                        </div>
+                        {affiliate?.metaAccessToken && (
+                          <div className="flex items-center gap-2 text-sm mt-2">
+                            <CheckCircle className="h-4 w-4 text-green-500" />
+                            <span className="text-muted-foreground">
+                              Access Token configurado
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-muted/50 rounded-lg">
+                    <p className="font-medium text-sm mb-2">Como encontrar seu Pixel ID:</p>
+                    <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
+                      <li>Acesse o Gerenciador de Eventos do Meta (business.facebook.com)</li>
+                      <li>Vá em "Fontes de dados" e selecione seu Pixel</li>
+                      <li>O ID do Pixel é o número de 15-16 dígitos mostrado no topo</li>
+                      <li>Copie e cole esse número no campo acima</li>
+                    </ol>
+                  </div>
                 </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="account">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <User className="h-5 w-5" />
+                  Informações da Conta
+                </CardTitle>
+                <CardDescription>
+                  Seus dados cadastrais como afiliado
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoadingAffiliate ? (
+                  <Skeleton className="h-32 w-full" />
+                ) : (
+                  <div className="space-y-3 max-w-md">
+                    <div className="flex justify-between border-b pb-2">
+                      <span className="text-muted-foreground">Nome</span>
+                      <span className="font-medium">{affiliate?.name}</span>
+                    </div>
+                    <div className="flex justify-between border-b pb-2">
+                      <span className="text-muted-foreground">Email</span>
+                      <span className="font-medium">{affiliate?.email}</span>
+                    </div>
+                    <div className="flex justify-between border-b pb-2">
+                      <span className="text-muted-foreground">WhatsApp</span>
+                      <span className="font-medium">{affiliate?.whatsapp || "Não informado"}</span>
+                    </div>
+                    <div className="flex justify-between border-b pb-2">
+                      <span className="text-muted-foreground">Comissão</span>
+                      <span className="font-medium">{affiliate?.commissionPercent || 0}%</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Status</span>
+                      <Badge 
+                        variant={
+                          affiliate?.status === 'active' ? "default" : 
+                          affiliate?.status === 'suspended' ? "destructive" : 
+                          "secondary"
+                        }
+                      >
+                        {affiliate?.status === 'active' ? "Ativo" : 
+                         affiliate?.status === 'suspended' ? "Suspenso" : 
+                         affiliate?.status === 'inactive' ? "Inativo" : 
+                         "Pendente"}
+                      </Badge>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
