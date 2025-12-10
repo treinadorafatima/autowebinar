@@ -68,12 +68,14 @@ function StripeCheckoutForm({
   onSuccess, 
   onError,
   isProcessing,
-  setIsProcessing 
+  setIsProcessing,
+  returnUrlParams,
 }: { 
   onSuccess: () => void; 
   onError: (error: string) => void;
   isProcessing: boolean;
   setIsProcessing: (value: boolean) => void;
+  returnUrlParams?: URLSearchParams;
 }) {
   const stripe = useStripe();
   const elements = useElements();
@@ -84,10 +86,16 @@ function StripeCheckoutForm({
 
     setIsProcessing(true);
 
+    const params = new URLSearchParams({ gateway: 'stripe' });
+    if (returnUrlParams) {
+      returnUrlParams.forEach((value, key) => params.set(key, value));
+    }
+    const returnUrl = `${window.location.origin}/pagamento/sucesso?${params.toString()}`;
+
     const { error } = await stripe.confirmPayment({
       elements,
       confirmParams: {
-        return_url: `${window.location.origin}/pagamento/sucesso?gateway=stripe`,
+        return_url: returnUrl,
       },
     });
 
@@ -128,13 +136,16 @@ export default function Checkout() {
   const { planoId } = useParams<{ planoId: string }>();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const { trackViewContent, trackInitiateCheckout, trackPurchase } = usePixel();
   
-  // Get URL params for renewal flow
+  // Get URL params for renewal flow and affiliate tracking
   const urlParams = new URLSearchParams(window.location.search);
   const emailFromUrl = urlParams.get("email") || "";
   const nomeFromUrl = urlParams.get("nome") || "";
   const isRenovacao = urlParams.get("renovacao") === "true";
+  const affiliateCode = urlParams.get("ref") || null;
+  
+  // Initialize pixel tracking with affiliate code for dual-pixel support
+  const { trackViewContent, trackInitiateCheckout, trackPurchase } = usePixel({ affiliateCode });
   
   const [formData, setFormData] = useState({
     nome: nomeFromUrl,
@@ -202,8 +213,9 @@ export default function Checkout() {
     if (selectedPlano) {
       trackViewContent({
         content_name: selectedPlano.nome,
-        content_ids: [selectedPlano.id],
-        value: selectedPlano.preco,
+        content_ids: [String(selectedPlano.id)],
+        value: selectedPlano.preco / 100,
+        content_type: "product",
       });
     }
   }, [selectedPlano, trackViewContent]);
@@ -250,9 +262,11 @@ export default function Checkout() {
       setIsRecurring(data.isRecurring || false);
       
       trackInitiateCheckout({
-        value: selectedPlano?.preco,
+        value: selectedPlano ? selectedPlano.preco / 100 : undefined,
         currency: "BRL",
         content_name: selectedPlano?.nome,
+        content_ids: selectedPlano ? [String(selectedPlano.id)] : undefined,
+        num_items: 1,
       });
 
       if (data.gateway === "stripe" && data.clientSecret) {
@@ -305,12 +319,22 @@ export default function Checkout() {
       if (data.status === 'approved') {
         if (selectedPlano) {
           trackPurchase({
-            value: selectedPlano.preco,
+            value: selectedPlano.preco / 100,
             currency: "BRL",
             content_name: selectedPlano.nome,
+            content_ids: [String(selectedPlano.id)],
+            pagamentoId: pagamentoId || undefined,
+            num_items: 1,
           });
         }
-        setLocation('/pagamento/sucesso?gateway=mercadopago');
+        const successParams = new URLSearchParams({ gateway: 'mercadopago' });
+        if (affiliateCode) successParams.set('ref', affiliateCode);
+        if (selectedPlano) {
+          successParams.set('planoId', String(selectedPlano.id));
+          successParams.set('plano', selectedPlano.nome);
+          successParams.set('valor', String(selectedPlano.preco / 100));
+        }
+        setLocation(`/pagamento/sucesso?${successParams.toString()}`);
       } else if (data.status === 'pending' || data.status === 'in_process') {
         setLocation('/pagamento/pendente?gateway=mercadopago');
       } else {
@@ -346,12 +370,22 @@ export default function Checkout() {
         // Only track purchase and redirect to success when ACTUALLY authorized
         if (selectedPlano) {
           trackPurchase({
-            value: selectedPlano.preco,
+            value: selectedPlano.preco / 100,
             currency: "BRL",
             content_name: selectedPlano.nome,
+            content_ids: [String(selectedPlano.id)],
+            pagamentoId: pagamentoId || undefined,
+            num_items: 1,
           });
         }
-        setLocation('/pagamento/sucesso?gateway=mercadopago&tipo=assinatura');
+        const successParams2 = new URLSearchParams({ gateway: 'mercadopago', tipo: 'assinatura' });
+        if (affiliateCode) successParams2.set('ref', affiliateCode);
+        if (selectedPlano) {
+          successParams2.set('planoId', String(selectedPlano.id));
+          successParams2.set('plano', selectedPlano.nome);
+          successParams2.set('valor', String(selectedPlano.preco / 100));
+        }
+        setLocation(`/pagamento/sucesso?${successParams2.toString()}`);
       } else if (data.status === 'pending') {
         // Pending means still processing - do NOT grant access yet
         setLocation('/pagamento/pendente?gateway=mercadopago&tipo=assinatura');
@@ -1111,10 +1145,29 @@ export default function Checkout() {
                       }}
                     >
                       <StripeCheckoutForm 
-                        onSuccess={() => setLocation('/pagamento/sucesso?gateway=stripe')}
+                        onSuccess={() => {
+                          const successParams = new URLSearchParams({ gateway: 'stripe' });
+                          if (affiliateCode) successParams.set('ref', affiliateCode);
+                          if (selectedPlano) {
+                            successParams.set('planoId', String(selectedPlano.id));
+                            successParams.set('plano', selectedPlano.nome);
+                            successParams.set('valor', String(selectedPlano.preco / 100));
+                          }
+                          setLocation(`/pagamento/sucesso?${successParams.toString()}`);
+                        }}
                         onError={(error) => toast({ title: "Erro", description: error, variant: "destructive" })}
                         isProcessing={isProcessingPayment}
                         setIsProcessing={setIsProcessingPayment}
+                        returnUrlParams={(() => {
+                          const params = new URLSearchParams();
+                          if (affiliateCode) params.set('ref', affiliateCode);
+                          if (selectedPlano) {
+                            params.set('planoId', String(selectedPlano.id));
+                            params.set('plano', selectedPlano.nome);
+                            params.set('valor', String(selectedPlano.preco / 100));
+                          }
+                          return params;
+                        })()}
                       />
                     </Elements>
                   ) : (

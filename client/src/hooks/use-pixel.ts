@@ -17,12 +17,18 @@ export function usePixel(options?: UsePixelOptions) {
   const initializedPixels = useRef<Set<string>>(new Set());
 
   const { data: configs } = useQuery<Record<string, string>>({
-    queryKey: ["/api/checkout/config/public"],
+    queryKey: ["/api/checkout/public-config"],
     staleTime: 1000 * 60 * 5,
   });
 
   const { data: affiliatePixelData } = useQuery<{ metaPixelId: string | null }>({
-    queryKey: ["/api/affiliate-pixel", affiliateCode],
+    queryKey: ['affiliate-pixel', affiliateCode],
+    queryFn: async () => {
+      if (!affiliateCode) return { metaPixelId: null };
+      const response = await fetch(`/api/affiliate-pixel/${affiliateCode}`);
+      if (!response.ok) return { metaPixelId: null };
+      return response.json();
+    },
     enabled: !!affiliateCode,
     staleTime: 1000 * 60 * 5,
   });

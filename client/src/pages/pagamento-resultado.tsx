@@ -42,7 +42,9 @@ export default function PagamentoResultado({ tipo }: Props) {
   const pagamentoId = params.get("id");
   const valor = params.get("valor");
   const plano = params.get("plano");
-  const { trackPurchase } = usePixel();
+  const planoId = params.get("planoId");
+  const affiliateCode = params.get("ref") || null;
+  const { trackPurchase } = usePixel({ affiliateCode });
   const purchaseTracked = useRef(false);
 
   const config = resultConfig[tipo];
@@ -52,14 +54,15 @@ export default function PagamentoResultado({ tipo }: Props) {
     if (tipo === "sucesso") {
       document.title = "Pagamento Aprovado | AutoWebinar";
       
-      if (!purchaseTracked.current && pagamentoId) {
+      if (!purchaseTracked.current && (pagamentoId || planoId)) {
         purchaseTracked.current = true;
         trackPurchase({
           value: valor ? parseFloat(valor) : 0,
           currency: "BRL",
           content_name: plano || "Plano AutoWebinar",
-          content_ids: pagamentoId ? [pagamentoId] : [],
+          content_ids: planoId ? [planoId] : [],
           pagamentoId: pagamentoId || undefined,
+          num_items: 1,
         });
       }
     } else if (tipo === "pendente") {
