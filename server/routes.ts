@@ -183,7 +183,13 @@ async function isWebinarOwnerPlanActive(ownerId: string): Promise<boolean> {
     const admin = await storage.getAdminById(ownerId);
     if (!admin) return false;
     
-    // Se não há data de expiração definida, considera ativo (planos legados)
+    // Superadmins sempre têm acesso
+    if (admin.role === "superadmin") return true;
+    
+    // Se não tem plano definido, não tem acesso
+    if (!admin.planoId) return false;
+    
+    // Se não há data de expiração definida, considera ativo (planos legados com plano atribuído)
     if (!admin.accessExpiresAt) return true;
     
     // Verifica se a data de expiração é no futuro
@@ -198,12 +204,16 @@ async function isWebinarOwnerPlanActive(ownerId: string): Promise<boolean> {
  * Verifica se o plano do admin está ativo (não expirado)
  * Aceita objeto admin diretamente para evitar query extra
  * Superadmins sempre têm plano ativo (role = 'superadmin')
+ * Usuários sem plano (planoId null) não têm acesso
  */
-function isAdminPlanActive(admin: { accessExpiresAt: Date | null; role?: string }): boolean {
+function isAdminPlanActive(admin: { accessExpiresAt: Date | null; role?: string; planoId?: string | null }): boolean {
   // Superadmins sempre têm acesso (não expira)
   if (admin.role === "superadmin") return true;
   
-  // Se não há data de expiração definida, considera ativo (planos legados)
+  // Se não tem plano definido, não tem acesso
+  if (!admin.planoId) return false;
+  
+  // Se não há data de expiração definida, considera ativo (planos legados com plano atribuído)
   if (!admin.accessExpiresAt) return true;
   
   // Verifica se a data de expiração é no futuro
