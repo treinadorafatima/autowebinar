@@ -80,10 +80,10 @@ interface AffiliateSale {
 }
 
 interface Affiliate {
-  id: number;
+  id: string;
+  adminId: string;
   name: string;
   email: string;
-  cpf: string;
   whatsapp?: string | null;
   commissionPercent: number;
   status: string;
@@ -386,12 +386,12 @@ export default function AfiliadoDashboardPage() {
               <User className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <h1 className="font-semibold" data-testid="text-affiliate-name">
+              <div className="font-semibold" data-testid="text-affiliate-name">
                 {isLoadingAffiliate ? <Skeleton className="h-5 w-32" /> : affiliate?.name}
-              </h1>
-              <p className="text-sm text-muted-foreground" data-testid="text-affiliate-email">
+              </div>
+              <div className="text-sm text-muted-foreground" data-testid="text-affiliate-email">
                 {isLoadingAffiliate ? <Skeleton className="h-4 w-40" /> : affiliate?.email}
-              </p>
+              </div>
             </div>
           </div>
           <Button variant="outline" onClick={handleLogout} data-testid="button-logout">
@@ -974,8 +974,17 @@ export default function AfiliadoDashboardPage() {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Status</span>
-                        <Badge variant={affiliate?.status === 'active' ? "default" : "secondary"}>
-                          {affiliate?.status === 'active' ? "Ativo" : "Pendente"}
+                        <Badge 
+                          variant={
+                            affiliate?.status === 'active' ? "default" : 
+                            affiliate?.status === 'suspended' ? "destructive" : 
+                            "secondary"
+                          }
+                        >
+                          {affiliate?.status === 'active' ? "Ativo" : 
+                           affiliate?.status === 'suspended' ? "Suspenso" : 
+                           affiliate?.status === 'inactive' ? "Inativo" : 
+                           "Pendente"}
                         </Badge>
                       </div>
                     </div>
