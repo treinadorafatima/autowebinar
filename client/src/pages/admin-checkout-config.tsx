@@ -351,7 +351,7 @@ export default function AdminCheckoutConfig() {
                 Google Ads
               </CardTitle>
               <CardDescription>
-                Configure o Google Ads Conversion Tracking. Obtenha seu ID em{" "}
+                Configure o Google Ads Conversion Tracking. Obtenha seus IDs em{" "}
                 <a
                   href="https://ads.google.com/aw/conversions"
                   target="_blank"
@@ -363,11 +363,32 @@ export default function AdminCheckoutConfig() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg text-sm mb-4">
+                <p className="font-medium mb-2">Como configurar:</p>
+                <ol className="space-y-1 text-muted-foreground list-decimal list-inside">
+                  <li>Acesse Google Ads → Ferramentas → Conversões</li>
+                  <li>Crie uma ação de conversão para "Compra"</li>
+                  <li>Copie o Conversion ID (ex: AW-123456789)</li>
+                  <li>Copie o Conversion Label (ex: AbC1dEfGh)</li>
+                </ol>
+              </div>
               {renderConfigField(
                 "GOOGLE_ADS_CONVERSION_ID",
-                "Conversion ID",
+                "Conversion ID (Tag Global)",
                 "AW-123456789"
               )}
+              {renderConfigField(
+                "GOOGLE_ADS_CONVERSION_LABEL",
+                "Conversion Label (Evento de Compra)",
+                "AbC1dEfGhIjKlMnO"
+              )}
+              <div className="p-4 bg-muted rounded-lg text-sm">
+                <p className="font-medium mb-2">Eventos rastreados:</p>
+                <ul className="space-y-1 text-muted-foreground">
+                  <li><span className="font-mono text-xs bg-background px-1 rounded">page_view</span> - Ao carregar a página</li>
+                  <li><span className="font-mono text-xs bg-background px-1 rounded">conversion</span> - Pagamento aprovado (usando o Label configurado)</li>
+                </ul>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
