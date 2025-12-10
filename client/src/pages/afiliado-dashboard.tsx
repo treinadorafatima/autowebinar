@@ -172,12 +172,12 @@ export default function AfiliadoDashboardPage() {
 
   const createLinkMutation = useMutation({
     mutationFn: async (data: NewLinkFormData) => {
-      const payload: { planoId?: number; targetUrl?: string; linkType: string } = {
+      const payload: { planoId?: string; targetUrl?: string; linkType: string } = {
         linkType: data.linkType,
       };
       
       if (data.linkType === "plano" && data.planoId) {
-        payload.planoId = parseInt(data.planoId);
+        payload.planoId = data.planoId;
       } else if (data.linkType === "homepage") {
         payload.targetUrl = "/";
       } else if (data.linkType === "trial") {
