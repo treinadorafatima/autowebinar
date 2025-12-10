@@ -798,7 +798,7 @@ export default function AfiliadoDashboardPage() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Wallet className="h-5 w-5" />
-                    Mercado Pago
+                    Mercado Pago - Pagamentos Automáticos
                   </CardTitle>
                   <CardDescription>
                     Conecte sua conta do Mercado Pago para receber suas comissões automaticamente
@@ -809,6 +809,21 @@ export default function AfiliadoDashboardPage() {
                     <Skeleton className="h-20 w-full" />
                   ) : (
                     <div className="space-y-4">
+                      <div className="p-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
+                        <div className="flex items-start gap-3">
+                          <DollarSign className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                          <div>
+                            <p className="font-medium text-blue-900 dark:text-blue-100 mb-1">
+                              Pagamentos Automáticos
+                            </p>
+                            <p className="text-sm text-blue-700 dark:text-blue-300">
+                              Suas comissões serão transferidas automaticamente para sua conta do Mercado Pago 
+                              após a confirmação de cada venda. Não é necessário solicitar saque!
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
                       <div className="flex items-center justify-between p-4 border rounded-lg">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 bg-[#009ee3]/10 rounded-full flex items-center justify-center">
@@ -846,6 +861,38 @@ export default function AfiliadoDashboardPage() {
                         </p>
                       )}
 
+                      {(!getMpConnectionStatus().connected || getMpConnectionStatus().expired) && (
+                        <div className="p-4 bg-muted/50 rounded-lg space-y-3">
+                          <p className="font-medium text-sm">Como conectar sua conta:</p>
+                          <ol className="text-sm text-muted-foreground space-y-2 list-decimal list-inside">
+                            <li>
+                              <strong>Tenha uma conta no Mercado Pago:</strong> Se ainda não tem, crie gratuitamente em{" "}
+                              <a 
+                                href="https://www.mercadopago.com.br" 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="text-[#009ee3] hover:underline"
+                                data-testid="link-mercadopago-site"
+                              >
+                                mercadopago.com.br
+                              </a>
+                            </li>
+                            <li>
+                              <strong>Clique em "Conectar Mercado Pago":</strong> Você será redirecionado para o site oficial do Mercado Pago
+                            </li>
+                            <li>
+                              <strong>Faça login na sua conta:</strong> Use seu email e senha do Mercado Pago
+                            </li>
+                            <li>
+                              <strong>Autorize a conexão:</strong> Permita que recebamos suas comissões em sua conta
+                            </li>
+                            <li>
+                              <strong>Pronto!</strong> Suas comissões serão depositadas automaticamente
+                            </li>
+                          </ol>
+                        </div>
+                      )}
+
                       <div className="flex gap-2">
                         {!getMpConnectionStatus().connected || getMpConnectionStatus().expired ? (
                           <Button
@@ -872,6 +919,23 @@ export default function AfiliadoDashboardPage() {
                           </Button>
                         )}
                       </div>
+
+                      {getMpConnectionStatus().connected && !getMpConnectionStatus().expired && (
+                        <div className="p-4 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg">
+                          <div className="flex items-start gap-3">
+                            <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+                            <div>
+                              <p className="font-medium text-green-900 dark:text-green-100 mb-1">
+                                Tudo certo!
+                              </p>
+                              <p className="text-sm text-green-700 dark:text-green-300">
+                                Sua conta está conectada e pronta para receber pagamentos automáticos. 
+                                Cada venda confirmada terá a comissão transferida diretamente para você.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </CardContent>
