@@ -2,7 +2,7 @@ import { type User, type InsertUser, type WebinarConfig, type WebinarConfigInser
 import * as crypto from "crypto";
 import { randomUUID } from "crypto";
 import { db } from "./db";
-import { eq, and, or, sql, isNull, desc, lte } from "drizzle-orm";
+import { eq, and, or, sql, isNull, desc, lte, gte } from "drizzle-orm";
 import * as fs from "fs";
 import * as path from "path";
 import { createClient } from "@supabase/supabase-js";
@@ -345,7 +345,7 @@ export interface IStorage {
   getAffiliateConfig(): Promise<AffiliateConfig | undefined>;
   upsertAffiliateConfig(data: Partial<AffiliateConfigInsert>): Promise<AffiliateConfig>;
   // Affiliate Stats
-  getAffiliateStats(affiliateId: string): Promise<{ totalSales: number; totalCommission: number; pendingCommission: number; paidCommission: number }>;
+  getAffiliateStats(affiliateId: string, startDate?: Date, endDate?: Date): Promise<{ totalClicks: number; totalConversions: number; totalSales: number; totalCommission: number; pendingCommission: number; paidCommission: number }>;
   // Affiliate Leads
   listLeadsByAffiliateLinkCodes(codes: string[]): Promise<Lead[]>;
 }
@@ -4186,8 +4186,30 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
 
   // Affiliate Stats
 
-  async getAffiliateStats(affiliateId: string): Promise<{ totalSales: number; totalCommission: number; pendingCommission: number; paidCommission: number }> {
-    const sales = await db.select().from(affiliateSales).where(eq(affiliateSales.affiliateId, affiliateId));
+  async getAffiliateStats(affiliateId: string, startDate?: Date, endDate?: Date): Promise<{ totalClicks: number; totalConversions: number; totalSales: number; totalCommission: number; pendingCommission: number; paidCommission: number }> {
+    // Get affiliate links for clicks and conversions (lifetime totals - not date filtered)
+    const links = await db.select().from(affiliateLinks).where(eq(affiliateLinks.affiliateId, affiliateId));
+    
+    let totalClicks = 0;
+    let totalConversions = 0;
+    
+    for (const link of links) {
+      totalClicks += link.clicks;
+      totalConversions += link.conversions;
+    }
+    
+    // Build conditions for sales query with date filtering at SQL level
+    const conditions: any[] = [eq(affiliateSales.affiliateId, affiliateId)];
+    
+    if (startDate) {
+      conditions.push(gte(affiliateSales.createdAt, startDate));
+    }
+    if (endDate) {
+      conditions.push(lte(affiliateSales.createdAt, endDate));
+    }
+    
+    // Get filtered sales from database
+    const sales = await db.select().from(affiliateSales).where(and(...conditions));
     
     let totalSales = 0;
     let totalCommission = 0;
@@ -4207,7 +4229,7 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
       }
     }
     
-    return { totalSales, totalCommission, pendingCommission, paidCommission };
+    return { totalClicks, totalConversions, totalSales, totalCommission, pendingCommission, paidCommission };
   }
 
   // Affiliate Leads

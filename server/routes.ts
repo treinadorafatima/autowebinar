@@ -10450,7 +10450,23 @@ Seja conversacional e objetivo.`;
         return res.status(403).json({ error: "Acesso negado" });
       }
 
-      const stats = await storage.getAffiliateStats(req.params.id);
+      // Parse date filters from query params
+      const startDateStr = req.query.startDate as string;
+      const endDateStr = req.query.endDate as string;
+      
+      let startDate: Date | undefined;
+      let endDate: Date | undefined;
+      
+      if (startDateStr) {
+        startDate = new Date(startDateStr);
+        startDate.setHours(0, 0, 0, 0);
+      }
+      if (endDateStr) {
+        endDate = new Date(endDateStr);
+        endDate.setHours(23, 59, 59, 999);
+      }
+
+      const stats = await storage.getAffiliateStats(req.params.id, startDate, endDate);
       res.json(stats);
     } catch (error: any) {
       res.status(400).json({ error: error.message });

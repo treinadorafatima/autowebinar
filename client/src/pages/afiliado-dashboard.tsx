@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -35,7 +35,8 @@ import {
   Wallet,
   Unlink,
   Users,
-  Trash2
+  Trash2,
+  Calendar
 } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { SiMercadopago } from "react-icons/si";
@@ -120,6 +121,7 @@ export default function AfiliadoDashboardPage() {
   const [linkToDelete, setLinkToDelete] = useState<AffiliateLink | null>(null);
   const [metaPixelInput, setMetaPixelInput] = useState("");
   const [metaAccessTokenInput, setMetaAccessTokenInput] = useState("");
+  const [dateRange, setDateRange] = useState("all");
 
   const affiliateId = localStorage.getItem("affiliateId");
   const affiliateToken = localStorage.getItem("affiliateToken");
@@ -135,8 +137,64 @@ export default function AfiliadoDashboardPage() {
     enabled: !!affiliateToken,
   });
 
+  // Memoize date range to prevent query key changes on every render
+  const dateRangeParams = useMemo(() => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
+    switch (dateRange) {
+      case "today": {
+        const endOfDay = new Date(today);
+        endOfDay.setHours(23, 59, 59, 999);
+        return { startDate: today.toISOString(), endDate: endOfDay.toISOString() };
+      }
+      case "7days": {
+        const sevenDaysAgo = new Date(today);
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        const endOfDay = new Date(today);
+        endOfDay.setHours(23, 59, 59, 999);
+        return { startDate: sevenDaysAgo.toISOString(), endDate: endOfDay.toISOString() };
+      }
+      case "30days": {
+        const thirtyDaysAgo = new Date(today);
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const endOfDay = new Date(today);
+        endOfDay.setHours(23, 59, 59, 999);
+        return { startDate: thirtyDaysAgo.toISOString(), endDate: endOfDay.toISOString() };
+      }
+      case "thisMonth": {
+        const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const endOfDay = new Date(today);
+        endOfDay.setHours(23, 59, 59, 999);
+        return { startDate: firstDayOfMonth.toISOString(), endDate: endOfDay.toISOString() };
+      }
+      case "lastMonth": {
+        const firstDayLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const lastDayLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+        return { startDate: firstDayLastMonth.toISOString(), endDate: lastDayLastMonth.toISOString() };
+      }
+      case "all":
+      default:
+        return { startDate: null, endDate: null };
+    }
+  }, [dateRange]);
+  
   const { data: stats, isLoading: isLoadingStats } = useQuery<AffiliateStats>({
-    queryKey: ["/api/affiliates", affiliateId, "stats"],
+    queryKey: ["/api/affiliates", affiliateId, "stats", dateRange],
+    queryFn: async () => {
+      const token = localStorage.getItem("affiliateToken");
+      let url = `/api/affiliates/${affiliateId}/stats`;
+      const params = new URLSearchParams();
+      if (dateRangeParams.startDate) params.set("startDate", dateRangeParams.startDate);
+      if (dateRangeParams.endDate) params.set("endDate", dateRangeParams.endDate);
+      if (params.toString()) url += `?${params.toString()}`;
+      
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error("Erro ao carregar estatísticas");
+      return res.json();
+    },
     enabled: !!affiliateId,
   });
 
@@ -402,6 +460,26 @@ export default function AfiliadoDashboardPage() {
       </header>
 
       <main className="container mx-auto px-4 py-8">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold">Estatísticas</h2>
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <Select value={dateRange} onValueChange={setDateRange}>
+              <SelectTrigger className="w-[180px]" data-testid="select-date-range">
+                <SelectValue placeholder="Período" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todo período</SelectItem>
+                <SelectItem value="today">Hoje</SelectItem>
+                <SelectItem value="7days">Últimos 7 dias</SelectItem>
+                <SelectItem value="30days">Últimos 30 dias</SelectItem>
+                <SelectItem value="thisMonth">Este mês</SelectItem>
+                <SelectItem value="lastMonth">Mês passado</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -412,9 +490,12 @@ export default function AfiliadoDashboardPage() {
               {isLoadingStats ? (
                 <Skeleton className="h-8 w-20" />
               ) : (
-                <div className="text-2xl font-bold" data-testid="stat-clicks">
-                  {stats?.totalClicks || 0}
-                </div>
+                <>
+                  <div className="text-2xl font-bold" data-testid="stat-clicks">
+                    {stats?.totalClicks || 0}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Total acumulado</p>
+                </>
               )}
             </CardContent>
           </Card>
@@ -428,25 +509,33 @@ export default function AfiliadoDashboardPage() {
               {isLoadingStats ? (
                 <Skeleton className="h-8 w-20" />
               ) : (
-                <div className="text-2xl font-bold" data-testid="stat-conversions">
-                  {stats?.totalConversions || 0}
-                </div>
+                <>
+                  <div className="text-2xl font-bold" data-testid="stat-conversions">
+                    {stats?.totalConversions || 0}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Total acumulado</p>
+                </>
               )}
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Vendas Totais</CardTitle>
+              <CardTitle className="text-sm font-medium">Vendas</CardTitle>
               <BarChart3 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               {isLoadingStats ? (
                 <Skeleton className="h-8 w-24" />
               ) : (
-                <div className="text-2xl font-bold" data-testid="stat-sales">
-                  {formatCurrency(stats?.totalSales || 0)}
-                </div>
+                <>
+                  <div className="text-2xl font-bold" data-testid="stat-sales">
+                    {formatCurrency(stats?.totalSales || 0)}
+                  </div>
+                  {dateRange !== "all" && (
+                    <p className="text-xs text-muted-foreground">No período selecionado</p>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>
