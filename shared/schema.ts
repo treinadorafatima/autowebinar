@@ -942,11 +942,16 @@ export const affiliateSales = pgTable("affiliate_sales", {
   saleAmount: integer("sale_amount").notNull(), // Valor da venda (centavos)
   commissionAmount: integer("commission_amount").notNull(), // Valor da comissão (centavos)
   commissionPercent: integer("commission_percent"), // Percentual de comissão usado
-  status: text("status").notNull().default("pending"), // 'pending', 'approved', 'paid', 'refunded', 'cancelled'
+  status: text("status").notNull().default("pending"), // 'pending', 'pending_payout', 'paid', 'refunded', 'cancelled', 'payout_failed'
   splitMethod: text("split_method"), // 'mp_marketplace', 'stripe_connect', 'manual'
+  mpPaymentId: text("mp_payment_id"), // ID do pagamento original no MP (para verificar reembolso)
   mpTransferId: text("mp_transfer_id"), // ID da transferência no MP (quando pago via split)
+  stripePaymentIntentId: text("stripe_payment_intent_id"), // ID do PaymentIntent no Stripe
   stripeTransferId: text("stripe_transfer_id"), // ID da transferência no Stripe Connect
-  paidAt: timestamp("paid_at"), // Data do pagamento
+  payoutScheduledAt: timestamp("payout_scheduled_at"), // Data agendada para pagamento ao afiliado
+  payoutAttempts: integer("payout_attempts").notNull().default(0), // Tentativas de pagamento
+  payoutError: text("payout_error"), // Último erro de pagamento
+  paidAt: timestamp("paid_at"), // Data do pagamento efetivo
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

@@ -2,7 +2,7 @@ import { type User, type InsertUser, type WebinarConfig, type WebinarConfigInser
 import * as crypto from "crypto";
 import { randomUUID } from "crypto";
 import { db } from "./db";
-import { eq, and, or, sql, isNull, desc } from "drizzle-orm";
+import { eq, and, or, sql, isNull, desc, lte } from "drizzle-orm";
 import * as fs from "fs";
 import * as path from "path";
 import { createClient } from "@supabase/supabase-js";
@@ -339,6 +339,8 @@ export interface IStorage {
   getAffiliateSaleByPagamentoId(pagamentoId: string): Promise<AffiliateSale | undefined>;
   createAffiliateSale(data: AffiliateSaleInsert): Promise<AffiliateSale>;
   updateAffiliateSale(id: string, data: Partial<AffiliateSaleInsert>): Promise<AffiliateSale | undefined>;
+  listPendingPayoutSales(): Promise<AffiliateSale[]>;
+  listAllAffiliateSales(): Promise<AffiliateSale[]>;
   // Affiliate Config
   getAffiliateConfig(): Promise<AffiliateConfig | undefined>;
   upsertAffiliateConfig(data: Partial<AffiliateConfigInsert>): Promise<AffiliateConfig>;
@@ -4103,8 +4105,13 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
       status: data.status ?? "pending",
       commissionPercent: data.commissionPercent ?? null,
       splitMethod: data.splitMethod ?? null,
+      mpPaymentId: data.mpPaymentId ?? null,
       mpTransferId: data.mpTransferId ?? null,
+      stripePaymentIntentId: data.stripePaymentIntentId ?? null,
       stripeTransferId: data.stripeTransferId ?? null,
+      payoutScheduledAt: data.payoutScheduledAt ?? null,
+      payoutAttempts: data.payoutAttempts ?? 0,
+      payoutError: data.payoutError ?? null,
       paidAt: data.paidAt ?? null,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -4121,6 +4128,22 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
     return result[0];
   }
 
+  async listPendingPayoutSales(): Promise<AffiliateSale[]> {
+    return db.select().from(affiliateSales)
+      .where(
+        and(
+          eq(affiliateSales.status, 'pending_payout'),
+          lte(affiliateSales.payoutScheduledAt, new Date())
+        )
+      )
+      .orderBy(affiliateSales.payoutScheduledAt);
+  }
+
+  async listAllAffiliateSales(): Promise<AffiliateSale[]> {
+    return db.select().from(affiliateSales)
+      .orderBy(desc(affiliateSales.createdAt));
+  }
+
   // Affiliate Config
 
   async getAffiliateConfig(): Promise<AffiliateConfig | undefined> {
@@ -4131,22 +4154,29 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
   async upsertAffiliateConfig(data: Partial<AffiliateConfigInsert>): Promise<AffiliateConfig> {
     const existing = await this.getAffiliateConfig();
     
+    // IMPORTANT: Enforce minimum 7-day hold for refund period
+    const MIN_HOLD_DAYS = 7;
+    const validatedData = { ...data };
+    if (validatedData.holdDays !== undefined) {
+      validatedData.holdDays = Math.max(Number(validatedData.holdDays) || MIN_HOLD_DAYS, MIN_HOLD_DAYS);
+    }
+    
     if (existing) {
       const result = await db.update(affiliateConfig)
-        .set({ ...data, updatedAt: new Date() })
+        .set({ ...validatedData, updatedAt: new Date() })
         .where(eq(affiliateConfig.id, "default"))
         .returning();
       return result[0];
     } else {
       const config: AffiliateConfig = {
         id: "default",
-        defaultCommissionPercent: data.defaultCommissionPercent ?? 30,
-        minWithdrawal: data.minWithdrawal ?? 5000,
-        holdDays: data.holdDays ?? 7,
-        autoPayEnabled: data.autoPayEnabled ?? true,
-        autoApprove: data.autoApprove ?? false,
-        mpAppId: data.mpAppId ?? null,
-        mpAppSecret: data.mpAppSecret ?? null,
+        defaultCommissionPercent: validatedData.defaultCommissionPercent ?? 30,
+        minWithdrawal: validatedData.minWithdrawal ?? 5000,
+        holdDays: Math.max(validatedData.holdDays ?? MIN_HOLD_DAYS, MIN_HOLD_DAYS),
+        autoPayEnabled: validatedData.autoPayEnabled ?? true,
+        autoApprove: validatedData.autoApprove ?? false,
+        mpAppId: validatedData.mpAppId ?? null,
+        mpAppSecret: validatedData.mpAppSecret ?? null,
         updatedAt: new Date(),
       };
       await db.insert(affiliateConfig).values(config);

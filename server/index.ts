@@ -6,6 +6,7 @@ import { setupVite, serveStatic, log } from "./vite";
 import { startEmailScheduler } from "./email-scheduler";
 import { startWhatsappScheduler } from "./whatsapp-scheduler";
 import { startSubscriptionScheduler } from "./subscription-scheduler";
+import { startAffiliatePayoutScheduler } from "./affiliate-payout-scheduler";
 
 const app = express();
 
@@ -142,5 +143,8 @@ app.use((req, res, next) => {
     
     // Start subscription scheduler for expiration reminders
     startSubscriptionScheduler();
+    
+    // Start affiliate payout scheduler for delayed commission payments
+    startAffiliatePayoutScheduler();
   });
 })();

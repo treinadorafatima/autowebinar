@@ -368,8 +368,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   /**
    * Helper function to create affiliate sale when payment is approved
    * Called from webhooks (MP and Stripe) when payment is confirmed
+   * 
+   * IMPORTANT: The affiliate payout is SCHEDULED for holdDays (default 7) days later
+   * to allow for refunds. The actual transfer happens via the payout scheduler.
    */
-  async function processAffiliateSale(pagamento: any, plano: any): Promise<void> {
+  async function processAffiliateSale(pagamento: any, plano: any, gateway: 'mercadopago' | 'stripe' = 'mercadopago'): Promise<void> {
     try {
       if (!pagamento.affiliateLinkCode) return;
       
@@ -385,10 +388,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
       
-      // Get commission config to calculate commission
+      // Get commission config to calculate commission and hold days
       const config = await storage.getAffiliateConfig();
       // Use nullish coalescing to allow 0% commission (0 is falsy but valid)
       const commissionPercent = affiliate.commissionPercent ?? config?.defaultCommissionPercent ?? 10;
+      // IMPORTANT: Minimum 7-day hold is mandatory to allow for refunds
+      const MIN_HOLD_DAYS = 7;
+      const holdDays = Math.max(config?.holdDays ?? MIN_HOLD_DAYS, MIN_HOLD_DAYS);
       
       // Calculate commission (valor is in centavos)
       const commissionAmount = Math.floor(pagamento.valor * (commissionPercent / 100));
@@ -401,7 +407,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
       
-      // Create affiliate sale
+      // Calculate payout scheduled date (now + holdDays)
+      const payoutScheduledAt = new Date();
+      payoutScheduledAt.setDate(payoutScheduledAt.getDate() + holdDays);
+      
+      // Determine split method based on affiliate connected accounts
+      let splitMethod: 'mp_marketplace' | 'stripe_connect' | 'manual' | null = 'manual';
+      if (gateway === 'mercadopago' && affiliate.mpUserId && config?.autoPayEnabled) {
+        splitMethod = 'mp_marketplace';
+      } else if (gateway === 'stripe' && affiliate.stripeConnectAccountId && affiliate.stripeConnectStatus === 'connected' && config?.autoPayEnabled) {
+        splitMethod = 'stripe_connect';
+      }
+      
+      // Create affiliate sale with scheduled payout
       await storage.createAffiliateSale({
         affiliateId: affiliate.id,
         affiliateLinkId: link.id,
@@ -409,7 +427,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         saleAmount: pagamento.valor,
         commissionAmount,
         commissionPercent,
-        status: "pending", // Pending until paid to affiliate
+        status: splitMethod !== 'manual' ? "pending_payout" : "pending", // pending_payout = scheduled for auto transfer
+        splitMethod,
+        mpPaymentId: gateway === 'mercadopago' ? pagamento.mercadopagoPaymentId : null,
+        stripePaymentIntentId: gateway === 'stripe' ? pagamento.stripePaymentIntentId : null,
+        payoutScheduledAt: splitMethod !== 'manual' ? payoutScheduledAt : null,
+        payoutAttempts: 0,
       });
       
       // Update affiliate balance (add to pending and total earnings)
@@ -423,7 +446,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Increment conversions on the link
       await storage.incrementAffiliateLinkConversions(link.id);
       
-      console.log(`[Affiliate] Sale created - affiliateId: ${affiliate.id}, pagamentoId: ${pagamento.id}, commission: ${commissionAmount} (${commissionPercent}%), newPendingAmount: ${newPendingAmount}`);
+      const payoutInfo = splitMethod !== 'manual' 
+        ? `scheduled for ${payoutScheduledAt.toISOString()} via ${splitMethod}` 
+        : 'manual payout required';
+      console.log(`[Affiliate] Sale created - affiliateId: ${affiliate.id}, pagamentoId: ${pagamento.id}, commission: ${commissionAmount} (${commissionPercent}%), ${payoutInfo}`);
       
       // Send sale notification email to affiliate (non-blocking)
       const affiliateAdmin = await storage.getAdminById(affiliate.adminId);
@@ -441,189 +467,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     } catch (error) {
       console.error("[Affiliate] Error processing affiliate sale:", error);
-    }
-  }
-
-  /**
-   * Helper function to get affiliate split data for payment creation
-   * Returns split configuration for MercadoPago or Stripe if affiliate has connected accounts
-   */
-  interface AffiliateSplitData {
-    hasValidSplit: boolean;
-    affiliateId: string | null;
-    linkId: string | null;
-    commissionPercent: number;
-    commissionAmount: number; // in centavos
-    applicationFee: number; // amount kept by platform (in centavos)
-    // MercadoPago specific
-    mpCollectorId: string | null;
-    // Stripe specific
-    stripeConnectAccountId: string | null;
-    splitMethod: 'mp_marketplace' | 'stripe_connect' | null;
-  }
-
-  async function getAffiliateSplitData(affiliateLinkCode: string | null, totalAmount: number, gateway: string): Promise<AffiliateSplitData> {
-    const noSplit: AffiliateSplitData = {
-      hasValidSplit: false,
-      affiliateId: null,
-      linkId: null,
-      commissionPercent: 0,
-      commissionAmount: 0,
-      applicationFee: totalAmount, // Platform keeps everything
-      mpCollectorId: null,
-      stripeConnectAccountId: null,
-      splitMethod: null,
-    };
-
-    try {
-      if (!affiliateLinkCode) return noSplit;
-
-      // Check if auto pay is enabled
-      const config = await storage.getAffiliateConfig();
-      if (!config?.autoPayEnabled) {
-        console.log('[AffiliateSplit] Auto pay is disabled');
-        return noSplit;
-      }
-
-      const link = await storage.getAffiliateLinkByCode(affiliateLinkCode);
-      if (!link) {
-        console.log(`[AffiliateSplit] Link not found for code: ${affiliateLinkCode}`);
-        return noSplit;
-      }
-
-      const affiliate = await storage.getAffiliateById(link.affiliateId);
-      if (!affiliate || affiliate.status !== "active") {
-        console.log(`[AffiliateSplit] Affiliate not active or not found: ${link.affiliateId}`);
-        return noSplit;
-      }
-
-      // Check if affiliate has connected payment account for the gateway
-      let canSplit = false;
-      let mpCollectorId: string | null = null;
-      let stripeConnectAccountId: string | null = null;
-      let splitMethod: 'mp_marketplace' | 'stripe_connect' | null = null;
-
-      if (gateway === 'mercadopago' && affiliate.mpUserId) {
-        canSplit = true;
-        mpCollectorId = affiliate.mpUserId;
-        splitMethod = 'mp_marketplace';
-        console.log(`[AffiliateSplit] Using MercadoPago Marketplace split, collector: ${mpCollectorId}`);
-      } else if (gateway === 'stripe' && affiliate.stripeConnectAccountId && affiliate.stripeConnectStatus === 'connected') {
-        canSplit = true;
-        stripeConnectAccountId = affiliate.stripeConnectAccountId;
-        splitMethod = 'stripe_connect';
-        console.log(`[AffiliateSplit] Using Stripe Connect split, account: ${stripeConnectAccountId}`);
-      }
-
-      if (!canSplit) {
-        console.log(`[AffiliateSplit] Affiliate ${affiliate.id} has no connected ${gateway} account - fallback to manual`);
-        return noSplit;
-      }
-
-      // Calculate commission
-      const commissionPercent = affiliate.commissionPercent ?? config?.defaultCommissionPercent ?? 10;
-      const commissionAmount = Math.floor(totalAmount * (commissionPercent / 100));
-      const applicationFee = totalAmount - commissionAmount; // Platform fee
-
-      console.log(`[AffiliateSplit] Split calculated - total: ${totalAmount}, commission: ${commissionAmount} (${commissionPercent}%), platform: ${applicationFee}`);
-
-      return {
-        hasValidSplit: true,
-        affiliateId: affiliate.id,
-        linkId: link.id,
-        commissionPercent,
-        commissionAmount,
-        applicationFee,
-        mpCollectorId,
-        stripeConnectAccountId,
-        splitMethod,
-      };
-    } catch (error) {
-      console.error('[AffiliateSplit] Error getting split data:', error);
-      return noSplit;
-    }
-  }
-
-  /**
-   * Process affiliate sale with automatic split marking
-   * This is called when a payment with split is confirmed via webhook
-   */
-  async function processAffiliateSaleWithSplit(
-    pagamento: any, 
-    plano: any, 
-    splitData: AffiliateSplitData,
-    transferId: string | null
-  ): Promise<void> {
-    try {
-      if (!splitData.hasValidSplit || !splitData.affiliateId) {
-        // No split - use regular processing
-        await processAffiliateSale(pagamento, plano);
-        return;
-      }
-
-      // Check if sale already exists
-      const existingSale = await storage.getAffiliateSaleByPagamentoId(pagamento.id);
-      if (existingSale) {
-        // Update existing sale with split transfer info
-        await storage.updateAffiliateSale(existingSale.id, {
-          status: 'paid',
-          splitMethod: splitData.splitMethod,
-          mpTransferId: splitData.splitMethod === 'mp_marketplace' ? transferId : null,
-          stripeTransferId: splitData.splitMethod === 'stripe_connect' ? transferId : null,
-          paidAt: new Date(),
-        });
-        console.log(`[AffiliateSplit] Updated existing sale ${existingSale.id} to paid via ${splitData.splitMethod}`);
-        return;
-      }
-
-      // Create new affiliate sale with paid status (since split was done at payment time)
-      const affiliate = await storage.getAffiliateById(splitData.affiliateId);
-      if (!affiliate) return;
-
-      await storage.createAffiliateSale({
-        affiliateId: splitData.affiliateId,
-        affiliateLinkId: splitData.linkId || '',
-        pagamentoId: pagamento.id,
-        saleAmount: pagamento.valor,
-        commissionAmount: splitData.commissionAmount,
-        commissionPercent: splitData.commissionPercent,
-        status: 'paid', // Already paid via split
-        splitMethod: splitData.splitMethod,
-        mpTransferId: splitData.splitMethod === 'mp_marketplace' ? transferId : undefined,
-        stripeTransferId: splitData.splitMethod === 'stripe_connect' ? transferId : undefined,
-      });
-
-      // Update affiliate balances
-      const newPaidAmount = (affiliate.paidAmount || 0) + splitData.commissionAmount;
-      const newTotalEarnings = (affiliate.totalEarnings || 0) + splitData.commissionAmount;
-      await storage.updateAffiliate(splitData.affiliateId, {
-        paidAmount: newPaidAmount,
-        totalEarnings: newTotalEarnings,
-      });
-
-      // Increment conversions on the link
-      if (splitData.linkId) {
-        await storage.incrementAffiliateLinkConversions(splitData.linkId);
-      }
-
-      console.log(`[AffiliateSplit] Sale created with split - affiliateId: ${splitData.affiliateId}, commission: ${splitData.commissionAmount}, method: ${splitData.splitMethod}`);
-
-      // Send sale notification email
-      const affiliateAdmin = await storage.getAdminById(affiliate.adminId);
-      if (affiliateAdmin) {
-        import("./email").then(({ sendAffiliateSaleEmail }) => {
-          sendAffiliateSaleEmail(
-            affiliateAdmin.email, 
-            affiliateAdmin.name || "Afiliado", 
-            pagamento.valor, 
-            splitData.commissionAmount
-          ).catch(err => {
-            console.error("[AffiliateSplit] Erro ao enviar email de venda:", err);
-          });
-        });
-      }
-    } catch (error) {
-      console.error("[AffiliateSplit] Error processing affiliate sale with split:", error);
     }
   }
 
@@ -7235,9 +7078,7 @@ Seja conversacional e objetivo.`;
               console.log('[Checkout] Created Stripe subscription:', subscriptionData.id);
             } else {
               // One-time payment - create Payment Intent
-              // Get affiliate split data for Stripe Connect
-              const splitData = await getAffiliateSplitData(affiliateLinkCode, plano.preco, 'stripe');
-              
+              // Note: Split payment is handled AFTER payment approval by the affiliate payout scheduler (7 days delay)
               const params = new URLSearchParams({
                 'amount': plano.preco.toString(),
                 'currency': 'brl',
@@ -7247,19 +7088,6 @@ Seja conversacional e objetivo.`;
                 'receipt_email': email,
                 'description': `${plano.nome} - ${plano.webinarLimit} webinars`,
               });
-
-              // Add Stripe Connect split if affiliate has Stripe account connected
-              if (splitData.hasValidSplit && splitData.stripeConnectAccountId) {
-                // Use application_fee_amount (platform keeps this) and transfer_data (affiliate receives rest)
-                params.append('application_fee_amount', splitData.applicationFee.toString());
-                params.append('transfer_data[destination]', splitData.stripeConnectAccountId);
-                params.append('metadata[affiliate_id]', splitData.affiliateId || '');
-                params.append('metadata[affiliate_link_id]', splitData.linkId || '');
-                params.append('metadata[commission_amount]', splitData.commissionAmount.toString());
-                params.append('metadata[commission_percent]', splitData.commissionPercent.toString());
-                params.append('metadata[split_method]', 'stripe_connect');
-                console.log(`[Stripe] Split configured - affiliate: ${splitData.affiliateId}, destination: ${splitData.stripeConnectAccountId}, commission: ${splitData.commissionAmount}`);
-              }
 
               const stripeResponse = await fetch('https://api.stripe.com/v1/payment_intents', {
                 method: 'POST',
@@ -7276,13 +7104,6 @@ Seja conversacional e objetivo.`;
                 await storage.updateCheckoutPagamento(pagamento.id, {
                   stripePaymentIntentId: stripeData.id,
                 });
-                
-                // Store split info for webhook processing
-                if (splitData.hasValidSplit) {
-                  await storage.updateCheckoutPagamento(pagamento.id, {
-                    statusDetail: `split:${splitData.affiliateId}:${splitData.commissionAmount}:${splitData.commissionPercent}`,
-                  });
-                }
               }
             }
           } catch (err) {
@@ -7511,10 +7332,8 @@ Seja conversacional e objetivo.`;
       const host = req.headers['x-forwarded-host'] || req.headers.host;
       const baseUrl = `${protocol}://${host}`;
 
-      // Get affiliate split data if applicable
-      const splitData = await getAffiliateSplitData(pagamento.affiliateLinkCode, plano.preco, 'mercadopago');
-
       // Prepare payment request for MercadoPago API
+      // Note: Split payment is handled AFTER payment approval by the affiliate payout scheduler (7 days delay)
       const paymentRequest: any = {
         transaction_amount: plano.preco / 100,
         description: plano.nome,
@@ -7534,27 +7353,6 @@ Seja conversacional e objetivo.`;
         ...(paymentData.issuer_id && { issuer_id: paymentData.issuer_id }),
         ...(paymentData.installments && { installments: paymentData.installments }),
       };
-
-      // Add MercadoPago Marketplace split if affiliate has MP account connected
-      if (splitData.hasValidSplit && splitData.mpCollectorId) {
-        // Marketplace split: payment goes to affiliate's account, platform receives application_fee
-        paymentRequest.marketplace = 'NONE'; // Required for marketplace mode
-        paymentRequest.sponsor_id = null; // No sponsor
-        // Additional metadata for tracking
-        paymentRequest.metadata = {
-          ...paymentRequest.metadata,
-          affiliate_id: splitData.affiliateId,
-          affiliate_link_id: splitData.linkId,
-          commission_amount: splitData.commissionAmount,
-          commission_percent: splitData.commissionPercent,
-          split_method: 'mp_marketplace',
-        };
-        // Store split data in payment record for webhook processing
-        await storage.updateCheckoutPagamento(pagamentoId, {
-          statusDetail: `split:${splitData.affiliateId}:${splitData.commissionAmount}:${splitData.commissionPercent}`,
-        });
-        console.log(`[MP Payment] Split configured - affiliate: ${splitData.affiliateId}, commission: ${splitData.commissionAmount} (${splitData.commissionPercent}%)`);
-      }
 
       console.log('[MP Payment] Creating payment:', JSON.stringify(paymentRequest, null, 2));
 
@@ -7728,8 +7526,8 @@ Seja conversacional e objetivo.`;
           });
         }
         
-        // Process affiliate sale if applicable (updates affiliate balance)
-        await processAffiliateSale(pagamento, plano);
+        // Process affiliate sale if applicable (with scheduled payout)
+        await processAffiliateSale(pagamento, plano, 'mercadopago');
       }
 
       await storage.updateCheckoutPagamento(pagamentoId, updateData);
@@ -8519,8 +8317,8 @@ Seja conversacional e objetivo.`;
                   });
                 }
                 
-                // Process affiliate sale if applicable
-                await processAffiliateSale(pagamento, plano);
+                // Process affiliate sale if applicable (with scheduled payout)
+                await processAffiliateSale(pagamento, plano, 'mercadopago');
               }
             }
 
@@ -8706,8 +8504,8 @@ Seja conversacional e objetivo.`;
                 });
               }
               
-              // Process affiliate sale if applicable
-              await processAffiliateSale(pagamento, plano);
+              // Process affiliate sale if applicable (with scheduled payout)
+              await processAffiliateSale(pagamento, plano, 'stripe');
             }
 
             await storage.updateCheckoutPagamento(pagamentoId, updateData);
@@ -8787,8 +8585,8 @@ Seja conversacional e objetivo.`;
                 });
               }
               
-              // Process affiliate sale if applicable
-              await processAffiliateSale(pagamento, plano);
+              // Process affiliate sale if applicable (with scheduled payout)
+              await processAffiliateSale(pagamento, plano, 'stripe');
             }
 
             await storage.updateCheckoutPagamento(pagamentoId, updateData);
@@ -9806,7 +9604,14 @@ Seja conversacional e objetivo.`;
         return res.status(403).json({ error: "Apenas super admin pode atualizar" });
       }
 
-      const config = await storage.upsertAffiliateConfig(req.body);
+      // Validate holdDays - minimum 7 days is mandatory for refund period
+      const MIN_HOLD_DAYS = 7;
+      const configData = { ...req.body };
+      if (configData.holdDays !== undefined) {
+        configData.holdDays = Math.max(Number(configData.holdDays) || MIN_HOLD_DAYS, MIN_HOLD_DAYS);
+      }
+
+      const config = await storage.upsertAffiliateConfig(configData);
       res.json(config);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
@@ -10647,6 +10452,187 @@ Seja conversacional e objetivo.`;
 
       const stats = await storage.getAffiliateStats(req.params.id);
       res.json(stats);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // ============================================
+  // AFFILIATE PAYOUT MANAGEMENT (ADMIN ONLY)
+  // ============================================
+
+  // List all affiliate sales (admin view with payout status)
+  app.get("/api/admin/affiliate-sales", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) return res.status(401).json({ error: "Unauthorized" });
+
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin || admin.role !== "superadmin") {
+        return res.status(403).json({ error: "Acesso negado - apenas superadmin" });
+      }
+
+      const sales = await storage.listAllAffiliateSales();
+      res.json(sales);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Get payout scheduler status
+  app.get("/api/admin/affiliate-payout/status", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) return res.status(401).json({ error: "Unauthorized" });
+
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin || admin.role !== "superadmin") {
+        return res.status(403).json({ error: "Acesso negado - apenas superadmin" });
+      }
+
+      const { getAffiliatePayoutSchedulerStatus } = await import("./affiliate-payout-scheduler");
+      const status = await getAffiliatePayoutSchedulerStatus();
+      
+      const pendingSales = await storage.listPendingPayoutSales();
+      
+      res.json({
+        ...status,
+        pendingPayouts: pendingSales.length,
+      });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Manually trigger payout processing
+  app.post("/api/admin/affiliate-payout/process", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) return res.status(401).json({ error: "Unauthorized" });
+
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin || admin.role !== "superadmin") {
+        return res.status(403).json({ error: "Acesso negado - apenas superadmin" });
+      }
+
+      const { manualProcessPendingPayouts } = await import("./affiliate-payout-scheduler");
+      const result = await manualProcessPendingPayouts();
+      
+      res.json({
+        success: true,
+        processed: result.processed,
+        errors: result.errors,
+      });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Retry a specific failed payout
+  app.post("/api/admin/affiliate-sales/:id/retry-payout", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) return res.status(401).json({ error: "Unauthorized" });
+
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin || admin.role !== "superadmin") {
+        return res.status(403).json({ error: "Acesso negado - apenas superadmin" });
+      }
+
+      const { retryFailedPayout } = await import("./affiliate-payout-scheduler");
+      const result = await retryFailedPayout(req.params.id);
+      
+      if (result.success) {
+        res.json({ success: true, message: "Pagamento processado com sucesso" });
+      } else {
+        res.status(400).json({ error: result.error });
+      }
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Mark a sale as manually paid (for manual transfers)
+  app.post("/api/admin/affiliate-sales/:id/mark-paid", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) return res.status(401).json({ error: "Unauthorized" });
+
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin || admin.role !== "superadmin") {
+        return res.status(403).json({ error: "Acesso negado - apenas superadmin" });
+      }
+
+      const sale = await storage.getAffiliateSaleById(req.params.id);
+      if (!sale) return res.status(404).json({ error: "Venda não encontrada" });
+
+      if (sale.status === 'paid') {
+        return res.status(400).json({ error: "Venda já está paga" });
+      }
+
+      const affiliate = await storage.getAffiliateById(sale.affiliateId);
+      if (!affiliate) return res.status(404).json({ error: "Afiliado não encontrado" });
+
+      await storage.updateAffiliateSale(req.params.id, {
+        status: 'paid',
+        splitMethod: 'manual',
+        paidAt: new Date(),
+        payoutError: null,
+      });
+
+      const newPendingAmount = Math.max(0, (affiliate.pendingAmount || 0) - sale.commissionAmount);
+      const newPaidAmount = (affiliate.paidAmount || 0) + sale.commissionAmount;
+      await storage.updateAffiliate(affiliate.id, {
+        pendingAmount: newPendingAmount,
+        paidAmount: newPaidAmount,
+      });
+
+      res.json({ success: true, message: "Venda marcada como paga" });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Cancel a pending payout (e.g., if refund occurred)
+  app.post("/api/admin/affiliate-sales/:id/cancel", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) return res.status(401).json({ error: "Unauthorized" });
+
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin || admin.role !== "superadmin") {
+        return res.status(403).json({ error: "Acesso negado - apenas superadmin" });
+      }
+
+      const sale = await storage.getAffiliateSaleById(req.params.id);
+      if (!sale) return res.status(404).json({ error: "Venda não encontrada" });
+
+      if (sale.status === 'paid') {
+        return res.status(400).json({ error: "Não é possível cancelar venda já paga" });
+      }
+
+      const affiliate = await storage.getAffiliateById(sale.affiliateId);
+      if (affiliate) {
+        const newPendingAmount = Math.max(0, (affiliate.pendingAmount || 0) - sale.commissionAmount);
+        const newTotalEarnings = Math.max(0, (affiliate.totalEarnings || 0) - sale.commissionAmount);
+        await storage.updateAffiliate(affiliate.id, {
+          pendingAmount: newPendingAmount,
+          totalEarnings: newTotalEarnings,
+        });
+      }
+
+      await storage.updateAffiliateSale(req.params.id, {
+        status: 'cancelled',
+        payoutError: req.body.reason || 'Cancelado pelo administrador',
+      });
+
+      res.json({ success: true, message: "Comissão cancelada" });
     } catch (error: any) {
       res.status(400).json({ error: error.message });
     }
