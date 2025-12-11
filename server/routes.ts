@@ -7640,6 +7640,8 @@ Seja conversacional e objetivo.`;
           frequency_type: frequencyType,
           transaction_amount: plano.preco / 100,
           currency_id: 'BRL',
+          billing_day_proportional: false,
+          first_invoice_offset: 0, // Cobrar imediatamente na criação da assinatura
         },
         back_url: `${baseUrl}/pagamento/sucesso?id=${pagamentoId}&tipo=assinatura`,
         notification_url: `${baseUrl}/webhook/mercadopago`,
