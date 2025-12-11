@@ -360,9 +360,23 @@ export default function Checkout() {
       }
     },
     onError: (error: Error) => {
+      // Try to parse error message from API response
+      let errorMessage = "Ocorreu um erro. Tente novamente.";
+      let errorAction = "";
+      try {
+        const match = error.message.match(/\d+:\s*(.+)/);
+        if (match) {
+          const jsonStr = match[1];
+          const parsed = JSON.parse(jsonStr);
+          errorMessage = parsed.error || errorMessage;
+          errorAction = parsed.action || "";
+        }
+      } catch {
+        errorMessage = error.message;
+      }
       toast({
-        title: "Erro ao processar pagamento",
-        description: error.message,
+        title: errorMessage,
+        description: errorAction,
         variant: "destructive",
       });
     },
@@ -412,9 +426,23 @@ export default function Checkout() {
       }
     },
     onError: (error: Error) => {
+      // Try to parse error message from API response
+      let errorMessage = "Ocorreu um erro. Tente novamente.";
+      let errorAction = "";
+      try {
+        const match = error.message.match(/\d+:\s*(.+)/);
+        if (match) {
+          const jsonStr = match[1];
+          const parsed = JSON.parse(jsonStr);
+          errorMessage = parsed.error || errorMessage;
+          errorAction = parsed.action || "";
+        }
+      } catch {
+        errorMessage = error.message;
+      }
       toast({
-        title: "Erro ao processar assinatura",
-        description: error.message,
+        title: errorMessage,
+        description: errorAction,
         variant: "destructive",
       });
     },
