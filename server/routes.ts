@@ -7421,6 +7421,19 @@ Seja conversacional e objetivo.`;
           lastFailureAt: new Date(),
         });
 
+        // Send payment rejected email
+        import("./email").then(({ sendPaymentFailedEmail }) => {
+          sendPaymentFailedEmail(
+            pagamento.email,
+            pagamento.nome,
+            plano.nome,
+            `${errorInfo.message} ${errorInfo.action}`,
+            pagamento.planoId
+          ).catch(err => {
+            console.error(`[MP Payment] Error sending payment rejected email:`, err);
+          });
+        });
+
         return res.status(400).json({ 
           error: errorInfo.message,
           action: errorInfo.action,
@@ -7460,6 +7473,19 @@ Seja conversacional e objetivo.`;
         updateData.lastFailureAt = new Date();
 
         await storage.updateCheckoutPagamento(pagamentoId, updateData);
+
+        // Send payment rejected email
+        import("./email").then(({ sendPaymentFailedEmail }) => {
+          sendPaymentFailedEmail(
+            pagamento.email,
+            pagamento.nome,
+            plano.nome,
+            `${errorInfo.message} ${errorInfo.action}`,
+            pagamento.planoId
+          ).catch(err => {
+            console.error(`[MP Payment] Error sending payment rejected email:`, err);
+          });
+        });
 
         return res.json({
           status: 'rejected',
