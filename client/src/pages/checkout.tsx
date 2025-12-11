@@ -970,6 +970,37 @@ export default function Checkout() {
 
   return (
     <div className="min-h-screen bg-[#0f172a]">
+      {/* Payment Processing Overlay */}
+      {isProcessingPayment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/95 backdrop-blur-sm">
+          <div className="text-center space-y-6 p-8">
+            <div className="relative mx-auto w-24 h-24">
+              <div className="absolute inset-0 rounded-full border-4 border-cyan-500/20"></div>
+              <div className="absolute inset-0 rounded-full border-4 border-t-cyan-400 animate-spin"></div>
+              <div className="absolute inset-3 rounded-full border-4 border-cyan-500/10"></div>
+              <div className="absolute inset-3 rounded-full border-4 border-t-emerald-400 animate-spin" style={{ animationDuration: '1.5s', animationDirection: 'reverse' }}></div>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <CreditCard className="w-8 h-8 text-cyan-400 animate-pulse" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-2xl font-bold text-white">Processando Pagamento</h3>
+              <p className="text-slate-400 max-w-sm">
+                Aguarde enquanto validamos seu pagamento com segurança...
+              </p>
+            </div>
+            <div className="flex items-center justify-center gap-2 text-slate-500 text-sm">
+              <ShieldCheck className="w-4 h-4" />
+              <span>Transação segura e criptografada</span>
+            </div>
+            <div className="flex justify-center gap-1 pt-4">
+              <div className="w-2 h-2 rounded-full bg-cyan-400 animate-bounce" style={{ animationDelay: '0ms' }}></div>
+              <div className="w-2 h-2 rounded-full bg-cyan-400 animate-bounce" style={{ animationDelay: '150ms' }}></div>
+              <div className="w-2 h-2 rounded-full bg-cyan-400 animate-bounce" style={{ animationDelay: '300ms' }}></div>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="container mx-auto max-w-7xl px-4 py-8">
         <div className="flex justify-center mb-8">
           <img 
