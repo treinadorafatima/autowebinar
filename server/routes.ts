@@ -8916,6 +8916,8 @@ Seja conversacional e objetivo.`;
           accessExpiresAt: expirationDate,
           webinarLimit: plano.webinarLimit,
           isActive: true,
+          paymentStatus: 'ok',
+          paymentFailedReason: null,
         });
       } else {
         const tempPassword = generateTempPassword();
@@ -8931,6 +8933,7 @@ Seja conversacional e objetivo.`;
           webinarLimit: plano.webinarLimit,
           isActive: true,
           accessExpiresAt: expirationDate,
+          paymentStatus: 'ok',
         });
         
         console.log(`[Manual Release] Created admin: ${pagamento.email}, temp password: ${tempPassword}`);
