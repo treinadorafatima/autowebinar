@@ -25,6 +25,8 @@ export const admins = pgTable("admins", {
   uploadLimit: integer("upload_limit").notNull().default(5), // limite de uploads
   planoId: text("plano_id"), // FK para plano de assinatura (opcional)
   isActive: boolean("is_active").notNull().default(true),
+  paymentStatus: text("payment_status").default("ok"), // 'ok', 'failed', 'pending' - Status do pagamento da assinatura
+  paymentFailedReason: text("payment_failed_reason"), // Motivo da falha do pagamento
   accessExpiresAt: timestamp("access_expires_at"), // Data de expiração do acesso (null = sem expiração)
   accountDomain: text("account_domain"), // Domínio customizado da conta (ex: minhaempresa.com)
   landingPageTitle: text("landing_page_title").default("Meus Webinários"), // Título da página inicial
