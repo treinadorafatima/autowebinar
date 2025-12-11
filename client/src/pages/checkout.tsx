@@ -394,8 +394,10 @@ export default function Checkout() {
       return res.json();
     },
     onSuccess: (data: any) => {
-      if (data.status === 'authorized') {
-        // Only track purchase and redirect to success when ACTUALLY authorized
+      // For subscriptions, only redirect to success if payment was ACTUALLY confirmed
+      // 'authorized' with paymentConfirmed=true means first payment went through
+      if (data.status === 'authorized' && data.paymentConfirmed) {
+        // Only track purchase and redirect to success when ACTUALLY authorized WITH payment
         if (selectedPlano) {
           trackPurchase({
             value: selectedPlano.preco / 100,
@@ -414,8 +416,9 @@ export default function Checkout() {
           successParams2.set('valor', String(selectedPlano.preco / 100));
         }
         setLocation(`/pagamento/sucesso?${successParams2.toString()}`);
-      } else if (data.status === 'pending') {
-        // Pending means still processing - do NOT grant access yet
+      } else if (data.status === 'pending' || (data.status === 'authorized' && !data.paymentConfirmed)) {
+        // Pending or authorized without payment means still processing - do NOT grant access yet
+        // Subscription was created but first payment hasn't been confirmed
         setLocation('/pagamento/pendente?gateway=mercadopago&tipo=assinatura');
       } else {
         toast({

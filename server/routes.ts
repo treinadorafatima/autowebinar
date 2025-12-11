@@ -7354,21 +7354,58 @@ Seja conversacional e objetivo.`;
 
       // Prepare payment request for MercadoPago API
       // Note: Split payment is handled AFTER payment approval by the affiliate payout scheduler (7 days delay)
+      // Added 3D Secure and additional_info to reduce cc_rejected_high_risk rejections
+      const payerFirstName = pagamento.nome.split(' ')[0];
+      const payerLastName = pagamento.nome.split(' ').slice(1).join(' ') || payerFirstName;
+      const payerPhone = (pagamento.telefone || '').replace(/\D/g, '');
+      const payerCpf = (pagamento.cpf || '').replace(/\D/g, '');
+      
       const paymentRequest: any = {
         transaction_amount: plano.preco / 100,
         description: plano.nome,
         payment_method_id: paymentData.payment_method_id,
         payer: {
           email: pagamento.email,
-          first_name: pagamento.nome.split(' ')[0],
-          last_name: pagamento.nome.split(' ').slice(1).join(' ') || '',
+          first_name: payerFirstName,
+          last_name: payerLastName,
           identification: paymentData.payer?.identification || {
-            type: 'CPF',
-            number: (pagamento.cpf || '').replace(/\D/g, ''),
+            type: payerCpf.length > 11 ? 'CNPJ' : 'CPF',
+            number: payerCpf,
           },
+          ...(payerPhone && {
+            phone: {
+              area_code: payerPhone.slice(0, 2),
+              number: payerPhone.slice(2),
+            },
+          }),
         },
         external_reference: pagamentoId,
         notification_url: `${baseUrl}/webhook/mercadopago`,
+        statement_descriptor: 'AutoWebinar',
+        // Enable 3D Secure to improve approval rates and reduce fraud rejections
+        three_d_secure_mode: 'optional',
+        // Additional info helps MercadoPago anti-fraud system
+        additional_info: {
+          items: [{
+            id: plano.id,
+            title: plano.nome,
+            description: plano.descricao || plano.nome,
+            category_id: 'services',
+            quantity: 1,
+            unit_price: plano.preco / 100,
+          }],
+          payer: {
+            first_name: payerFirstName,
+            last_name: payerLastName,
+            ...(payerPhone && {
+              phone: {
+                area_code: payerPhone.slice(0, 2),
+                number: payerPhone.slice(2),
+              },
+            }),
+            registration_date: new Date().toISOString().split('T')[0],
+          },
+        },
         ...(paymentData.token && { token: paymentData.token }),
         ...(paymentData.issuer_id && { issuer_id: paymentData.issuer_id }),
         ...(paymentData.installments && { installments: paymentData.installments }),
@@ -7706,7 +7743,7 @@ Seja conversacional e objetivo.`;
 
       // Update payment record
       const updateData: any = {
-        status: mpData.status === 'authorized' ? 'approved' : mpData.status,
+        status: 'pending', // Default to pending until we verify first payment
         statusDetail: mpData.status,
         metodoPagamento: 'credit_card',
         mercadopagoPaymentId: mpData.id?.toString(),
@@ -7734,9 +7771,42 @@ Seja conversacional e objetivo.`;
         updateData.userFriendlyError = `${errorInfo.message} ${errorInfo.action}`;
       }
 
-      // ONLY grant access when payment is AUTHORIZED (not pending)
-      // Pending means payment is still processing and should NOT grant access
+      // For subscriptions, 'authorized' means the subscription was CREATED, not that payment was made
+      // We need to check for actual payment in the authorized_payments endpoint
+      let hasConfirmedPayment = false;
+      
       if (mpData.status === 'authorized') {
+        // Wait a moment for the first payment to process
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // Check for authorized payments on this subscription
+        try {
+          const paymentsResponse = await fetch(
+            `https://api.mercadopago.com/preapproval/${mpData.id}/authorized_payments`,
+            {
+              headers: { 'Authorization': `Bearer ${accessToken}` },
+            }
+          );
+          
+          if (paymentsResponse.ok) {
+            const paymentsData = await paymentsResponse.json();
+            console.log(`[MP Subscription] Authorized payments for ${mpData.id}:`, JSON.stringify(paymentsData, null, 2));
+            
+            // Check if there's at least one approved/authorized payment
+            hasConfirmedPayment = paymentsData.results?.some(
+              (p: any) => p.status === 'approved' || p.status === 'authorized'
+            ) || false;
+          }
+        } catch (err) {
+          console.error('[MP Subscription] Error checking authorized payments:', err);
+        }
+        
+        console.log(`[MP Subscription] Subscription ${mpData.id} authorized, hasConfirmedPayment: ${hasConfirmedPayment}`);
+      }
+
+      // ONLY grant access when we have a CONFIRMED PAYMENT (not just subscription authorized)
+      if (mpData.status === 'authorized' && hasConfirmedPayment) {
+        updateData.status = 'approved';
         updateData.dataAprovacao = new Date();
         
         // Log success
@@ -7844,10 +7914,16 @@ Seja conversacional e objetivo.`;
 
       await storage.updateCheckoutPagamento(pagamentoId, updateData);
 
+      // Return the actual status based on whether we confirmed payment
+      // Frontend should check for 'authorized' AND hasConfirmedPayment to redirect to success
       res.json({
-        status: mpData.status,
+        status: hasConfirmedPayment ? 'authorized' : 'pending',
         statusDetail: mpData.status,
         subscriptionId: mpData.id,
+        paymentConfirmed: hasConfirmedPayment,
+        message: hasConfirmedPayment 
+          ? 'Assinatura criada e primeiro pagamento confirmado' 
+          : 'Assinatura criada, aguardando confirmação do primeiro pagamento',
       });
     } catch (error: any) {
       console.error('[MP Subscription] Error:', error);
