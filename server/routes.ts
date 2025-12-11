@@ -527,17 +527,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Invalid credentials" });
       }
 
-      if (!admin.isActive) {
-        return res.status(403).json({ error: "Usuário inativo" });
-      }
-
-      // Verificar expiração do acesso
-      if (admin.accessExpiresAt) {
-        const expiresAt = new Date(admin.accessExpiresAt);
-        if (expiresAt < new Date()) {
-          return res.status(403).json({ error: "Acesso expirado. Entre em contato com o administrador." });
-        }
-      }
+      // Permitir login mesmo se inativo ou expirado - o frontend mostrará as telas de bloqueio apropriadas
+      // (ExpiredPlanBlocker, PaymentFailedBlocker, NoPlanBlocker)
 
       const token = await createSession(email);
       res.json({ token, email: admin.email });
@@ -780,6 +771,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       planoId: admin?.planoId || null,
       paymentStatus: admin?.paymentStatus || "ok",
       paymentFailedReason: admin?.paymentFailedReason || null,
+      isActive: admin?.isActive ?? true,
     });
   });
 

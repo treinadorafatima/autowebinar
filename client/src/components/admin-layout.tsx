@@ -19,6 +19,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ExpiredPlanBlocker } from "@/components/expired-plan-blocker";
 import { NoPlanBlocker } from "@/components/no-plan-blocker";
 import { PaymentFailedBlocker } from "@/components/payment-failed-blocker";
+import { InactiveBlocker } from "@/components/inactive-blocker";
 
 interface AdminUser {
   name: string;
@@ -28,6 +29,7 @@ interface AdminUser {
   planoId: string | null;
   paymentStatus: string | null;
   paymentFailedReason: string | null;
+  isActive: boolean;
 }
 
 interface AdminLayoutProps {
@@ -97,9 +99,23 @@ export function AdminLayout({ children, token, onLogout }: AdminLayoutProps) {
   const isTrial = user?.planoId === "trial";
   const hasNoPlan = user && !user.planoId && user.role !== "superadmin";
   const hasPaymentFailed = user?.paymentStatus === "failed";
+  const isInactive = user && user.isActive === false && user.role !== "superadmin";
   
   const allowedPagesWhenBlocked = ["/admin/subscription", "/checkout"];
   const isOnAllowedPage = allowedPagesWhenBlocked.some(page => location.startsWith(page));
+  
+  if (isInactive && user) {
+    return (
+      <InactiveBlocker 
+        userName={user.name || "Usuario"}
+        userEmail={user.email}
+        onLogout={() => {
+          onLogout();
+          setLocation("/login");
+        }}
+      />
+    );
+  }
   
   if (hasPaymentFailed && !isOnAllowedPage && user) {
     return (
