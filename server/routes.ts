@@ -8154,16 +8154,54 @@ Seja conversacional e objetivo.`;
             const plano = await storage.getCheckoutPlanoById(pagamento.planoId);
             
             // Handle authorized/pending/cancelled states
+            // IMPORTANT: 'authorized' means subscription is SET UP, NOT that payment was made!
+            // We need to check for actual payments before granting access
             if (preapproval.status === 'authorized' || preapproval.status === 'pending') {
+              
+              // Check if there are any authorized payments for this subscription
+              let hasAuthorizedPayment = false;
+              try {
+                const paymentsResponse = await fetch(
+                  `https://api.mercadopago.com/preapproval/${preapprovalId}/authorized_payments`,
+                  {
+                    headers: { 'Authorization': `Bearer ${accessToken}` },
+                  }
+                );
+                
+                if (paymentsResponse.ok) {
+                  const paymentsData = await paymentsResponse.json();
+                  // Check if there's at least one approved payment
+                  hasAuthorizedPayment = paymentsData.results?.some(
+                    (p: any) => p.status === 'approved' || p.status === 'authorized'
+                  ) || false;
+                  console.log(`[MP Webhook] Preapproval ${preapprovalId} has ${paymentsData.results?.length || 0} payments, hasAuthorizedPayment: ${hasAuthorizedPayment}`);
+                }
+              } catch (err) {
+                console.error('[MP Webhook] Error checking authorized payments:', err);
+              }
+              
+              // If subscription is authorized but NO payment yet, just update status to pending
+              if (preapproval.status === 'authorized' && !hasAuthorizedPayment) {
+                await storage.updateCheckoutPagamento(pagamentoId, {
+                  status: 'pending',
+                  statusDetail: 'Assinatura criada - aguardando primeira cobrança',
+                  metodoPagamento: 'subscription',
+                  mercadopagoPaymentId: preapprovalId.toString(),
+                });
+                console.log(`[MP Webhook] Subscription ${pagamentoId} authorized but NO payment yet - waiting for first charge`);
+                return res.status(200).send('OK');
+              }
+              
               const updateData: any = {
-                status: preapproval.status === 'authorized' ? 'approved' : 'pending',
-                statusDetail: `Assinatura ${preapproval.status}`,
+                status: (preapproval.status === 'authorized' && hasAuthorizedPayment) ? 'approved' : 'pending',
+                statusDetail: hasAuthorizedPayment ? 'Assinatura ativa - pagamento confirmado' : `Assinatura ${preapproval.status}`,
                 metodoPagamento: 'subscription',
                 mercadopagoPaymentId: preapprovalId.toString(),
                 dataPagamento: new Date(),
               };
 
-              if (preapproval.status === 'authorized' && plano) {
+              // Only grant access if we have a confirmed payment
+              if (preapproval.status === 'authorized' && hasAuthorizedPayment && plano) {
                 updateData.dataAprovacao = new Date();
                 
                 // Calculate expiration based on plan frequency
@@ -8191,7 +8229,7 @@ Seja conversacional e objetivo.`;
                     paymentFailedReason: null,
                   });
                   updateData.adminId = admin.id;
-                  console.log(`[MP Webhook] Updated admin ${pagamento.email} for subscription`);
+                  console.log(`[MP Webhook] Updated admin ${pagamento.email} for subscription WITH CONFIRMED PAYMENT`);
                   
                   // Send payment confirmation email
                   import("./email").then(({ sendPaymentConfirmedEmail }) => {
@@ -8219,7 +8257,7 @@ Seja conversacional e objetivo.`;
                   });
                   updateData.adminId = admin.id;
                   
-                  console.log(`[MP Webhook] Created admin for subscription: ${pagamento.email}, temp password: ${tempPassword}`);
+                  console.log(`[MP Webhook] Created admin for subscription WITH CONFIRMED PAYMENT: ${pagamento.email}, temp password: ${tempPassword}`);
                   
                   // Send access credentials email for new users
                   import("./email").then(({ sendAccessCredentialsEmail }) => {
@@ -8410,9 +8448,123 @@ Seja conversacional e objetivo.`;
       }
 
       // Handle authorized_payment (recurring payment for subscription)
-      if (type === 'subscription_authorized_payment' || action === 'payment.created') {
-        console.log('[MP Webhook] Subscription payment received');
-        // These are handled by the payment webhook above via external_reference
+      // This is the REAL payment event - grant access here!
+      if (type === 'subscription_authorized_payment') {
+        console.log('[MP Webhook] Subscription PAYMENT received - this is the real charge!');
+        
+        const paymentId = data?.id;
+        if (paymentId) {
+          // Fetch the authorized payment details
+          const paymentResponse = await fetch(
+            `https://api.mercadopago.com/authorized_payments/${paymentId}`,
+            {
+              headers: { 'Authorization': `Bearer ${accessToken}` },
+            }
+          );
+          
+          if (paymentResponse.ok) {
+            const paymentData = await paymentResponse.json();
+            console.log('[MP Webhook] Authorized payment data:', JSON.stringify(paymentData, null, 2));
+            
+            const preapprovalId = paymentData.preapproval_id;
+            
+            // Get the preapproval to find the external_reference (pagamentoId)
+            if (preapprovalId) {
+              const preapprovalResponse = await fetch(
+                `https://api.mercadopago.com/preapproval/${preapprovalId}`,
+                {
+                  headers: { 'Authorization': `Bearer ${accessToken}` },
+                }
+              );
+              
+              if (preapprovalResponse.ok) {
+                const preapproval = await preapprovalResponse.json();
+                const pagamentoId = preapproval.external_reference;
+                
+                if (pagamentoId && paymentData.status === 'approved') {
+                  const pagamento = await storage.getCheckoutPagamentoById(pagamentoId);
+                  if (pagamento) {
+                    const plano = await storage.getCheckoutPlanoById(pagamento.planoId);
+                    
+                    if (plano) {
+                      // Calculate expiration based on plan frequency
+                      const expirationDate = new Date();
+                      if (plano.frequenciaTipo === 'days') {
+                        expirationDate.setDate(expirationDate.getDate() + (plano.frequencia || 30));
+                      } else if (plano.frequenciaTipo === 'years') {
+                        expirationDate.setFullYear(expirationDate.getFullYear() + (plano.frequencia || 1));
+                      } else {
+                        expirationDate.setMonth(expirationDate.getMonth() + (plano.frequencia || 1));
+                      }
+                      
+                      // Update pagamento
+                      await storage.updateCheckoutPagamento(pagamentoId, {
+                        status: 'approved',
+                        statusDetail: 'Pagamento da assinatura confirmado',
+                        dataAprovacao: new Date(),
+                        dataExpiracao: expirationDate,
+                      });
+                      
+                      // Create or update admin - NOW we can grant access!
+                      let admin = await storage.getAdminByEmail(pagamento.email);
+                      
+                      if (admin) {
+                        await storage.updateAdmin(admin.id, {
+                          accessExpiresAt: expirationDate,
+                          webinarLimit: plano.webinarLimit,
+                          uploadLimit: plano.uploadLimit || plano.webinarLimit,
+                          isActive: true,
+                          planoId: plano.id,
+                          paymentStatus: 'ok',
+                          paymentFailedReason: null,
+                        });
+                        console.log(`[MP Webhook] PAYMENT CONFIRMED - Updated admin ${pagamento.email}`);
+                        
+                        // Send payment confirmation email
+                        import("./email").then(({ sendPaymentConfirmedEmail }) => {
+                          sendPaymentConfirmedEmail(pagamento.email, pagamento.nome, plano.nome, expirationDate).catch(err => {
+                            console.error(`[MP Webhook] Error sending confirmation email:`, err);
+                          });
+                        });
+                      } else {
+                        // Create new admin
+                        const tempPassword = generateTempPassword();
+                        const bcrypt = await import('bcryptjs');
+                        const hashedPassword = await bcrypt.hash(tempPassword, 10);
+                        
+                        admin = await storage.createAdmin({
+                          name: pagamento.nome,
+                          email: pagamento.email,
+                          password: hashedPassword,
+                          telefone: pagamento.telefone,
+                          role: 'user',
+                          webinarLimit: plano.webinarLimit,
+                          uploadLimit: plano.uploadLimit || plano.webinarLimit,
+                          isActive: true,
+                          accessExpiresAt: expirationDate,
+                          planoId: plano.id,
+                          paymentStatus: 'ok',
+                        });
+                        
+                        console.log(`[MP Webhook] PAYMENT CONFIRMED - Created admin ${pagamento.email}, temp password: ${tempPassword}`);
+                        
+                        // Send access credentials email
+                        import("./email").then(({ sendAccessCredentialsEmail }) => {
+                          sendAccessCredentialsEmail(pagamento.email, pagamento.nome, tempPassword, plano.nome).catch(err => {
+                            console.error(`[MP Webhook] Error sending credentials email:`, err);
+                          });
+                        });
+                      }
+                      
+                      // Process affiliate sale if applicable
+                      await processAffiliateSale(pagamento, plano);
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
       }
 
       res.status(200).send('OK');
