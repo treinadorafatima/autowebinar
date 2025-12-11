@@ -7590,9 +7590,10 @@ Seja conversacional e objetivo.`;
 
       // Create preapproval with card_token for transparent checkout
       // IMPORTANT: status: "authorized" is required for card_token subscriptions
-      // start_date must be in the future when MP receives it, so add 5 minutes buffer
+      // First payment is charged immediately. start_date defines when the recurring cycle begins.
+      // We add 1 minute buffer to avoid "past date" validation error due to network latency
       const now = new Date();
-      now.setMinutes(now.getMinutes() + 5);
+      now.setMinutes(now.getMinutes() + 1);
       const startDate = now.toISOString();
       
       const preapprovalRequest: any = {
