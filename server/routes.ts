@@ -23,6 +23,22 @@ import { spawn } from "child_process";
 import { getMercadoPagoErrorMessage, getStripeErrorMessage, logPaymentError, logPaymentSuccess } from "./payment-errors";
 import { createWriteStream } from "fs";
 
+// Helper function to generate a simple, easy-to-type temporary password
+function generateTempPassword(): string {
+  // Removed confusing chars: 0,O,1,l,I,o
+  const chars = 'abcdefghjkmnpqrstuvwxyz23456789';
+  let password = '';
+  for (let i = 0; i < 6; i++) {
+    password += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return password;
+}
+
+// Helper function to normalize email (lowercase and trim)
+function normalizeEmail(email: string): string {
+  return email.toLowerCase().trim();
+}
+
 // Ensure upload directories exist with error handling
 const uploadTempDir = path.join(process.cwd(), "uploads", "temp");
 const videosDir = path.join(process.cwd(), "uploads", "videos");
@@ -484,7 +500,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/login", async (req, res) => {
     try {
       const { email, password } = req.body;
-      const admin = await storage.getAdminByEmail(email);
+      const admin = await storage.getAdminByEmail(normalizeEmail(email));
       
       if (!admin) {
         return res.status(401).json({ error: "Invalid credentials" });
@@ -7508,7 +7524,7 @@ Seja conversacional e objetivo.`;
           });
         } else {
           // Create new admin with temporary password
-          const tempPassword = Math.random().toString(36).slice(-8);
+          const tempPassword = generateTempPassword();
           const bcrypt = await import('bcryptjs');
           const hashedPassword = await bcrypt.hash(tempPassword, 10);
           
@@ -7761,7 +7777,7 @@ Seja conversacional e objetivo.`;
           });
         } else {
           // Create new admin with temporary password
-          const tempPassword = Math.random().toString(36).slice(-8);
+          const tempPassword = generateTempPassword();
           const bcrypt = await import('bcryptjs');
           const hashedPassword = await bcrypt.hash(tempPassword, 10);
           
@@ -8156,7 +8172,7 @@ Seja conversacional e objetivo.`;
                     });
                   });
                 } else {
-                  const tempPassword = Math.random().toString(36).slice(-8);
+                  const tempPassword = generateTempPassword();
                   const bcrypt = await import('bcryptjs');
                   const hashedPassword = await bcrypt.hash(tempPassword, 10);
                   
@@ -8295,7 +8311,7 @@ Seja conversacional e objetivo.`;
                   });
                 } else {
                   // Create new admin
-                  const tempPassword = Math.random().toString(36).slice(-8);
+                  const tempPassword = generateTempPassword();
                   const bcrypt = await import('bcryptjs');
                   const hashedPassword = await bcrypt.hash(tempPassword, 10);
                   
@@ -8485,7 +8501,7 @@ Seja conversacional e objetivo.`;
                   });
                 });
               } else {
-                const tempPassword = Math.random().toString(36).slice(-8);
+                const tempPassword = generateTempPassword();
                 const bcrypt = await import('bcryptjs');
                 const hashedPassword = await bcrypt.hash(tempPassword, 10);
                 
@@ -8563,7 +8579,7 @@ Seja conversacional e objetivo.`;
                   });
                 });
               } else {
-                const tempPassword = Math.random().toString(36).slice(-8);
+                const tempPassword = generateTempPassword();
                 const bcrypt = await import('bcryptjs');
                 const hashedPassword = await bcrypt.hash(tempPassword, 10);
                 
@@ -8645,7 +8661,7 @@ Seja conversacional e objetivo.`;
                   });
                 });
               } else {
-                const tempPassword = Math.random().toString(36).slice(-8);
+                const tempPassword = generateTempPassword();
                 const bcrypt = await import('bcryptjs');
                 const hashedPassword = await bcrypt.hash(tempPassword, 10);
                 
@@ -8856,7 +8872,7 @@ Seja conversacional e objetivo.`;
           isActive: true,
         });
       } else {
-        const tempPassword = Math.random().toString(36).slice(-8);
+        const tempPassword = generateTempPassword();
         const bcrypt = await import('bcryptjs');
         const hashedPassword = await bcrypt.hash(tempPassword, 10);
         

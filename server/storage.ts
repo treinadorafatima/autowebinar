@@ -406,15 +406,20 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAdminByEmail(email: string): Promise<Admin | undefined> {
-    const result = await db.select().from(admins).where(eq(admins.email, email)).limit(1);
+    // Normalize email to lowercase for case-insensitive matching
+    const normalizedEmail = email.toLowerCase().trim();
+    const result = await db.select().from(admins).where(eq(admins.email, normalizedEmail)).limit(1);
     return result[0];
   }
 
   async createAdmin(admin: AdminInsert): Promise<Admin> {
     const id = randomUUID();
+    // Normalize email to lowercase
+    const normalizedEmail = admin.email.toLowerCase().trim();
     const newAdmin: Admin = { 
       ...admin, 
       id, 
+      email: normalizedEmail,
       createdAt: new Date(),
       name: admin.name ?? null,
       telefone: admin.telefone ?? null,
