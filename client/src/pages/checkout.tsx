@@ -879,7 +879,7 @@ export default function Checkout() {
                                     ? "bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white"
                                     : plano.destaque 
                                       ? "bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white" 
-                                      : ""
+                                      : "border-cyan-500 text-cyan-400 hover:bg-cyan-500/10"
                               }`}
                               size="lg"
                               variant={plano.destaque || isRenew || isUpgrade ? "default" : "outline"}
