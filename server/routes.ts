@@ -7769,6 +7769,13 @@ Seja conversacional e objetivo.`;
         updateData.gatewayErrorCode = 'pending';
         updateData.gatewayErrorMessage = errorInfo.message;
         updateData.userFriendlyError = `${errorInfo.message} ${errorInfo.action}`;
+        
+        // Send pending payment email with PIX/Boleto alternatives
+        import("./email").then(({ sendPaymentPendingEmail }) => {
+          sendPaymentPendingEmail(pagamento.email, pagamento.nome, plano.nome, 'credit_card', pagamento.planoId).catch(err => {
+            console.error(`[MP Subscription] Error sending pending payment email:`, err);
+          });
+        });
       }
 
       // For subscriptions, 'authorized' means the subscription was CREATED, not that payment was made
@@ -7913,6 +7920,15 @@ Seja conversacional e objetivo.`;
       }
 
       await storage.updateCheckoutPagamento(pagamentoId, updateData);
+
+      // If subscription authorized but no payment confirmed, send pending email
+      if (mpData.status === 'authorized' && !hasConfirmedPayment) {
+        import("./email").then(({ sendPaymentPendingEmail }) => {
+          sendPaymentPendingEmail(pagamento.email, pagamento.nome, plano.nome, 'credit_card', pagamento.planoId).catch(err => {
+            console.error(`[MP Subscription] Error sending pending payment email:`, err);
+          });
+        });
+      }
 
       // Return the actual status based on whether we confirmed payment
       // Frontend should check for 'authorized' AND hasConfirmedPayment to redirect to success

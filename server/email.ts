@@ -656,6 +656,160 @@ ${APP_NAME}
   }
 }
 
+export async function sendPaymentPendingEmail(to: string, name: string, planName: string, paymentMethod: string, planoId?: string): Promise<boolean> {
+  try {
+    const { client, fromEmail } = getResendClient();
+    
+    // Build checkout URL with pre-filled email and name for alternative payment
+    const checkoutParams = new URLSearchParams({
+      email: to,
+      nome: name,
+    });
+    const checkoutUrl = planoId 
+      ? `${APP_URL}/checkout/${planoId}?${checkoutParams.toString()}`
+      : `${APP_URL}/checkout?${checkoutParams.toString()}`;
+    
+    // Card pending - offer PIX/Boleto as alternatives
+    const text = `
+Ola ${name},
+
+Recebemos seu pedido para o plano ${planName}!
+
+Seu pagamento com cartao esta EM ANALISE pelo banco emissor.
+
+Isso pode levar de 24 a 48 horas para ser processado.
+
+NAO QUER ESPERAR? Pague agora com PIX ou Boleto!
+
+PIX: Aprovacao instantanea - seu acesso e liberado na hora!
+Boleto: Vencimento em 3 dias uteis.
+
+Pagar com PIX ou Boleto: ${checkoutUrl}
+
+IMPORTANTE: Seu acesso sera liberado automaticamente assim que o pagamento for confirmado. Voce recebera um email com suas credenciais de acesso.
+
+Precisa de ajuda? Entre em contato com nosso suporte.
+
+---
+${APP_NAME}
+    `.trim();
+    
+    const html = `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pagamento em Analise - ${APP_NAME}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background-color: #f4f4f5;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f5;">
+    <tr>
+      <td style="padding: 40px 20px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden;">
+          <tr>
+            <td style="background-color: #f59e0b; padding: 30px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 600;">Pagamento em Analise</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 40px 30px;">
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Ola <strong>${name}</strong>,
+              </p>
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Recebemos seu pedido para o plano <strong>${planName}</strong>!
+              </p>
+              
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 25px 0; background-color: #fffbeb; border-radius: 6px; border-left: 4px solid #f59e0b;">
+                <tr>
+                  <td style="padding: 16px;">
+                    <p style="margin: 0 0 8px; color: #92400e; font-weight: 600; font-size: 14px;">
+                      Pagamento com cartao - EM ANALISE
+                    </p>
+                    <p style="margin: 0; color: #92400e; font-size: 14px; line-height: 1.6;">
+                      Seu pagamento esta sendo analisado pelo banco emissor do cartao. Isso pode levar de <strong>24 a 48 horas</strong>.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+              
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 25px 0; background-color: #ecfdf5; border-radius: 6px; border: 2px solid #10b981;">
+                <tr>
+                  <td style="padding: 20px;">
+                    <p style="margin: 0 0 12px; color: #047857; font-weight: 700; font-size: 16px; text-align: center;">
+                      NAO QUER ESPERAR?
+                    </p>
+                    <p style="margin: 0 0 16px; color: #047857; font-size: 14px; line-height: 1.6; text-align: center;">
+                      Pague agora com <strong>PIX</strong> ou <strong>Boleto</strong> e tenha seu acesso liberado imediatamente!
+                    </p>
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                      <tr>
+                        <td style="text-align: center;">
+                          <a href="${checkoutUrl}" style="display: inline-block; background-color: #10b981; color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 6px; font-weight: 600; font-size: 16px;">
+                            Pagar com PIX ou Boleto
+                          </a>
+                        </td>
+                      </tr>
+                    </table>
+                    <p style="margin: 16px 0 0; color: #047857; font-size: 13px; line-height: 1.6; text-align: center;">
+                      <strong>PIX:</strong> Aprovacao instantanea<br>
+                      <strong>Boleto:</strong> Vencimento em 3 dias uteis
+                    </p>
+                  </td>
+                </tr>
+              </table>
+              
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 25px 0; background-color: #f0f9ff; border-radius: 6px;">
+                <tr>
+                  <td style="padding: 16px;">
+                    <p style="margin: 0 0 8px; color: #0369a1; font-weight: 600; font-size: 14px;">
+                      O que acontece depois?
+                    </p>
+                    <p style="margin: 0; color: #0369a1; font-size: 14px; line-height: 1.6;">
+                      Assim que o pagamento for confirmado (seja pelo cartao ou outro metodo), voce recebera um email com suas <strong>credenciais de acesso</strong>.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+              
+              <p style="margin: 30px 0 0; color: #6b7280; font-size: 14px; line-height: 1.6;">
+                Precisa de ajuda? Entre em contato com nosso suporte.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color: #f8fafc; padding: 20px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0; color: #9ca3af; font-size: 12px;">
+                ${APP_NAME} - Webinarios Automatizados
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `;
+
+    const result = await client.emails.send({
+      from: fromEmail,
+      replyTo: REPLY_TO_EMAIL,
+      to: [to],
+      subject: `Pagamento em analise - ${planName} - ${APP_NAME}`,
+      html,
+      text,
+    });
+
+    console.log(`[email] Email de pagamento pendente enviado para ${to}`, result);
+    return true;
+  } catch (error) {
+    console.error(`[email] Erro ao enviar email de pagamento pendente para ${to}:`, error);
+    return false;
+  }
+}
+
 export async function sendPaymentConfirmedEmail(to: string, name: string, planName: string, expirationDate: Date): Promise<boolean> {
   try {
     const { client, fromEmail } = getResendClient();
