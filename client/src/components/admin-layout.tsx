@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ExpiredPlanBlocker } from "@/components/expired-plan-blocker";
+import { NoPlanBlocker } from "@/components/no-plan-blocker";
 
 interface AdminUser {
   name: string;
@@ -91,9 +92,23 @@ export function AdminLayout({ children, token, onLogout }: AdminLayoutProps) {
 
   const isExpired = user?.accessExpiresAt && new Date(user.accessExpiresAt) < new Date();
   const isTrial = user?.planoId === "trial";
+  const hasNoPlan = user && !user.planoId && user.role !== "superadmin";
   
-  const allowedPagesWhenExpired = ["/admin/subscription", "/checkout"];
-  const isOnAllowedPage = allowedPagesWhenExpired.some(page => location.startsWith(page));
+  const allowedPagesWhenBlocked = ["/admin/subscription", "/checkout"];
+  const isOnAllowedPage = allowedPagesWhenBlocked.some(page => location.startsWith(page));
+  
+  if (hasNoPlan && !isOnAllowedPage) {
+    return (
+      <NoPlanBlocker 
+        userName={user.name || "Usuário"}
+        userEmail={user.email}
+        onLogout={() => {
+          onLogout();
+          setLocation("/login");
+        }}
+      />
+    );
+  }
   
   if (isExpired && !isOnAllowedPage && user) {
     return (
