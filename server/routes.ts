@@ -7590,12 +7590,7 @@ Seja conversacional e objetivo.`;
 
       // Create preapproval with card_token for transparent checkout
       // IMPORTANT: status: "authorized" is required for card_token subscriptions
-      // First payment is charged immediately. start_date defines when the recurring cycle begins.
-      // We add 1 minute buffer to avoid "past date" validation error due to network latency
-      const now = new Date();
-      now.setMinutes(now.getMinutes() + 1);
-      const startDate = now.toISOString();
-      
+      // Do NOT send start_date - let MP use default behavior (immediate first charge)
       const preapprovalRequest: any = {
         reason: plano.nome,
         external_reference: pagamentoId,
@@ -7607,7 +7602,6 @@ Seja conversacional e objetivo.`;
           frequency_type: frequencyType,
           transaction_amount: plano.preco / 100,
           currency_id: 'BRL',
-          start_date: startDate,
         },
         back_url: `${baseUrl}/pagamento/sucesso?id=${pagamentoId}&tipo=assinatura`,
         notification_url: `${baseUrl}/webhook/mercadopago`,
