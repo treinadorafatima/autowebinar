@@ -905,9 +905,12 @@ export const affiliates = pgTable("affiliates", {
   stripeConnectAccountId: text("stripe_connect_account_id"), // ID da conta Stripe Connect do afiliado
   stripeConnectStatus: text("stripe_connect_status").default("pending"), // 'pending', 'connected', 'disabled'
   stripeConnectedAt: timestamp("stripe_connected_at"), // Data de conexão com Stripe Connect
+  pixKey: text("pix_key"), // Chave PIX do afiliado
+  pixKeyType: text("pix_key_type"), // Tipo: 'cpf', 'cnpj', 'email', 'phone', 'random'
   totalEarnings: integer("total_earnings").notNull().default(0), // Total ganho (centavos)
-  pendingAmount: integer("pending_amount").notNull().default(0), // Valor pendente (centavos)
-  paidAmount: integer("paid_amount").notNull().default(0), // Valor pago (centavos)
+  pendingAmount: integer("pending_amount").notNull().default(0), // Valor pendente - aguardando liberação (centavos)
+  availableAmount: integer("available_amount").notNull().default(0), // Valor disponível para saque (centavos)
+  paidAmount: integer("paid_amount").notNull().default(0), // Valor já sacado (centavos)
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -976,3 +979,25 @@ export const affiliateConfig = pgTable("affiliate_config", {
 export type AffiliateConfig = typeof affiliateConfig.$inferSelect;
 export const affiliateConfigInsertSchema = createInsertSchema(affiliateConfig).omit({ updatedAt: true });
 export type AffiliateConfigInsert = z.infer<typeof affiliateConfigInsertSchema>;
+
+// Affiliate Withdrawals table - withdrawal requests from affiliates
+export const affiliateWithdrawals = pgTable("affiliate_withdrawals", {
+  id: text("id").primaryKey(),
+  affiliateId: text("affiliate_id").notNull(), // FK para affiliates
+  amount: integer("amount").notNull(), // Valor solicitado (centavos)
+  pixKey: text("pix_key").notNull(), // Chave PIX usada no saque
+  pixKeyType: text("pix_key_type").notNull(), // Tipo da chave PIX
+  status: text("status").notNull().default("pending"), // 'pending', 'approved', 'paid', 'rejected', 'cancelled'
+  requestedAt: timestamp("requested_at").defaultNow(), // Data da solicitação
+  processedAt: timestamp("processed_at"), // Data do processamento (aprovação/rejeição)
+  paidAt: timestamp("paid_at"), // Data do pagamento efetivo
+  processedBy: text("processed_by"), // ID do admin que processou
+  transactionId: text("transaction_id"), // ID da transação PIX (opcional)
+  notes: text("notes"), // Observações do admin
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type AffiliateWithdrawal = typeof affiliateWithdrawals.$inferSelect;
+export const affiliateWithdrawalInsertSchema = createInsertSchema(affiliateWithdrawals).omit({ id: true, createdAt: true, updatedAt: true });
+export type AffiliateWithdrawalInsert = z.infer<typeof affiliateWithdrawalInsertSchema>;

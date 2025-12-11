@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type WebinarConfig, type WebinarConfigInsert, type Admin, type AdminInsert, type UploadedVideo, type UploadedVideoInsert, type Comment, type CommentInsert, type Webinar, type WebinarInsert, type Setting, type SettingInsert, type ViewerSession, type WebinarScript, type WebinarScriptInsert, type AiConfig, type AiConfigInsert, type AiMemory, type AiMemoryInsert, type CheckoutPlano, type CheckoutPlanoInsert, type CheckoutPagamento, type CheckoutPagamentoInsert, type CheckoutConfig, type CheckoutConfigInsert, type CheckoutAssinatura, type CheckoutAssinaturaInsert, type AiChat, type AiChatInsert, type AiMessageChat, type AiMessageChatInsert, type VideoTranscription, type VideoTranscriptionInsert, type AdminEmailCredential, type AdminEmailCredentialInsert, type EmailSequence, type EmailSequenceInsert, type ScheduledEmail, type ScheduledEmailInsert, type LeadFormConfig, type LeadFormConfigInsert, type WhatsappAccount, type WhatsappAccountInsert, type WhatsappSession, type WhatsappSessionInsert, type WhatsappSequence, type WhatsappSequenceInsert, type ScheduledWhatsappMessage, type ScheduledWhatsappMessageInsert, type MediaFile, type MediaFileInsert, type LeadMessage, type LeadMessageInsert, type Lead, type WhatsappBroadcast, type WhatsappBroadcastInsert, type WhatsappBroadcastRecipient, type WhatsappBroadcastRecipientInsert, type Affiliate, type AffiliateInsert, type AffiliateLink, type AffiliateLinkInsert, type AffiliateSale, type AffiliateSaleInsert, type AffiliateConfig, type AffiliateConfigInsert, admins, webinarConfigs, users, uploadedVideos, comments, webinars as webinarsTable, settings, viewerSessions, webinarScripts, aiConfigs, aiMemories, checkoutPlanos, checkoutPagamentos, checkoutConfigs, checkoutAssinaturas, aiChats, aiMessageChats, videoTranscriptions, adminEmailCredentials, emailSequences, scheduledEmails, leadFormConfigs, whatsappAccounts, whatsappSessions, whatsappSequences, scheduledWhatsappMessages, mediaFiles, webinarViewLogs, leads, leadMessages, whatsappBroadcasts, whatsappBroadcastRecipients, affiliates, affiliateLinks, affiliateSales, affiliateConfig } from "@shared/schema";
+import { type User, type InsertUser, type WebinarConfig, type WebinarConfigInsert, type Admin, type AdminInsert, type UploadedVideo, type UploadedVideoInsert, type Comment, type CommentInsert, type Webinar, type WebinarInsert, type Setting, type SettingInsert, type ViewerSession, type WebinarScript, type WebinarScriptInsert, type AiConfig, type AiConfigInsert, type AiMemory, type AiMemoryInsert, type CheckoutPlano, type CheckoutPlanoInsert, type CheckoutPagamento, type CheckoutPagamentoInsert, type CheckoutConfig, type CheckoutConfigInsert, type CheckoutAssinatura, type CheckoutAssinaturaInsert, type AiChat, type AiChatInsert, type AiMessageChat, type AiMessageChatInsert, type VideoTranscription, type VideoTranscriptionInsert, type AdminEmailCredential, type AdminEmailCredentialInsert, type EmailSequence, type EmailSequenceInsert, type ScheduledEmail, type ScheduledEmailInsert, type LeadFormConfig, type LeadFormConfigInsert, type WhatsappAccount, type WhatsappAccountInsert, type WhatsappSession, type WhatsappSessionInsert, type WhatsappSequence, type WhatsappSequenceInsert, type ScheduledWhatsappMessage, type ScheduledWhatsappMessageInsert, type MediaFile, type MediaFileInsert, type LeadMessage, type LeadMessageInsert, type Lead, type WhatsappBroadcast, type WhatsappBroadcastInsert, type WhatsappBroadcastRecipient, type WhatsappBroadcastRecipientInsert, type Affiliate, type AffiliateInsert, type AffiliateLink, type AffiliateLinkInsert, type AffiliateSale, type AffiliateSaleInsert, type AffiliateConfig, type AffiliateConfigInsert, type AffiliateWithdrawal, type AffiliateWithdrawalInsert, admins, webinarConfigs, users, uploadedVideos, comments, webinars as webinarsTable, settings, viewerSessions, webinarScripts, aiConfigs, aiMemories, checkoutPlanos, checkoutPagamentos, checkoutConfigs, checkoutAssinaturas, aiChats, aiMessageChats, videoTranscriptions, adminEmailCredentials, emailSequences, scheduledEmails, leadFormConfigs, whatsappAccounts, whatsappSessions, whatsappSequences, scheduledWhatsappMessages, mediaFiles, webinarViewLogs, leads, leadMessages, whatsappBroadcasts, whatsappBroadcastRecipients, affiliates, affiliateLinks, affiliateSales, affiliateConfig, affiliateWithdrawals } from "@shared/schema";
 import * as crypto from "crypto";
 import { randomUUID } from "crypto";
 import { db } from "./db";
@@ -348,6 +348,13 @@ export interface IStorage {
   getAffiliateStats(affiliateId: string, startDate?: Date, endDate?: Date): Promise<{ totalClicks: number; totalConversions: number; totalSales: number; totalCommission: number; pendingCommission: number; paidCommission: number }>;
   // Affiliate Leads
   listLeadsByAffiliateLinkCodes(codes: string[]): Promise<Lead[]>;
+  // Affiliate Withdrawals
+  listAffiliateWithdrawals(): Promise<AffiliateWithdrawal[]>;
+  listAffiliateWithdrawalsByAffiliate(affiliateId: string): Promise<AffiliateWithdrawal[]>;
+  getAffiliateWithdrawalById(id: string): Promise<AffiliateWithdrawal | undefined>;
+  createAffiliateWithdrawal(data: AffiliateWithdrawalInsert): Promise<AffiliateWithdrawal>;
+  updateAffiliateWithdrawal(id: string, data: Partial<AffiliateWithdrawalInsert>): Promise<AffiliateWithdrawal | undefined>;
+  listPendingWithdrawals(): Promise<AffiliateWithdrawal[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3984,8 +3991,11 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
       stripeConnectAccountId: data.stripeConnectAccountId ?? null,
       stripeConnectStatus: data.stripeConnectStatus ?? "pending",
       stripeConnectedAt: data.stripeConnectedAt ?? null,
+      pixKey: data.pixKey ?? null,
+      pixKeyType: data.pixKeyType ?? null,
       totalEarnings: data.totalEarnings ?? 0,
       pendingAmount: data.pendingAmount ?? 0,
+      availableAmount: data.availableAmount ?? 0,
       paidAmount: data.paidAmount ?? 0,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -4240,6 +4250,59 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
       .from(leads)
       .where(sql`${leads.affiliateLinkCode} = ANY(ARRAY[${sql.join(codes.map(c => sql`${c}`), sql`, `)}]::text[])`)
       .orderBy(desc(leads.capturedAt));
+  }
+
+  // Affiliate Withdrawals
+
+  async listAffiliateWithdrawals(): Promise<AffiliateWithdrawal[]> {
+    return db.select().from(affiliateWithdrawals).orderBy(desc(affiliateWithdrawals.requestedAt));
+  }
+
+  async listAffiliateWithdrawalsByAffiliate(affiliateId: string): Promise<AffiliateWithdrawal[]> {
+    return db.select().from(affiliateWithdrawals)
+      .where(eq(affiliateWithdrawals.affiliateId, affiliateId))
+      .orderBy(desc(affiliateWithdrawals.requestedAt));
+  }
+
+  async getAffiliateWithdrawalById(id: string): Promise<AffiliateWithdrawal | undefined> {
+    const result = await db.select().from(affiliateWithdrawals).where(eq(affiliateWithdrawals.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createAffiliateWithdrawal(data: AffiliateWithdrawalInsert): Promise<AffiliateWithdrawal> {
+    const id = randomUUID();
+    const withdrawal: AffiliateWithdrawal = {
+      id,
+      affiliateId: data.affiliateId,
+      amount: data.amount,
+      pixKey: data.pixKey,
+      pixKeyType: data.pixKeyType,
+      status: data.status ?? "pending",
+      requestedAt: data.requestedAt ?? new Date(),
+      processedAt: data.processedAt ?? null,
+      paidAt: data.paidAt ?? null,
+      processedBy: data.processedBy ?? null,
+      transactionId: data.transactionId ?? null,
+      notes: data.notes ?? null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    await db.insert(affiliateWithdrawals).values(withdrawal);
+    return withdrawal;
+  }
+
+  async updateAffiliateWithdrawal(id: string, data: Partial<AffiliateWithdrawalInsert>): Promise<AffiliateWithdrawal | undefined> {
+    const result = await db.update(affiliateWithdrawals)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(affiliateWithdrawals.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async listPendingWithdrawals(): Promise<AffiliateWithdrawal[]> {
+    return db.select().from(affiliateWithdrawals)
+      .where(eq(affiliateWithdrawals.status, 'pending'))
+      .orderBy(affiliateWithdrawals.requestedAt);
   }
 }
 

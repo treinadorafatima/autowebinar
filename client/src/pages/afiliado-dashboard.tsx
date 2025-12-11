@@ -93,6 +93,26 @@ interface Affiliate {
   mpTokenExpiresAt?: string | null;
   metaPixelId?: string | null;
   metaAccessToken?: string | null;
+  pixKey?: string | null;
+  pixKeyType?: string | null;
+  totalEarnings?: number;
+  pendingAmount?: number;
+  availableAmount?: number;
+  paidAmount?: number;
+}
+
+interface AffiliateWithdrawal {
+  id: string;
+  affiliateId: string;
+  amount: number;
+  pixKey: string;
+  pixKeyType: string;
+  status: string;
+  requestedAt: string;
+  processedAt?: string | null;
+  paidAt?: string | null;
+  transactionId?: string | null;
+  notes?: string | null;
 }
 
 interface Plano {
@@ -122,6 +142,10 @@ export default function AfiliadoDashboardPage() {
   const [metaPixelInput, setMetaPixelInput] = useState("");
   const [metaAccessTokenInput, setMetaAccessTokenInput] = useState("");
   const [dateRange, setDateRange] = useState("all");
+  const [pixKeyInput, setPixKeyInput] = useState("");
+  const [pixKeyTypeInput, setPixKeyTypeInput] = useState("");
+  const [withdrawalAmount, setWithdrawalAmount] = useState("");
+  const [isWithdrawalDialogOpen, setIsWithdrawalDialogOpen] = useState(false);
 
   const affiliateId = localStorage.getItem("affiliateId");
   const affiliateToken = localStorage.getItem("affiliateToken");
@@ -335,7 +359,63 @@ export default function AfiliadoDashboardPage() {
     if (affiliate?.metaAccessToken) {
       setMetaAccessTokenInput(affiliate.metaAccessToken);
     }
-  }, [affiliate?.metaPixelId, affiliate?.metaAccessToken]);
+    if (affiliate?.pixKey) {
+      setPixKeyInput(affiliate.pixKey);
+    }
+    if (affiliate?.pixKeyType) {
+      setPixKeyTypeInput(affiliate.pixKeyType);
+    }
+  }, [affiliate?.metaPixelId, affiliate?.metaAccessToken, affiliate?.pixKey, affiliate?.pixKeyType]);
+
+  const { data: withdrawals } = useQuery<AffiliateWithdrawal[]>({
+    queryKey: ["/api/affiliate/me/withdrawals"],
+    enabled: !!affiliateToken,
+  });
+
+  const updatePixKeyMutation = useMutation({
+    mutationFn: async (data: { pixKey: string; pixKeyType: string }) => {
+      const response = await apiRequest("PATCH", `/api/affiliate/me/pix`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Chave PIX salva!",
+        description: "Sua chave PIX foi atualizada com sucesso.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/affiliate/me"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro ao salvar",
+        description: error.message || "Não foi possível salvar a chave PIX.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const requestWithdrawalMutation = useMutation({
+    mutationFn: async (amount: number) => {
+      const response = await apiRequest("POST", `/api/affiliate/me/withdrawals`, { amount });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Saque solicitado!",
+        description: "Sua solicitação de saque foi enviada. Aguarde o processamento.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/affiliate/me"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/affiliate/me/withdrawals"] });
+      setIsWithdrawalDialogOpen(false);
+      setWithdrawalAmount("");
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro ao solicitar saque",
+        description: error.message || "Não foi possível solicitar o saque.",
+        variant: "destructive",
+      });
+    },
+  });
 
   const updateMetaAccessTokenMutation = useMutation({
     mutationFn: async (metaAccessToken: string) => {
