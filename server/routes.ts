@@ -8905,6 +8905,25 @@ Seja conversacional e objetivo.`;
         adminId: admin.id,
       });
 
+      // Create or update subscription record for manual release
+      const existingSubscription = await storage.getCheckoutAssinaturaByAdminId(admin.id);
+      if (existingSubscription) {
+        await storage.updateCheckoutAssinatura(existingSubscription.id, {
+          status: 'active',
+          planoId: plano.id,
+          gateway: 'manual',
+          proximoPagamento: expirationDate,
+        });
+      } else {
+        await storage.createCheckoutAssinatura({
+          adminId: admin.id,
+          planoId: plano.id,
+          status: 'active',
+          gateway: 'manual',
+          proximoPagamento: expirationDate,
+        });
+      }
+
       res.json({ success: true, adminId: admin.id });
     } catch (error: any) {
       res.status(400).json({ error: error.message });
