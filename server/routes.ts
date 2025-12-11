@@ -9928,6 +9928,16 @@ Seja conversacional e objetivo.`;
 
       const token = jwt.sign({ email: admin.email }, JWT_SECRET, { expiresIn: "24h" });
 
+      // Send welcome email on first login
+      if (!affiliate.welcomeEmailSent) {
+        await storage.updateAffiliate(affiliate.id, { welcomeEmailSent: true });
+        import("./email").then(({ sendAffiliateWelcomeEmail }) => {
+          sendAffiliateWelcomeEmail(admin.email, admin.name || "Afiliado").catch(err => {
+            console.error("[affiliate] Erro ao enviar email de boas-vindas:", err);
+          });
+        });
+      }
+
       res.json({ 
         token, 
         affiliate: { 
@@ -10260,6 +10270,20 @@ Seja conversacional e objetivo.`;
           import("./email").then(({ sendAffiliateApprovedEmail }) => {
             sendAffiliateApprovedEmail(affiliateAdmin.email, affiliateAdmin.name || "Afiliado").catch(err => {
               console.error("[affiliate] Erro ao enviar email de aprovação:", err);
+            });
+          });
+        }
+      }
+
+      // Send rejection email if status changed to rejected
+      const wasNotRejected = currentAffiliate.status !== "rejected";
+      const willBeRejected = req.body.status === "rejected";
+      if (wasNotRejected && willBeRejected) {
+        const affiliateAdmin = await storage.getAdminById(affiliate.adminId);
+        if (affiliateAdmin) {
+          import("./email").then(({ sendAffiliateRejectedEmail }) => {
+            sendAffiliateRejectedEmail(affiliateAdmin.email, affiliateAdmin.name || "Afiliado", req.body.rejectionReason).catch(err => {
+              console.error("[affiliate] Erro ao enviar email de rejeição:", err);
             });
           });
         }
@@ -10986,6 +11010,18 @@ Seja conversacional e objetivo.`;
         availableAmount: availableAmount - amount,
       });
 
+      // Send email notification for withdrawal request
+      import("./email").then(({ sendAffiliateWithdrawalRequestedEmail }) => {
+        sendAffiliateWithdrawalRequestedEmail(
+          email,
+          admin.name || "Afiliado",
+          amount,
+          affiliate.pixKey!
+        ).catch(err => {
+          console.error("[affiliate] Erro ao enviar email de solicitação de saque:", err);
+        });
+      });
+
       res.json({ 
         success: true, 
         message: "Solicitação de saque criada com sucesso",
@@ -11069,6 +11105,21 @@ Seja conversacional e objetivo.`;
         await storage.updateAffiliate(affiliate.id, {
           paidAmount: (affiliate.paidAmount || 0) + withdrawal.amount,
         });
+
+        // Send email notification for withdrawal paid
+        const affiliateAdmin = await storage.getAdminById(affiliate.adminId);
+        if (affiliateAdmin) {
+          import("./email").then(({ sendAffiliateWithdrawalPaidEmail }) => {
+            sendAffiliateWithdrawalPaidEmail(
+              affiliateAdmin.email,
+              affiliateAdmin.name || "Afiliado",
+              withdrawal.amount,
+              withdrawal.pixKey
+            ).catch(err => {
+              console.error("[affiliate] Erro ao enviar email de saque pago:", err);
+            });
+          });
+        }
       }
 
       res.json({ success: true, message: "Saque marcado como pago" });

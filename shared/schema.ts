@@ -907,6 +907,7 @@ export const affiliates = pgTable("affiliates", {
   stripeConnectedAt: timestamp("stripe_connected_at"), // Data de conexão com Stripe Connect
   pixKey: text("pix_key"), // Chave PIX do afiliado
   pixKeyType: text("pix_key_type"), // Tipo: 'cpf', 'cnpj', 'email', 'phone', 'random'
+  welcomeEmailSent: boolean("welcome_email_sent").notNull().default(false), // Se já enviou email de boas-vindas
   totalEarnings: integer("total_earnings").notNull().default(0), // Total ganho (centavos)
   pendingAmount: integer("pending_amount").notNull().default(0), // Valor pendente - aguardando liberação (centavos)
   availableAmount: integer("available_amount").notNull().default(0), // Valor disponível para saque (centavos)

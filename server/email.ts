@@ -1446,3 +1446,518 @@ Este e um email automatico, por favor nao responda.
     return false;
   }
 }
+
+export async function sendAffiliateRejectedEmail(to: string, name: string, reason?: string): Promise<boolean> {
+  try {
+    const { client, fromEmail } = getResendClient();
+    
+    const reasonText = reason ? `\nMotivo: ${reason}` : '';
+    
+    const text = `
+Ola ${name},
+
+Agradecemos seu interesse em participar do programa de afiliados do ${APP_NAME}.
+
+Infelizmente, apos analise do seu cadastro, nao foi possivel aprovar sua solicitacao neste momento.${reasonText}
+
+Voce pode tentar novamente no futuro, garantindo que todas as informacoes estejam corretas e completas.
+
+Se tiver alguma duvida, entre em contato conosco.
+
+---
+${APP_NAME} - Programa de Afiliados
+    `.trim();
+    
+    const html = `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cadastro Nao Aprovado - ${APP_NAME}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background-color: #f4f4f5;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f5;">
+    <tr>
+      <td style="padding: 40px 20px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden;">
+          <tr>
+            <td style="background-color: #ef4444; padding: 30px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 600;">Cadastro Nao Aprovado</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 40px 30px;">
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Ola <strong>${name}</strong>,
+              </p>
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Agradecemos seu interesse em participar do programa de afiliados do ${APP_NAME}.
+              </p>
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Infelizmente, apos analise do seu cadastro, nao foi possivel aprovar sua solicitacao neste momento.
+              </p>
+              ${reason ? `
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 30px 0; background-color: #fef2f2; border-radius: 6px;">
+                <tr>
+                  <td style="padding: 20px;">
+                    <p style="margin: 0; color: #991b1b; font-size: 14px; line-height: 1.6;">
+                      <strong>Motivo:</strong> ${reason}
+                    </p>
+                  </td>
+                </tr>
+              </table>
+              ` : ''}
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Voce pode tentar novamente no futuro, garantindo que todas as informacoes estejam corretas e completas.
+              </p>
+              <p style="margin: 0; color: #6b7280; font-size: 14px; line-height: 1.6;">
+                Se tiver alguma duvida, entre em contato conosco.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color: #f8fafc; padding: 20px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0; color: #9ca3af; font-size: 12px;">
+                ${APP_NAME} - Programa de Afiliados
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `;
+
+    const result = await client.emails.send({
+      from: fromEmail,
+      replyTo: REPLY_TO_EMAIL,
+      to: [to],
+      subject: `Cadastro nao aprovado - Programa de Afiliados ${APP_NAME}`,
+      html,
+      text,
+    });
+
+    console.log(`[email] Email de cadastro rejeitado enviado para ${to}`, result);
+    return true;
+  } catch (error) {
+    console.error(`[email] Erro ao enviar email de cadastro rejeitado para ${to}:`, error);
+    return false;
+  }
+}
+
+export async function sendAffiliateWithdrawalRequestedEmail(to: string, name: string, amount: number, pixKey: string): Promise<boolean> {
+  try {
+    const { client, fromEmail } = getResendClient();
+    
+    const amountFormatted = (amount / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    
+    const text = `
+Ola ${name},
+
+Recebemos sua solicitacao de saque no programa de afiliados do ${APP_NAME}.
+
+Detalhes da solicitacao:
+- Valor: ${amountFormatted}
+- Chave PIX: ${pixKey}
+
+Sua solicitacao sera processada em ate 3 dias uteis. Voce recebera um email de confirmacao quando o pagamento for efetuado.
+
+Acesse seu painel para acompanhar o status: ${AFFILIATE_LOGIN_URL}
+
+---
+${APP_NAME} - Programa de Afiliados
+    `.trim();
+    
+    const html = `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Solicitacao de Saque Recebida - ${APP_NAME}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background-color: #f4f4f5;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f5;">
+    <tr>
+      <td style="padding: 40px 20px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden;">
+          <tr>
+            <td style="background-color: #3b82f6; padding: 30px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 600;">Solicitacao de Saque Recebida</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 40px 30px;">
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Ola <strong>${name}</strong>,
+              </p>
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Recebemos sua solicitacao de saque no programa de afiliados do ${APP_NAME}.
+              </p>
+              
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 30px 0; background-color: #eff6ff; border-radius: 6px; border: 2px solid #3b82f6;">
+                <tr>
+                  <td style="padding: 20px;">
+                    <p style="margin: 0 0 12px; color: #1e40af; font-weight: 600; font-size: 14px;">Detalhes da solicitacao:</p>
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                      <tr>
+                        <td style="padding: 8px 0; color: #374151; font-size: 14px; border-bottom: 1px solid #dbeafe;">
+                          <strong>Valor:</strong>
+                        </td>
+                        <td style="padding: 8px 0; color: #1e40af; font-size: 18px; font-weight: 700; text-align: right; border-bottom: 1px solid #dbeafe;">
+                          ${amountFormatted}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 8px 0; color: #374151; font-size: 14px;">
+                          <strong>Chave PIX:</strong>
+                        </td>
+                        <td style="padding: 8px 0; color: #374151; font-size: 14px; text-align: right;">
+                          ${pixKey}
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+              
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 20px 0; background-color: #fef3c7; border-radius: 6px;">
+                <tr>
+                  <td style="padding: 16px;">
+                    <p style="margin: 0; color: #92400e; font-size: 14px; line-height: 1.6;">
+                      <strong>Status:</strong> Em processamento<br><br>
+                      Sua solicitacao sera processada em ate 3 dias uteis. Voce recebera um email de confirmacao quando o pagamento for efetuado.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+              
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                <tr>
+                  <td style="text-align: center; padding: 20px 0;">
+                    <a href="${AFFILIATE_LOGIN_URL}" style="display: inline-block; background-color: #3b82f6; color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 6px; font-weight: 600; font-size: 16px;">
+                      Acessar Meu Painel
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color: #f8fafc; padding: 20px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0; color: #9ca3af; font-size: 12px;">
+                ${APP_NAME} - Programa de Afiliados
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `;
+
+    const result = await client.emails.send({
+      from: fromEmail,
+      replyTo: REPLY_TO_EMAIL,
+      to: [to],
+      subject: `Solicitacao de saque recebida - ${APP_NAME}`,
+      html,
+      text,
+    });
+
+    console.log(`[email] Email de solicitacao de saque enviado para ${to}`, result);
+    return true;
+  } catch (error) {
+    console.error(`[email] Erro ao enviar email de solicitacao de saque para ${to}:`, error);
+    return false;
+  }
+}
+
+export async function sendAffiliateWithdrawalPaidEmail(to: string, name: string, amount: number, pixKey: string): Promise<boolean> {
+  try {
+    const { client, fromEmail } = getResendClient();
+    
+    const amountFormatted = (amount / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    
+    const text = `
+Ola ${name},
+
+Seu saque foi processado com sucesso!
+
+Detalhes do pagamento:
+- Valor: ${amountFormatted}
+- Chave PIX: ${pixKey}
+
+O valor ja deve estar disponivel na sua conta em alguns minutos.
+
+Obrigado por fazer parte do nosso programa de afiliados! Continue divulgando e vendendo.
+
+Acesse seu painel: ${AFFILIATE_LOGIN_URL}
+
+---
+${APP_NAME} - Programa de Afiliados
+    `.trim();
+    
+    const html = `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Saque Pago - ${APP_NAME}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background-color: #f4f4f5;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f5;">
+    <tr>
+      <td style="padding: 40px 20px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden;">
+          <tr>
+            <td style="background-color: #10b981; padding: 30px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 600;">Saque Pago com Sucesso!</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 40px 30px;">
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Ola <strong>${name}</strong>,
+              </p>
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Seu saque foi processado com sucesso!
+              </p>
+              
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 30px 0; background-color: #ecfdf5; border-radius: 6px; border: 2px solid #10b981;">
+                <tr>
+                  <td style="padding: 20px;">
+                    <p style="margin: 0 0 12px; color: #047857; font-weight: 600; font-size: 14px;">Detalhes do pagamento:</p>
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                      <tr>
+                        <td style="padding: 8px 0; color: #374151; font-size: 14px; border-bottom: 1px solid #d1fae5;">
+                          <strong>Valor pago:</strong>
+                        </td>
+                        <td style="padding: 8px 0; color: #047857; font-size: 22px; font-weight: 700; text-align: right; border-bottom: 1px solid #d1fae5;">
+                          ${amountFormatted}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 8px 0; color: #374151; font-size: 14px;">
+                          <strong>Chave PIX:</strong>
+                        </td>
+                        <td style="padding: 8px 0; color: #374151; font-size: 14px; text-align: right;">
+                          ${pixKey}
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+              
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                O valor ja deve estar disponivel na sua conta em alguns minutos.
+              </p>
+              
+              <p style="margin: 0 0 30px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Obrigado por fazer parte do nosso programa de afiliados! Continue divulgando e vendendo.
+              </p>
+              
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                <tr>
+                  <td style="text-align: center; padding: 20px 0;">
+                    <a href="${AFFILIATE_LOGIN_URL}" style="display: inline-block; background-color: #10b981; color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 6px; font-weight: 600; font-size: 16px;">
+                      Acessar Meu Painel
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color: #f8fafc; padding: 20px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0; color: #9ca3af; font-size: 12px;">
+                ${APP_NAME} - Programa de Afiliados
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `;
+
+    const result = await client.emails.send({
+      from: fromEmail,
+      replyTo: REPLY_TO_EMAIL,
+      to: [to],
+      subject: `Saque de ${amountFormatted} pago com sucesso - ${APP_NAME}`,
+      html,
+      text,
+    });
+
+    console.log(`[email] Email de saque pago enviado para ${to}`, result);
+    return true;
+  } catch (error) {
+    console.error(`[email] Erro ao enviar email de saque pago para ${to}:`, error);
+    return false;
+  }
+}
+
+export async function sendAffiliateWelcomeEmail(to: string, name: string): Promise<boolean> {
+  try {
+    const { client, fromEmail } = getResendClient();
+    
+    const text = `
+Ola ${name},
+
+Bem-vindo ao painel de afiliados do ${APP_NAME}!
+
+Estamos felizes em ter voce como parceiro. Aqui estao algumas dicas para comecar:
+
+1. Gere seus links de divulgacao
+   Acesse a secao de produtos e gere seus links exclusivos para compartilhar.
+
+2. Acompanhe suas vendas
+   No painel, voce pode ver todas as suas vendas e comissoes em tempo real.
+
+3. Solicite saques
+   Quando atingir o valor minimo, voce pode solicitar o saque das suas comissoes.
+
+4. Materiais de divulgacao
+   Utilize os materiais disponibilizados para aumentar suas vendas.
+
+Se tiver alguma duvida, estamos aqui para ajudar!
+
+Acesse seu painel: ${AFFILIATE_LOGIN_URL}
+
+Boas vendas!
+
+---
+${APP_NAME} - Programa de Afiliados
+    `.trim();
+    
+    const html = `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bem-vindo ao Programa de Afiliados - ${APP_NAME}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background-color: #f4f4f5;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f5;">
+    <tr>
+      <td style="padding: 40px 20px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden;">
+          <tr>
+            <td style="background-color: #7c3aed; padding: 30px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 600;">Bem-vindo ao Programa de Afiliados!</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 40px 30px;">
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Ola <strong>${name}</strong>,
+              </p>
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Bem-vindo ao painel de afiliados do ${APP_NAME}! Estamos felizes em ter voce como parceiro.
+              </p>
+              
+              <p style="margin: 0 0 16px; color: #374151; font-size: 16px; font-weight: 600;">
+                Aqui estao algumas dicas para comecar:
+              </p>
+              
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 20px 0;">
+                <tr>
+                  <td style="padding: 16px; background-color: #f3f4f6; border-radius: 6px; margin-bottom: 12px;">
+                    <p style="margin: 0 0 8px; color: #7c3aed; font-weight: 600; font-size: 15px;">1. Gere seus links de divulgacao</p>
+                    <p style="margin: 0; color: #6b7280; font-size: 14px; line-height: 1.5;">
+                      Acesse a secao de produtos e gere seus links exclusivos para compartilhar.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+              
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 12px 0;">
+                <tr>
+                  <td style="padding: 16px; background-color: #f3f4f6; border-radius: 6px;">
+                    <p style="margin: 0 0 8px; color: #7c3aed; font-weight: 600; font-size: 15px;">2. Acompanhe suas vendas</p>
+                    <p style="margin: 0; color: #6b7280; font-size: 14px; line-height: 1.5;">
+                      No painel, voce pode ver todas as suas vendas e comissoes em tempo real.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+              
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 12px 0;">
+                <tr>
+                  <td style="padding: 16px; background-color: #f3f4f6; border-radius: 6px;">
+                    <p style="margin: 0 0 8px; color: #7c3aed; font-weight: 600; font-size: 15px;">3. Solicite saques</p>
+                    <p style="margin: 0; color: #6b7280; font-size: 14px; line-height: 1.5;">
+                      Quando atingir o valor minimo, voce pode solicitar o saque das suas comissoes.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+              
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 12px 0 30px;">
+                <tr>
+                  <td style="padding: 16px; background-color: #f3f4f6; border-radius: 6px;">
+                    <p style="margin: 0 0 8px; color: #7c3aed; font-weight: 600; font-size: 15px;">4. Materiais de divulgacao</p>
+                    <p style="margin: 0; color: #6b7280; font-size: 14px; line-height: 1.5;">
+                      Utilize os materiais disponibilizados para aumentar suas vendas.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+              
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                <tr>
+                  <td style="text-align: center; padding: 20px 0;">
+                    <a href="${AFFILIATE_LOGIN_URL}" style="display: inline-block; background-color: #7c3aed; color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 6px; font-weight: 600; font-size: 16px;">
+                      Acessar Meu Painel
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              
+              <p style="margin: 20px 0 0; color: #6b7280; font-size: 14px; line-height: 1.6; text-align: center;">
+                Se tiver alguma duvida, estamos aqui para ajudar!
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color: #f8fafc; padding: 20px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0; color: #9ca3af; font-size: 12px;">
+                ${APP_NAME} - Programa de Afiliados
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `;
+
+    const result = await client.emails.send({
+      from: fromEmail,
+      replyTo: REPLY_TO_EMAIL,
+      to: [to],
+      subject: `Bem-vindo ao Programa de Afiliados ${APP_NAME}!`,
+      html,
+      text,
+    });
+
+    console.log(`[email] Email de boas-vindas de afiliado enviado para ${to}`, result);
+    return true;
+  } catch (error) {
+    console.error(`[email] Erro ao enviar email de boas-vindas de afiliado para ${to}:`, error);
+    return false;
+  }
+}
