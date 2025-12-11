@@ -7590,8 +7590,9 @@ Seja conversacional e objetivo.`;
 
       // Create preapproval with card_token for transparent checkout
       // IMPORTANT: status: "authorized" is required for card_token subscriptions
-      // start_date = now ensures immediate first payment
+      // start_date must be in the future when MP receives it, so add 5 minutes buffer
       const now = new Date();
+      now.setMinutes(now.getMinutes() + 5);
       const startDate = now.toISOString();
       
       const preapprovalRequest: any = {
