@@ -970,193 +970,377 @@ export default function AfiliadoDashboardPage() {
           </TabsContent>
 
           <TabsContent value="saque">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Wallet className="h-5 w-5" />
-                  Receber Comissões via Mercado Pago
-                </CardTitle>
-                <CardDescription>
-                  Conecte sua conta do Mercado Pago para receber suas comissões automaticamente quando uma venda for confirmada
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {isLoadingAffiliate ? (
-                  <Skeleton className="h-20 w-full" />
-                ) : (
-                  <div className="space-y-6">
-                    <div className="p-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
-                      <div className="flex items-start gap-3">
-                        <DollarSign className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
-                        <div>
-                          <p className="font-medium text-blue-900 dark:text-blue-100 mb-2">
-                            Como funciona o recebimento de comissões?
-                          </p>
-                          <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-2">
-                            <li>1. Conecte sua conta do Mercado Pago abaixo</li>
-                            <li>2. Quando alguém comprar através do seu link, você ganha uma comissão</li>
-                            <li>3. Após a confirmação do pagamento, a comissão é transferida automaticamente para seu Mercado Pago</li>
-                            <li>4. Você pode transferir do Mercado Pago para sua conta bancária quando quiser</li>
-                          </ul>
+            <div className="space-y-6">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+                    <CardTitle className="text-sm font-medium">Disponível para Saque</CardTitle>
+                    <Wallet className="h-4 w-4 text-green-500" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-green-600" data-testid="text-available-balance">
+                      {formatCurrency(affiliate?.availableAmount || 0)}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">Pronto para solicitar saque</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+                    <CardTitle className="text-sm font-medium">Aguardando Liberação</CardTitle>
+                    <Clock className="h-4 w-4 text-yellow-500" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-yellow-600" data-testid="text-pending-balance">
+                      {formatCurrency(affiliate?.pendingAmount || 0)}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">Liberado após período de garantia</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+                    <CardTitle className="text-sm font-medium">Saques Pendentes</CardTitle>
+                    <Loader2 className="h-4 w-4 text-blue-500" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-blue-600" data-testid="text-requested-balance">
+                      {formatCurrency(withdrawals?.filter(w => w.status === 'pending').reduce((sum, w) => sum + w.amount, 0) || 0)}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">Aguardando processamento</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+                    <CardTitle className="text-sm font-medium">Total Sacado</CardTitle>
+                    <DollarSign className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold" data-testid="text-paid-balance">
+                      {formatCurrency(affiliate?.paidAmount || 0)}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">Valor total já recebido</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Wallet className="h-5 w-5" />
+                    Solicitar Saque via PIX
+                  </CardTitle>
+                  <CardDescription>
+                    Configure sua chave PIX e solicite saques manuais do seu saldo disponível
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {isLoadingAffiliate ? (
+                    <Skeleton className="h-20 w-full" />
+                  ) : (
+                    <div className="space-y-6">
+                      <div className="p-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
+                        <div className="flex items-start gap-3">
+                          <DollarSign className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                          <div>
+                            <p className="font-medium text-blue-900 dark:text-blue-100 mb-2">
+                              Como funciona o saque manual?
+                            </p>
+                            <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
+                              <li>1. Cadastre sua chave PIX abaixo</li>
+                              <li>2. Quando tiver saldo disponível, clique em "Solicitar Saque"</li>
+                              <li>3. Sua solicitação será analisada pelo administrador</li>
+                              <li>4. Após aprovação, o valor será enviado para sua conta PIX</li>
+                            </ul>
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <div className="p-4 border rounded-lg">
-                        <div className="flex items-center gap-3 mb-3">
-                          <div className="w-12 h-12 bg-[#009ee3]/10 rounded-full flex items-center justify-center">
-                            <SiMercadopago className="h-6 w-6 text-[#009ee3]" />
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div className="space-y-4">
+                          <div>
+                            <p className="font-medium mb-2">Tipo de Chave PIX</p>
+                            <Select value={pixKeyTypeInput} onValueChange={setPixKeyTypeInput}>
+                              <SelectTrigger data-testid="select-pix-key-type">
+                                <SelectValue placeholder="Selecione o tipo" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="cpf">CPF</SelectItem>
+                                <SelectItem value="cnpj">CNPJ</SelectItem>
+                                <SelectItem value="email">E-mail</SelectItem>
+                                <SelectItem value="phone">Telefone</SelectItem>
+                                <SelectItem value="random">Chave Aleatória</SelectItem>
+                              </SelectContent>
+                            </Select>
                           </div>
                           <div>
-                            <p className="font-medium">Status da Conta</p>
-                            <div className="flex items-center gap-2 mt-1">
-                              {getMpConnectionStatus().connected ? (
-                                getMpConnectionStatus().expired ? (
-                                  <Badge variant="destructive">
-                                    <XCircle className="h-3 w-3 mr-1" />
-                                    Conexão Expirada
-                                  </Badge>
+                            <p className="font-medium mb-2">Chave PIX</p>
+                            <div className="flex gap-2">
+                              <Input
+                                placeholder="Digite sua chave PIX"
+                                value={pixKeyInput}
+                                onChange={(e) => setPixKeyInput(e.target.value)}
+                                data-testid="input-pix-key"
+                              />
+                              <Button
+                                onClick={() => {
+                                  if (!pixKeyInput || !pixKeyTypeInput) {
+                                    toast({
+                                      title: "Preencha todos os campos",
+                                      description: "Informe o tipo e a chave PIX.",
+                                      variant: "destructive",
+                                    });
+                                    return;
+                                  }
+                                  updatePixKeyMutation.mutate({ pixKey: pixKeyInput, pixKeyType: pixKeyTypeInput });
+                                }}
+                                disabled={updatePixKeyMutation.isPending}
+                                data-testid="button-save-pix"
+                              >
+                                {updatePixKeyMutation.isPending ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
                                 ) : (
-                                  <Badge variant="default" className="bg-green-500">
-                                    <CheckCircle className="h-3 w-3 mr-1" />
-                                    Conectado
-                                  </Badge>
-                                )
-                              ) : (
-                                <Badge variant="secondary">
-                                  <Clock className="h-3 w-3 mr-1" />
-                                  Não Conectado
-                                </Badge>
+                                  "Salvar"
+                                )}
+                              </Button>
+                            </div>
+                            {affiliate?.pixKey && (
+                              <div className="flex items-center gap-2 text-sm mt-2">
+                                <CheckCircle className="h-4 w-4 text-green-500" />
+                                <span className="text-muted-foreground">
+                                  Chave salva: <span className="font-mono">{affiliate.pixKey}</span> ({affiliate.pixKeyType})
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="p-4 border rounded-lg">
+                          <p className="font-medium mb-4">Solicitar Saque</p>
+                          {(affiliate?.availableAmount || 0) > 0 ? (
+                            <div className="space-y-4">
+                              <div>
+                                <p className="text-sm text-muted-foreground mb-2">Valor disponível:</p>
+                                <p className="text-2xl font-bold text-green-600">{formatCurrency(affiliate?.availableAmount || 0)}</p>
+                              </div>
+                              <Button
+                                onClick={() => setIsWithdrawalDialogOpen(true)}
+                                disabled={!affiliate?.pixKey}
+                                data-testid="button-request-withdrawal"
+                              >
+                                <Wallet className="h-4 w-4 mr-2" />
+                                Solicitar Saque
+                              </Button>
+                              {!affiliate?.pixKey && (
+                                <p className="text-xs text-muted-foreground">
+                                  Cadastre sua chave PIX primeiro para solicitar saques.
+                                </p>
                               )}
                             </div>
-                          </div>
-                        </div>
-                        
-                        {getMpConnectionStatus().connected && affiliate?.mpConnectedAt && (
-                          <p className="text-sm text-muted-foreground">
-                            Conectado desde: {formatDate(affiliate.mpConnectedAt)}
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="p-4 border rounded-lg">
-                        <p className="font-medium mb-2">Resumo de Comissões</p>
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Total ganho:</span>
-                            <span className="font-medium text-green-600">{formatCurrency(stats?.totalCommission || 0)}</span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Pendente:</span>
-                            <span className="font-medium">{formatCurrency(stats?.pendingCommission || 0)}</span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Já pago:</span>
-                            <span className="font-medium">{formatCurrency(stats?.paidCommission || 0)}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {(!getMpConnectionStatus().connected || getMpConnectionStatus().expired) && (
-                      <div className="p-4 bg-muted/50 rounded-lg space-y-4">
-                        <p className="font-semibold">Passo a passo para conectar sua conta:</p>
-                        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                          <div className="flex items-start gap-3 p-3 bg-background rounded-md border">
-                            <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
-                              <span className="font-bold text-primary">1</span>
-                            </div>
-                            <div>
-                              <p className="font-medium text-sm">Crie uma conta gratuita</p>
-                              <p className="text-xs text-muted-foreground">
-                                Se ainda não tem, acesse{" "}
-                                <a 
-                                  href="https://www.mercadopago.com.br" 
-                                  target="_blank" 
-                                  rel="noopener noreferrer"
-                                  className="text-[#009ee3] hover:underline"
-                                  data-testid="link-mercadopago-site"
-                                >
-                                  mercadopago.com.br
-                                </a>
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-start gap-3 p-3 bg-background rounded-md border">
-                            <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
-                              <span className="font-bold text-primary">2</span>
-                            </div>
-                            <div>
-                              <p className="font-medium text-sm">Clique no botão abaixo</p>
-                              <p className="text-xs text-muted-foreground">
-                                Você será redirecionado para o Mercado Pago
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-start gap-3 p-3 bg-background rounded-md border">
-                            <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
-                              <span className="font-bold text-primary">3</span>
-                            </div>
-                            <div>
-                              <p className="font-medium text-sm">Autorize a conexão</p>
-                              <p className="text-xs text-muted-foreground">
-                                Faça login e permita receber pagamentos
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="flex gap-2">
-                      {!getMpConnectionStatus().connected || getMpConnectionStatus().expired ? (
-                        <Button
-                          onClick={handleConnectMercadoPago}
-                          className="bg-[#009ee3] hover:bg-[#007bb5]"
-                          data-testid="button-connect-mp"
-                        >
-                          <SiMercadopago className="h-4 w-4 mr-2" />
-                          Conectar Mercado Pago
-                        </Button>
-                      ) : (
-                        <Button
-                          variant="outline"
-                          onClick={() => disconnectMpMutation.mutate()}
-                          disabled={disconnectMpMutation.isPending}
-                          data-testid="button-disconnect-mp"
-                        >
-                          {disconnectMpMutation.isPending ? (
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                           ) : (
-                            <Unlink className="h-4 w-4 mr-2" />
+                            <div className="text-center py-4">
+                              <Wallet className="h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-50" />
+                              <p className="text-muted-foreground">Sem saldo disponível para saque</p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Continue divulgando seus links para ganhar comissões!
+                              </p>
+                            </div>
                           )}
-                          Desconectar
-                        </Button>
-                      )}
-                    </div>
-
-                    {getMpConnectionStatus().connected && !getMpConnectionStatus().expired && (
-                      <div className="p-4 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg">
-                        <div className="flex items-start gap-3">
-                          <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
-                          <div>
-                            <p className="font-medium text-green-900 dark:text-green-100 mb-1">
-                              Tudo configurado!
-                            </p>
-                            <p className="text-sm text-green-700 dark:text-green-300">
-                              Sua conta está conectada. Quando uma venda for confirmada através dos seus links, 
-                              a comissão será transferida automaticamente para sua conta do Mercado Pago.
-                              Você pode sacar para sua conta bancária diretamente no app do Mercado Pago.
-                            </p>
-                          </div>
                         </div>
                       </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Calendar className="h-5 w-5" />
+                    Histórico de Saques
+                  </CardTitle>
+                  <CardDescription>
+                    Acompanhe todas as suas solicitações de saque
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {withdrawals && withdrawals.length > 0 ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Data</TableHead>
+                          <TableHead>Valor</TableHead>
+                          <TableHead>Chave PIX</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Pago em</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {withdrawals.map((withdrawal) => (
+                          <TableRow key={withdrawal.id} data-testid={`row-withdrawal-${withdrawal.id}`}>
+                            <TableCell className="text-muted-foreground">
+                              {formatDate(withdrawal.requestedAt)}
+                            </TableCell>
+                            <TableCell className="font-medium">
+                              {formatCurrency(withdrawal.amount)}
+                            </TableCell>
+                            <TableCell className="font-mono text-xs">
+                              {withdrawal.pixKey}
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant={
+                                  withdrawal.status === 'paid' ? 'default' :
+                                  withdrawal.status === 'pending' ? 'secondary' :
+                                  withdrawal.status === 'rejected' ? 'destructive' :
+                                  'outline'
+                                }
+                                className={withdrawal.status === 'paid' ? 'bg-green-500' : ''}
+                              >
+                                {withdrawal.status === 'pending' && 'Pendente'}
+                                {withdrawal.status === 'approved' && 'Aprovado'}
+                                {withdrawal.status === 'paid' && 'Pago'}
+                                {withdrawal.status === 'rejected' && 'Rejeitado'}
+                                {withdrawal.status === 'cancelled' && 'Cancelado'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {withdrawal.paidAt ? formatDate(withdrawal.paidAt) : '-'}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>Nenhuma solicitação de saque ainda.</p>
+                      <p className="text-sm">Quando você solicitar um saque, ele aparecerá aqui.</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <SiMercadopago className="h-5 w-5 text-[#009ee3]" />
+                    Recebimento Automático via Mercado Pago
+                  </CardTitle>
+                  <CardDescription>
+                    Alternativa: conecte sua conta do Mercado Pago para receber comissões automaticamente
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-[#009ee3]/10 rounded-full flex items-center justify-center">
+                        <SiMercadopago className="h-5 w-5 text-[#009ee3]" />
+                      </div>
+                      <div>
+                        <p className="font-medium">Status: {getMpConnectionStatus().connected ? (getMpConnectionStatus().expired ? "Expirado" : "Conectado") : "Não conectado"}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {getMpConnectionStatus().connected && !getMpConnectionStatus().expired 
+                            ? "Comissões são transferidas automaticamente"
+                            : "Conecte para receber automaticamente"}
+                        </p>
+                      </div>
+                    </div>
+                    {!getMpConnectionStatus().connected || getMpConnectionStatus().expired ? (
+                      <Button
+                        onClick={handleConnectMercadoPago}
+                        className="bg-[#009ee3] hover:bg-[#007bb5]"
+                        data-testid="button-connect-mp"
+                      >
+                        <SiMercadopago className="h-4 w-4 mr-2" />
+                        Conectar
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        onClick={() => disconnectMpMutation.mutate()}
+                        disabled={disconnectMpMutation.isPending}
+                        data-testid="button-disconnect-mp"
+                      >
+                        {disconnectMpMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Unlink className="h-4 w-4 mr-2" />
+                        )}
+                        Desconectar
+                      </Button>
                     )}
                   </div>
-                )}
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Dialog open={isWithdrawalDialogOpen} onOpenChange={setIsWithdrawalDialogOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Solicitar Saque</DialogTitle>
+                  <DialogDescription>
+                    Informe o valor que deseja sacar. O valor será enviado para sua chave PIX cadastrada.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-2">Saldo disponível:</p>
+                    <p className="text-xl font-bold text-green-600">{formatCurrency(affiliate?.availableAmount || 0)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-2">Chave PIX:</p>
+                    <p className="font-mono">{affiliate?.pixKey} ({affiliate?.pixKeyType})</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium mb-2">Valor do saque (R$):</p>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="0,00"
+                      value={withdrawalAmount}
+                      onChange={(e) => setWithdrawalAmount(e.target.value)}
+                      data-testid="input-withdrawal-amount"
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsWithdrawalDialogOpen(false)}>
+                    Cancelar
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      const amountInCents = Math.round(parseFloat(withdrawalAmount) * 100);
+                      if (isNaN(amountInCents) || amountInCents <= 0) {
+                        toast({
+                          title: "Valor inválido",
+                          description: "Informe um valor válido para saque.",
+                          variant: "destructive",
+                        });
+                        return;
+                      }
+                      if (amountInCents > (affiliate?.availableAmount || 0)) {
+                        toast({
+                          title: "Saldo insuficiente",
+                          description: "O valor solicitado é maior que o saldo disponível.",
+                          variant: "destructive",
+                        });
+                        return;
+                      }
+                      requestWithdrawalMutation.mutate(amountInCents);
+                    }}
+                    disabled={requestWithdrawalMutation.isPending}
+                    data-testid="button-confirm-withdrawal"
+                  >
+                    {requestWithdrawalMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Wallet className="h-4 w-4 mr-2" />
+                    )}
+                    Confirmar Saque
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </TabsContent>
 
           <TabsContent value="tracking">

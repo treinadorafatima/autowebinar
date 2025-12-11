@@ -115,6 +115,23 @@ interface AffiliateConfig {
   mpAppSecret: string | null;
 }
 
+interface AffiliateWithdrawal {
+  id: string;
+  affiliateId: string;
+  amount: number;
+  pixKey: string;
+  pixKeyType: string;
+  status: string;
+  requestedAt: string;
+  processedAt?: string | null;
+  paidAt?: string | null;
+  processedBy?: string | null;
+  transactionId?: string | null;
+  notes?: string | null;
+  affiliateName?: string;
+  affiliateEmail?: string;
+}
+
 const saleStatusLabels: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   pending: { label: "Pendente", variant: "outline" },
   approved: { label: "Aprovado", variant: "secondary" },
@@ -263,6 +280,65 @@ export default function AdminAffiliatesPage() {
     },
   });
 
+  const { data: withdrawals = [], isLoading: isLoadingWithdrawals } = useQuery<AffiliateWithdrawal[]>({
+    queryKey: ["/api/affiliate-withdrawals"],
+    enabled: activeTab === "withdrawals",
+  });
+
+  const [withdrawalStatusFilter, setWithdrawalStatusFilter] = useState<string>("all");
+  const [withdrawalToProcess, setWithdrawalToProcess] = useState<AffiliateWithdrawal | null>(null);
+  const [isPayWithdrawalDialogOpen, setIsPayWithdrawalDialogOpen] = useState(false);
+  const [isRejectWithdrawalDialogOpen, setIsRejectWithdrawalDialogOpen] = useState(false);
+  const [withdrawalNotes, setWithdrawalNotes] = useState("");
+
+  const markWithdrawalPaidMutation = useMutation({
+    mutationFn: async ({ id, notes }: { id: string; notes?: string }) => {
+      const res = await apiRequest("PATCH", `/api/affiliate-withdrawals/${id}/pay`, { notes });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/affiliate-withdrawals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/affiliates"] });
+      toast({ title: "Saque marcado como pago!" });
+      setIsPayWithdrawalDialogOpen(false);
+      setWithdrawalToProcess(null);
+      setWithdrawalNotes("");
+    },
+    onError: () => {
+      toast({ title: "Erro ao processar saque", variant: "destructive" });
+    },
+  });
+
+  const rejectWithdrawalMutation = useMutation({
+    mutationFn: async ({ id, notes }: { id: string; notes?: string }) => {
+      const res = await apiRequest("PATCH", `/api/affiliate-withdrawals/${id}/reject`, { notes });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/affiliate-withdrawals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/affiliates"] });
+      toast({ title: "Saque rejeitado" });
+      setIsRejectWithdrawalDialogOpen(false);
+      setWithdrawalToProcess(null);
+      setWithdrawalNotes("");
+    },
+    onError: () => {
+      toast({ title: "Erro ao rejeitar saque", variant: "destructive" });
+    },
+  });
+
+  const filteredWithdrawals = withdrawals.filter((w) => {
+    return withdrawalStatusFilter === "all" || w.status === withdrawalStatusFilter;
+  });
+
+  const withdrawalsStats = {
+    total: withdrawals.length,
+    pending: withdrawals.filter((w) => w.status === "pending").length,
+    paid: withdrawals.filter((w) => w.status === "paid").length,
+    totalPending: withdrawals.filter((w) => w.status === "pending").reduce((sum, w) => sum + w.amount, 0),
+    totalPaid: withdrawals.filter((w) => w.status === "paid").reduce((sum, w) => sum + w.amount, 0),
+  };
+
   const filteredAffiliates = affiliates.filter((affiliate) => {
     const matchesSearch =
       affiliate.admin?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -401,6 +477,15 @@ export default function AdminAffiliatesPage() {
           <TabsTrigger value="settings" data-testid="tab-settings">
             <Settings className="h-4 w-4 mr-2" />
             Configurações
+          </TabsTrigger>
+          <TabsTrigger value="withdrawals" data-testid="tab-withdrawals">
+            <Wallet className="h-4 w-4 mr-2" />
+            Saques
+            {withdrawalsStats.pending > 0 && (
+              <Badge variant="destructive" className="ml-2 h-5 px-1.5">
+                {withdrawalsStats.pending}
+              </Badge>
+            )}
           </TabsTrigger>
         </TabsList>
 
@@ -955,7 +1040,291 @@ export default function AdminAffiliatesPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="withdrawals" className="space-y-6 mt-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+                <CardTitle className="text-sm font-medium">Solicitações Pendentes</CardTitle>
+                <Clock className="h-4 w-4 text-yellow-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-yellow-600" data-testid="text-pending-withdrawals">
+                  {withdrawalsStats.pending}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {formatCurrency(withdrawalsStats.totalPending)} pendentes
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+                <CardTitle className="text-sm font-medium">Saques Pagos</CardTitle>
+                <CheckCircle className="h-4 w-4 text-green-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-600" data-testid="text-paid-withdrawals">
+                  {withdrawalsStats.paid}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {formatCurrency(withdrawalsStats.totalPaid)} pagos
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+                <CardTitle className="text-sm font-medium">Total de Solicitações</CardTitle>
+                <Wallet className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold" data-testid="text-total-withdrawals">
+                  {withdrawalsStats.total}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Wallet className="h-5 w-5" />
+                Solicitações de Saque
+              </CardTitle>
+              <CardDescription>
+                Gerencie as solicitações de saque dos afiliados. Após o envio do PIX, marque como pago.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-4 mb-4">
+                <Select value={withdrawalStatusFilter} onValueChange={setWithdrawalStatusFilter}>
+                  <SelectTrigger className="w-48" data-testid="select-withdrawal-status-filter">
+                    <SelectValue placeholder="Filtrar por status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os status</SelectItem>
+                    <SelectItem value="pending">Pendentes</SelectItem>
+                    <SelectItem value="paid">Pagos</SelectItem>
+                    <SelectItem value="rejected">Rejeitados</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {isLoadingWithdrawals ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : (
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Afiliado</TableHead>
+                        <TableHead>Valor</TableHead>
+                        <TableHead>Chave PIX</TableHead>
+                        <TableHead>Tipo</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Solicitado em</TableHead>
+                        <TableHead>Ações</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredWithdrawals.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                            Nenhuma solicitação de saque encontrada.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        filteredWithdrawals.map((withdrawal) => (
+                          <TableRow key={withdrawal.id} data-testid={`row-withdrawal-${withdrawal.id}`}>
+                            <TableCell>
+                              <div>
+                                <p className="font-medium">{withdrawal.affiliateName || "Afiliado"}</p>
+                                <p className="text-xs text-muted-foreground">{withdrawal.affiliateEmail || "-"}</p>
+                              </div>
+                            </TableCell>
+                            <TableCell className="font-medium">
+                              {formatCurrency(withdrawal.amount)}
+                            </TableCell>
+                            <TableCell className="font-mono text-xs max-w-[200px] truncate">
+                              {withdrawal.pixKey}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="capitalize">
+                                {withdrawal.pixKeyType}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant={
+                                  withdrawal.status === 'paid' ? 'default' :
+                                  withdrawal.status === 'pending' ? 'secondary' :
+                                  withdrawal.status === 'rejected' ? 'destructive' :
+                                  'outline'
+                                }
+                                className={withdrawal.status === 'paid' ? 'bg-green-500' : ''}
+                              >
+                                {withdrawal.status === 'pending' && 'Pendente'}
+                                {withdrawal.status === 'approved' && 'Aprovado'}
+                                {withdrawal.status === 'paid' && 'Pago'}
+                                {withdrawal.status === 'rejected' && 'Rejeitado'}
+                                {withdrawal.status === 'cancelled' && 'Cancelado'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {formatDate(withdrawal.requestedAt)}
+                            </TableCell>
+                            <TableCell>
+                              {withdrawal.status === 'pending' && (
+                                <div className="flex gap-1">
+                                  <Button
+                                    size="sm"
+                                    onClick={() => {
+                                      setWithdrawalToProcess(withdrawal);
+                                      setIsPayWithdrawalDialogOpen(true);
+                                    }}
+                                    data-testid={`button-pay-withdrawal-${withdrawal.id}`}
+                                  >
+                                    <Check className="h-4 w-4 mr-1" />
+                                    Pagar
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      setWithdrawalToProcess(withdrawal);
+                                      setIsRejectWithdrawalDialogOpen(true);
+                                    }}
+                                    data-testid={`button-reject-withdrawal-${withdrawal.id}`}
+                                  >
+                                    <X className="h-4 w-4 mr-1" />
+                                    Rejeitar
+                                  </Button>
+                                </div>
+                              )}
+                              {withdrawal.status === 'paid' && withdrawal.paidAt && (
+                                <span className="text-xs text-muted-foreground">
+                                  Pago em {formatDate(withdrawal.paidAt)}
+                                </span>
+                              )}
+                              {withdrawal.status === 'rejected' && (
+                                <span className="text-xs text-muted-foreground">
+                                  {withdrawal.notes || "Rejeitado"}
+                                </span>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
+
+      <AlertDialog open={isPayWithdrawalDialogOpen} onOpenChange={setIsPayWithdrawalDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar Pagamento de Saque</AlertDialogTitle>
+            <AlertDialogDescription>
+              <div className="space-y-3 mt-2">
+                <p>Você está prestes a marcar este saque como pago:</p>
+                <div className="bg-muted p-3 rounded-md space-y-1">
+                  <p><strong>Afiliado:</strong> {withdrawalToProcess?.affiliateName}</p>
+                  <p><strong>Valor:</strong> {formatCurrency(withdrawalToProcess?.amount || 0)}</p>
+                  <p><strong>Chave PIX:</strong> <span className="font-mono">{withdrawalToProcess?.pixKey}</span></p>
+                  <p><strong>Tipo:</strong> {withdrawalToProcess?.pixKeyType}</p>
+                </div>
+                <p className="text-sm">Certifique-se de que você já enviou o PIX antes de confirmar.</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="mt-4">
+            <Label>Observações (opcional)</Label>
+            <Input
+              placeholder="ID da transação, comprovante, etc."
+              value={withdrawalNotes}
+              onChange={(e) => setWithdrawalNotes(e.target.value)}
+              data-testid="input-withdrawal-notes"
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setWithdrawalToProcess(null);
+              setWithdrawalNotes("");
+            }}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (withdrawalToProcess) {
+                  markWithdrawalPaidMutation.mutate({
+                    id: withdrawalToProcess.id,
+                    notes: withdrawalNotes || undefined,
+                  });
+                }
+              }}
+              data-testid="button-confirm-pay-withdrawal"
+            >
+              {markWithdrawalPaidMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Confirmar Pagamento
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={isRejectWithdrawalDialogOpen} onOpenChange={setIsRejectWithdrawalDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Rejeitar Saque</AlertDialogTitle>
+            <AlertDialogDescription>
+              <div className="space-y-3 mt-2">
+                <p>Você está prestes a rejeitar este saque:</p>
+                <div className="bg-muted p-3 rounded-md space-y-1">
+                  <p><strong>Afiliado:</strong> {withdrawalToProcess?.affiliateName}</p>
+                  <p><strong>Valor:</strong> {formatCurrency(withdrawalToProcess?.amount || 0)}</p>
+                </div>
+                <p className="text-sm text-destructive">O valor será devolvido ao saldo disponível do afiliado.</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="mt-4">
+            <Label>Motivo da rejeição</Label>
+            <Input
+              placeholder="Informe o motivo da rejeição"
+              value={withdrawalNotes}
+              onChange={(e) => setWithdrawalNotes(e.target.value)}
+              data-testid="input-rejection-reason"
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setWithdrawalToProcess(null);
+              setWithdrawalNotes("");
+            }}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (withdrawalToProcess) {
+                  rejectWithdrawalMutation.mutate({
+                    id: withdrawalToProcess.id,
+                    notes: withdrawalNotes || undefined,
+                  });
+                }
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-reject-withdrawal"
+            >
+              {rejectWithdrawalMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Rejeitar Saque
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={isPayDialogOpen} onOpenChange={setIsPayDialogOpen}>
         <AlertDialogContent>
