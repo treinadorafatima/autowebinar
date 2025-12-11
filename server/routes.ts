@@ -778,6 +778,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       webinarLimit: admin?.webinarLimit || 5,
       accessExpiresAt: admin?.accessExpiresAt || null,
       planoId: admin?.planoId || null,
+      paymentStatus: admin?.paymentStatus || "ok",
+      paymentFailedReason: admin?.paymentFailedReason || null,
     });
   });
 
@@ -7539,6 +7541,8 @@ Seja conversacional e objetivo.`;
             uploadLimit: plano.uploadLimit || plano.webinarLimit,
             isActive: true,
             planoId: plano.id,
+            paymentStatus: 'ok',
+            paymentFailedReason: null,
           });
           updateData.adminId = admin.id;
           
@@ -7771,6 +7775,8 @@ Seja conversacional e objetivo.`;
             uploadLimit: plano.uploadLimit || plano.webinarLimit,
             isActive: true,
             planoId: plano.id,
+            paymentStatus: 'ok',
+            paymentFailedReason: null,
           });
           updateData.adminId = admin.id;
           
@@ -8187,6 +8193,8 @@ Seja conversacional e objetivo.`;
                     uploadLimit: plano.uploadLimit || plano.webinarLimit,
                     isActive: true,
                     planoId: plano.id,
+                    paymentStatus: 'ok',
+                    paymentFailedReason: null,
                   });
                   updateData.adminId = admin.id;
                   console.log(`[MP Webhook] Updated admin ${pagamento.email} for subscription`);
@@ -8213,6 +8221,7 @@ Seja conversacional e objetivo.`;
                     isActive: true,
                     accessExpiresAt: expirationDate,
                     planoId: plano.id,
+                    paymentStatus: 'ok',
                   });
                   updateData.adminId = admin.id;
                   
@@ -8326,6 +8335,8 @@ Seja conversacional e objetivo.`;
                     uploadLimit: plano.uploadLimit || plano.webinarLimit,
                     isActive: true,
                     planoId: plano.id,
+                    paymentStatus: 'ok',
+                    paymentFailedReason: null,
                   });
                   updateData.adminId = admin.id;
                   
@@ -8352,6 +8363,7 @@ Seja conversacional e objetivo.`;
                     isActive: true,
                     accessExpiresAt: expirationDate,
                     planoId: plano.id,
+                    paymentStatus: 'ok',
                   });
                   updateData.adminId = admin.id;
                   
@@ -8370,18 +8382,19 @@ Seja conversacional e objetivo.`;
               }
             }
 
-            // BLOQUEAR ACESSO quando pagamento for rejeitado (renovação falhou)
+            // Marcar status de pagamento como falho (permite login mas mostra tela de renovação)
             if (payment.status === 'rejected') {
               const admin = await storage.getAdminByEmail(pagamento.email);
               if (admin) {
-                await storage.updateAdmin(admin.id, {
-                  isActive: false,
-                });
-                console.log(`[MP Webhook] BLOCKED admin ${pagamento.email} due to payment rejection: ${payment.status_detail}`);
-                
-                // Send payment failed email with direct checkout link
                 const plano = await storage.getCheckoutPlanoById(pagamento.planoId);
                 const errorInfo = getMercadoPagoErrorMessage(payment.status_detail);
+                await storage.updateAdmin(admin.id, {
+                  paymentStatus: 'failed',
+                  paymentFailedReason: `${errorInfo.message} ${errorInfo.action}`,
+                });
+                console.log(`[MP Webhook] Payment failed for ${pagamento.email}: ${payment.status_detail}`);
+                
+                // Send payment failed email with direct checkout link
                 import("./email").then(({ sendPaymentFailedEmail }) => {
                   sendPaymentFailedEmail(
                     pagamento.email, 
@@ -8595,6 +8608,8 @@ Seja conversacional e objetivo.`;
                   uploadLimit: plano.uploadLimit || plano.webinarLimit,
                   isActive: true,
                   planoId: plano.id,
+                  paymentStatus: 'ok',
+                  paymentFailedReason: null,
                 });
                 updateData.adminId = admin.id;
                 
@@ -8620,6 +8635,7 @@ Seja conversacional e objetivo.`;
                   isActive: true,
                   accessExpiresAt: expirationDate,
                   planoId: plano.id,
+                  paymentStatus: 'ok',
                 });
                 updateData.adminId = admin.id;
                 
@@ -8677,6 +8693,8 @@ Seja conversacional e objetivo.`;
                   uploadLimit: plano.uploadLimit || plano.webinarLimit,
                   isActive: true,
                   planoId: plano.id,
+                  paymentStatus: 'ok',
+                  paymentFailedReason: null,
                 });
                 console.log(`[Stripe Webhook] Renewed subscription for ${pagamento.email}, expires: ${expirationDate}`);
                 
@@ -8702,6 +8720,7 @@ Seja conversacional e objetivo.`;
                   isActive: true,
                   accessExpiresAt: expirationDate,
                   planoId: plano.id,
+                  paymentStatus: 'ok',
                 });
                 console.log(`[Stripe Webhook] Created admin via subscription: ${pagamento.email}, temp password: ${tempPassword}`);
                 
@@ -8778,13 +8797,14 @@ Seja conversacional e objetivo.`;
                                    invoice.last_payment_error?.message || 
                                    "Cartão recusado ou limite insuficiente";
             
-            // BLOQUEAR ACESSO IMEDIATAMENTE
+            // Marcar status de pagamento como falho (permite login mas mostra tela de renovação)
             const admin = await storage.getAdminByEmail(pagamento.email);
             if (admin) {
               await storage.updateAdmin(admin.id, {
-                isActive: false,
+                paymentStatus: 'failed',
+                paymentFailedReason: failureMessage,
               });
-              console.log(`[Stripe Webhook] BLOCKED admin ${pagamento.email} due to payment failure`);
+              console.log(`[Stripe Webhook] Payment failed for ${pagamento.email}: ${failureMessage}`);
             }
             
             // Update payment status

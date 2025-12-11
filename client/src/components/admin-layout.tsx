@@ -18,6 +18,7 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ExpiredPlanBlocker } from "@/components/expired-plan-blocker";
 import { NoPlanBlocker } from "@/components/no-plan-blocker";
+import { PaymentFailedBlocker } from "@/components/payment-failed-blocker";
 
 interface AdminUser {
   name: string;
@@ -25,6 +26,8 @@ interface AdminUser {
   role: string;
   accessExpiresAt: string | null;
   planoId: string | null;
+  paymentStatus: string | null;
+  paymentFailedReason: string | null;
 }
 
 interface AdminLayoutProps {
@@ -93,14 +96,30 @@ export function AdminLayout({ children, token, onLogout }: AdminLayoutProps) {
   const isExpired = user?.accessExpiresAt && new Date(user.accessExpiresAt) < new Date();
   const isTrial = user?.planoId === "trial";
   const hasNoPlan = user && !user.planoId && user.role !== "superadmin";
+  const hasPaymentFailed = user?.paymentStatus === "failed";
   
   const allowedPagesWhenBlocked = ["/admin/subscription", "/checkout"];
   const isOnAllowedPage = allowedPagesWhenBlocked.some(page => location.startsWith(page));
   
+  if (hasPaymentFailed && !isOnAllowedPage && user) {
+    return (
+      <PaymentFailedBlocker 
+        userName={user.name || "Usuario"}
+        userEmail={user.email}
+        planoId={user.planoId}
+        failedReason={user.paymentFailedReason}
+        onLogout={() => {
+          onLogout();
+          setLocation("/login");
+        }}
+      />
+    );
+  }
+  
   if (hasNoPlan && !isOnAllowedPage) {
     return (
       <NoPlanBlocker 
-        userName={user.name || "Usuário"}
+        userName={user.name || "Usuario"}
         userEmail={user.email}
         onLogout={() => {
           onLogout();
