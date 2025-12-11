@@ -8284,17 +8284,46 @@ Seja conversacional e objetivo.`;
                 return res.status(200).send('OK');
               }
               
+              // Get real payment date from authorized payments if available
+              // Use existing record date as fallback to preserve original payment date
+              let realPaymentDate: Date = pagamento.dataPagamento || new Date();
+              let realApprovalDate: Date = pagamento.dataAprovacao || realPaymentDate;
+              try {
+                const paymentsResponse2 = await fetch(
+                  `https://api.mercadopago.com/preapproval/${preapprovalId}/authorized_payments`,
+                  {
+                    headers: { 'Authorization': `Bearer ${accessToken}` },
+                  }
+                );
+                if (paymentsResponse2.ok) {
+                  const paymentsData2 = await paymentsResponse2.json();
+                  const approvedPayment = paymentsData2.results?.find(
+                    (p: any) => p.status === 'approved' || p.status === 'authorized'
+                  );
+                  if (approvedPayment) {
+                    realPaymentDate = approvedPayment.date_created 
+                      ? new Date(approvedPayment.date_created) 
+                      : (pagamento.dataPagamento || new Date());
+                    realApprovalDate = approvedPayment.date_approved 
+                      ? new Date(approvedPayment.date_approved) 
+                      : realPaymentDate;
+                  }
+                }
+              } catch (err) {
+                console.error('[MP Webhook] Error fetching payment dates:', err);
+              }
+              
               const updateData: any = {
                 status: (preapproval.status === 'authorized' && hasAuthorizedPayment) ? 'approved' : 'pending',
                 statusDetail: hasAuthorizedPayment ? 'Assinatura ativa - pagamento confirmado' : `Assinatura ${preapproval.status}`,
                 metodoPagamento: 'subscription',
                 mercadopagoPaymentId: preapprovalId.toString(),
-                dataPagamento: new Date(),
+                dataPagamento: realPaymentDate,
               };
 
               // Only grant access if we have a confirmed payment
               if (preapproval.status === 'authorized' && hasAuthorizedPayment && plano) {
-                updateData.dataAprovacao = new Date();
+                updateData.dataAprovacao = realApprovalDate;
                 
                 // Calculate expiration based on plan frequency
                 const expirationDate = new Date();
@@ -8417,17 +8446,25 @@ Seja conversacional e objetivo.`;
         if (pagamentoId) {
           const pagamento = await storage.getCheckoutPagamentoById(pagamentoId);
           if (pagamento) {
+            // Use real dates from MercadoPago API, fallback to existing record date or current date
+            const paymentDate = payment.date_created 
+              ? new Date(payment.date_created) 
+              : (pagamento.dataPagamento || new Date());
+            const approvalDate = payment.date_approved 
+              ? new Date(payment.date_approved) 
+              : (payment.date_created ? new Date(payment.date_created) : (pagamento.dataPagamento || new Date()));
+            
             const updateData: any = {
               status: payment.status,
               statusDetail: payment.status_detail,
               metodoPagamento: payment.payment_type_id,
               mercadopagoPaymentId: paymentId.toString(),
-              dataPagamento: new Date(),
+              dataPagamento: paymentDate,
             };
 
             // If approved, create/update admin account
             if (payment.status === 'approved') {
-              updateData.dataAprovacao = new Date();
+              updateData.dataAprovacao = approvalDate;
               
               const plano = await storage.getCheckoutPlanoById(pagamento.planoId);
               if (plano) {
@@ -8747,13 +8784,16 @@ Seja conversacional e objetivo.`;
           if (pagamento) {
             const plano = await storage.getCheckoutPlanoById(pagamento.planoId);
             
+            // Use real dates from Stripe (created is Unix timestamp in seconds)
+            const paymentDate = session.created ? new Date(session.created * 1000) : new Date();
+            
             const updateData: any = {
               status: 'approved',
               statusDetail: 'Pagamento confirmado via Stripe Checkout',
               metodoPagamento: session.payment_method_types?.[0] || 'card',
               stripePaymentIntentId: session.payment_intent || session.id,
-              dataPagamento: new Date(),
-              dataAprovacao: new Date(),
+              dataPagamento: paymentDate,
+              dataAprovacao: paymentDate,
             };
 
             if (plano) {
@@ -8823,13 +8863,16 @@ Seja conversacional e objetivo.`;
           if (pagamento && pagamento.status !== 'approved') {
             const plano = await storage.getCheckoutPlanoById(pagamento.planoId);
             
+            // Use real dates from Stripe (created is Unix timestamp in seconds)
+            const paymentDate = paymentIntent.created ? new Date(paymentIntent.created * 1000) : new Date();
+            
             const updateData: any = {
               status: 'approved',
               statusDetail: 'Pagamento confirmado via Stripe Elements',
               metodoPagamento: 'card',
               stripePaymentIntentId: paymentIntent.id,
-              dataPagamento: new Date(),
-              dataAprovacao: new Date(),
+              dataPagamento: paymentDate,
+              dataAprovacao: paymentDate,
             };
 
             if (plano) {
@@ -8970,11 +9013,16 @@ Seja conversacional e objetivo.`;
                 });
               }
 
+              // Use real dates from Stripe invoice (status_transitions.paid_at is Unix timestamp)
+              const invoicePaymentDate = invoice.status_transitions?.paid_at 
+                ? new Date(invoice.status_transitions.paid_at * 1000) 
+                : (invoice.created ? new Date(invoice.created * 1000) : new Date());
+              
               await storage.updateCheckoutPagamento(pagamentoId, {
                 status: 'approved',
                 statusDetail: 'Assinatura ativa',
-                dataPagamento: new Date(),
-                dataAprovacao: new Date(),
+                dataPagamento: invoicePaymentDate,
+                dataAprovacao: invoicePaymentDate,
                 dataExpiracao: expirationDate,
                 adminId: admin.id,
               });
