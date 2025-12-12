@@ -7,6 +7,7 @@ import { startEmailScheduler } from "./email-scheduler";
 import { startWhatsappScheduler } from "./whatsapp-scheduler";
 import { startSubscriptionScheduler } from "./subscription-scheduler";
 import { startAffiliatePayoutScheduler } from "./affiliate-payout-scheduler";
+import { startPixExpirationScheduler } from "./pix-expiration-scheduler";
 
 const app = express();
 
@@ -146,5 +147,8 @@ app.use((req, res, next) => {
     
     // Start affiliate payout scheduler for delayed commission payments
     startAffiliatePayoutScheduler();
+    
+    // Start PIX expiration scheduler for recovery emails
+    startPixExpirationScheduler();
   });
 })();

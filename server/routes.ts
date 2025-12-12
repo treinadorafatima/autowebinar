@@ -8201,6 +8201,249 @@ Seja conversacional e objetivo.`;
     }
   });
 
+  // Checkout - Criar Payment Intent para PIX via Stripe
+  app.post("/api/checkout/stripe/criar-pix", async (req, res) => {
+    try {
+      const { pagamentoId } = req.body;
+      
+      const pagamento = await storage.getCheckoutPagamentoById(pagamentoId);
+      if (!pagamento) {
+        return res.status(404).json({ error: "Pagamento não encontrado" });
+      }
+
+      const plano = await storage.getCheckoutPlanoById(pagamento.planoId);
+      if (!plano) {
+        return res.status(404).json({ error: "Plano não encontrado" });
+      }
+
+      const stripeSecretKey = await storage.getCheckoutConfig('STRIPE_SECRET_KEY');
+      if (!stripeSecretKey) {
+        return res.status(500).json({ error: "Stripe não configurado" });
+      }
+
+      // Create Payment Intent with PIX payment method
+      const params = new URLSearchParams({
+        'amount': plano.preco.toString(),
+        'currency': 'brl',
+        'payment_method_types[0]': 'pix',
+        'metadata[pagamentoId]': pagamentoId,
+        'metadata[planoId]': plano.id,
+        'receipt_email': pagamento.email,
+        'description': `${plano.nome} - PIX`,
+      });
+
+      const stripeResponse = await fetch('https://api.stripe.com/v1/payment_intents', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${stripeSecretKey}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: params.toString(),
+      });
+
+      if (!stripeResponse.ok) {
+        const error = await stripeResponse.text();
+        console.error('[Stripe PIX] Error creating payment intent:', error);
+        return res.status(500).json({ error: 'Erro ao criar pagamento PIX' });
+      }
+
+      const stripeData = await stripeResponse.json();
+
+      // Confirm the payment intent to generate PIX code
+      const confirmParams = new URLSearchParams({
+        'payment_method_data[type]': 'pix',
+        'return_url': `${process.env.REPLIT_DOMAINS 
+          ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
+          : process.env.BASE_URL || 'http://localhost:5000'}/pagamento/sucesso?pagamentoId=${pagamentoId}&gateway=stripe`,
+      });
+
+      const confirmResponse = await fetch(`https://api.stripe.com/v1/payment_intents/${stripeData.id}/confirm`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${stripeSecretKey}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: confirmParams.toString(),
+      });
+
+      if (!confirmResponse.ok) {
+        const error = await confirmResponse.text();
+        console.error('[Stripe PIX] Error confirming payment intent:', error);
+        return res.status(500).json({ error: 'Erro ao confirmar pagamento PIX' });
+      }
+
+      const confirmedData = await confirmResponse.json();
+      
+      // Extract PIX data from next_action
+      const pixAction = confirmedData.next_action?.pix_display_qr_code;
+      const expiresAt = pixAction?.expires_at ? new Date(pixAction.expires_at * 1000) : new Date(Date.now() + 24 * 60 * 60 * 1000);
+      
+      // Update payment with PIX data
+      await storage.updateCheckoutPagamento(pagamentoId, {
+        stripePaymentIntentId: stripeData.id,
+        metodoPagamento: 'pix',
+        status: 'pending',
+        pixQrCode: pixAction?.image_url_png || null,
+        pixCopiaCola: pixAction?.data || null,
+        pixExpiresAt: expiresAt,
+      });
+
+      // Send PIX generated email
+      if (pixAction?.data) {
+        import("./email").then(({ sendPixGeneratedEmail }) => {
+          sendPixGeneratedEmail(
+            pagamento.email,
+            pagamento.nome,
+            plano.nome,
+            pixAction.data,
+            pixAction.image_url_png || null,
+            expiresAt,
+            plano.preco
+          ).catch(err => {
+            console.error(`[Stripe PIX] Error sending PIX generated email:`, err);
+          });
+        });
+      }
+
+      console.log('[Stripe PIX] Created PIX payment:', stripeData.id);
+
+      res.json({
+        paymentIntentId: stripeData.id,
+        pixQrCode: pixAction?.image_url_png || null,
+        pixCopiaCola: pixAction?.data || null,
+        expiresAt: expiresAt.toISOString(),
+        hostedInstructionsUrl: pixAction?.hosted_instructions_url || null,
+      });
+    } catch (error: any) {
+      console.error('[Stripe PIX] Error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Checkout - Criar Payment Intent para Boleto via Stripe
+  app.post("/api/checkout/stripe/criar-boleto", async (req, res) => {
+    try {
+      const { pagamentoId } = req.body;
+      
+      const pagamento = await storage.getCheckoutPagamentoById(pagamentoId);
+      if (!pagamento) {
+        return res.status(404).json({ error: "Pagamento não encontrado" });
+      }
+
+      const plano = await storage.getCheckoutPlanoById(pagamento.planoId);
+      if (!plano) {
+        return res.status(404).json({ error: "Plano não encontrado" });
+      }
+
+      const stripeSecretKey = await storage.getCheckoutConfig('STRIPE_SECRET_KEY');
+      if (!stripeSecretKey) {
+        return res.status(500).json({ error: "Stripe não configurado" });
+      }
+
+      // Calculate expiration (3 business days from now)
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 3);
+
+      // Create Payment Intent with Boleto payment method
+      const params = new URLSearchParams({
+        'amount': plano.preco.toString(),
+        'currency': 'brl',
+        'payment_method_types[0]': 'boleto',
+        'metadata[pagamentoId]': pagamentoId,
+        'metadata[planoId]': plano.id,
+        'receipt_email': pagamento.email,
+        'description': `${plano.nome} - Boleto`,
+      });
+
+      const stripeResponse = await fetch('https://api.stripe.com/v1/payment_intents', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${stripeSecretKey}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: params.toString(),
+      });
+
+      if (!stripeResponse.ok) {
+        const error = await stripeResponse.text();
+        console.error('[Stripe Boleto] Error creating payment intent:', error);
+        return res.status(500).json({ error: 'Erro ao criar pagamento Boleto' });
+      }
+
+      const stripeData = await stripeResponse.json();
+
+      // Confirm the payment intent to generate Boleto
+      const confirmParams = new URLSearchParams({
+        'payment_method_data[type]': 'boleto',
+        'payment_method_data[billing_details][email]': pagamento.email,
+        'payment_method_data[billing_details][name]': pagamento.nome,
+        'payment_method_data[boleto][tax_id]': pagamento.cpf?.replace(/\D/g, '') || '00000000000',
+        'return_url': `${process.env.REPLIT_DOMAINS 
+          ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
+          : process.env.BASE_URL || 'http://localhost:5000'}/pagamento/sucesso?pagamentoId=${pagamentoId}&gateway=stripe`,
+      });
+
+      const confirmResponse = await fetch(`https://api.stripe.com/v1/payment_intents/${stripeData.id}/confirm`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${stripeSecretKey}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: confirmParams.toString(),
+      });
+
+      if (!confirmResponse.ok) {
+        const error = await confirmResponse.text();
+        console.error('[Stripe Boleto] Error confirming payment intent:', error);
+        return res.status(500).json({ error: 'Erro ao confirmar pagamento Boleto' });
+      }
+
+      const confirmedData = await confirmResponse.json();
+      
+      // Extract Boleto data from next_action
+      const boletoAction = confirmedData.next_action?.boleto_display_details;
+      
+      // Update payment with Boleto data
+      await storage.updateCheckoutPagamento(pagamentoId, {
+        stripePaymentIntentId: stripeData.id,
+        metodoPagamento: 'boleto',
+        status: 'pending',
+        boletoUrl: boletoAction?.hosted_voucher_url || null,
+        boletoCodigo: boletoAction?.number || null,
+        boletoExpiresAt: boletoAction?.expires_at ? new Date(boletoAction.expires_at * 1000) : expiresAt,
+      });
+
+      // Send Boleto generated email
+      if (boletoAction?.hosted_voucher_url) {
+        import("./email").then(({ sendBoletoGeneratedEmail }) => {
+          sendBoletoGeneratedEmail(
+            pagamento.email,
+            pagamento.nome,
+            plano.nome,
+            boletoAction.hosted_voucher_url,
+            boletoAction.number || null,
+            boletoAction.expires_at ? new Date(boletoAction.expires_at * 1000) : expiresAt,
+            plano.preco
+          ).catch(err => {
+            console.error(`[Stripe Boleto] Error sending Boleto generated email:`, err);
+          });
+        });
+      }
+
+      console.log('[Stripe Boleto] Created Boleto payment:', stripeData.id);
+
+      res.json({
+        paymentIntentId: stripeData.id,
+        boletoUrl: boletoAction?.hosted_voucher_url || null,
+        boletoCodigo: boletoAction?.number || null,
+        expiresAt: (boletoAction?.expires_at ? new Date(boletoAction.expires_at * 1000) : expiresAt).toISOString(),
+      });
+    } catch (error: any) {
+      console.error('[Stripe Boleto] Error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Webhook - Mercado Pago
   app.post("/webhook/mercadopago", async (req, res) => {
     try {
@@ -8871,10 +9114,19 @@ Seja conversacional e objetivo.`;
             // Use real dates from Stripe (created is Unix timestamp in seconds)
             const paymentDate = paymentIntent.created ? new Date(paymentIntent.created * 1000) : new Date();
             
+            // Detect payment method type (card, pix, boleto)
+            const paymentMethodType = paymentIntent.payment_method_types?.[0] || 
+                                     paymentIntent.charges?.data?.[0]?.payment_method_details?.type || 
+                                     'card';
+            
             const updateData: any = {
               status: 'approved',
-              statusDetail: 'Pagamento confirmado via Stripe Elements',
-              metodoPagamento: 'card',
+              statusDetail: paymentMethodType === 'pix' 
+                ? 'Pagamento PIX confirmado' 
+                : paymentMethodType === 'boleto' 
+                  ? 'Pagamento Boleto confirmado'
+                  : 'Pagamento confirmado via Stripe Elements',
+              metodoPagamento: paymentMethodType,
               stripePaymentIntentId: paymentIntent.id,
               dataPagamento: paymentDate,
               dataAprovacao: paymentDate,

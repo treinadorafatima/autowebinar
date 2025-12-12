@@ -2115,3 +2115,434 @@ ${APP_NAME} - Programa de Afiliados
     return false;
   }
 }
+
+export async function sendPixGeneratedEmail(
+  to: string, 
+  name: string, 
+  planName: string, 
+  pixCopiaCola: string, 
+  pixQrCodeBase64: string | null,
+  expiresAt: Date,
+  amount: number
+): Promise<boolean> {
+  try {
+    const { client, fromEmail } = getResendClient();
+    const formattedAmount = (amount / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    const formattedExpiration = expiresAt.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+    
+    const text = `
+Ola ${name},
+
+Seu PIX foi gerado com sucesso para o plano ${planName}!
+
+Valor: ${formattedAmount}
+Validade: ${formattedExpiration}
+
+Codigo PIX (Copia e Cola):
+${pixCopiaCola}
+
+Como pagar:
+1. Abra o app do seu banco
+2. Escolha a opcao Pix
+3. Cole o codigo acima ou escaneie o QR Code
+4. Confirme o pagamento
+
+IMPORTANTE: Apos o pagamento, seu acesso sera liberado automaticamente em poucos segundos.
+
+---
+${APP_NAME}
+    `.trim();
+    
+    const qrCodeHtml = pixQrCodeBase64 
+      ? `<img src="${pixQrCodeBase64}" alt="QR Code PIX" style="max-width: 200px; height: auto; margin: 20px auto; display: block;" />`
+      : '';
+    
+    const html = `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Seu PIX foi gerado - ${APP_NAME}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background-color: #f4f4f5;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f5;">
+    <tr>
+      <td style="padding: 40px 20px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden;">
+          <tr>
+            <td style="background-color: #00b894; padding: 30px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 600;">PIX Gerado com Sucesso!</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 40px 30px;">
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Ola <strong>${name}</strong>,
+              </p>
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Seu PIX para o plano <strong>${planName}</strong> foi gerado!
+              </p>
+              
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 25px 0; background-color: #f0fff4; border-radius: 6px; border: 2px solid #00b894;">
+                <tr>
+                  <td style="padding: 20px; text-align: center;">
+                    <p style="margin: 0 0 8px; color: #047857; font-weight: 600; font-size: 24px;">
+                      ${formattedAmount}
+                    </p>
+                    <p style="margin: 0; color: #059669; font-size: 14px;">
+                      Valido ate: ${formattedExpiration}
+                    </p>
+                  </td>
+                </tr>
+              </table>
+              
+              ${qrCodeHtml}
+              
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 25px 0; background-color: #f8fafc; border-radius: 6px;">
+                <tr>
+                  <td style="padding: 20px;">
+                    <p style="margin: 0 0 12px; color: #374151; font-weight: 600; font-size: 14px;">Codigo PIX (Copia e Cola):</p>
+                    <p style="margin: 0; background-color: #e5e7eb; padding: 12px; border-radius: 4px; font-family: monospace; font-size: 12px; word-break: break-all; color: #374151;">
+                      ${pixCopiaCola}
+                    </p>
+                  </td>
+                </tr>
+              </table>
+              
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 25px 0; background-color: #f0f9ff; border-radius: 6px;">
+                <tr>
+                  <td style="padding: 16px;">
+                    <p style="margin: 0 0 12px; color: #0369a1; font-weight: 600; font-size: 14px;">Como pagar:</p>
+                    <p style="margin: 0; color: #0369a1; font-size: 14px; line-height: 1.8;">
+                      1. Abra o app do seu banco<br>
+                      2. Escolha a opcao Pix<br>
+                      3. Cole o codigo ou escaneie o QR Code<br>
+                      4. Confirme o pagamento
+                    </p>
+                  </td>
+                </tr>
+              </table>
+              
+              <p style="margin: 30px 0 0; color: #059669; font-size: 14px; line-height: 1.6; text-align: center; font-weight: 600;">
+                Apos o pagamento, seu acesso sera liberado automaticamente!
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color: #f8fafc; padding: 20px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0; color: #9ca3af; font-size: 12px;">
+                ${APP_NAME} - Pagamentos Seguros
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `;
+
+    const result = await client.emails.send({
+      from: fromEmail,
+      replyTo: REPLY_TO_EMAIL,
+      to: [to],
+      subject: `PIX gerado para ${planName} - ${APP_NAME}`,
+      html,
+      text,
+    });
+
+    console.log(`[email] Email de PIX gerado enviado para ${to}`, result);
+    return true;
+  } catch (error) {
+    console.error(`[email] Erro ao enviar email de PIX gerado para ${to}:`, error);
+    return false;
+  }
+}
+
+export async function sendBoletoGeneratedEmail(
+  to: string, 
+  name: string, 
+  planName: string, 
+  boletoUrl: string, 
+  boletoCodigo: string | null,
+  expiresAt: Date,
+  amount: number
+): Promise<boolean> {
+  try {
+    const { client, fromEmail } = getResendClient();
+    const formattedAmount = (amount / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    const formattedExpiration = expiresAt.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+    
+    const text = `
+Ola ${name},
+
+Seu Boleto foi gerado com sucesso para o plano ${planName}!
+
+Valor: ${formattedAmount}
+Vencimento: ${formattedExpiration}
+
+Link do Boleto: ${boletoUrl}
+${boletoCodigo ? `\nCodigo de Barras:\n${boletoCodigo}` : ''}
+
+Como pagar:
+1. Acesse o link acima para visualizar o boleto
+2. Voce pode pagar no banco, lotérica ou pelo app do seu banco
+3. Use o codigo de barras para pagamento rapido
+
+IMPORTANTE: O pagamento pode levar ate 2 dias uteis para ser compensado. Apos a confirmacao, seu acesso sera liberado automaticamente.
+
+---
+${APP_NAME}
+    `.trim();
+    
+    const html = `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Seu Boleto foi gerado - ${APP_NAME}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background-color: #f4f4f5;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f5;">
+    <tr>
+      <td style="padding: 40px 20px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden;">
+          <tr>
+            <td style="background-color: #6366f1; padding: 30px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 600;">Boleto Gerado com Sucesso!</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 40px 30px;">
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Ola <strong>${name}</strong>,
+              </p>
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Seu Boleto para o plano <strong>${planName}</strong> foi gerado!
+              </p>
+              
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 25px 0; background-color: #eef2ff; border-radius: 6px; border: 2px solid #6366f1;">
+                <tr>
+                  <td style="padding: 20px; text-align: center;">
+                    <p style="margin: 0 0 8px; color: #4338ca; font-weight: 600; font-size: 24px;">
+                      ${formattedAmount}
+                    </p>
+                    <p style="margin: 0; color: #4f46e5; font-size: 14px;">
+                      Vencimento: ${formattedExpiration}
+                    </p>
+                  </td>
+                </tr>
+              </table>
+              
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                <tr>
+                  <td style="text-align: center; padding: 20px 0;">
+                    <a href="${boletoUrl}" style="display: inline-block; background-color: #6366f1; color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 6px; font-weight: 600; font-size: 16px;">
+                      Visualizar Boleto
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              
+              ${boletoCodigo ? `
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 25px 0; background-color: #f8fafc; border-radius: 6px;">
+                <tr>
+                  <td style="padding: 20px;">
+                    <p style="margin: 0 0 12px; color: #374151; font-weight: 600; font-size: 14px;">Codigo de Barras:</p>
+                    <p style="margin: 0; background-color: #e5e7eb; padding: 12px; border-radius: 4px; font-family: monospace; font-size: 12px; word-break: break-all; color: #374151; text-align: center;">
+                      ${boletoCodigo}
+                    </p>
+                  </td>
+                </tr>
+              </table>
+              ` : ''}
+              
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 25px 0; background-color: #f0f9ff; border-radius: 6px;">
+                <tr>
+                  <td style="padding: 16px;">
+                    <p style="margin: 0 0 12px; color: #0369a1; font-weight: 600; font-size: 14px;">Como pagar:</p>
+                    <p style="margin: 0; color: #0369a1; font-size: 14px; line-height: 1.8;">
+                      1. Clique no botao acima para visualizar o boleto<br>
+                      2. Pague no banco, loterica ou pelo app do banco<br>
+                      3. Use o codigo de barras para pagamento rapido
+                    </p>
+                  </td>
+                </tr>
+              </table>
+              
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 25px 0; background-color: #fffbeb; border-radius: 6px;">
+                <tr>
+                  <td style="padding: 16px;">
+                    <p style="margin: 0; color: #92400e; font-size: 14px; line-height: 1.6;">
+                      <strong>Importante:</strong> O pagamento pode levar ate 2 dias uteis para ser compensado. Apos a confirmacao, seu acesso sera liberado automaticamente.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color: #f8fafc; padding: 20px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0; color: #9ca3af; font-size: 12px;">
+                ${APP_NAME} - Pagamentos Seguros
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `;
+
+    const result = await client.emails.send({
+      from: fromEmail,
+      replyTo: REPLY_TO_EMAIL,
+      to: [to],
+      subject: `Boleto gerado para ${planName} - ${APP_NAME}`,
+      html,
+      text,
+    });
+
+    console.log(`[email] Email de Boleto gerado enviado para ${to}`, result);
+    return true;
+  } catch (error) {
+    console.error(`[email] Erro ao enviar email de Boleto gerado para ${to}:`, error);
+    return false;
+  }
+}
+
+export async function sendPixExpiredRecoveryEmail(
+  to: string, 
+  name: string, 
+  planName: string, 
+  planoId: string,
+  amount: number
+): Promise<boolean> {
+  try {
+    const { client, fromEmail } = getResendClient();
+    const formattedAmount = (amount / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    
+    const checkoutParams = new URLSearchParams({
+      email: to,
+      nome: name,
+      recuperacao: "true"
+    });
+    const checkoutUrl = `${APP_URL}/checkout/${planoId}?${checkoutParams.toString()}`;
+    
+    const text = `
+Ola ${name},
+
+Seu PIX para o plano ${planName} expirou!
+
+Valor: ${formattedAmount}
+
+Nao se preocupe! Voce ainda pode finalizar sua compra.
+
+Clique no link abaixo para gerar um novo PIX ou escolher outra forma de pagamento:
+${checkoutUrl}
+
+Metodos de pagamento disponiveis:
+- PIX: Aprovacao instantanea
+- Boleto: Vencimento em 3 dias uteis
+- Cartao de Credito: Parcelado em ate 12x
+
+Estamos aqui para ajudar se precisar!
+
+---
+${APP_NAME}
+    `.trim();
+    
+    const html = `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Seu PIX expirou - ${APP_NAME}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background-color: #f4f4f5;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f5;">
+    <tr>
+      <td style="padding: 40px 20px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden;">
+          <tr>
+            <td style="background-color: #f59e0b; padding: 30px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 600;">Seu PIX Expirou</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 40px 30px;">
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Ola <strong>${name}</strong>,
+              </p>
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                O PIX gerado para o plano <strong>${planName}</strong> no valor de <strong>${formattedAmount}</strong> expirou.
+              </p>
+              
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 25px 0; background-color: #ecfdf5; border-radius: 6px; border: 2px solid #10b981;">
+                <tr>
+                  <td style="padding: 20px; text-align: center;">
+                    <p style="margin: 0 0 16px; color: #047857; font-weight: 700; font-size: 18px;">
+                      Nao se preocupe! Voce ainda pode finalizar sua compra.
+                    </p>
+                    <a href="${checkoutUrl}" style="display: inline-block; background-color: #10b981; color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 6px; font-weight: 600; font-size: 16px;">
+                      Finalizar Compra Agora
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 25px 0; background-color: #f8fafc; border-radius: 6px;">
+                <tr>
+                  <td style="padding: 20px;">
+                    <p style="margin: 0 0 12px; color: #374151; font-weight: 600; font-size: 14px;">Metodos de pagamento disponiveis:</p>
+                    <p style="margin: 0; color: #374151; font-size: 14px; line-height: 1.8;">
+                      <strong style="color: #00b894;">PIX:</strong> Aprovacao instantanea<br>
+                      <strong style="color: #6366f1;">Boleto:</strong> Vencimento em 3 dias uteis<br>
+                      <strong style="color: #3b82f6;">Cartao:</strong> Parcelado em ate 12x
+                    </p>
+                  </td>
+                </tr>
+              </table>
+              
+              <p style="margin: 30px 0 0; color: #6b7280; font-size: 14px; line-height: 1.6; text-align: center;">
+                Estamos aqui para ajudar se precisar!
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color: #f8fafc; padding: 20px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0; color: #9ca3af; font-size: 12px;">
+                ${APP_NAME} - Pagamentos Seguros
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `;
+
+    const result = await client.emails.send({
+      from: fromEmail,
+      replyTo: REPLY_TO_EMAIL,
+      to: [to],
+      subject: `Seu PIX expirou - Finalize sua compra do ${planName}`,
+      html,
+      text,
+    });
+
+    console.log(`[email] Email de PIX expirado enviado para ${to}`, result);
+    return true;
+  } catch (error) {
+    console.error(`[email] Erro ao enviar email de PIX expirado para ${to}:`, error);
+    return false;
+  }
+}

@@ -456,6 +456,10 @@ export const checkoutPagamentos = pgTable("checkout_pagamentos", {
   lastFailureAt: timestamp("last_failure_at"), // Data/hora da última falha
   // Campos para tracking de afiliados
   affiliateLinkCode: text("affiliate_link_code"), // Código do link de afiliado usado
+  // Campos para PIX/Boleto expiration tracking
+  pixExpiresAt: timestamp("pix_expires_at"), // Data/hora de expiração do PIX
+  boletoExpiresAt: timestamp("boleto_expires_at"), // Data/hora de vencimento do boleto
+  pixExpiredEmailSent: boolean("pix_expired_email_sent").default(false), // Se já enviou email de PIX expirado
   criadoEm: timestamp("criado_em").defaultNow(),
   atualizadoEm: timestamp("atualizado_em").defaultNow(),
 });
