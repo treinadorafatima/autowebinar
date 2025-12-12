@@ -8712,7 +8712,12 @@ Seja conversacional e objetivo.`;
       // Validate webhook signature if secret is configured
       if (webhookSecret && sig) {
         const crypto = await import('crypto');
-        const rawBody = JSON.stringify(req.body);
+        // Use the raw body captured by Express middleware for accurate signature verification
+        const rawBody = (req as any).rawBody instanceof Buffer 
+          ? (req as any).rawBody.toString('utf8') 
+          : JSON.stringify(req.body);
+        
+        console.log(`[Stripe Webhook] Raw body source: ${(req as any).rawBody instanceof Buffer ? 'Buffer' : 'JSON.stringify'}`);
         
         // Parse stripe-signature header
         const elements = sig.split(',').reduce((acc: any, part) => {
