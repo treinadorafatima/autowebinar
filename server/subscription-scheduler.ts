@@ -157,9 +157,11 @@ async function generateRenewalPixBoleto(admin: AdminWithPlan): Promise<boolean> 
       boletoExpiresAt: null,
     };
 
+    const amountInCentavos = Math.round(Number(plan.preco) * 100);
+
     try {
       const pixParams = new URLSearchParams({
-        'amount': plan.preco.toString(),
+        'amount': amountInCentavos.toString(),
         'currency': 'brl',
         'payment_method_types[0]': 'pix',
         'metadata[pagamentoId]': pagamento.id,
@@ -202,7 +204,13 @@ async function generateRenewalPixBoleto(admin: AdminWithPlan): Promise<boolean> 
             paymentData.pixQrCode = pixAction.image_url_png || null;
             paymentData.pixExpiresAt = pixAction.expires_at ? new Date(pixAction.expires_at * 1000) : new Date(Date.now() + 24 * 60 * 60 * 1000);
           }
+        } else {
+          const errorData = await confirmResponse.json().catch(() => ({}));
+          console.error('[subscription-scheduler] PIX confirm failed:', confirmResponse.status, errorData);
         }
+      } else {
+        const errorData = await pixResponse.json().catch(() => ({}));
+        console.error('[subscription-scheduler] PIX create failed:', pixResponse.status, errorData);
       }
     } catch (pixErr) {
       console.error('[subscription-scheduler] Error generating PIX:', pixErr);
@@ -213,7 +221,7 @@ async function generateRenewalPixBoleto(admin: AdminWithPlan): Promise<boolean> 
       boletoExpiresAt.setDate(boletoExpiresAt.getDate() + 3);
 
       const boletoParams = new URLSearchParams({
-        'amount': plan.preco.toString(),
+        'amount': amountInCentavos.toString(),
         'currency': 'brl',
         'payment_method_types[0]': 'boleto',
         'metadata[pagamentoId]': pagamento.id,
@@ -260,7 +268,13 @@ async function generateRenewalPixBoleto(admin: AdminWithPlan): Promise<boolean> 
             paymentData.boletoCodigo = boletoAction.number || null;
             paymentData.boletoExpiresAt = boletoAction.expires_at ? new Date(boletoAction.expires_at * 1000) : boletoExpiresAt;
           }
+        } else {
+          const errorData = await confirmResponse.json().catch(() => ({}));
+          console.error('[subscription-scheduler] Boleto confirm failed:', confirmResponse.status, errorData);
         }
+      } else {
+        const errorData = await boletoResponse.json().catch(() => ({}));
+        console.error('[subscription-scheduler] Boleto create failed:', boletoResponse.status, errorData);
       }
     } catch (boletoErr) {
       console.error('[subscription-scheduler] Error generating Boleto:', boletoErr);
