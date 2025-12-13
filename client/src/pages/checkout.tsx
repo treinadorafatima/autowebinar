@@ -1326,18 +1326,16 @@ export default function Checkout() {
                         <SiMastercard className="w-6 h-6" />
                       </div>
                     </div>
-                    {!isRecorrente && (
-                      <>
-                        <div className="flex items-center gap-3 p-3 bg-white/5 rounded-lg">
-                          <QrCode className="w-5 h-5 text-yellow-400" />
-                          <span>Pix (Aprovação Instantânea)</span>
-                        </div>
-                        <div className="flex items-center gap-3 p-3 bg-white/5 rounded-lg">
-                          <Barcode className="w-5 h-5 text-orange-400" />
-                          <span>Boleto Bancário</span>
-                        </div>
-                      </>
-                    )}
+                    <div className="flex items-center gap-3 p-3 bg-white/5 rounded-lg">
+                      <QrCode className="w-5 h-5 text-emerald-400" />
+                      <span>Pix</span>
+                      <span className="ml-auto text-xs text-emerald-400">Aprovação Instantânea</span>
+                    </div>
+                    <div className="flex items-center gap-3 p-3 bg-white/5 rounded-lg">
+                      <Barcode className="w-5 h-5 text-emerald-400" />
+                      <span>Boleto Bancário</span>
+                      <span className="ml-auto text-xs text-slate-400">Até 3 dias úteis</span>
+                    </div>
                   </div>
                 </div>
 
