@@ -1316,6 +1316,7 @@ export default function Checkout() {
 
                 <div className="space-y-3">
                   <p className="text-sm font-medium text-slate-300">Formas de Pagamento Aceitas:</p>
+                  <p className="text-white text-sm font-semibold">Cartão, Pix ou Boleto</p>
                   <div className="space-y-2">
                     <div className="flex items-center gap-3 p-3 bg-white/5 rounded-lg">
                       <CreditCard className="w-5 h-5 text-emerald-400" />
@@ -1325,7 +1326,7 @@ export default function Checkout() {
                         <SiMastercard className="w-6 h-6" />
                       </div>
                     </div>
-                    {isMercadoPago && !isRecorrente && (
+                    {!isRecorrente && (
                       <>
                         <div className="flex items-center gap-3 p-3 bg-white/5 rounded-lg">
                           <QrCode className="w-5 h-5 text-yellow-400" />
