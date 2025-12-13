@@ -7947,6 +7947,151 @@ Seja conversacional e objetivo.`;
     }
   });
 
+  // Checkout - Gerar Pix/Boleto para assinatura recorrente Mercado Pago
+  app.post("/api/checkout/mercadopago/assinatura-pix-boleto", async (req, res) => {
+    try {
+      const { pagamentoId, payerEmail, payerName, payerDocument, payerDocumentType, method } = req.body;
+      
+      if (!method || !['pix', 'boleto'].includes(method)) {
+        return res.status(400).json({ error: "Método de pagamento inválido" });
+      }
+
+      const pagamento = await storage.getCheckoutPagamentoById(pagamentoId);
+      if (!pagamento) {
+        return res.status(404).json({ error: "Pagamento não encontrado" });
+      }
+
+      const plano = await storage.getCheckoutPlanoById(pagamento.planoId);
+      if (!plano) {
+        return res.status(404).json({ error: "Plano não encontrado" });
+      }
+
+      const accessToken = await storage.getCheckoutConfig('MERCADOPAGO_ACCESS_TOKEN');
+      if (!accessToken) {
+        return res.status(500).json({ error: "Mercado Pago não configurado" });
+      }
+
+      // Get base URL for webhooks
+      const protocol = req.headers['x-forwarded-proto'] || 'https';
+      const host = req.headers['x-forwarded-host'] || req.headers.host;
+      const baseUrl = `${protocol}://${host}`;
+
+      // Clean document number
+      const docNumber = (payerDocument || '').replace(/\D/g, '');
+      const docType = payerDocumentType || 'CPF';
+
+      // Set expiration date based on method
+      const expirationDate = new Date();
+      if (method === 'pix') {
+        expirationDate.setMinutes(expirationDate.getMinutes() + 30); // 30 minutes for pix
+      } else {
+        expirationDate.setDate(expirationDate.getDate() + 3); // 3 days for boleto
+      }
+
+      // Create a direct payment request for Pix/Boleto (first month payment)
+      const paymentRequest: any = {
+        transaction_amount: plano.preco / 100,
+        description: `Assinatura ${plano.nome} - 1ª mensalidade`,
+        payment_method_id: method === 'pix' ? 'pix' : 'bolbradesco',
+        date_of_expiration: expirationDate.toISOString(),
+        external_reference: pagamentoId,
+        notification_url: `${baseUrl}/webhook/mercadopago`,
+        payer: {
+          email: payerEmail || pagamento.email,
+          first_name: (payerName || pagamento.nome || '').split(' ')[0],
+          last_name: (payerName || pagamento.nome || '').split(' ').slice(1).join(' ') || '',
+          identification: {
+            type: docType,
+            number: docNumber,
+          },
+        },
+      };
+
+      console.log(`[MP Subscription ${method.toUpperCase()}] Creating payment:`, JSON.stringify(paymentRequest, null, 2));
+
+      const mpResponse = await fetch('https://api.mercadopago.com/v1/payments', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+          'X-Idempotency-Key': `${pagamentoId}-${method}-${Date.now()}`,
+        },
+        body: JSON.stringify(paymentRequest),
+      });
+
+      const mpData = await mpResponse.json();
+      console.log(`[MP Subscription ${method.toUpperCase()}] Response:`, JSON.stringify(mpData, null, 2));
+
+      if (!mpResponse.ok) {
+        console.error(`[MP Subscription ${method.toUpperCase()}] Error:`, mpData);
+        return res.status(400).json({ 
+          error: mpData.message || `Erro ao gerar ${method === 'pix' ? 'Pix' : 'Boleto'}`,
+          details: mpData,
+        });
+      }
+
+      // Update payment record with Pix/Boleto data
+      const updateData: any = {
+        status: 'pending',
+        statusDetail: mpData.status,
+        metodoPagamento: method,
+        mercadopagoPaymentId: mpData.id?.toString(),
+        tipoAssinatura: 'recorrente',
+      };
+
+      let responseData: any = { method, paymentId: mpData.id };
+
+      if (method === 'pix') {
+        const pixData = mpData.point_of_interaction?.transaction_data;
+        if (pixData) {
+          updateData.pixQrCode = pixData.qr_code;
+          updateData.pixCopiaCola = pixData.qr_code;
+          updateData.pixExpiresAt = expirationDate;
+          
+          responseData.pix = {
+            qrCode: pixData.qr_code,
+            qrCodeBase64: pixData.qr_code_base64,
+            expiresAt: expirationDate.toISOString(),
+          };
+        }
+      } else {
+        // Boleto
+        const boletoUrl = mpData.transaction_details?.external_resource_url;
+        const barcode = mpData.barcode?.content;
+        
+        updateData.boletoUrl = boletoUrl;
+        updateData.boletoCodigo = barcode;
+        updateData.boletoExpiresAt = expirationDate;
+        
+        responseData.boleto = {
+          url: boletoUrl,
+          barcode: barcode || '',
+          expiresAt: expirationDate.toISOString(),
+        };
+      }
+
+      await storage.updateCheckoutPagamento(pagamentoId, updateData);
+
+      // Send email with payment instructions
+      import("./email").then(({ sendPaymentPendingEmail }) => {
+        sendPaymentPendingEmail(
+          payerEmail || pagamento.email, 
+          payerName || pagamento.nome, 
+          plano.nome, 
+          method, 
+          pagamento.planoId
+        ).catch(err => {
+          console.error(`[MP Subscription ${method.toUpperCase()}] Error sending pending email:`, err);
+        });
+      });
+
+      res.json(responseData);
+    } catch (error: any) {
+      console.error('[MP Subscription Pix/Boleto] Error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Checkout - Criar Payment Intent/Subscription Stripe (para Stripe Elements - transparente)
   app.post("/api/checkout/stripe/criar-payment-intent-elements", async (req, res) => {
     try {

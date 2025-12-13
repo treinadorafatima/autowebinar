@@ -168,6 +168,9 @@ export default function Checkout() {
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [isRecurring, setIsRecurring] = useState(false);
   const [mpInitPoint, setMpInitPoint] = useState<string | null>(null);
+  const [recurringPaymentMethod, setRecurringPaymentMethod] = useState<"card" | "pix" | "boleto">("card");
+  const [recurringPixData, setRecurringPixData] = useState<{qrCode: string; qrCodeBase64: string; expiresAt: string} | null>(null);
+  const [recurringBoletoData, setRecurringBoletoData] = useState<{url: string; barcode: string; expiresAt: string} | null>(null);
 
   const { data: planos, isLoading: loadingPlanos } = useQuery<Plano[]>({
     queryKey: ["/api/checkout/planos/ativos"],
@@ -377,6 +380,46 @@ export default function Checkout() {
       toast({
         title: errorMessage,
         description: errorAction,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const gerarPixBoletoRecorrenteMutation = useMutation({
+    mutationFn: async (method: "pix" | "boleto") => {
+      const res = await apiRequest("POST", "/api/checkout/mercadopago/assinatura-pix-boleto", {
+        pagamentoId,
+        payerEmail: formData.email,
+        payerName: formData.nome,
+        payerDocument: formData.documento,
+        payerDocumentType: formData.tipoDocumento,
+        method,
+      });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      if (data.method === 'pix' && data.pix) {
+        setRecurringPixData({
+          qrCode: data.pix.qrCode,
+          qrCodeBase64: data.pix.qrCodeBase64,
+          expiresAt: data.pix.expiresAt,
+        });
+      } else if (data.method === 'boleto' && data.boleto) {
+        setRecurringBoletoData({
+          url: data.boleto.url,
+          barcode: data.boleto.barcode,
+          expiresAt: data.boleto.expiresAt,
+        });
+      }
+      toast({
+        title: data.method === 'pix' ? "Pix gerado com sucesso!" : "Boleto gerado com sucesso!",
+        description: "Efetue o pagamento para ativar sua assinatura.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro ao gerar pagamento",
+        description: error.message,
         variant: "destructive",
       });
     },
@@ -1200,21 +1243,204 @@ export default function Checkout() {
 
                   {isMercadoPago && pagamentoId ? (
                     isRecurring ? (
-                      mpInitialized && cardPaymentInitialization ? (
-                        <div className="mercadopago-container" key="card-payment-container">
-                          <CardPayment
-                            initialization={cardPaymentInitialization}
-                            customization={cardPaymentCustomization}
-                            onSubmit={handleCardPaymentSubmit}
-                            onReady={handleMpReady}
-                            onError={handleMpError}
-                          />
+                      <>
+                        <div className="mb-6">
+                          <Label className="text-sm font-medium text-slate-700 mb-3 block">Escolha a forma de pagamento</Label>
+                          <div className="grid grid-cols-3 gap-3">
+                            <button
+                              type="button"
+                              onClick={() => { setRecurringPaymentMethod("card"); setRecurringPixData(null); setRecurringBoletoData(null); }}
+                              className={`p-4 rounded-lg border-2 transition-all flex flex-col items-center gap-2 ${
+                                recurringPaymentMethod === "card" 
+                                  ? "border-blue-500 bg-blue-50" 
+                                  : "border-slate-200 hover:border-slate-300"
+                              }`}
+                              data-testid="button-payment-method-card"
+                            >
+                              <CreditCard className={`w-6 h-6 ${recurringPaymentMethod === "card" ? "text-blue-500" : "text-slate-400"}`} />
+                              <span className={`text-sm font-medium ${recurringPaymentMethod === "card" ? "text-blue-700" : "text-slate-600"}`}>Cartão</span>
+                              <span className="text-xs text-slate-400">Automático</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => { setRecurringPaymentMethod("pix"); setRecurringBoletoData(null); }}
+                              className={`p-4 rounded-lg border-2 transition-all flex flex-col items-center gap-2 ${
+                                recurringPaymentMethod === "pix" 
+                                  ? "border-emerald-500 bg-emerald-50" 
+                                  : "border-slate-200 hover:border-slate-300"
+                              }`}
+                              data-testid="button-payment-method-pix"
+                            >
+                              <QrCode className={`w-6 h-6 ${recurringPaymentMethod === "pix" ? "text-emerald-500" : "text-slate-400"}`} />
+                              <span className={`text-sm font-medium ${recurringPaymentMethod === "pix" ? "text-emerald-700" : "text-slate-600"}`}>Pix</span>
+                              <span className="text-xs text-slate-400">Manual</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => { setRecurringPaymentMethod("boleto"); setRecurringPixData(null); }}
+                              className={`p-4 rounded-lg border-2 transition-all flex flex-col items-center gap-2 ${
+                                recurringPaymentMethod === "boleto" 
+                                  ? "border-orange-500 bg-orange-50" 
+                                  : "border-slate-200 hover:border-slate-300"
+                              }`}
+                              data-testid="button-payment-method-boleto"
+                            >
+                              <Barcode className={`w-6 h-6 ${recurringPaymentMethod === "boleto" ? "text-orange-500" : "text-slate-400"}`} />
+                              <span className={`text-sm font-medium ${recurringPaymentMethod === "boleto" ? "text-orange-700" : "text-slate-600"}`}>Boleto</span>
+                              <span className="text-xs text-slate-400">Manual</span>
+                            </button>
+                          </div>
+                          {(recurringPaymentMethod === "pix" || recurringPaymentMethod === "boleto") && (
+                            <div className="mt-3 p-3 bg-amber-50 rounded-lg border border-amber-100">
+                              <p className="text-xs text-amber-700">
+                                <strong>Atenção:</strong> Pagamentos via {recurringPaymentMethod === "pix" ? "Pix" : "Boleto"} não são automáticos. 
+                                Você receberá um lembrete por email antes do vencimento de cada mensalidade.
+                              </p>
+                            </div>
+                          )}
                         </div>
-                      ) : (
-                        <div className="flex items-center justify-center py-12">
-                          <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
-                        </div>
-                      )
+
+                        {recurringPaymentMethod === "card" && mpInitialized && cardPaymentInitialization ? (
+                          <div className="mercadopago-container" key="card-payment-container">
+                            <CardPayment
+                              initialization={cardPaymentInitialization}
+                              customization={cardPaymentCustomization}
+                              onSubmit={handleCardPaymentSubmit}
+                              onReady={handleMpReady}
+                              onError={handleMpError}
+                            />
+                          </div>
+                        ) : recurringPaymentMethod === "card" ? (
+                          <div className="flex items-center justify-center py-12">
+                            <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+                          </div>
+                        ) : null}
+
+                        {recurringPaymentMethod === "pix" && (
+                          <div className="space-y-4">
+                            {!recurringPixData ? (
+                              <div className="text-center">
+                                <Button
+                                  onClick={() => gerarPixBoletoRecorrenteMutation.mutate("pix")}
+                                  disabled={gerarPixBoletoRecorrenteMutation.isPending}
+                                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-6 text-lg"
+                                  data-testid="button-generate-pix"
+                                >
+                                  {gerarPixBoletoRecorrenteMutation.isPending ? (
+                                    <>
+                                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                                      Gerando Pix...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <QrCode className="w-5 h-5 mr-2" />
+                                      Gerar QR Code Pix
+                                    </>
+                                  )}
+                                </Button>
+                              </div>
+                            ) : (
+                              <div className="text-center space-y-4">
+                                <div className="bg-white p-4 rounded-lg border inline-block">
+                                  <img 
+                                    src={`data:image/png;base64,${recurringPixData.qrCodeBase64}`} 
+                                    alt="QR Code Pix" 
+                                    className="w-48 h-48 mx-auto"
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <p className="text-sm text-slate-600">Ou copie o código Pix:</p>
+                                  <div className="flex gap-2 max-w-md mx-auto">
+                                    <Input 
+                                      value={recurringPixData.qrCode} 
+                                      readOnly 
+                                      className="text-xs"
+                                    />
+                                    <Button
+                                      variant="outline"
+                                      onClick={() => {
+                                        navigator.clipboard.writeText(recurringPixData.qrCode);
+                                        toast({ title: "Código copiado!" });
+                                      }}
+                                      data-testid="button-copy-pix"
+                                    >
+                                      Copiar
+                                    </Button>
+                                  </div>
+                                </div>
+                                <p className="text-xs text-slate-500">
+                                  Válido até: {new Date(recurringPixData.expiresAt).toLocaleString('pt-BR')}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {recurringPaymentMethod === "boleto" && (
+                          <div className="space-y-4">
+                            {!recurringBoletoData ? (
+                              <div className="text-center">
+                                <Button
+                                  onClick={() => gerarPixBoletoRecorrenteMutation.mutate("boleto")}
+                                  disabled={gerarPixBoletoRecorrenteMutation.isPending}
+                                  className="bg-orange-600 hover:bg-orange-700 text-white px-8 py-6 text-lg"
+                                  data-testid="button-generate-boleto"
+                                >
+                                  {gerarPixBoletoRecorrenteMutation.isPending ? (
+                                    <>
+                                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                                      Gerando Boleto...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Barcode className="w-5 h-5 mr-2" />
+                                      Gerar Boleto
+                                    </>
+                                  )}
+                                </Button>
+                              </div>
+                            ) : (
+                              <div className="text-center space-y-4">
+                                <div className="p-4 bg-orange-50 rounded-lg border border-orange-100">
+                                  <CheckCircle2 className="w-12 h-12 text-orange-500 mx-auto mb-3" />
+                                  <p className="font-medium text-orange-900">Boleto gerado com sucesso!</p>
+                                </div>
+                                <div className="space-y-2">
+                                  <p className="text-sm text-slate-600">Código de barras:</p>
+                                  <div className="flex gap-2 max-w-md mx-auto">
+                                    <Input 
+                                      value={recurringBoletoData.barcode} 
+                                      readOnly 
+                                      className="text-xs font-mono"
+                                    />
+                                    <Button
+                                      variant="outline"
+                                      onClick={() => {
+                                        navigator.clipboard.writeText(recurringBoletoData.barcode);
+                                        toast({ title: "Código copiado!" });
+                                      }}
+                                      data-testid="button-copy-boleto"
+                                    >
+                                      Copiar
+                                    </Button>
+                                  </div>
+                                </div>
+                                <Button
+                                  onClick={() => window.open(recurringBoletoData.url, '_blank')}
+                                  className="bg-orange-600 hover:bg-orange-700"
+                                  data-testid="button-open-boleto"
+                                >
+                                  <Barcode className="w-4 h-4 mr-2" />
+                                  Abrir Boleto
+                                </Button>
+                                <p className="text-xs text-slate-500">
+                                  Vencimento: {new Date(recurringBoletoData.expiresAt).toLocaleDateString('pt-BR')}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </>
                     ) : mpInitialized && paymentInitialization ? (
                       <div className="mercadopago-container" key="payment-container">
                         <Payment
