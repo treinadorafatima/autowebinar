@@ -1,10 +1,13 @@
 import { db } from "./db";
-import { admins, checkoutPlanos } from "@shared/schema";
+import { admins, checkoutPlanos, checkoutPagamentos } from "@shared/schema";
 import { eq, and, gte, lte, isNotNull, sql } from "drizzle-orm";
+import { randomUUID } from "crypto";
 import { 
   sendExpirationReminderEmail, 
-  sendExpiredRenewalEmail 
+  sendExpiredRenewalEmail,
+  sendAutoRenewalPaymentEmail
 } from "./email";
+import { storage } from "./storage";
 
 const SCHEDULER_INTERVAL_MS = 3600000; // Check every hour
 let schedulerInterval: NodeJS.Timeout | null = null;
@@ -18,6 +21,17 @@ interface AdminWithPlan {
   planoId: string | null;
   lastExpirationEmailSent: Date | null;
   planName?: string;
+  cpf?: string | null;
+  telefone?: string | null;
+}
+
+interface RenewalPaymentData {
+  pixCopiaCola: string | null;
+  pixQrCode: string | null;
+  pixExpiresAt: Date | null;
+  boletoUrl: string | null;
+  boletoCodigo: string | null;
+  boletoExpiresAt: Date | null;
 }
 
 async function getAdminsExpiringInDays(days: number): Promise<AdminWithPlan[]> {
@@ -38,6 +52,8 @@ async function getAdminsExpiringInDays(days: number): Promise<AdminWithPlan[]> {
       accessExpiresAt: admins.accessExpiresAt,
       planoId: admins.planoId,
       lastExpirationEmailSent: admins.lastExpirationEmailSent,
+      cpf: admins.cpf,
+      telefone: admins.telefone,
     })
     .from(admins)
     .where(
@@ -107,6 +123,183 @@ async function markEmailSent(adminId: string): Promise<void> {
   }
 }
 
+async function generateRenewalPixBoleto(admin: AdminWithPlan): Promise<boolean> {
+  if (!admin.planoId) return false;
+  
+  try {
+    const plano = await db.select().from(checkoutPlanos).where(eq(checkoutPlanos.id, admin.planoId)).limit(1);
+    if (!plano[0]) return false;
+    
+    const plan = plano[0];
+    const stripeSecretKey = await storage.getCheckoutConfig('STRIPE_SECRET_KEY');
+    if (!stripeSecretKey) {
+      console.log('[subscription-scheduler] Stripe not configured, skipping auto-renewal');
+      return false;
+    }
+
+    const pagamento = await storage.createCheckoutPagamento({
+      email: admin.email,
+      nome: admin.name || 'Cliente',
+      cpf: admin.cpf || null,
+      telefone: admin.telefone || null,
+      planoId: plan.id,
+      valor: plan.preco,
+      status: 'pending',
+      statusDetail: 'Auto-renewal payment generated',
+    });
+
+    let paymentData: RenewalPaymentData = {
+      pixCopiaCola: null,
+      pixQrCode: null,
+      pixExpiresAt: null,
+      boletoUrl: null,
+      boletoCodigo: null,
+      boletoExpiresAt: null,
+    };
+
+    try {
+      const pixParams = new URLSearchParams({
+        'amount': plan.preco.toString(),
+        'currency': 'brl',
+        'payment_method_types[0]': 'pix',
+        'metadata[pagamentoId]': pagamento.id,
+        'metadata[adminId]': admin.id,
+        'metadata[autoRenewal]': 'true',
+        'receipt_email': admin.email,
+        'description': `Renovação ${plan.nome}`,
+      });
+
+      const pixResponse = await fetch('https://api.stripe.com/v1/payment_intents', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${stripeSecretKey}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: pixParams.toString(),
+      });
+
+      if (pixResponse.ok) {
+        const pixIntent = await pixResponse.json();
+        
+        const confirmParams = new URLSearchParams({
+          'payment_method_data[type]': 'pix',
+        });
+
+        const confirmResponse = await fetch(`https://api.stripe.com/v1/payment_intents/${pixIntent.id}/confirm`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${stripeSecretKey}`,
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: confirmParams.toString(),
+        });
+
+        if (confirmResponse.ok) {
+          const confirmedPix = await confirmResponse.json();
+          const pixAction = confirmedPix.next_action?.pix_display_qr_code;
+          if (pixAction) {
+            paymentData.pixCopiaCola = pixAction.data || null;
+            paymentData.pixQrCode = pixAction.image_url_png || null;
+            paymentData.pixExpiresAt = pixAction.expires_at ? new Date(pixAction.expires_at * 1000) : new Date(Date.now() + 24 * 60 * 60 * 1000);
+          }
+        }
+      }
+    } catch (pixErr) {
+      console.error('[subscription-scheduler] Error generating PIX:', pixErr);
+    }
+
+    try {
+      const boletoExpiresAt = new Date();
+      boletoExpiresAt.setDate(boletoExpiresAt.getDate() + 3);
+
+      const boletoParams = new URLSearchParams({
+        'amount': plan.preco.toString(),
+        'currency': 'brl',
+        'payment_method_types[0]': 'boleto',
+        'metadata[pagamentoId]': pagamento.id,
+        'metadata[adminId]': admin.id,
+        'metadata[autoRenewal]': 'true',
+        'receipt_email': admin.email,
+        'description': `Renovação ${plan.nome}`,
+      });
+
+      const boletoResponse = await fetch('https://api.stripe.com/v1/payment_intents', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${stripeSecretKey}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: boletoParams.toString(),
+      });
+
+      if (boletoResponse.ok) {
+        const boletoIntent = await boletoResponse.json();
+        
+        const cpfDigits = (admin.cpf || '').replace(/\D/g, '') || '00000000000';
+        const confirmParams = new URLSearchParams({
+          'payment_method_data[type]': 'boleto',
+          'payment_method_data[billing_details][email]': admin.email,
+          'payment_method_data[billing_details][name]': admin.name || 'Cliente',
+          'payment_method_data[boleto][tax_id]': cpfDigits,
+        });
+
+        const confirmResponse = await fetch(`https://api.stripe.com/v1/payment_intents/${boletoIntent.id}/confirm`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${stripeSecretKey}`,
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: confirmParams.toString(),
+        });
+
+        if (confirmResponse.ok) {
+          const confirmedBoleto = await confirmResponse.json();
+          const boletoAction = confirmedBoleto.next_action?.boleto_display_details;
+          if (boletoAction) {
+            paymentData.boletoUrl = boletoAction.hosted_voucher_url || null;
+            paymentData.boletoCodigo = boletoAction.number || null;
+            paymentData.boletoExpiresAt = boletoAction.expires_at ? new Date(boletoAction.expires_at * 1000) : boletoExpiresAt;
+          }
+        }
+      }
+    } catch (boletoErr) {
+      console.error('[subscription-scheduler] Error generating Boleto:', boletoErr);
+    }
+
+    await storage.updateCheckoutPagamento(pagamento.id, {
+      pixQrCode: paymentData.pixQrCode,
+      pixCopiaCola: paymentData.pixCopiaCola,
+      pixExpiresAt: paymentData.pixExpiresAt,
+      boletoUrl: paymentData.boletoUrl,
+      boletoCodigo: paymentData.boletoCodigo,
+      boletoExpiresAt: paymentData.boletoExpiresAt,
+    });
+
+    if (paymentData.pixCopiaCola || paymentData.boletoUrl) {
+      await sendAutoRenewalPaymentEmail(
+        admin.email,
+        admin.name || 'Cliente',
+        plan.nome,
+        plan.preco,
+        admin.accessExpiresAt!,
+        paymentData.pixCopiaCola,
+        paymentData.pixQrCode,
+        paymentData.pixExpiresAt,
+        paymentData.boletoUrl,
+        paymentData.boletoCodigo,
+        paymentData.boletoExpiresAt
+      );
+      console.log(`[subscription-scheduler] Sent auto-renewal payment email to ${admin.email}`);
+      return true;
+    }
+
+    return false;
+  } catch (error) {
+    console.error(`[subscription-scheduler] Error generating renewal payment for ${admin.email}:`, error);
+    return false;
+  }
+}
+
 function shouldSendEmail(admin: AdminWithPlan, daysType: '3days' | '1day' | 'expired'): boolean {
   if (!admin.lastExpirationEmailSent) return true;
   
@@ -173,6 +366,7 @@ async function processExpirationReminders(): Promise<void> {
       if (success) {
         await markEmailSent(admin.id);
         console.log(`[subscription-scheduler] Sent 1-day reminder to ${admin.email}`);
+        await generateRenewalPixBoleto(admin);
       }
     }
     

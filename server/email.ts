@@ -2416,6 +2416,205 @@ ${APP_NAME}
   }
 }
 
+export async function sendAutoRenewalPaymentEmail(
+  to: string,
+  name: string,
+  planName: string,
+  amount: number,
+  expiresAt: Date,
+  pixCopiaCola: string | null,
+  pixQrCode: string | null,
+  pixExpiresAt: Date | null,
+  boletoUrl: string | null,
+  boletoCodigo: string | null,
+  boletoExpiresAt: Date | null
+): Promise<boolean> {
+  try {
+    const { client, fromEmail } = getResendClient();
+    const formattedAmount = (amount / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    const formattedExpiration = expiresAt.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+    const formattedPixExpiration = pixExpiresAt?.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }) || '';
+    const formattedBoletoExpiration = boletoExpiresAt?.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }) || '';
+
+    const text = `
+Ola ${name},
+
+Seu plano ${planName} vence em breve (${formattedExpiration}).
+
+Para renovar seu acesso, geramos automaticamente as opcoes de pagamento abaixo:
+
+Valor: ${formattedAmount}
+
+${pixCopiaCola ? `=== OPCAO 1: PIX (Aprovacao Instantanea) ===
+Valido ate: ${formattedPixExpiration}
+
+Codigo PIX (Copia e Cola):
+${pixCopiaCola}
+
+Como pagar:
+1. Abra o app do seu banco
+2. Escolha a opcao Pix
+3. Cole o codigo acima
+4. Confirme o pagamento
+` : ''}
+${boletoUrl ? `=== OPCAO 2: BOLETO BANCARIO ===
+Vencimento: ${formattedBoletoExpiration}
+
+Link do Boleto: ${boletoUrl}
+${boletoCodigo ? `Codigo de Barras: ${boletoCodigo}` : ''}
+
+Como pagar:
+1. Acesse o link acima
+2. Pague no banco, loterica ou app do banco
+` : ''}
+
+IMPORTANTE: Apos o pagamento, seu acesso sera renovado automaticamente!
+
+---
+${APP_NAME}
+    `.trim();
+
+    const qrCodeHtml = pixQrCode
+      ? `<img src="${pixQrCode}" alt="QR Code PIX" style="max-width: 180px; height: auto; margin: 15px auto; display: block;" />`
+      : '';
+
+    const pixSection = pixCopiaCola ? `
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 20px 0; background-color: #f0fff4; border-radius: 6px; border: 2px solid #00b894;">
+                <tr>
+                  <td style="padding: 20px;">
+                    <p style="margin: 0 0 12px; color: #047857; font-weight: 600; font-size: 16px; text-align: center;">
+                      Opcao 1: PIX (Aprovacao Instantanea)
+                    </p>
+                    ${qrCodeHtml}
+                    <p style="margin: 0 0 8px; color: #059669; font-size: 13px; text-align: center;">
+                      Valido ate: ${formattedPixExpiration}
+                    </p>
+                    <p style="margin: 12px 0 8px; color: #374151; font-weight: 600; font-size: 13px;">Codigo PIX:</p>
+                    <p style="margin: 0; background-color: #d1fae5; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 11px; word-break: break-all; color: #374151;">
+                      ${pixCopiaCola}
+                    </p>
+                  </td>
+                </tr>
+              </table>
+    ` : '';
+
+    const boletoSection = boletoUrl ? `
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 20px 0; background-color: #eef2ff; border-radius: 6px; border: 2px solid #6366f1;">
+                <tr>
+                  <td style="padding: 20px;">
+                    <p style="margin: 0 0 12px; color: #4338ca; font-weight: 600; font-size: 16px; text-align: center;">
+                      Opcao 2: Boleto Bancario
+                    </p>
+                    <p style="margin: 0 0 15px; color: #4f46e5; font-size: 13px; text-align: center;">
+                      Vencimento: ${formattedBoletoExpiration}
+                    </p>
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                      <tr>
+                        <td style="text-align: center;">
+                          <a href="${boletoUrl}" style="display: inline-block; background-color: #6366f1; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 6px; font-weight: 600; font-size: 14px;">
+                            Visualizar Boleto
+                          </a>
+                        </td>
+                      </tr>
+                    </table>
+                    ${boletoCodigo ? `
+                    <p style="margin: 15px 0 8px; color: #374151; font-weight: 600; font-size: 13px;">Codigo de Barras:</p>
+                    <p style="margin: 0; background-color: #c7d2fe; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 11px; word-break: break-all; color: #374151; text-align: center;">
+                      ${boletoCodigo}
+                    </p>
+                    ` : ''}
+                  </td>
+                </tr>
+              </table>
+    ` : '';
+
+    const html = `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Renove seu plano - ${APP_NAME}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background-color: #f4f4f5;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f5;">
+    <tr>
+      <td style="padding: 40px 20px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden;">
+          <tr>
+            <td style="background-color: #3b82f6; padding: 30px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 600;">Renove Seu Plano</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 35px 30px;">
+              <p style="margin: 0 0 18px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Ola <strong>${name}</strong>,
+              </p>
+              <p style="margin: 0 0 18px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Seu plano <strong>${planName}</strong> vence em <strong>${formattedExpiration}</strong>.
+              </p>
+              <p style="margin: 0 0 18px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Para garantir que voce nao perca acesso, geramos automaticamente as opcoes de pagamento abaixo:
+              </p>
+
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 20px 0; background-color: #f8fafc; border-radius: 6px;">
+                <tr>
+                  <td style="padding: 16px; text-align: center;">
+                    <p style="margin: 0 0 4px; color: #6b7280; font-size: 14px;">Valor da Renovacao:</p>
+                    <p style="margin: 0; color: #1e40af; font-weight: 700; font-size: 28px;">
+                      ${formattedAmount}
+                    </p>
+                  </td>
+                </tr>
+              </table>
+
+              ${pixSection}
+              ${boletoSection}
+
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 25px 0; background-color: #ecfdf5; border-radius: 6px;">
+                <tr>
+                  <td style="padding: 16px;">
+                    <p style="margin: 0; color: #047857; font-size: 14px; line-height: 1.6; text-align: center;">
+                      <strong>Apos o pagamento, seu acesso sera renovado automaticamente!</strong>
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color: #f8fafc; padding: 20px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0; color: #9ca3af; font-size: 12px;">
+                ${APP_NAME} - Renovacao Automatica
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `;
+
+    const result = await client.emails.send({
+      from: fromEmail,
+      replyTo: REPLY_TO_EMAIL,
+      to: [to],
+      subject: `Renove seu plano ${planName} - ${APP_NAME}`,
+      html,
+      text,
+    });
+
+    console.log(`[email] Email de renovacao automatica enviado para ${to}`, result);
+    return true;
+  } catch (error) {
+    console.error(`[email] Erro ao enviar email de renovacao automatica para ${to}:`, error);
+    return false;
+  }
+}
+
 export async function sendPixExpiredRecoveryEmail(
   to: string, 
   name: string, 
