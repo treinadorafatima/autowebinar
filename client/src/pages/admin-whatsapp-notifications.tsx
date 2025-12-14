@@ -19,6 +19,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import type { WhatsappNotificationTemplate } from "@shared/schema";
 
 interface WhatsappNotificationLog {
   id: string;
@@ -60,6 +61,14 @@ interface WhatsAppConnectionStatus {
   qrExpired?: boolean;
 }
 
+const templatePlaceholders: Record<string, string[]> = {
+  credentials: ["{name}", "{planName}", "{email}", "{tempPassword}", "{loginUrl}"],
+  payment_confirmed: ["{name}", "{planName}", "{expirationDate}"],
+  password_reset: ["{name}", "{resetUrl}"],
+  plan_expired: ["{name}", "{planName}", "{renewUrl}"],
+  payment_failed: ["{name}", "{reason}", "{paymentUrl}"],
+};
+
 export default function AdminWhatsAppNotificationsPage() {
   const { toast } = useToast();
   const [qrPollingEnabled, setQrPollingEnabled] = useState(false);
@@ -68,6 +77,8 @@ export default function AdminWhatsAppNotificationsPage() {
   const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
   const [editHourlyLimit, setEditHourlyLimit] = useState<number>(10);
   const [editPriority, setEditPriority] = useState<number>(0);
+  const [editingTemplateId, setEditingTemplateId] = useState<number | null>(null);
+  const [editingTemplateMessage, setEditingTemplateMessage] = useState<string>("");
 
   const { data: notificationStatus, isLoading: loadingStatus, refetch: refetchStatus } = useQuery<NotificationStatus>({
     queryKey: ["/api/notifications/whatsapp/status"],
@@ -96,6 +107,12 @@ export default function AdminWhatsAppNotificationsPage() {
 
   const { data: notificationQueue = [], isLoading: loadingQueue, refetch: refetchQueue } = useQuery<WhatsappNotificationLog[]>({
     queryKey: ["/api/notifications/whatsapp/queue"],
+  });
+
+  const { data: templates = [], isLoading: loadingTemplates, isError: templatesError } = useQuery<WhatsappNotificationTemplate[]>({
+    queryKey: ["/api/notifications/whatsapp/templates"],
+    refetchOnWindowFocus: false,
+    staleTime: 30000,
   });
 
   const { data: connectingAccountStatus, refetch: refetchConnectingAccount } = useQuery<WhatsAppConnectionStatus>({
@@ -278,6 +295,40 @@ export default function AdminWhatsAppNotificationsPage() {
     },
   });
 
+  const updateTemplateMutation = useMutation({
+    mutationFn: async ({ templateId, messageTemplate }: { templateId: number; messageTemplate: string }) => {
+      return apiRequest("PATCH", `/api/notifications/whatsapp/templates/${templateId}`, {
+        messageTemplate,
+      });
+    },
+    onSuccess: () => {
+      setEditingTemplateId(null);
+      setEditingTemplateMessage("");
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications/whatsapp/templates"] });
+      toast({
+        title: "Template salvo",
+        description: "O template de mensagem foi atualizado com sucesso",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro ao salvar",
+        description: error.message || "Não foi possível salvar o template",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const startEditingTemplate = (template: WhatsappNotificationTemplate) => {
+    setEditingTemplateId(template.id);
+    setEditingTemplateMessage(template.messageTemplate);
+  };
+
+  const cancelEditingTemplate = () => {
+    setEditingTemplateId(null);
+    setEditingTemplateMessage("");
+  };
+
   const startEditingAccount = (account: WhatsAppAccount) => {
     setEditingAccountId(account.id);
     setEditHourlyLimit(account.hourlyLimit || 10);
@@ -380,6 +431,19 @@ export default function AdminWhatsAppNotificationsPage() {
         </p>
       </div>
 
+      <Tabs defaultValue="configuracoes" className="w-full">
+        <TabsList className="grid w-full grid-cols-2 mb-4">
+          <TabsTrigger value="configuracoes" data-testid="tab-configuracoes">
+            <Settings className="w-4 h-4 mr-2" />
+            Configurações
+          </TabsTrigger>
+          <TabsTrigger value="templates" data-testid="tab-templates">
+            <FileText className="w-4 h-4 mr-2" />
+            Templates de Mensagem
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="configuracoes" className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -933,6 +997,132 @@ export default function AdminWhatsAppNotificationsPage() {
           )}
         </CardContent>
       </Card>
+        </TabsContent>
+
+        <TabsContent value="templates" className="space-y-6" data-testid="tab-content-templates">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="w-5 h-5" />
+                Templates de Mensagem
+              </CardTitle>
+              <CardDescription>
+                Personalize os textos das mensagens automáticas enviadas aos clientes. 
+                Use os placeholders disponíveis para incluir informações dinâmicas.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingTemplates ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : templatesError ? (
+                <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                  <AlertCircle className="w-10 h-10 mb-2 text-destructive" />
+                  <p>Erro ao carregar templates</p>
+                </div>
+              ) : templates.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                  <FileText className="w-10 h-10 mb-2" />
+                  <p>Nenhum template encontrado</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {templates.map((template) => (
+                    <div 
+                      key={template.id}
+                      className="p-4 border rounded-lg space-y-3"
+                      data-testid={`card-template-${template.id}`}
+                    >
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div>
+                          <p className="font-medium" data-testid={`text-template-name-${template.id}`}>{template.name}</p>
+                          {template.description && (
+                            <p className="text-sm text-muted-foreground">{template.description}</p>
+                          )}
+                        </div>
+                        {editingTemplateId !== template.id && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => startEditingTemplate(template)}
+                            data-testid={`button-edit-template-${template.id}`}
+                          >
+                            <Edit3 className="w-4 h-4 mr-2" />
+                            Editar
+                          </Button>
+                        )}
+                      </div>
+
+                      {editingTemplateId === template.id ? (
+                        <div className="space-y-3">
+                          <div className="space-y-2">
+                            <Label htmlFor={`template-${template.id}`}>Mensagem</Label>
+                            <Textarea
+                              id={`template-${template.id}`}
+                              value={editingTemplateMessage}
+                              onChange={(e) => setEditingTemplateMessage(e.target.value)}
+                              rows={6}
+                              className="font-mono text-sm"
+                              data-testid={`textarea-template-${template.id}`}
+                            />
+                          </div>
+                          <div className="flex flex-wrap gap-1">
+                            <span className="text-xs text-muted-foreground mr-1">Placeholders:</span>
+                            {(templatePlaceholders[template.type] || []).map((placeholder) => (
+                              <Badge 
+                                key={placeholder} 
+                                variant="outline" 
+                                className="text-xs cursor-pointer"
+                                onClick={() => setEditingTemplateMessage(prev => prev + " " + placeholder)}
+                                data-testid={`badge-placeholder-${template.id}-${placeholder.replace(/[{}]/g, '')}`}
+                              >
+                                {placeholder}
+                              </Badge>
+                            ))}
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => updateTemplateMutation.mutate({ 
+                                templateId: template.id, 
+                                messageTemplate: editingTemplateMessage 
+                              })}
+                              disabled={updateTemplateMutation.isPending}
+                              data-testid={`button-save-template-${template.id}`}
+                            >
+                              {updateTemplateMutation.isPending ? (
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              ) : (
+                                <Save className="w-4 h-4 mr-2" />
+                              )}
+                              Salvar
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={cancelEditingTemplate}
+                              data-testid={`button-cancel-template-${template.id}`}
+                            >
+                              Cancelar
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="p-3 bg-muted/30 rounded-md">
+                          <pre className="whitespace-pre-wrap text-sm font-mono" data-testid={`text-template-message-${template.id}`}>
+                            {template.messageTemplate}
+                          </pre>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
