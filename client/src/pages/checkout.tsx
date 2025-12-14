@@ -1250,7 +1250,7 @@ export default function Checkout() {
                         <div>
                           <p className="font-medium text-blue-900">Renovação Automática</p>
                           <p className="text-sm text-blue-700">
-                            Sua assinatura será renovada automaticamente a cada 1 mês.
+                            Sua assinatura será renovada automaticamente {getFrequenciaTexto(selectedPlano.frequencia, selectedPlano.frequenciaTipo)}.
                             <br />
                             Você pode cancelar a qualquer momento através da sua área de membros.
                           </p>
