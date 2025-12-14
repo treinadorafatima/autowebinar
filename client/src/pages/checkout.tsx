@@ -31,6 +31,24 @@ interface Plano {
   destaque: boolean;
   tipoCobranca?: string;
   disponivelRenovacao?: boolean;
+  frequencia?: number;
+  frequenciaTipo?: string;
+}
+
+function getFrequenciaTexto(frequencia?: number, frequenciaTipo?: string): string {
+  if (!frequenciaTipo) return "mensalmente";
+  const freq = frequencia || 1;
+  
+  switch (frequenciaTipo) {
+    case "days":
+      return freq === 1 ? "diariamente" : `a cada ${freq} dias`;
+    case "months":
+      return freq === 1 ? "mensalmente" : `a cada ${freq} meses`;
+    case "years":
+      return freq === 1 ? "anualmente" : `a cada ${freq} anos`;
+    default:
+      return "mensalmente";
+  }
 }
 
 interface GatewayConfig {
@@ -1535,7 +1553,7 @@ export default function Checkout() {
                   </span>
                   {isRecorrente && (
                     <p className="text-slate-300 text-sm mt-1">
-                      Você será cobrado mensalmente
+                      Você será cobrado {getFrequenciaTexto(selectedPlano.frequencia, selectedPlano.frequenciaTipo)}
                     </p>
                   )}
                 </div>
