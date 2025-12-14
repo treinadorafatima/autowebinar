@@ -8,6 +8,7 @@ import { storage } from "./storage";
 import { sendWhatsAppMessage, getWhatsAppStatus, initWhatsAppConnection } from "./whatsapp-service";
 
 const CONFIG_KEY = "NOTIFICATIONS_WHATSAPP_ACCOUNT_ID";
+const ENABLED_CONFIG_KEY = "WHATSAPP_NOTIFICATIONS_ENABLED";
 const APP_NAME = "AutoWebinar";
 const APP_URL = process.env.PUBLIC_BASE_URL 
   ? process.env.PUBLIC_BASE_URL.replace(/\/$/, '')
@@ -56,12 +57,40 @@ export async function clearNotificationAccountId(): Promise<void> {
 }
 
 /**
+ * Verifica se as notificações WhatsApp estão habilitadas
+ * Retorna true por padrão se não estiver configurado (para não quebrar instalações existentes)
+ */
+export async function isWhatsAppNotificationsEnabled(): Promise<boolean> {
+  const value = await storage.getCheckoutConfig(ENABLED_CONFIG_KEY);
+  // Se não está configurado, considera habilitado por padrão
+  if (value === null || value === undefined || value === "") {
+    return true;
+  }
+  return value === "true";
+}
+
+/**
+ * Habilita ou desabilita as notificações WhatsApp
+ */
+export async function setWhatsAppNotificationsEnabled(enabled: boolean): Promise<void> {
+  await storage.setCheckoutConfig(ENABLED_CONFIG_KEY, enabled ? "true" : "false");
+  console.log(`[whatsapp-notifications] Notificações ${enabled ? "habilitadas" : "desabilitadas"}`);
+}
+
+/**
  * Envia mensagem WhatsApp usando a conta de notificações configurada
  * Retorna true se enviou com sucesso, false caso contrário
  * Nunca lança erros (safe)
  */
 async function sendNotificationMessage(phone: string, message: string): Promise<boolean> {
   try {
+    // Verificar se as notificações estão habilitadas
+    const enabled = await isWhatsAppNotificationsEnabled();
+    if (!enabled) {
+      console.log("[whatsapp-notifications] Notificações desabilitadas, ignorando envio");
+      return false;
+    }
+    
     if (!phone) {
       console.log("[whatsapp-notifications] Telefone não fornecido, ignorando envio");
       return false;
@@ -318,15 +347,18 @@ export async function getNotificationStatus(): Promise<{
   accountId: string | null;
   status: string;
   phoneNumber?: string;
+  enabled: boolean;
 }> {
   try {
     const accountId = await storage.getCheckoutConfig(CONFIG_KEY);
+    const enabled = await isWhatsAppNotificationsEnabled();
     
     if (!accountId) {
       return {
         configured: false,
         accountId: null,
         status: "not_configured",
+        enabled,
       };
     }
     
@@ -337,6 +369,7 @@ export async function getNotificationStatus(): Promise<{
       accountId,
       status: status.status,
       phoneNumber: status.phoneNumber,
+      enabled,
     };
   } catch (error) {
     console.error("[whatsapp-notifications] Erro ao obter status:", error);
@@ -344,6 +377,7 @@ export async function getNotificationStatus(): Promise<{
       configured: false,
       accountId: null,
       status: "error",
+      enabled: false,
     };
   }
 }

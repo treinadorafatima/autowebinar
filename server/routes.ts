@@ -6878,12 +6878,12 @@ Seja conversacional e objetivo.`;
       }
 
       // Get all WhatsApp accounts that belong to superadmin
-      const accounts = await storage.getWhatsappAccountsByAdminId(admin.id);
+      const accounts = await storage.listWhatsappAccountsByAdmin(admin.id);
       const { getWhatsAppStatus } = await import("./whatsapp-service");
       
       // Get status for each account
       const accountsWithStatus = await Promise.all(
-        accounts.map(async (acc) => {
+        accounts.map(async (acc: { id: string; name: string }) => {
           const status = await getWhatsAppStatus(acc.id);
           return {
             id: acc.id,
@@ -6952,6 +6952,34 @@ Seja conversacional e objetivo.`;
       await clearNotificationAccountId();
       
       res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // WhatsApp Notifications - Toggle enabled/disabled
+  app.post("/api/notifications/whatsapp/toggle", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.replace("Bearer ", "");
+      if (!token) return res.status(401).json({ error: "Token não fornecido" });
+      
+      const email = await validateSession(token);
+      if (!email) return res.status(401).json({ error: "Sessão inválida" });
+      
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin || admin.role !== "superadmin") {
+        return res.status(403).json({ error: "Acesso negado - apenas superadmin" });
+      }
+
+      const { enabled } = req.body;
+      if (typeof enabled !== "boolean") {
+        return res.status(400).json({ error: "Campo 'enabled' deve ser boolean" });
+      }
+
+      const { setWhatsAppNotificationsEnabled } = await import("./whatsapp-notifications");
+      await setWhatsAppNotificationsEnabled(enabled);
+      
+      res.json({ success: true, enabled });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

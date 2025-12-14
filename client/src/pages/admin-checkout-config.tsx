@@ -11,6 +11,7 @@ import { SiMercadopago, SiStripe, SiFacebook, SiGoogleads, SiWhatsapp } from "re
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 
 interface ConfigItem {
   chave: string;
@@ -29,6 +30,7 @@ interface NotificationStatus {
   accountId: string | null;
   status: string;
   phoneNumber?: string;
+  enabled: boolean;
 }
 
 function WhatsAppNotificationsTab() {
@@ -70,6 +72,20 @@ function WhatsAppNotificationsTab() {
     },
   });
 
+  const toggleMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const res = await apiRequest("POST", "/api/notifications/whatsapp/toggle", { enabled });
+      return res.json();
+    },
+    onSuccess: (_, enabled) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications/whatsapp/status"] });
+      toast({ title: enabled ? "Notificacoes ativadas" : "Notificacoes desativadas" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro ao alterar", description: error.message, variant: "destructive" });
+    },
+  });
+
   const isLoading = isLoadingStatus || isLoadingAccounts;
   const connectedAccounts = accounts?.filter(acc => acc.status === "connected") || [];
 
@@ -105,7 +121,7 @@ function WhatsAppNotificationsTab() {
           </div>
         ) : (
           <>
-            <div className="p-4 bg-muted rounded-lg">
+            <div className="p-4 bg-muted rounded-lg space-y-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="font-medium">Status das Notificacoes</p>
@@ -116,6 +132,23 @@ function WhatsAppNotificationsTab() {
                   </p>
                 </div>
                 {notificationStatus?.configured && getStatusBadge(notificationStatus.status)}
+              </div>
+              
+              <div className="flex items-center justify-between pt-2 border-t">
+                <div>
+                  <p className="font-medium">Envio de Notificacoes</p>
+                  <p className="text-sm text-muted-foreground">
+                    {notificationStatus?.enabled 
+                      ? "Notificacoes WhatsApp estao ativas"
+                      : "Notificacoes WhatsApp estao desativadas"}
+                  </p>
+                </div>
+                <Switch
+                  checked={notificationStatus?.enabled ?? false}
+                  onCheckedChange={(checked) => toggleMutation.mutate(checked)}
+                  disabled={toggleMutation.isPending || !notificationStatus?.configured}
+                  data-testid="switch-whatsapp-notifications"
+                />
               </div>
             </div>
 
