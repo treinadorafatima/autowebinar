@@ -663,7 +663,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       const { sendPasswordResetEmail } = await import("./email");
-      await sendPasswordResetEmail(email.toLowerCase(), admin.name || "Usuário", resetToken);
+      console.log(`[auth] Iniciando envio de email de recuperação para ${email}`);
+      const emailSent = await sendPasswordResetEmail(email.toLowerCase(), admin.name || "Usuário", resetToken);
+      console.log(`[auth] Resultado do envio de email: ${emailSent ? 'SUCESSO' : 'FALHOU'}`);
       
       // Send WhatsApp notification if phone available
       if (admin.telefone) {
