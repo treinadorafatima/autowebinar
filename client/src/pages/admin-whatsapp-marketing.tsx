@@ -237,9 +237,12 @@ export default function AdminWhatsAppMarketing() {
     },
   });
 
-  const { data: accounts, isLoading: loadingAccounts } = useQuery<WhatsAppAccount[]>({
+  const { data: allAccounts, isLoading: loadingAccounts } = useQuery<WhatsAppAccount[]>({
     queryKey: ["/api/whatsapp/accounts"],
   });
+
+  // Filter out notification system accounts - they should only appear in the notifications page
+  const accounts = allAccounts?.filter(acc => !acc.label.toLowerCase().includes("notificaç") && !acc.label.toLowerCase().includes("notificac"));
 
   useEffect(() => {
     if (accounts && accounts.length > 0 && !selectedAccountId) {
