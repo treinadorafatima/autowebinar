@@ -621,6 +621,23 @@ export type WhatsappNotificationTemplate = typeof whatsappNotificationTemplates.
 export const whatsappNotificationTemplateInsertSchema = createInsertSchema(whatsappNotificationTemplates).omit({ id: true, updatedAt: true });
 export type WhatsappNotificationTemplateInsert = z.infer<typeof whatsappNotificationTemplateInsertSchema>;
 
+// Email Notification Templates - Editable email templates for system notifications
+export const emailNotificationTemplates = pgTable("email_notification_templates", {
+  id: text("id").primaryKey(),
+  notificationType: text("notification_type").notNull().unique(), // 'credentials', 'payment_confirmed', 'password_reset', 'plan_expired', 'payment_failed', 'welcome'
+  name: text("name").notNull(), // Display name
+  description: text("description"), // Description of when this is sent
+  subject: text("subject").notNull(), // Email subject with placeholders
+  htmlTemplate: text("html_template").notNull(), // HTML template with placeholders
+  textTemplate: text("text_template").notNull(), // Plain text template with placeholders
+  isActive: boolean("is_active").notNull().default(true),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type EmailNotificationTemplate = typeof emailNotificationTemplates.$inferSelect;
+export const emailNotificationTemplateInsertSchema = createInsertSchema(emailNotificationTemplates).omit({ id: true, updatedAt: true });
+export type EmailNotificationTemplateInsert = z.infer<typeof emailNotificationTemplateInsertSchema>;
+
 // ============================================
 // EMAIL MARKETING SYSTEM
 // ============================================
