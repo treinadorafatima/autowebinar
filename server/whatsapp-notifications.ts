@@ -17,6 +17,40 @@ const APP_URL = process.env.PUBLIC_BASE_URL
     ? `https://${process.env.REPLIT_DEV_DOMAIN}` 
     : "https://autowebinar.com.br");
 const LOGIN_URL = `${APP_URL}/login`;
+const ADMIN_URL = `${APP_URL}/admin`;
+const RENEW_URL = `${APP_URL}/checkout`;
+const PAYMENT_URL = `${APP_URL}/checkout`;
+
+/**
+ * Substitui placeholders no template com valores reais
+ */
+function replacePlaceholders(template: string, data: Record<string, string>): string {
+  let result = template;
+  for (const [key, value] of Object.entries(data)) {
+    const placeholder = `{${key}}`;
+    result = result.replace(new RegExp(placeholder.replace(/[{}]/g, '\\$&'), 'gi'), value || '');
+  }
+  return result;
+}
+
+/**
+ * Busca template do banco de dados ou retorna mensagem padrão
+ */
+async function getTemplateMessage(
+  notificationType: string, 
+  data: Record<string, string>,
+  defaultMessage: string
+): Promise<string> {
+  try {
+    const template = await storage.getWhatsappNotificationTemplateByType(notificationType);
+    if (template && template.isActive && template.messageTemplate) {
+      return replacePlaceholders(template.messageTemplate, data);
+    }
+  } catch (error) {
+    console.error(`[whatsapp-notifications] Erro ao buscar template ${notificationType}:`, error);
+  }
+  return defaultMessage;
+}
 
 /**
  * Obtém o adminId do superadmin para buscar contas de notificação
@@ -194,7 +228,7 @@ export async function sendWhatsAppCredentialsSafe(
   try {
     const formattedPhone = formatPhoneNumber(phone);
     
-    const message = `Ola ${name}!
+    const defaultMessage = `Ola ${name}!
 
 Seu acesso ao ${APP_NAME} foi liberado!
 
@@ -208,6 +242,15 @@ Por seguranca, altere sua senha apos o primeiro login.
 
 Duvidas? Estamos aqui para ajudar!`;
 
+    const templateData = {
+      name,
+      planName,
+      tempPassword,
+      loginUrl: LOGIN_URL,
+      appName: APP_NAME,
+    };
+
+    const message = await getTemplateMessage("credentials", templateData, defaultMessage);
     return await sendNotificationMessage(formattedPhone, message);
   } catch (error) {
     console.error("[whatsapp-notifications] Erro em sendWhatsAppCredentialsSafe:", error);
@@ -231,7 +274,7 @@ export async function sendWhatsAppPaymentConfirmedSafe(
       ? new Date(expirationDate).toLocaleDateString('pt-BR')
       : expirationDate.toLocaleDateString('pt-BR');
     
-    const message = `Ola ${name}!
+    const defaultMessage = `Ola ${name}!
 
 Seu pagamento foi *confirmado*!
 
@@ -242,6 +285,15 @@ Acesse sua conta: ${LOGIN_URL}
 
 Obrigado por escolher o ${APP_NAME}!`;
 
+    const templateData = {
+      name,
+      planName,
+      expirationDate: dateStr,
+      loginUrl: LOGIN_URL,
+      appName: APP_NAME,
+    };
+
+    const message = await getTemplateMessage("payment_confirmed", templateData, defaultMessage);
     return await sendNotificationMessage(formattedPhone, message);
   } catch (error) {
     console.error("[whatsapp-notifications] Erro em sendWhatsAppPaymentConfirmedSafe:", error);
@@ -262,7 +314,7 @@ export async function sendWhatsAppPasswordResetSafe(
     const formattedPhone = formatPhoneNumber(phone);
     const resetUrl = `${APP_URL}/reset-password?token=${resetToken}`;
     
-    const message = `Ola ${name}!
+    const defaultMessage = `Ola ${name}!
 
 Recebemos sua solicitacao para redefinir a senha no ${APP_NAME}.
 
@@ -273,6 +325,13 @@ ${resetUrl}
 
 Se voce nao solicitou isso, ignore esta mensagem.`;
 
+    const templateData = {
+      name,
+      resetUrl,
+      appName: APP_NAME,
+    };
+
+    const message = await getTemplateMessage("password_reset", templateData, defaultMessage);
     return await sendNotificationMessage(formattedPhone, message);
   } catch (error) {
     console.error("[whatsapp-notifications] Erro em sendWhatsAppPasswordResetSafe:", error);
@@ -292,7 +351,7 @@ export async function sendWhatsAppPlanExpiredSafe(
   try {
     const formattedPhone = formatPhoneNumber(phone);
     
-    const message = `Ola ${name}!
+    const defaultMessage = `Ola ${name}!
 
 Seu plano *${planName}* expirou.
 
@@ -303,10 +362,18 @@ O que acontece agora:
 
 *Seus dados estao seguros!*
 
-Renove agora: ${APP_URL}/checkout
+Renove agora: ${RENEW_URL}
 
 Precisa de ajuda? Estamos aqui!`;
 
+    const templateData = {
+      name,
+      planName,
+      renewUrl: RENEW_URL,
+      appName: APP_NAME,
+    };
+
+    const message = await getTemplateMessage("plan_expired", templateData, defaultMessage);
     return await sendNotificationMessage(formattedPhone, message);
   } catch (error) {
     console.error("[whatsapp-notifications] Erro em sendWhatsAppPlanExpiredSafe:", error);
@@ -327,24 +394,33 @@ export async function sendWhatsAppPaymentFailedSafe(
   try {
     const formattedPhone = formatPhoneNumber(phone);
     
-    let message = `Ola ${name}!
+    let defaultMessage = `Ola ${name}!
 
 Houve um problema com seu pagamento do plano *${planName}*.`;
 
     if (reason) {
-      message += `
+      defaultMessage += `
 
 Motivo: ${reason}`;
     }
 
-    message += `
+    defaultMessage += `
 
 Por favor, verifique seus dados de pagamento e tente novamente.
 
-Regularizar: ${APP_URL}/checkout
+Regularizar: ${PAYMENT_URL}
 
 Duvidas? Estamos aqui para ajudar!`;
 
+    const templateData = {
+      name,
+      planName,
+      reason: reason || "",
+      paymentUrl: PAYMENT_URL,
+      appName: APP_NAME,
+    };
+
+    const message = await getTemplateMessage("payment_failed", templateData, defaultMessage);
     return await sendNotificationMessage(formattedPhone, message);
   } catch (error) {
     console.error("[whatsapp-notifications] Erro em sendWhatsAppPaymentFailedSafe:", error);
@@ -363,7 +439,7 @@ export async function sendWhatsAppWelcomeSafe(
   try {
     const formattedPhone = formatPhoneNumber(phone);
     
-    const message = `Ola ${name}!
+    const defaultMessage = `Ola ${name}!
 
 Bem-vindo ao ${APP_NAME}!
 
@@ -375,10 +451,17 @@ O que voce pode fazer:
 - Capturar leads automaticamente
 - Transcrever videos com IA
 
-Acesse: ${APP_URL}/admin
+Acesse: ${ADMIN_URL}
 
 Duvidas? Estamos aqui para ajudar!`;
 
+    const templateData = {
+      name,
+      adminUrl: ADMIN_URL,
+      appName: APP_NAME,
+    };
+
+    const message = await getTemplateMessage("welcome", templateData, defaultMessage);
     return await sendNotificationMessage(formattedPhone, message);
   } catch (error) {
     console.error("[whatsapp-notifications] Erro em sendWhatsAppWelcomeSafe:", error);

@@ -62,11 +62,12 @@ interface WhatsAppConnectionStatus {
 }
 
 const templatePlaceholders: Record<string, string[]> = {
-  credentials: ["{name}", "{planName}", "{email}", "{tempPassword}", "{loginUrl}"],
-  payment_confirmed: ["{name}", "{planName}", "{expirationDate}"],
-  password_reset: ["{name}", "{resetUrl}"],
-  plan_expired: ["{name}", "{planName}", "{renewUrl}"],
-  payment_failed: ["{name}", "{reason}", "{paymentUrl}"],
+  credentials: ["{name}", "{planName}", "{tempPassword}", "{loginUrl}", "{appName}"],
+  payment_confirmed: ["{name}", "{planName}", "{expirationDate}", "{loginUrl}", "{appName}"],
+  password_reset: ["{name}", "{resetUrl}", "{appName}"],
+  plan_expired: ["{name}", "{planName}", "{renewUrl}", "{appName}"],
+  payment_failed: ["{name}", "{planName}", "{reason}", "{paymentUrl}", "{appName}"],
+  welcome: ["{name}", "{adminUrl}", "{appName}"],
 };
 
 export default function AdminWhatsAppNotificationsPage() {
