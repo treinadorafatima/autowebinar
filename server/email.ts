@@ -2887,45 +2887,157 @@ ${APP_NAME}
  * SAFE WEBHOOK EMAIL FUNCTIONS
  * These functions NEVER throw exceptions and always return void.
  * They queue failed emails for retry instead of breaking webhooks.
+ * 
+ * IMPORTANT: These functions use try-catch around the entire call because
+ * the legacy send* functions can throw SYNCHRONOUSLY (e.g., getResendClient()
+ * throws when RESEND_API_KEY is not set) before returning a Promise.
+ * 
+ * NOTE: The legacy send* functions return `false` on failure instead of rejecting,
+ * so we need to check both the Promise rejection AND the return value.
  */
 
 export function sendAccessCredentialsEmailSafe(to: string, name: string, tempPassword: string, planName: string): void {
-  sendAccessCredentialsEmail(to, name, tempPassword, planName).catch((err) => {
-    console.error(`[email-safe] Failed to send credentials email to ${to}, queuing for retry:`, err.message);
+  try {
+    if (!isEmailServiceAvailable()) {
+      console.warn(`[email-safe] Email service not available, queuing credentials email for ${to}`);
+      queueEmailForRetry('credentials', to, { name, tempPassword, planName }, 'RESEND_API_KEY not configured');
+      return;
+    }
+    
+    sendAccessCredentialsEmail(to, name, tempPassword, planName)
+      .then((success) => {
+        if (!success) {
+          console.error(`[email-safe] Credentials email returned false for ${to}, queuing for retry`);
+          queueEmailForRetry('credentials', to, { name, tempPassword, planName }, 'Email send returned false');
+        }
+      })
+      .catch((err) => {
+        console.error(`[email-safe] Failed to send credentials email to ${to}, queuing for retry:`, err.message);
+        queueEmailForRetry('credentials', to, { name, tempPassword, planName }, err.message);
+      });
+  } catch (err: any) {
+    console.error(`[email-safe] Sync error sending credentials email to ${to}, queuing for retry:`, err.message);
     queueEmailForRetry('credentials', to, { name, tempPassword, planName }, err.message);
-  });
+  }
 }
 
 export function sendPaymentConfirmedEmailSafe(to: string, name: string, planName: string, expirationDate: Date): void {
-  sendPaymentConfirmedEmail(to, name, planName, expirationDate).catch((err) => {
-    console.error(`[email-safe] Failed to send payment confirmed email to ${to}, queuing for retry:`, err.message);
+  try {
+    if (!isEmailServiceAvailable()) {
+      console.warn(`[email-safe] Email service not available, queuing payment confirmed email for ${to}`);
+      queueEmailForRetry('payment_confirmed', to, { name, planName, expirationDate }, 'RESEND_API_KEY not configured');
+      return;
+    }
+    
+    sendPaymentConfirmedEmail(to, name, planName, expirationDate)
+      .then((success) => {
+        if (!success) {
+          console.error(`[email-safe] Payment confirmed email returned false for ${to}, queuing for retry`);
+          queueEmailForRetry('payment_confirmed', to, { name, planName, expirationDate }, 'Email send returned false');
+        }
+      })
+      .catch((err) => {
+        console.error(`[email-safe] Failed to send payment confirmed email to ${to}, queuing for retry:`, err.message);
+        queueEmailForRetry('payment_confirmed', to, { name, planName, expirationDate }, err.message);
+      });
+  } catch (err: any) {
+    console.error(`[email-safe] Sync error sending payment confirmed email to ${to}, queuing for retry:`, err.message);
     queueEmailForRetry('payment_confirmed', to, { name, planName, expirationDate }, err.message);
-  });
+  }
 }
 
 export function sendPaymentFailedEmailSafe(to: string, name: string, planName: string, reason: string, planoId?: string): void {
-  sendPaymentFailedEmail(to, name, planName, reason, planoId).catch((err) => {
-    console.error(`[email-safe] Failed to send payment failed email to ${to}, queuing for retry:`, err.message);
+  try {
+    if (!isEmailServiceAvailable()) {
+      console.warn(`[email-safe] Email service not available, queuing payment failed email for ${to}`);
+      queueEmailForRetry('payment_failed', to, { name, planName, reason, planoId }, 'RESEND_API_KEY not configured');
+      return;
+    }
+    
+    sendPaymentFailedEmail(to, name, planName, reason, planoId)
+      .then((success) => {
+        if (!success) {
+          console.error(`[email-safe] Payment failed email returned false for ${to}, queuing for retry`);
+          queueEmailForRetry('payment_failed', to, { name, planName, reason, planoId }, 'Email send returned false');
+        }
+      })
+      .catch((err) => {
+        console.error(`[email-safe] Failed to send payment failed email to ${to}, queuing for retry:`, err.message);
+        queueEmailForRetry('payment_failed', to, { name, planName, reason, planoId }, err.message);
+      });
+  } catch (err: any) {
+    console.error(`[email-safe] Sync error sending payment failed email to ${to}, queuing for retry:`, err.message);
     queueEmailForRetry('payment_failed', to, { name, planName, reason, planoId }, err.message);
-  });
+  }
 }
 
 export function sendPlanExpiredEmailSafe(to: string, name: string, planName: string): void {
-  sendPlanExpiredEmail(to, name, planName).catch((err) => {
-    console.error(`[email-safe] Failed to send plan expired email to ${to}, queuing for retry:`, err.message);
+  try {
+    if (!isEmailServiceAvailable()) {
+      console.warn(`[email-safe] Email service not available, queuing plan expired email for ${to}`);
+      queueEmailForRetry('plan_expired', to, { name, planName }, 'RESEND_API_KEY not configured');
+      return;
+    }
+    
+    sendPlanExpiredEmail(to, name, planName)
+      .then((success) => {
+        if (!success) {
+          console.error(`[email-safe] Plan expired email returned false for ${to}, queuing for retry`);
+          queueEmailForRetry('plan_expired', to, { name, planName }, 'Email send returned false');
+        }
+      })
+      .catch((err) => {
+        console.error(`[email-safe] Failed to send plan expired email to ${to}, queuing for retry:`, err.message);
+        queueEmailForRetry('plan_expired', to, { name, planName }, err.message);
+      });
+  } catch (err: any) {
+    console.error(`[email-safe] Sync error sending plan expired email to ${to}, queuing for retry:`, err.message);
     queueEmailForRetry('plan_expired', to, { name, planName }, err.message);
-  });
+  }
 }
 
 export function sendWelcomeEmailSafe(to: string, name: string): void {
-  sendWelcomeEmail(to, name).catch((err) => {
-    console.error(`[email-safe] Failed to send welcome email to ${to}, queuing for retry:`, err.message);
+  try {
+    if (!isEmailServiceAvailable()) {
+      console.warn(`[email-safe] Email service not available, queuing welcome email for ${to}`);
+      queueEmailForRetry('welcome', to, { name }, 'RESEND_API_KEY not configured');
+      return;
+    }
+    
+    sendWelcomeEmail(to, name)
+      .then((success) => {
+        if (!success) {
+          console.error(`[email-safe] Welcome email returned false for ${to}, queuing for retry`);
+          queueEmailForRetry('welcome', to, { name }, 'Email send returned false');
+        }
+      })
+      .catch((err) => {
+        console.error(`[email-safe] Failed to send welcome email to ${to}, queuing for retry:`, err.message);
+        queueEmailForRetry('welcome', to, { name }, err.message);
+      });
+  } catch (err: any) {
+    console.error(`[email-safe] Sync error sending welcome email to ${to}, queuing for retry:`, err.message);
     queueEmailForRetry('welcome', to, { name }, err.message);
-  });
+  }
 }
 
 export function sendAffiliateSaleEmailSafe(to: string, name: string, saleAmount: number, commissionAmount: number): void {
-  sendAffiliateSaleEmail(to, name, saleAmount, commissionAmount).catch((err) => {
-    console.error(`[email-safe] Failed to send affiliate sale email to ${to}:`, err.message);
-  });
+  try {
+    if (!isEmailServiceAvailable()) {
+      console.warn(`[email-safe] Email service not available, skipping affiliate sale email for ${to}`);
+      return;
+    }
+    
+    sendAffiliateSaleEmail(to, name, saleAmount, commissionAmount)
+      .then((success) => {
+        if (!success) {
+          console.warn(`[email-safe] Affiliate sale email returned false for ${to}`);
+        }
+      })
+      .catch((err) => {
+        console.error(`[email-safe] Failed to send affiliate sale email to ${to}:`, err.message);
+      });
+  } catch (err: any) {
+    console.error(`[email-safe] Sync error sending affiliate sale email to ${to}:`, err.message);
+  }
 }
