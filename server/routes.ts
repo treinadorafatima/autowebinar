@@ -22,6 +22,14 @@ import XLSX from "xlsx";
 import { spawn } from "child_process";
 import { getMercadoPagoErrorMessage, getStripeErrorMessage, logPaymentError, logPaymentSuccess } from "./payment-errors";
 import { createWriteStream } from "fs";
+import { 
+  sendAccessCredentialsEmailSafe, 
+  sendPaymentConfirmedEmailSafe, 
+  sendPaymentFailedEmailSafe, 
+  sendPlanExpiredEmailSafe,
+  sendWelcomeEmailSafe,
+  sendAffiliateSaleEmailSafe
+} from "./email";
 
 // Helper function to generate a simple, easy-to-type temporary password
 function generateTempPassword(): string {
@@ -8740,12 +8748,8 @@ Seja conversacional e objetivo.`;
                   updateData.adminId = admin.id;
                   console.log(`[MP Webhook] Updated admin ${pagamento.email} for subscription WITH CONFIRMED PAYMENT`);
                   
-                  // Send payment confirmation email
-                  import("./email").then(({ sendPaymentConfirmedEmail }) => {
-                    sendPaymentConfirmedEmail(pagamento.email, pagamento.nome, plano.nome, expirationDate).catch(err => {
-                      console.error(`[MP Webhook] Error sending confirmation email:`, err);
-                    });
-                  });
+                  // Send payment confirmation email (safe - never throws)
+                  sendPaymentConfirmedEmailSafe(pagamento.email, pagamento.nome, plano.nome, expirationDate);
                 } else {
                   const tempPassword = generateTempPassword();
                   const bcrypt = await import('bcryptjs');
@@ -8768,12 +8772,8 @@ Seja conversacional e objetivo.`;
                   
                   console.log(`[MP Webhook] Created admin for subscription WITH CONFIRMED PAYMENT: ${pagamento.email}, temp password: ${tempPassword}`);
                   
-                  // Send access credentials email for new users
-                  import("./email").then(({ sendAccessCredentialsEmail }) => {
-                    sendAccessCredentialsEmail(pagamento.email, pagamento.nome, tempPassword, plano.nome).catch(err => {
-                      console.error(`[MP Webhook] Error sending credentials email:`, err);
-                    });
-                  });
+                  // Send access credentials email for new users (safe - never throws)
+                  sendAccessCredentialsEmailSafe(pagamento.email, pagamento.nome, tempPassword, plano.nome);
                 }
               }
 
@@ -8795,13 +8795,9 @@ Seja conversacional e objetivo.`;
                   });
                   console.log(`[MP Webhook] Deactivated admin ${pagamento.email} due to subscription cancellation`);
                   
-                  // Send plan expired email
+                  // Send plan expired email (safe - never throws)
                   const plano = await storage.getCheckoutPlanoById(pagamento.planoId);
-                  import("./email").then(({ sendPlanExpiredEmail }) => {
-                    sendPlanExpiredEmail(pagamento.email, pagamento.nome, plano?.nome || "Seu Plano").catch(err => {
-                      console.error(`[MP Webhook] Error sending plan expired email:`, err);
-                    });
-                  });
+                  sendPlanExpiredEmailSafe(pagamento.email, pagamento.nome, plano?.nome || "Seu Plano");
                 }
               }
             }
@@ -8889,12 +8885,8 @@ Seja conversacional e objetivo.`;
                   });
                   updateData.adminId = admin.id;
                   
-                  // Send payment confirmation email
-                  import("./email").then(({ sendPaymentConfirmedEmail }) => {
-                    sendPaymentConfirmedEmail(pagamento.email, pagamento.nome, plano.nome, expirationDate).catch(err => {
-                      console.error(`[MP Webhook] Error sending confirmation email:`, err);
-                    });
-                  });
+                  // Send payment confirmation email (safe - never throws)
+                  sendPaymentConfirmedEmailSafe(pagamento.email, pagamento.nome, plano.nome, expirationDate);
                 } else {
                   // Create new admin
                   const tempPassword = generateTempPassword();
@@ -8918,12 +8910,8 @@ Seja conversacional e objetivo.`;
                   
                   console.log(`[MP Webhook] Created admin: ${pagamento.email}, temp password: ${tempPassword}`);
                   
-                  // Send access credentials email for new users
-                  import("./email").then(({ sendAccessCredentialsEmail }) => {
-                    sendAccessCredentialsEmail(pagamento.email, pagamento.nome, tempPassword, plano.nome).catch(err => {
-                      console.error(`[MP Webhook] Error sending credentials email:`, err);
-                    });
-                  });
+                  // Send access credentials email for new users (safe - never throws)
+                  sendAccessCredentialsEmailSafe(pagamento.email, pagamento.nome, tempPassword, plano.nome);
                 }
                 
                 // Process affiliate sale if applicable (with scheduled payout)
@@ -8943,18 +8931,14 @@ Seja conversacional e objetivo.`;
                 });
                 console.log(`[MP Webhook] Payment failed for ${pagamento.email}: ${payment.status_detail}`);
                 
-                // Send payment failed email with direct checkout link
-                import("./email").then(({ sendPaymentFailedEmail }) => {
-                  sendPaymentFailedEmail(
-                    pagamento.email, 
-                    pagamento.nome, 
-                    plano?.nome || "Seu Plano",
-                    `${errorInfo.message} ${errorInfo.action}`,
-                    pagamento.planoId
-                  ).catch(err => {
-                    console.error(`[MP Webhook] Error sending payment failed email:`, err);
-                  });
-                });
+                // Send payment failed email with direct checkout link (safe - never throws)
+                sendPaymentFailedEmailSafe(
+                  pagamento.email, 
+                  pagamento.nome, 
+                  plano?.nome || "Seu Plano",
+                  `${errorInfo.message} ${errorInfo.action}`,
+                  pagamento.planoId
+                );
               }
             }
 
@@ -9037,12 +9021,8 @@ Seja conversacional e objetivo.`;
                         });
                         console.log(`[MP Webhook] PAYMENT CONFIRMED - Updated admin ${pagamento.email}`);
                         
-                        // Send payment confirmation email
-                        import("./email").then(({ sendPaymentConfirmedEmail }) => {
-                          sendPaymentConfirmedEmail(pagamento.email, pagamento.nome, plano.nome, expirationDate).catch(err => {
-                            console.error(`[MP Webhook] Error sending confirmation email:`, err);
-                          });
-                        });
+                        // Send payment confirmation email (safe - never throws)
+                        sendPaymentConfirmedEmailSafe(pagamento.email, pagamento.nome, plano.nome, expirationDate);
                       } else {
                         // Create new admin
                         const tempPassword = generateTempPassword();
@@ -9065,12 +9045,8 @@ Seja conversacional e objetivo.`;
                         
                         console.log(`[MP Webhook] PAYMENT CONFIRMED - Created admin ${pagamento.email}, temp password: ${tempPassword}`);
                         
-                        // Send access credentials email
-                        import("./email").then(({ sendAccessCredentialsEmail }) => {
-                          sendAccessCredentialsEmail(pagamento.email, pagamento.nome, tempPassword, plano.nome).catch(err => {
-                            console.error(`[MP Webhook] Error sending credentials email:`, err);
-                          });
-                        });
+                        // Send access credentials email (safe - never throws)
+                        sendAccessCredentialsEmailSafe(pagamento.email, pagamento.nome, tempPassword, plano.nome);
                       }
                       
                       // Process affiliate sale if applicable
@@ -9204,12 +9180,8 @@ Seja conversacional e objetivo.`;
                 });
                 updateData.adminId = admin.id;
                 
-                // Send payment confirmation email for existing users
-                import("./email").then(({ sendPaymentConfirmedEmail }) => {
-                  sendPaymentConfirmedEmail(pagamento.email, pagamento.nome, plano.nome, expirationDate).catch(err => {
-                    console.error(`[Stripe Webhook] Error sending confirmation email:`, err);
-                  });
-                });
+                // Send payment confirmation email for existing users (safe - never throws)
+                sendPaymentConfirmedEmailSafe(pagamento.email, pagamento.nome, plano.nome, expirationDate);
               } else {
                 const tempPassword = generateTempPassword();
                 const bcrypt = await import('bcryptjs');
@@ -9228,12 +9200,8 @@ Seja conversacional e objetivo.`;
                 
                 console.log(`[Stripe Webhook] Created admin: ${pagamento.email}, temp password: ${tempPassword}`);
                 
-                // Send access credentials email for new users
-                import("./email").then(({ sendAccessCredentialsEmail }) => {
-                  sendAccessCredentialsEmail(pagamento.email, pagamento.nome, tempPassword, plano.nome).catch(err => {
-                    console.error(`[Stripe Webhook] Error sending credentials email:`, err);
-                  });
-                });
+                // Send access credentials email for new users (safe - never throws)
+                sendAccessCredentialsEmailSafe(pagamento.email, pagamento.nome, tempPassword, plano.nome);
               }
               
               // Process affiliate sale if applicable (with scheduled payout)
@@ -9296,12 +9264,8 @@ Seja conversacional e objetivo.`;
                 });
                 updateData.adminId = admin.id;
                 
-                // Send payment confirmation email for existing users
-                import("./email").then(({ sendPaymentConfirmedEmail }) => {
-                  sendPaymentConfirmedEmail(pagamento.email, pagamento.nome, plano.nome, expirationDate).catch(err => {
-                    console.error(`[Stripe Webhook] Error sending confirmation email:`, err);
-                  });
-                });
+                // Send payment confirmation email for existing users (safe - never throws)
+                sendPaymentConfirmedEmailSafe(pagamento.email, pagamento.nome, plano.nome, expirationDate);
               } else {
                 const tempPassword = generateTempPassword();
                 const bcrypt = await import('bcryptjs');
@@ -9324,12 +9288,8 @@ Seja conversacional e objetivo.`;
                 
                 console.log(`[Stripe Webhook] Created admin via PI: ${pagamento.email}, temp password: ${tempPassword}`);
                 
-                // Send access credentials email for new users
-                import("./email").then(({ sendAccessCredentialsEmail }) => {
-                  sendAccessCredentialsEmail(pagamento.email, pagamento.nome, tempPassword, plano.nome).catch(err => {
-                    console.error(`[Stripe Webhook] Error sending credentials email:`, err);
-                  });
-                });
+                // Send access credentials email for new users (safe - never throws)
+                sendAccessCredentialsEmailSafe(pagamento.email, pagamento.nome, tempPassword, plano.nome);
               }
               
               // Process affiliate sale if applicable (with scheduled payout)
@@ -9381,12 +9341,8 @@ Seja conversacional e objetivo.`;
                 });
                 console.log(`[Stripe Webhook] Renewed subscription for ${pagamento.email}, expires: ${expirationDate}`);
                 
-                // Send payment confirmation email
-                import("./email").then(({ sendPaymentConfirmedEmail }) => {
-                  sendPaymentConfirmedEmail(pagamento.email, pagamento.nome, plano.nome, expirationDate).catch(err => {
-                    console.error(`[Stripe Webhook] Error sending confirmation email:`, err);
-                  });
-                });
+                // Send payment confirmation email (safe - never throws)
+                sendPaymentConfirmedEmailSafe(pagamento.email, pagamento.nome, plano.nome, expirationDate);
               } else {
                 const tempPassword = generateTempPassword();
                 const bcrypt = await import('bcryptjs');
@@ -9407,12 +9363,8 @@ Seja conversacional e objetivo.`;
                 });
                 console.log(`[Stripe Webhook] Created admin via subscription: ${pagamento.email}, temp password: ${tempPassword}`);
                 
-                // Send access credentials email for new users
-                import("./email").then(({ sendAccessCredentialsEmail }) => {
-                  sendAccessCredentialsEmail(pagamento.email, pagamento.nome, tempPassword, plano.nome).catch(err => {
-                    console.error(`[Stripe Webhook] Error sending credentials email:`, err);
-                  });
-                });
+                // Send access credentials email for new users (safe - never throws)
+                sendAccessCredentialsEmailSafe(pagamento.email, pagamento.nome, tempPassword, plano.nome);
               }
 
               // Use real dates from Stripe invoice (status_transitions.paid_at is Unix timestamp)
@@ -9455,13 +9407,9 @@ Seja conversacional e objetivo.`;
               });
               console.log(`[Stripe Webhook] Deactivated admin: ${pagamento.email}`);
               
-              // Send plan expired email
+              // Send plan expired email (safe - never throws)
               const plano = await storage.getCheckoutPlanoById(pagamento.planoId);
-              import("./email").then(({ sendPlanExpiredEmail }) => {
-                sendPlanExpiredEmail(pagamento.email, pagamento.nome, plano?.nome || "Seu Plano").catch(err => {
-                  console.error(`[Stripe Webhook] Error sending plan expired email:`, err);
-                });
-              });
+              sendPlanExpiredEmailSafe(pagamento.email, pagamento.nome, plano?.nome || "Seu Plano");
             }
           }
         }
@@ -9501,18 +9449,14 @@ Seja conversacional e objetivo.`;
               statusDetail: failureMessage,
             });
             
-            // Send payment failed email with direct checkout link
-            import("./email").then(({ sendPaymentFailedEmail }) => {
-              sendPaymentFailedEmail(
-                pagamento.email, 
-                pagamento.nome, 
-                plano?.nome || "Seu Plano",
-                failureMessage,
-                pagamento.planoId
-              ).catch(err => {
-                console.error(`[Stripe Webhook] Error sending payment failed email:`, err);
-              });
-            });
+            // Send payment failed email with direct checkout link (safe - never throws)
+            sendPaymentFailedEmailSafe(
+              pagamento.email, 
+              pagamento.nome, 
+              plano?.nome || "Seu Plano",
+              failureMessage,
+              pagamento.planoId
+            );
             
             console.log(`[Stripe Webhook] Sent payment failed email to ${pagamento.email}`);
           }

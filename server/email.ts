@@ -3,6 +3,48 @@ import { Resend } from 'resend';
 const FROM_EMAIL = "AutoWebinar <contato@autowebinar.shop>";
 const REPLY_TO_EMAIL = "contato@autowebinar.shop";
 
+// Email queue for retry mechanism
+interface PendingEmail {
+  id: string;
+  type: string;
+  to: string;
+  data: any;
+  attempts: number;
+  createdAt: Date;
+  lastError?: string;
+}
+
+const pendingEmails: PendingEmail[] = [];
+const MAX_RETRY_ATTEMPTS = 3;
+const RETRY_INTERVAL_MS = 60000; // 1 minute
+
+/**
+ * Check if email service is available
+ */
+export function isEmailServiceAvailable(): boolean {
+  return !!process.env.RESEND_API_KEY;
+}
+
+/**
+ * Get Resend client - returns null if not configured instead of throwing
+ */
+function getResendClientSafe(): { client: Resend; fromEmail: string } | null {
+  const apiKey = process.env.RESEND_API_KEY;
+  
+  if (!apiKey) {
+    console.warn('[email] RESEND_API_KEY não configurada - emails não serão enviados');
+    return null;
+  }
+  
+  return {
+    client: new Resend(apiKey),
+    fromEmail: FROM_EMAIL
+  };
+}
+
+/**
+ * Legacy function - throws if not configured (for backward compatibility)
+ */
 function getResendClient() {
   const apiKey = process.env.RESEND_API_KEY;
   
@@ -14,6 +56,101 @@ function getResendClient() {
     client: new Resend(apiKey),
     fromEmail: FROM_EMAIL
   };
+}
+
+/**
+ * Queue an email for retry if initial send fails
+ */
+function queueEmailForRetry(type: string, to: string, data: any, error: string): void {
+  const id = `${type}_${to}_${Date.now()}`;
+  pendingEmails.push({
+    id,
+    type,
+    to,
+    data,
+    attempts: 1,
+    createdAt: new Date(),
+    lastError: error,
+  });
+  console.log(`[email-queue] Email queued for retry: ${type} to ${to} (${pendingEmails.length} pending)`);
+}
+
+/**
+ * Process pending emails (called by scheduler)
+ */
+export async function processPendingEmails(): Promise<void> {
+  if (pendingEmails.length === 0) return;
+  
+  const resend = getResendClientSafe();
+  if (!resend) {
+    console.log('[email-queue] Resend not configured, skipping retry');
+    return;
+  }
+  
+  const toProcess = [...pendingEmails];
+  
+  for (const email of toProcess) {
+    if (email.attempts >= MAX_RETRY_ATTEMPTS) {
+      // Remove from queue after max attempts
+      const idx = pendingEmails.findIndex(e => e.id === email.id);
+      if (idx !== -1) pendingEmails.splice(idx, 1);
+      console.error(`[email-queue] Email failed after ${MAX_RETRY_ATTEMPTS} attempts: ${email.type} to ${email.to}`);
+      continue;
+    }
+    
+    try {
+      let success = false;
+      
+      switch (email.type) {
+        case 'welcome':
+          success = await sendWelcomeEmail(email.to, email.data.name);
+          break;
+        case 'credentials':
+          success = await sendAccessCredentialsEmail(email.to, email.data.name, email.data.tempPassword, email.data.planName);
+          break;
+        case 'payment_confirmed':
+          success = await sendPaymentConfirmedEmail(email.to, email.data.name, email.data.planName, email.data.expirationDate);
+          break;
+        case 'password_reset':
+          success = await sendPasswordResetEmail(email.to, email.data.name, email.data.resetToken);
+          break;
+        case 'plan_expired':
+          success = await sendPlanExpiredEmail(email.to, email.data.name, email.data.planName);
+          break;
+        case 'payment_failed':
+          success = await sendPaymentFailedEmail(email.to, email.data.name, email.data.planName, email.data.reason, email.data.planoId);
+          break;
+      }
+      
+      if (success) {
+        const idx = pendingEmails.findIndex(e => e.id === email.id);
+        if (idx !== -1) pendingEmails.splice(idx, 1);
+        console.log(`[email-queue] Retry successful: ${email.type} to ${email.to}`);
+      } else {
+        email.attempts++;
+        email.lastError = 'Send returned false';
+      }
+    } catch (error: any) {
+      email.attempts++;
+      email.lastError = error.message;
+      console.error(`[email-queue] Retry failed: ${email.type} to ${email.to}:`, error.message);
+    }
+  }
+}
+
+/**
+ * Start email retry scheduler
+ */
+export function startEmailRetryScheduler(): void {
+  console.log('[email-queue] Starting email retry scheduler');
+  setInterval(processPendingEmails, RETRY_INTERVAL_MS);
+}
+
+/**
+ * Get pending email count for monitoring
+ */
+export function getPendingEmailCount(): number {
+  return pendingEmails.length;
 }
 
 const APP_NAME = "AutoWebinar";
@@ -2744,4 +2881,51 @@ ${APP_NAME}
     console.error(`[email] Erro ao enviar email de PIX expirado para ${to}:`, error);
     return false;
   }
+}
+
+/**
+ * SAFE WEBHOOK EMAIL FUNCTIONS
+ * These functions NEVER throw exceptions and always return void.
+ * They queue failed emails for retry instead of breaking webhooks.
+ */
+
+export function sendAccessCredentialsEmailSafe(to: string, name: string, tempPassword: string, planName: string): void {
+  sendAccessCredentialsEmail(to, name, tempPassword, planName).catch((err) => {
+    console.error(`[email-safe] Failed to send credentials email to ${to}, queuing for retry:`, err.message);
+    queueEmailForRetry('credentials', to, { name, tempPassword, planName }, err.message);
+  });
+}
+
+export function sendPaymentConfirmedEmailSafe(to: string, name: string, planName: string, expirationDate: Date): void {
+  sendPaymentConfirmedEmail(to, name, planName, expirationDate).catch((err) => {
+    console.error(`[email-safe] Failed to send payment confirmed email to ${to}, queuing for retry:`, err.message);
+    queueEmailForRetry('payment_confirmed', to, { name, planName, expirationDate }, err.message);
+  });
+}
+
+export function sendPaymentFailedEmailSafe(to: string, name: string, planName: string, reason: string, planoId?: string): void {
+  sendPaymentFailedEmail(to, name, planName, reason, planoId).catch((err) => {
+    console.error(`[email-safe] Failed to send payment failed email to ${to}, queuing for retry:`, err.message);
+    queueEmailForRetry('payment_failed', to, { name, planName, reason, planoId }, err.message);
+  });
+}
+
+export function sendPlanExpiredEmailSafe(to: string, name: string, planName: string): void {
+  sendPlanExpiredEmail(to, name, planName).catch((err) => {
+    console.error(`[email-safe] Failed to send plan expired email to ${to}, queuing for retry:`, err.message);
+    queueEmailForRetry('plan_expired', to, { name, planName }, err.message);
+  });
+}
+
+export function sendWelcomeEmailSafe(to: string, name: string): void {
+  sendWelcomeEmail(to, name).catch((err) => {
+    console.error(`[email-safe] Failed to send welcome email to ${to}, queuing for retry:`, err.message);
+    queueEmailForRetry('welcome', to, { name }, err.message);
+  });
+}
+
+export function sendAffiliateSaleEmailSafe(to: string, name: string, saleAmount: number, commissionAmount: number): void {
+  sendAffiliateSaleEmail(to, name, saleAmount, commissionAmount).catch((err) => {
+    console.error(`[email-safe] Failed to send affiliate sale email to ${to}:`, err.message);
+  });
 }

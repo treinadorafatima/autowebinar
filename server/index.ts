@@ -8,6 +8,7 @@ import { startWhatsappScheduler } from "./whatsapp-scheduler";
 import { startSubscriptionScheduler } from "./subscription-scheduler";
 import { startAffiliatePayoutScheduler } from "./affiliate-payout-scheduler";
 import { startPixExpirationScheduler } from "./pix-expiration-scheduler";
+import { startEmailRetryScheduler } from "./email";
 
 const app = express();
 
@@ -150,5 +151,8 @@ app.use((req, res, next) => {
     
     // Start PIX expiration scheduler for recovery emails
     startPixExpirationScheduler();
+    
+    // Start email retry scheduler for failed webhook emails
+    startEmailRetryScheduler();
   });
 })();
