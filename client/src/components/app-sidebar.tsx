@@ -18,7 +18,8 @@ import {
   TrendingUp,
   Shield,
   Zap,
-  UserCheck
+  UserCheck,
+  Bell
 } from "lucide-react";
 import { SiWhatsapp } from "react-icons/si";
 import logoUrl from "@assets/logo-autowebinar-preto.png";
@@ -154,6 +155,12 @@ const adminMenuItems = [
     title: "Vendas",
     url: "/admin/checkout/relatorios",
     icon: TrendingUp,
+    superadminOnly: true,
+  },
+  {
+    title: "Notificações WhatsApp",
+    url: "/admin/whatsapp-notifications",
+    icon: Bell,
     superadminOnly: true,
   },
 ];
