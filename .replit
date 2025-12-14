@@ -46,4 +46,5 @@ integrations = ["javascript_openai_ai_integrations:1.0.0", "resend:1.0.0"]
 
 [userenv.shared]
 SUPABASE_URL = "https://erodfrfuuhxdaeqfjzsn.supabase.co"
-VITE_PUBLIC_BASE_URL = "https://seu-replit.replit.dev"
+VITE_PUBLIC_BASE_URL = "https://autowebinar.com.br"
+PUBLIC_BASE_URL = "https://autowebinar.com.br"

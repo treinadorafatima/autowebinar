@@ -11,15 +11,37 @@ import { sendWhatsAppMessage, getWhatsAppStatus, initWhatsAppConnection } from "
 const ENABLED_CONFIG_KEY = "WHATSAPP_NOTIFICATIONS_ENABLED";
 const SUPERADMIN_ID_KEY = "NOTIFICATIONS_SUPERADMIN_ID";
 const APP_NAME = "AutoWebinar";
-const APP_URL = process.env.PUBLIC_BASE_URL 
-  ? process.env.PUBLIC_BASE_URL.replace(/\/$/, '')
-  : (process.env.REPLIT_DEV_DOMAIN 
-    ? `https://${process.env.REPLIT_DEV_DOMAIN}` 
-    : "https://autowebinar.com.br");
-const LOGIN_URL = `${APP_URL}/login`;
-const ADMIN_URL = `${APP_URL}/admin`;
-const RENEW_URL = `${APP_URL}/checkout`;
-const PAYMENT_URL = `${APP_URL}/checkout`;
+
+/**
+ * Detecta dinamicamente a URL base da aplicação
+ * Prioridade:
+ * 1. PUBLIC_BASE_URL (variável de ambiente explícita)
+ * 2. RENDER_EXTERNAL_URL (Render.com)
+ * 3. REPLIT_DOMAINS (Replit - domínio principal)
+ * 4. REPLIT_DEV_DOMAIN (Replit - domínio de desenvolvimento)
+ * 5. Fallback para autowebinar.com.br
+ */
+function getAppUrl(): string {
+  if (process.env.PUBLIC_BASE_URL) {
+    return process.env.PUBLIC_BASE_URL.replace(/\/$/, '');
+  }
+  if (process.env.RENDER_EXTERNAL_URL) {
+    return process.env.RENDER_EXTERNAL_URL.replace(/\/$/, '');
+  }
+  if (process.env.REPLIT_DOMAINS) {
+    const primaryDomain = process.env.REPLIT_DOMAINS.split(',')[0].trim();
+    return `https://${primaryDomain}`;
+  }
+  if (process.env.REPLIT_DEV_DOMAIN) {
+    return `https://${process.env.REPLIT_DEV_DOMAIN}`;
+  }
+  return "https://autowebinar.com.br";
+}
+
+function getLoginUrl(): string { return `${getAppUrl()}/login`; }
+function getAdminUrl(): string { return `${getAppUrl()}/admin`; }
+function getRenewUrl(): string { return `${getAppUrl()}/checkout`; }
+function getPaymentUrl(): string { return `${getAppUrl()}/checkout`; }
 
 /**
  * Substitui placeholders no template com valores reais
@@ -238,7 +260,7 @@ Email: ${email || ""}
 Senha: ${tempPassword}
 Plano: ${planName}
 
-Acesse: ${LOGIN_URL}
+Acesse: ${getLoginUrl()}
 
 Por seguranca, altere sua senha apos o primeiro login.
 
@@ -249,7 +271,7 @@ Duvidas? Estamos aqui para ajudar!`;
       email: email || "",
       planName,
       tempPassword,
-      loginUrl: LOGIN_URL,
+      loginUrl: getLoginUrl(),
       appName: APP_NAME,
     };
 
@@ -284,7 +306,7 @@ Seu pagamento foi *confirmado*!
 Plano: ${planName}
 Acesso ate: ${dateStr}
 
-Acesse sua conta: ${LOGIN_URL}
+Acesse sua conta: ${getLoginUrl()}
 
 Obrigado por escolher o ${APP_NAME}!`;
 
@@ -292,7 +314,7 @@ Obrigado por escolher o ${APP_NAME}!`;
       name,
       planName,
       expirationDate: dateStr,
-      loginUrl: LOGIN_URL,
+      loginUrl: getLoginUrl(),
       appName: APP_NAME,
     };
 
@@ -315,7 +337,7 @@ export async function sendWhatsAppPasswordResetSafe(
 ): Promise<boolean> {
   try {
     const formattedPhone = formatPhoneNumber(phone);
-    const resetUrl = `${APP_URL}/reset-password?token=${resetToken}`;
+    const resetUrl = `${getAppUrl()}/reset-password?token=${resetToken}`;
     
     const defaultMessage = `Ola ${name}!
 
@@ -365,14 +387,14 @@ O que acontece agora:
 
 *Seus dados estao seguros!*
 
-Renove agora: ${RENEW_URL}
+Renove agora: ${getRenewUrl()}
 
 Precisa de ajuda? Estamos aqui!`;
 
     const templateData = {
       name,
       planName,
-      renewUrl: RENEW_URL,
+      renewUrl: getRenewUrl(),
       appName: APP_NAME,
     };
 
@@ -411,7 +433,7 @@ Motivo: ${reason}`;
 
 Por favor, verifique seus dados de pagamento e tente novamente.
 
-Regularizar: ${PAYMENT_URL}
+Regularizar: ${getPaymentUrl()}
 
 Duvidas? Estamos aqui para ajudar!`;
 
@@ -419,7 +441,7 @@ Duvidas? Estamos aqui para ajudar!`;
       name,
       planName,
       reason: reason || "",
-      paymentUrl: PAYMENT_URL,
+      paymentUrl: getPaymentUrl(),
       appName: APP_NAME,
     };
 
@@ -454,13 +476,13 @@ O que voce pode fazer:
 - Capturar leads automaticamente
 - Transcrever videos com IA
 
-Acesse: ${ADMIN_URL}
+Acesse: ${getAdminUrl()}
 
 Duvidas? Estamos aqui para ajudar!`;
 
     const templateData = {
       name,
-      adminUrl: ADMIN_URL,
+      adminUrl: getAdminUrl(),
       appName: APP_NAME,
     };
 

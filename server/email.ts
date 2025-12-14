@@ -244,12 +244,45 @@ export function getPendingEmailCount(): number {
 }
 
 const APP_NAME = "AutoWebinar";
-const APP_URL = process.env.PUBLIC_BASE_URL 
-  ? process.env.PUBLIC_BASE_URL.replace(/\/$/, '')
-  : (process.env.REPLIT_DEV_DOMAIN 
-    ? `https://${process.env.REPLIT_DEV_DOMAIN}` 
-    : "https://autowebinar.com.br");
-const LOGIN_URL = `${APP_URL}/login`;
+
+/**
+ * Detecta dinamicamente a URL base da aplicação
+ * Prioridade:
+ * 1. PUBLIC_BASE_URL (variável de ambiente explícita)
+ * 2. RENDER_EXTERNAL_URL (Render.com)
+ * 3. REPLIT_DOMAINS (Replit - domínio principal)
+ * 4. REPLIT_DEV_DOMAIN (Replit - domínio de desenvolvimento)
+ * 5. Fallback para autowebinar.com.br
+ */
+function getAppUrl(): string {
+  // 1. Variável de ambiente explícita (maior prioridade)
+  if (process.env.PUBLIC_BASE_URL) {
+    return process.env.PUBLIC_BASE_URL.replace(/\/$/, '');
+  }
+  
+  // 2. Render.com - detecta automaticamente o domínio externo
+  if (process.env.RENDER_EXTERNAL_URL) {
+    return process.env.RENDER_EXTERNAL_URL.replace(/\/$/, '');
+  }
+  
+  // 3. Replit - domínio principal (pode ter domínio customizado)
+  if (process.env.REPLIT_DOMAINS) {
+    const primaryDomain = process.env.REPLIT_DOMAINS.split(',')[0].trim();
+    return `https://${primaryDomain}`;
+  }
+  
+  // 4. Replit - domínio de desenvolvimento
+  if (process.env.REPLIT_DEV_DOMAIN) {
+    return `https://${process.env.REPLIT_DEV_DOMAIN}`;
+  }
+  
+  // 5. Fallback
+  return "https://autowebinar.com.br";
+}
+
+function getLoginUrl(): string {
+  return `${getAppUrl()}/login`;
+}
 
 export async function sendWelcomeEmail(to: string, name: string): Promise<boolean> {
   try {
@@ -259,8 +292,8 @@ export async function sendWelcomeEmail(to: string, name: string): Promise<boolea
       name: name || 'Usuário',
       email: to,
       appName: APP_NAME,
-      adminUrl: `${APP_URL}/admin`,
-      loginUrl: LOGIN_URL,
+      adminUrl: `${getAppUrl()}/admin`,
+      loginUrl: getLoginUrl(),
     };
     
     const dbTemplate = await getActiveTemplate('welcome');
@@ -290,7 +323,7 @@ O que voce pode fazer:
 - Capturar leads automaticamente
 - Transcrever videos automaticamente com IA
 
-Acesse sua conta: ${APP_URL}/admin
+Acesse sua conta: ${getAppUrl()}/admin
 
 Se tiver qualquer duvida, estamos aqui para ajudar!
 
@@ -343,7 +376,7 @@ ${APP_NAME}
               <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                 <tr>
                   <td style="text-align: center; padding: 20px 0;">
-                    <a href="${APP_URL}/admin" style="display: inline-block; background-color: #3b82f6; color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 6px; font-weight: 600; font-size: 16px;">
+                    <a href="${getAppUrl()}/admin" style="display: inline-block; background-color: #3b82f6; color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 6px; font-weight: 600; font-size: 16px;">
                       Acessar Minha Conta
                     </a>
                   </td>
@@ -397,7 +430,7 @@ export async function sendAccessCredentialsEmail(to: string, name: string, tempP
       email: to,
       tempPassword: tempPassword,
       planName: planName,
-      loginUrl: LOGIN_URL,
+      loginUrl: getLoginUrl(),
       appName: APP_NAME,
     };
     
@@ -424,7 +457,7 @@ Aqui estao suas credenciais de acesso:
 E-mail: ${to}
 Senha: ${tempPassword}
 
-Acesse sua conta agora: ${LOGIN_URL}
+Acesse sua conta agora: ${getLoginUrl()}
 
 IMPORTANTE: Por seguranca, recomendamos que voce altere sua senha apos o primeiro login.
 
@@ -498,7 +531,7 @@ ${APP_NAME}
               <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                 <tr>
                   <td style="text-align: center; padding: 20px 0;">
-                    <a href="${LOGIN_URL}" style="display: inline-block; background-color: #10b981; color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 6px; font-weight: 600; font-size: 16px;">
+                    <a href="${getLoginUrl()}" style="display: inline-block; background-color: #10b981; color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 6px; font-weight: 600; font-size: 16px;">
                       Acessar Minha Conta
                     </a>
                   </td>
@@ -561,7 +594,7 @@ ${APP_NAME}
 export async function sendPasswordResetEmail(to: string, name: string, resetToken: string): Promise<boolean> {
   try {
     const { client, fromEmail } = await getResendClient();
-    const resetUrl = `${APP_URL}/reset-password?token=${resetToken}`;
+    const resetUrl = `${getAppUrl()}/reset-password?token=${resetToken}`;
     
     const placeholderValues: Record<string, string> = {
       name: name || 'Usuário',
@@ -699,7 +732,7 @@ Este e um email automatico, por favor nao responda.
 export async function sendPlanExpiredEmail(to: string, name: string, planName: string): Promise<boolean> {
   try {
     const { client, fromEmail } = await getResendClient();
-    const renewUrl = `${APP_URL}/checkout`;
+    const renewUrl = `${getAppUrl()}/checkout`;
     
     const placeholderValues: Record<string, string> = {
       name: name || 'Usuário',
@@ -733,7 +766,7 @@ O que acontece agora:
 
 Nao se preocupe! Seus dados estao seguros. Renove seu plano agora e continue vendendo no automatico.
 
-Renovar plano: ${APP_URL}/checkout
+Renovar plano: ${getAppUrl()}/checkout
 
 Precisa de ajuda? Entre em contato com nosso suporte.
 
@@ -790,7 +823,7 @@ ${APP_NAME}
               <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                 <tr>
                   <td style="text-align: center; padding: 25px 0;">
-                    <a href="${APP_URL}/checkout" style="display: inline-block; background-color: #3b82f6; color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 6px; font-weight: 600; font-size: 16px;">
+                    <a href="${getAppUrl()}/checkout" style="display: inline-block; background-color: #3b82f6; color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 6px; font-weight: 600; font-size: 16px;">
                       Renovar Meu Plano
                     </a>
                   </td>
@@ -846,8 +879,8 @@ export async function sendPaymentFailedEmail(to: string, name: string, planName:
       renovacao: "true"
     });
     const checkoutUrl = planoId 
-      ? `${APP_URL}/checkout/${planoId}?${checkoutParams.toString()}`
-      : `${APP_URL}/checkout?${checkoutParams.toString()}`;
+      ? `${getAppUrl()}/checkout/${planoId}?${checkoutParams.toString()}`
+      : `${getAppUrl()}/checkout?${checkoutParams.toString()}`;
     
     const placeholderValues: Record<string, string> = {
       name: name || 'Usuário',
@@ -1012,8 +1045,8 @@ export async function sendPaymentPendingEmail(to: string, name: string, planName
       nome: name,
     });
     const checkoutUrl = planoId 
-      ? `${APP_URL}/checkout/${planoId}?${checkoutParams.toString()}`
-      : `${APP_URL}/checkout?${checkoutParams.toString()}`;
+      ? `${getAppUrl()}/checkout/${planoId}?${checkoutParams.toString()}`
+      : `${getAppUrl()}/checkout?${checkoutParams.toString()}`;
     
     // Card pending - offer PIX/Boleto as alternatives
     const text = `
@@ -1165,7 +1198,7 @@ export async function sendPaymentConfirmedEmail(to: string, name: string, planNa
       name: name || 'Usuário',
       planName: planName,
       expirationDate: formattedDate,
-      loginUrl: `${APP_URL}/admin`,
+      loginUrl: `${getAppUrl()}/admin`,
       appName: APP_NAME,
     };
     
@@ -1193,7 +1226,7 @@ Detalhes da sua assinatura:
 
 Seu acesso esta liberado! Voce ja pode aproveitar todos os recursos da plataforma.
 
-Acesse sua conta: ${APP_URL}/admin
+Acesse sua conta: ${getAppUrl()}/admin
 
 Obrigado por confiar no ${APP_NAME}!
 
@@ -1247,7 +1280,7 @@ ${APP_NAME}
               <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                 <tr>
                   <td style="text-align: center; padding: 20px 0;">
-                    <a href="${APP_URL}/admin" style="display: inline-block; background-color: #10b981; color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 6px; font-weight: 600; font-size: 16px;">
+                    <a href="${getAppUrl()}/admin" style="display: inline-block; background-color: #10b981; color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 6px; font-weight: 600; font-size: 16px;">
                       Acessar Minha Conta
                     </a>
                   </td>
@@ -1296,7 +1329,7 @@ export async function sendExpirationReminderEmail(to: string, name: string, plan
   try {
     const { client, fromEmail } = await getResendClient();
     const formattedDate = expirationDate.toLocaleDateString('pt-BR');
-    const renewUrl = `${APP_URL}/checkout?email=${encodeURIComponent(to)}`;
+    const renewUrl = `${getAppUrl()}/checkout?email=${encodeURIComponent(to)}`;
     
     const urgencyText = daysUntilExpiration === 1 ? "amanha" : `em ${daysUntilExpiration} dias`;
     const subjectUrgency = daysUntilExpiration === 1 ? "Seu plano vence amanha!" : `Seu plano vence em ${daysUntilExpiration} dias`;
@@ -1411,7 +1444,7 @@ ${APP_NAME}
 export async function sendExpiredRenewalEmail(to: string, name: string, planName: string): Promise<boolean> {
   try {
     const { client, fromEmail } = await getResendClient();
-    const renewUrl = `${APP_URL}/checkout?email=${encodeURIComponent(to)}`;
+    const renewUrl = `${getAppUrl()}/checkout?email=${encodeURIComponent(to)}`;
     
     const text = `
 Ola ${name},
@@ -1532,7 +1565,7 @@ ${APP_NAME}
 // AFFILIATE EMAIL FUNCTIONS
 // ============================================
 
-const AFFILIATE_LOGIN_URL = `${APP_URL}/afiliado/login`;
+const AFFILIATE_LOGIN_URL = `${getAppUrl()}/afiliado/login`;
 
 export async function sendAffiliateApprovedEmail(to: string, name: string): Promise<boolean> {
   try {
@@ -1864,7 +1897,7 @@ ${APP_NAME} - Programa de Afiliados
 export async function sendAffiliatePasswordResetEmail(to: string, name: string, resetToken: string): Promise<boolean> {
   try {
     const { client, fromEmail } = await getResendClient();
-    const resetUrl = `${APP_URL}/afiliado/reset-password?token=${resetToken}`;
+    const resetUrl = `${getAppUrl()}/afiliado/reset-password?token=${resetToken}`;
     
     const text = `
 Ola ${name},
@@ -2999,7 +3032,7 @@ export async function sendPixExpiredRecoveryEmail(
       nome: name,
       recuperacao: "true"
     });
-    const checkoutUrl = `${APP_URL}/checkout/${planoId}?${checkoutParams.toString()}`;
+    const checkoutUrl = `${getAppUrl()}/checkout/${planoId}?${checkoutParams.toString()}`;
     
     const text = `
 Ola ${name},
