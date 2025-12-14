@@ -2,8 +2,73 @@ import { Resend } from 'resend';
 import { storage } from './storage';
 import type { EmailNotificationTemplate } from '@shared/schema';
 
+// Fixed email configuration for AutoWebinar
 const FROM_EMAIL = "AutoWebinar <contato@autowebinar.shop>";
 const REPLY_TO_EMAIL = "contato@autowebinar.shop";
+
+// Cache for Resend API key
+let cachedApiKey: string | null = null;
+let apiKeyCacheTime: number = 0;
+const API_KEY_CACHE_TTL = 60000; // 1 minute cache
+
+/**
+ * Get Resend API key from Replit connection or environment
+ * Always uses fixed FROM_EMAIL for autowebinar.shop
+ */
+async function getResendApiKey(): Promise<string> {
+  // Check cache first
+  if (cachedApiKey && Date.now() - apiKeyCacheTime < API_KEY_CACHE_TTL) {
+    return cachedApiKey;
+  }
+
+  // Try to get API key from Replit Connectors API
+  const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
+  const xReplitToken = process.env.REPL_IDENTITY 
+    ? 'repl ' + process.env.REPL_IDENTITY 
+    : process.env.WEB_REPL_RENEWAL 
+    ? 'depl ' + process.env.WEB_REPL_RENEWAL 
+    : null;
+
+  if (hostname && xReplitToken) {
+    try {
+      const response = await fetch(
+        `https://${hostname}/api/v2/connection?include_secrets=true&connector_names=resend`,
+        {
+          headers: {
+            'Accept': 'application/json',
+            'X_REPLIT_TOKEN': xReplitToken
+          }
+        }
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
+        const connectionSettings = data.items?.[0];
+        
+        if (connectionSettings?.settings?.api_key) {
+          const apiKeyFromConnection = connectionSettings.settings.api_key as string;
+          cachedApiKey = apiKeyFromConnection;
+          apiKeyCacheTime = Date.now();
+          console.log(`[email] Using Resend API key from Replit connection`);
+          return apiKeyFromConnection;
+        }
+      }
+    } catch (error) {
+      console.warn('[email] Failed to get Resend API key from connector, falling back to env:', error);
+    }
+  }
+
+  // Fallback to environment variable
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    throw new Error('[email] RESEND_API_KEY não configurada e conexão Replit não disponível');
+  }
+
+  cachedApiKey = apiKey;
+  apiKeyCacheTime = Date.now();
+  console.log(`[email] Using Resend API key from environment variable`);
+  return cachedApiKey;
+}
 
 /**
  * Replace placeholders in email template with actual values
@@ -53,36 +118,30 @@ const RETRY_INTERVAL_MS = 60000; // 1 minute
  * Check if email service is available
  */
 export function isEmailServiceAvailable(): boolean {
-  return !!process.env.RESEND_API_KEY;
+  return !!(process.env.RESEND_API_KEY || process.env.REPLIT_CONNECTORS_HOSTNAME);
 }
 
 /**
  * Get Resend client - returns null if not configured instead of throwing
  */
-function getResendClientSafe(): { client: Resend; fromEmail: string } | null {
-  const apiKey = process.env.RESEND_API_KEY;
-  
-  if (!apiKey) {
-    console.warn('[email] RESEND_API_KEY não configurada - emails não serão enviados');
+async function getResendClientSafe(): Promise<{ client: Resend; fromEmail: string } | null> {
+  try {
+    const apiKey = await getResendApiKey();
+    return {
+      client: new Resend(apiKey),
+      fromEmail: FROM_EMAIL
+    };
+  } catch (error) {
+    console.warn('[email] Resend não configurado:', error);
     return null;
   }
-  
-  return {
-    client: new Resend(apiKey),
-    fromEmail: FROM_EMAIL
-  };
 }
 
 /**
- * Legacy function - throws if not configured (for backward compatibility)
+ * Get Resend client - throws if not configured
  */
-function getResendClient() {
-  const apiKey = process.env.RESEND_API_KEY;
-  
-  if (!apiKey) {
-    throw new Error('RESEND_API_KEY não configurada');
-  }
-  
+async function getResendClient(): Promise<{ client: Resend; fromEmail: string }> {
+  const apiKey = await getResendApiKey();
   return {
     client: new Resend(apiKey),
     fromEmail: FROM_EMAIL
@@ -112,7 +171,7 @@ function queueEmailForRetry(type: string, to: string, data: any, error: string):
 export async function processPendingEmails(): Promise<void> {
   if (pendingEmails.length === 0) return;
   
-  const resend = getResendClientSafe();
+  const resend = await getResendClientSafe();
   if (!resend) {
     console.log('[email-queue] Resend not configured, skipping retry');
     return;
@@ -194,7 +253,7 @@ const LOGIN_URL = `${APP_URL}/login`;
 
 export async function sendWelcomeEmail(to: string, name: string): Promise<boolean> {
   try {
-    const { client, fromEmail } = getResendClient();
+    const { client, fromEmail } = await getResendClient();
     
     const placeholderValues: Record<string, string> = {
       name: name || 'Usuário',
@@ -331,7 +390,7 @@ ${APP_NAME}
 
 export async function sendAccessCredentialsEmail(to: string, name: string, tempPassword: string, planName: string): Promise<boolean> {
   try {
-    const { client, fromEmail } = getResendClient();
+    const { client, fromEmail } = await getResendClient();
     
     const placeholderValues: Record<string, string> = {
       name: name || 'Usuário',
@@ -501,7 +560,7 @@ ${APP_NAME}
 
 export async function sendPasswordResetEmail(to: string, name: string, resetToken: string): Promise<boolean> {
   try {
-    const { client, fromEmail } = getResendClient();
+    const { client, fromEmail } = await getResendClient();
     const resetUrl = `${APP_URL}/reset-password?token=${resetToken}`;
     
     const placeholderValues: Record<string, string> = {
@@ -610,6 +669,8 @@ Este e um email automatico, por favor nao responda.
     `;
     }
 
+    console.log(`[email] Tentando enviar email de recuperacao para ${to} de ${fromEmail}`);
+    
     const result = await client.emails.send({
       from: fromEmail,
       replyTo: REPLY_TO_EMAIL,
@@ -619,17 +680,25 @@ Este e um email automatico, por favor nao responda.
       text,
     });
 
-    console.log(`[email] Email de recuperacao de senha enviado para ${to}`, result);
+    if (result.error) {
+      console.error(`[email] Erro Resend ao enviar email de recuperacao para ${to}:`, result.error);
+      return false;
+    }
+
+    console.log(`[email] Email de recuperacao de senha enviado com sucesso para ${to}. ID: ${result.data?.id}`);
     return true;
-  } catch (error) {
-    console.error(`[email] Erro ao enviar email de recuperacao para ${to}:`, error);
+  } catch (error: any) {
+    console.error(`[email] Erro ao enviar email de recuperacao para ${to}:`, error?.message || error);
+    if (error?.statusCode) {
+      console.error(`[email] Status code: ${error.statusCode}`);
+    }
     return false;
   }
 }
 
 export async function sendPlanExpiredEmail(to: string, name: string, planName: string): Promise<boolean> {
   try {
-    const { client, fromEmail } = getResendClient();
+    const { client, fromEmail } = await getResendClient();
     const renewUrl = `${APP_URL}/checkout`;
     
     const placeholderValues: Record<string, string> = {
@@ -768,7 +837,7 @@ ${APP_NAME}
 
 export async function sendPaymentFailedEmail(to: string, name: string, planName: string, reason: string, planoId?: string): Promise<boolean> {
   try {
-    const { client, fromEmail } = getResendClient();
+    const { client, fromEmail } = await getResendClient();
     
     // Build checkout URL with pre-filled email and name
     const checkoutParams = new URLSearchParams({
@@ -935,7 +1004,7 @@ ${APP_NAME}
 
 export async function sendPaymentPendingEmail(to: string, name: string, planName: string, paymentMethod: string, planoId?: string): Promise<boolean> {
   try {
-    const { client, fromEmail } = getResendClient();
+    const { client, fromEmail } = await getResendClient();
     
     // Build checkout URL with pre-filled email and name for alternative payment
     const checkoutParams = new URLSearchParams({
@@ -1089,7 +1158,7 @@ ${APP_NAME}
 
 export async function sendPaymentConfirmedEmail(to: string, name: string, planName: string, expirationDate: Date): Promise<boolean> {
   try {
-    const { client, fromEmail } = getResendClient();
+    const { client, fromEmail } = await getResendClient();
     const formattedDate = expirationDate.toLocaleDateString('pt-BR');
     
     const placeholderValues: Record<string, string> = {
@@ -1225,7 +1294,7 @@ ${APP_NAME}
 
 export async function sendExpirationReminderEmail(to: string, name: string, planName: string, daysUntilExpiration: number, expirationDate: Date): Promise<boolean> {
   try {
-    const { client, fromEmail } = getResendClient();
+    const { client, fromEmail } = await getResendClient();
     const formattedDate = expirationDate.toLocaleDateString('pt-BR');
     const renewUrl = `${APP_URL}/checkout?email=${encodeURIComponent(to)}`;
     
@@ -1341,7 +1410,7 @@ ${APP_NAME}
 
 export async function sendExpiredRenewalEmail(to: string, name: string, planName: string): Promise<boolean> {
   try {
-    const { client, fromEmail } = getResendClient();
+    const { client, fromEmail } = await getResendClient();
     const renewUrl = `${APP_URL}/checkout?email=${encodeURIComponent(to)}`;
     
     const text = `
@@ -1467,7 +1536,7 @@ const AFFILIATE_LOGIN_URL = `${APP_URL}/afiliado/login`;
 
 export async function sendAffiliateApprovedEmail(to: string, name: string): Promise<boolean> {
   try {
-    const { client, fromEmail } = getResendClient();
+    const { client, fromEmail } = await getResendClient();
     
     const text = `
 Ola ${name},
@@ -1578,7 +1647,7 @@ ${APP_NAME} - Programa de Afiliados
 
 export async function sendAffiliatePendingEmail(to: string, name: string): Promise<boolean> {
   try {
-    const { client, fromEmail } = getResendClient();
+    const { client, fromEmail } = await getResendClient();
     
     const text = `
 Ola ${name},
@@ -1676,7 +1745,7 @@ ${APP_NAME} - Programa de Afiliados
 
 export async function sendAffiliateSaleEmail(to: string, name: string, saleAmount: number, commissionAmount: number): Promise<boolean> {
   try {
-    const { client, fromEmail } = getResendClient();
+    const { client, fromEmail } = await getResendClient();
     
     const saleFormatted = (saleAmount / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     const commissionFormatted = (commissionAmount / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -1794,7 +1863,7 @@ ${APP_NAME} - Programa de Afiliados
 
 export async function sendAffiliatePasswordResetEmail(to: string, name: string, resetToken: string): Promise<boolean> {
   try {
-    const { client, fromEmail } = getResendClient();
+    const { client, fromEmail } = await getResendClient();
     const resetUrl = `${APP_URL}/afiliado/reset-password?token=${resetToken}`;
     
     const text = `
@@ -1902,7 +1971,7 @@ Este e um email automatico, por favor nao responda.
 
 export async function sendAffiliateRejectedEmail(to: string, name: string, reason?: string): Promise<boolean> {
   try {
-    const { client, fromEmail } = getResendClient();
+    const { client, fromEmail } = await getResendClient();
     
     const reasonText = reason ? `\nMotivo: ${reason}` : '';
     
@@ -2003,7 +2072,7 @@ ${APP_NAME} - Programa de Afiliados
 
 export async function sendAffiliateWithdrawalRequestedEmail(to: string, name: string, amount: number, pixKey: string): Promise<boolean> {
   try {
-    const { client, fromEmail } = getResendClient();
+    const { client, fromEmail } = await getResendClient();
     
     const amountFormatted = (amount / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     
@@ -2133,7 +2202,7 @@ ${APP_NAME} - Programa de Afiliados
 
 export async function sendAffiliateWithdrawalPaidEmail(to: string, name: string, amount: number, pixKey: string): Promise<boolean> {
   try {
-    const { client, fromEmail } = getResendClient();
+    const { client, fromEmail } = await getResendClient();
     
     const amountFormatted = (amount / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     
@@ -2262,7 +2331,7 @@ ${APP_NAME} - Programa de Afiliados
 
 export async function sendAffiliateWelcomeEmail(to: string, name: string): Promise<boolean> {
   try {
-    const { client, fromEmail } = getResendClient();
+    const { client, fromEmail } = await getResendClient();
     
     const text = `
 Ola ${name},
@@ -2425,7 +2494,7 @@ export async function sendPixGeneratedEmail(
   amount: number
 ): Promise<boolean> {
   try {
-    const { client, fromEmail } = getResendClient();
+    const { client, fromEmail } = await getResendClient();
     const formattedAmount = (amount / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     const formattedExpiration = expiresAt.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
     
@@ -2570,7 +2639,7 @@ export async function sendBoletoGeneratedEmail(
   amount: number
 ): Promise<boolean> {
   try {
-    const { client, fromEmail } = getResendClient();
+    const { client, fromEmail } = await getResendClient();
     const formattedAmount = (amount / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     const formattedExpiration = expiresAt.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
     
@@ -2729,7 +2798,7 @@ export async function sendAutoRenewalPaymentEmail(
   boletoExpiresAt: Date | null
 ): Promise<boolean> {
   try {
-    const { client, fromEmail } = getResendClient();
+    const { client, fromEmail } = await getResendClient();
     const formattedAmount = (amount / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     const formattedExpiration = expiresAt.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
     const formattedPixExpiration = pixExpiresAt?.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }) || '';
@@ -2922,7 +2991,7 @@ export async function sendPixExpiredRecoveryEmail(
   amount: number
 ): Promise<boolean> {
   try {
-    const { client, fromEmail } = getResendClient();
+    const { client, fromEmail } = await getResendClient();
     const formattedAmount = (amount / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     
     const checkoutParams = new URLSearchParams({
