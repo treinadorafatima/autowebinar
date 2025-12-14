@@ -406,11 +406,11 @@ export default function AdminWhatsAppNotificationsPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Smartphone className="w-5 h-5" />
-            Conta WhatsApp para Notificações
+            Contas WhatsApp para Notificações
           </CardTitle>
           <CardDescription>
-            Conecte uma conta WhatsApp que será usada exclusivamente para enviar notificações do sistema.
-            Esta conta é separada das contas de marketing dos usuários.
+            Conecte contas WhatsApp para enviar notificações. O sistema usa rotação automática entre todas as contas conectadas,
+            respeitando o limite de mensagens por hora de cada uma. Quando uma conta atinge o limite, a próxima é usada automaticamente.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -439,7 +439,7 @@ export default function AdminWhatsAppNotificationsPage() {
           ) : !notificationStatus?.configured && accounts.length > 0 ? (
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Selecione uma conta existente ou crie uma nova. Você pode conectar diretamente via QR Code:
+                Todas as contas conectadas serão usadas automaticamente em rotação. Conecte via QR Code para ativar:
               </p>
               <div className="grid gap-3">
                 {accounts.map((account) => (
@@ -529,14 +529,6 @@ export default function AdminWhatsAppNotificationsPage() {
                             Gerar QR Code
                           </Button>
                         )}
-                        <Button
-                          size="sm"
-                          onClick={() => setAccountMutation.mutate(account.id)}
-                          disabled={setAccountMutation.isPending}
-                          data-testid={`button-select-account-${account.id}`}
-                        >
-                          Usar para Notificações
-                        </Button>
                         <Button
                           variant="destructive"
                           size="sm"
