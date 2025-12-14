@@ -9,9 +9,25 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { 
   CheckCircle, XCircle, Loader2, Wifi, WifiOff, RefreshCcw, 
-  QrCode, Smartphone, Bell, BellOff, AlertCircle
+  QrCode, Smartphone, Bell, BellOff, AlertCircle, Clock, 
+  History, Trash2, MessageSquare, Ban
 } from "lucide-react";
 import { SiWhatsapp } from "react-icons/si";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+
+interface WhatsappNotificationLog {
+  id: string;
+  notificationType: string;
+  recipientPhone: string;
+  recipientName: string | null;
+  message: string;
+  status: string;
+  sentAt: string | null;
+  createdAt: string;
+  error: string | null;
+}
 
 interface NotificationStatus {
   configured: boolean;
@@ -60,6 +76,44 @@ export default function AdminWhatsAppNotificationsPage() {
     },
     enabled: !!notificationStatus?.accountId,
     refetchInterval: qrPollingEnabled ? 3000 : false,
+  });
+
+  const { data: notificationLogs = [], isLoading: loadingLogs, refetch: refetchLogs } = useQuery<WhatsappNotificationLog[]>({
+    queryKey: ["/api/notifications/whatsapp/logs"],
+  });
+
+  const { data: notificationQueue = [], isLoading: loadingQueue, refetch: refetchQueue } = useQuery<WhatsappNotificationLog[]>({
+    queryKey: ["/api/notifications/whatsapp/queue"],
+  });
+
+  const cancelQueueMutation = useMutation({
+    mutationFn: async () => {
+      const queueCount = notificationQueue.length;
+      await apiRequest("DELETE", "/api/notifications/whatsapp/queue");
+      return queueCount;
+    },
+    onSuccess: (cancelledCount: number) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications/whatsapp/queue"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications/whatsapp/logs"] });
+      if (cancelledCount > 0) {
+        toast({
+          title: "Fila cancelada",
+          description: `${cancelledCount} mensagem(ns) pendente(s) foi(foram) cancelada(s)`,
+        });
+      } else {
+        toast({
+          title: "Fila vazia",
+          description: "Não havia mensagens pendentes para cancelar",
+        });
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro",
+        description: error.message || "Não foi possível cancelar a fila",
+        variant: "destructive",
+      });
+    },
   });
 
   const toggleMutation = useMutation({
@@ -203,6 +257,41 @@ export default function AdminWhatsAppNotificationsPage() {
         return <Badge variant="secondary"><WifiOff className="w-3 h-3 mr-1" /> Desconectado</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
+    }
+  };
+
+  const getNotificationStatusBadge = (status: string, id: string) => {
+    switch (status) {
+      case "pending":
+        return <Badge className="bg-yellow-500" data-testid={`badge-status-pending-${id}`}><Clock className="w-3 h-3 mr-1" /> Pendente</Badge>;
+      case "sent":
+        return <Badge className="bg-green-500" data-testid={`badge-status-sent-${id}`}><CheckCircle className="w-3 h-3 mr-1" /> Enviado</Badge>;
+      case "failed":
+        return <Badge variant="destructive" data-testid={`badge-status-failed-${id}`}><XCircle className="w-3 h-3 mr-1" /> Falhou</Badge>;
+      case "cancelled":
+        return <Badge variant="secondary" data-testid={`badge-status-cancelled-${id}`}><Ban className="w-3 h-3 mr-1" /> Cancelado</Badge>;
+      default:
+        return <Badge variant="outline" data-testid={`badge-status-${status}-${id}`}>{status}</Badge>;
+    }
+  };
+
+  const getNotificationTypeLabel = (type: string) => {
+    const labels: Record<string, string> = {
+      credentials: "Credenciais de Acesso",
+      payment_confirmed: "Confirmação de Pagamento",
+      password_reset: "Redefinição de Senha",
+      plan_expired: "Expiração de Plano",
+      welcome: "Boas-vindas",
+    };
+    return labels[type] || type;
+  };
+
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return "-";
+    try {
+      return format(new Date(dateString), "dd/MM/yyyy HH:mm", { locale: ptBR });
+    } catch {
+      return "-";
     }
   };
 
@@ -501,6 +590,158 @@ export default function AdminWhatsAppNotificationsPage() {
               </div>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="w-5 h-5" />
+                Fila de Mensagens Pendentes
+              </CardTitle>
+              <CardDescription>
+                Mensagens aguardando envio
+              </CardDescription>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => refetchQueue()}
+                disabled={loadingQueue}
+                data-testid="button-refresh-queue"
+              >
+                <RefreshCcw className={`w-4 h-4 mr-2 ${loadingQueue ? "animate-spin" : ""}`} />
+                Atualizar
+              </Button>
+              {notificationQueue.length > 0 && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => cancelQueueMutation.mutate()}
+                  disabled={cancelQueueMutation.isPending}
+                  data-testid="button-cancel-queue"
+                >
+                  {cancelQueueMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Trash2 className="w-4 h-4 mr-2" />
+                  )}
+                  Cancelar Tudo
+                </Button>
+              )}
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {loadingQueue ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : notificationQueue.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+              <MessageSquare className="w-10 h-10 mb-2" />
+              <p>Nenhuma mensagem pendente</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead>Destinatário</TableHead>
+                    <TableHead>Telefone</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Criado em</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {notificationQueue.map((log) => (
+                    <TableRow key={log.id} data-testid={`row-queue-${log.id}`}>
+                      <TableCell className="font-medium" data-testid={`cell-queue-type-${log.id}`}>
+                        {getNotificationTypeLabel(log.notificationType)}
+                      </TableCell>
+                      <TableCell data-testid={`cell-queue-name-${log.id}`}>{log.recipientName || "-"}</TableCell>
+                      <TableCell data-testid={`cell-queue-phone-${log.id}`}>{log.recipientPhone}</TableCell>
+                      <TableCell data-testid={`cell-queue-status-${log.id}`}>{getNotificationStatusBadge(log.status, log.id)}</TableCell>
+                      <TableCell data-testid={`cell-queue-date-${log.id}`}>{formatDate(log.createdAt)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <History className="w-5 h-5" />
+                Histórico de Mensagens
+              </CardTitle>
+              <CardDescription>
+                Histórico de notificações enviadas
+              </CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => refetchLogs()}
+              disabled={loadingLogs}
+              data-testid="button-refresh-logs"
+            >
+              <RefreshCcw className={`w-4 h-4 mr-2 ${loadingLogs ? "animate-spin" : ""}`} />
+              Atualizar
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {loadingLogs ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : notificationLogs.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+              <History className="w-10 h-10 mb-2" />
+              <p>Nenhuma mensagem no histórico</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead>Destinatário</TableHead>
+                    <TableHead>Telefone</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Enviado em</TableHead>
+                    <TableHead>Erro</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {notificationLogs.map((log) => (
+                    <TableRow key={log.id} data-testid={`row-log-${log.id}`}>
+                      <TableCell className="font-medium" data-testid={`cell-log-type-${log.id}`}>
+                        {getNotificationTypeLabel(log.notificationType)}
+                      </TableCell>
+                      <TableCell data-testid={`cell-log-name-${log.id}`}>{log.recipientName || "-"}</TableCell>
+                      <TableCell data-testid={`cell-log-phone-${log.id}`}>{log.recipientPhone}</TableCell>
+                      <TableCell data-testid={`cell-log-status-${log.id}`}>{getNotificationStatusBadge(log.status, log.id)}</TableCell>
+                      <TableCell data-testid={`cell-log-date-${log.id}`}>{formatDate(log.sentAt)}</TableCell>
+                      <TableCell className="max-w-[200px] truncate" title={log.error || ""} data-testid={`cell-log-error-${log.id}`}>
+                        {log.error || "-"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
