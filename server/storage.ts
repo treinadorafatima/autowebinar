@@ -4610,11 +4610,8 @@ Qualquer dúvida, estamos à disposição!`,
 
   async initDefaultEmailNotificationTemplates(): Promise<void> {
     const APP_NAME = "AutoWebinar";
-    const APP_URL = process.env.PUBLIC_BASE_URL 
-      ? process.env.PUBLIC_BASE_URL.replace(/\/$/, '')
-      : (process.env.REPLIT_DEV_DOMAIN 
-        ? `https://${process.env.REPLIT_DEV_DOMAIN}` 
-        : "https://autowebinar.com.br");
+    const { getAppUrl } = await import("./utils/getAppUrl");
+    const APP_URL = getAppUrl();
 
     const defaultTemplates = [
       {

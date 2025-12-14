@@ -36,6 +36,7 @@ import {
   sendWhatsAppPaymentFailedSafe,
   sendWhatsAppPlanExpiredSafe
 } from "./whatsapp-notifications";
+import { getAppUrl } from "./utils/getAppUrl";
 
 // Helper function to generate a simple, easy-to-type temporary password
 function generateTempPassword(): string {
@@ -8621,9 +8622,7 @@ Seja conversacional e objetivo.`;
       }
 
       // Get base URL for success/cancel redirects
-      const baseUrl = process.env.REPLIT_DOMAINS 
-        ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
-        : process.env.BASE_URL || 'http://localhost:5000';
+      const baseUrl = getAppUrl();
 
       // Create Checkout Session via Stripe API
       const params = new URLSearchParams({
@@ -8723,9 +8722,7 @@ Seja conversacional e objetivo.`;
       // Confirm the payment intent to generate PIX code
       const confirmParams = new URLSearchParams({
         'payment_method_data[type]': 'pix',
-        'return_url': `${process.env.REPLIT_DOMAINS 
-          ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
-          : process.env.BASE_URL || 'http://localhost:5000'}/pagamento/sucesso?pagamentoId=${pagamentoId}&gateway=stripe`,
+        'return_url': `${getAppUrl()}/pagamento/sucesso?pagamentoId=${pagamentoId}&gateway=stripe`,
       });
 
       const confirmResponse = await fetch(`https://api.stripe.com/v1/payment_intents/${stripeData.id}/confirm`, {
@@ -8849,9 +8846,7 @@ Seja conversacional e objetivo.`;
         'payment_method_data[billing_details][email]': pagamento.email,
         'payment_method_data[billing_details][name]': pagamento.nome,
         'payment_method_data[boleto][tax_id]': pagamento.cpf?.replace(/\D/g, '') || '00000000000',
-        'return_url': `${process.env.REPLIT_DOMAINS 
-          ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
-          : process.env.BASE_URL || 'http://localhost:5000'}/pagamento/sucesso?pagamentoId=${pagamentoId}&gateway=stripe`,
+        'return_url': `${getAppUrl()}/pagamento/sucesso?pagamentoId=${pagamentoId}&gateway=stripe`,
       });
 
       const confirmResponse = await fetch(`https://api.stripe.com/v1/payment_intents/${stripeData.id}/confirm`, {

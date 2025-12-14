@@ -3,6 +3,7 @@ import { db } from "./db";
 import { eq, and, lte, sql } from "drizzle-orm";
 import { scheduledWhatsappMessages, leads, webinars as webinarsTable, whatsappSequences, WhatsappAccount } from "@shared/schema";
 import { sendWhatsAppMessage, sendWhatsAppMediaMessage, MediaMessage } from "./whatsapp-service";
+import { getWebinarUrl, getReplayUrl } from "./utils/getAppUrl";
 
 const SCHEDULER_INTERVAL_MS = 15000; // Check every 15 seconds for better timing accuracy
 const BATCH_SIZE = 10; // Process 10 messages at a time
@@ -66,16 +67,14 @@ async function processScheduledWhatsappMessages(): Promise<void> {
 
         const webinar = await storage.getWebinarById(scheduled.webinarId);
         
-        const baseUrl = process.env.BASE_URL || "https://autowebinar.shop";
-        
         const mergeFields: MergeFields = {
           nome: scheduled.targetName || "Participante",
           telefone: scheduled.targetPhone,
           webinar_titulo: webinar?.name || "Webinar",
           webinar_data: scheduled.webinarSessionDate || "",
           webinar_horario: webinar ? `${String(webinar.startHour).padStart(2, "0")}:${String(webinar.startMinute).padStart(2, "0")}` : "",
-          webinar_link: webinar ? `${baseUrl}/webinar/${webinar.slug}` : "",
-          replay_link: webinar ? `${baseUrl}/webinar/${webinar.slug}?replay=1` : ""
+          webinar_link: webinar ? getWebinarUrl(webinar.slug) : "",
+          replay_link: webinar ? getReplayUrl(webinar.slug) : ""
         };
 
         const processedMessage = replaceMergeTags(sequence.messageText, mergeFields);

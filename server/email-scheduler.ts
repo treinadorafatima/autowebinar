@@ -4,6 +4,7 @@ import { Resend } from "resend";
 import { db } from "./db";
 import { eq, and, lte, sql } from "drizzle-orm";
 import { scheduledEmails, leads, webinars as webinarsTable } from "@shared/schema";
+import { getWebinarUrl, getReplayUrl, getUnsubscribeUrl } from "./utils/getAppUrl";
 
 const SCHEDULER_INTERVAL_MS = 60000; // Check every minute
 const BATCH_SIZE = 10; // Process 10 emails at a time
@@ -108,17 +109,15 @@ async function processScheduledEmails(): Promise<void> {
 
         const webinar = await storage.getWebinarById(scheduled.webinarId);
         
-        const baseUrl = process.env.BASE_URL || "https://autowebinar.shop";
-        
         const mergeFields: MergeFields = {
           nome: scheduled.targetName || "Participante",
           email: scheduled.targetEmail,
           webinar_titulo: webinar?.name || "Webinar",
           webinar_data: scheduled.webinarSessionDate || "",
           webinar_horario: webinar ? `${String(webinar.startHour).padStart(2, "0")}:${String(webinar.startMinute).padStart(2, "0")}` : "",
-          webinar_link: webinar ? `${baseUrl}/webinar/${webinar.slug}` : "",
-          replay_link: webinar ? `${baseUrl}/webinar/${webinar.slug}?replay=1` : "",
-          descadastrar_link: `${baseUrl}/unsubscribe?email=${encodeURIComponent(scheduled.targetEmail)}`
+          webinar_link: webinar ? getWebinarUrl(webinar.slug) : "",
+          replay_link: webinar ? getReplayUrl(webinar.slug) : "",
+          descadastrar_link: getUnsubscribeUrl(scheduled.targetEmail)
         };
 
         let htmlContent = sequence.compiledHtml || `
