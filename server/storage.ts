@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type WebinarConfig, type WebinarConfigInsert, type Admin, type AdminInsert, type UploadedVideo, type UploadedVideoInsert, type Comment, type CommentInsert, type Webinar, type WebinarInsert, type Setting, type SettingInsert, type ViewerSession, type WebinarScript, type WebinarScriptInsert, type AiConfig, type AiConfigInsert, type AiMemory, type AiMemoryInsert, type CheckoutPlano, type CheckoutPlanoInsert, type CheckoutPagamento, type CheckoutPagamentoInsert, type CheckoutConfig, type CheckoutConfigInsert, type CheckoutAssinatura, type CheckoutAssinaturaInsert, type AiChat, type AiChatInsert, type AiMessageChat, type AiMessageChatInsert, type VideoTranscription, type VideoTranscriptionInsert, type AdminEmailCredential, type AdminEmailCredentialInsert, type EmailSequence, type EmailSequenceInsert, type ScheduledEmail, type ScheduledEmailInsert, type LeadFormConfig, type LeadFormConfigInsert, type WhatsappAccount, type WhatsappAccountInsert, type WhatsappSession, type WhatsappSessionInsert, type WhatsappSequence, type WhatsappSequenceInsert, type ScheduledWhatsappMessage, type ScheduledWhatsappMessageInsert, type MediaFile, type MediaFileInsert, type LeadMessage, type LeadMessageInsert, type Lead, type WhatsappBroadcast, type WhatsappBroadcastInsert, type WhatsappBroadcastRecipient, type WhatsappBroadcastRecipientInsert, type Affiliate, type AffiliateInsert, type AffiliateLink, type AffiliateLinkInsert, type AffiliateSale, type AffiliateSaleInsert, type AffiliateConfig, type AffiliateConfigInsert, type AffiliateWithdrawal, type AffiliateWithdrawalInsert, type WhatsappNotificationLog, type WhatsappNotificationLogInsert, admins, webinarConfigs, users, uploadedVideos, comments, webinars as webinarsTable, settings, viewerSessions, webinarScripts, aiConfigs, aiMemories, checkoutPlanos, checkoutPagamentos, checkoutConfigs, checkoutAssinaturas, aiChats, aiMessageChats, videoTranscriptions, adminEmailCredentials, emailSequences, scheduledEmails, leadFormConfigs, whatsappAccounts, whatsappSessions, whatsappNotificationsLog, whatsappSequences, scheduledWhatsappMessages, mediaFiles, webinarViewLogs, leads, leadMessages, whatsappBroadcasts, whatsappBroadcastRecipients, affiliates, affiliateLinks, affiliateSales, affiliateConfig, affiliateWithdrawals } from "@shared/schema";
+import { type User, type InsertUser, type WebinarConfig, type WebinarConfigInsert, type Admin, type AdminInsert, type UploadedVideo, type UploadedVideoInsert, type Comment, type CommentInsert, type Webinar, type WebinarInsert, type Setting, type SettingInsert, type ViewerSession, type WebinarScript, type WebinarScriptInsert, type AiConfig, type AiConfigInsert, type AiMemory, type AiMemoryInsert, type CheckoutPlano, type CheckoutPlanoInsert, type CheckoutPagamento, type CheckoutPagamentoInsert, type CheckoutConfig, type CheckoutConfigInsert, type CheckoutAssinatura, type CheckoutAssinaturaInsert, type AiChat, type AiChatInsert, type AiMessageChat, type AiMessageChatInsert, type VideoTranscription, type VideoTranscriptionInsert, type AdminEmailCredential, type AdminEmailCredentialInsert, type EmailSequence, type EmailSequenceInsert, type ScheduledEmail, type ScheduledEmailInsert, type LeadFormConfig, type LeadFormConfigInsert, type WhatsappAccount, type WhatsappAccountInsert, type WhatsappSession, type WhatsappSessionInsert, type WhatsappSequence, type WhatsappSequenceInsert, type ScheduledWhatsappMessage, type ScheduledWhatsappMessageInsert, type MediaFile, type MediaFileInsert, type LeadMessage, type LeadMessageInsert, type Lead, type WhatsappBroadcast, type WhatsappBroadcastInsert, type WhatsappBroadcastRecipient, type WhatsappBroadcastRecipientInsert, type Affiliate, type AffiliateInsert, type AffiliateLink, type AffiliateLinkInsert, type AffiliateSale, type AffiliateSaleInsert, type AffiliateConfig, type AffiliateConfigInsert, type AffiliateWithdrawal, type AffiliateWithdrawalInsert, type WhatsappNotificationLog, type WhatsappNotificationLogInsert, type WhatsappNotificationTemplate, type WhatsappNotificationTemplateInsert, admins, webinarConfigs, users, uploadedVideos, comments, webinars as webinarsTable, settings, viewerSessions, webinarScripts, aiConfigs, aiMemories, checkoutPlanos, checkoutPagamentos, checkoutConfigs, checkoutAssinaturas, aiChats, aiMessageChats, videoTranscriptions, adminEmailCredentials, emailSequences, scheduledEmails, leadFormConfigs, whatsappAccounts, whatsappSessions, whatsappNotificationsLog, whatsappSequences, scheduledWhatsappMessages, mediaFiles, webinarViewLogs, leads, leadMessages, whatsappBroadcasts, whatsappBroadcastRecipients, affiliates, affiliateLinks, affiliateSales, affiliateConfig, affiliateWithdrawals, whatsappNotificationTemplates } from "@shared/schema";
 import * as crypto from "crypto";
 import { randomUUID } from "crypto";
 import { db } from "./db";
@@ -362,6 +362,11 @@ export interface IStorage {
   getPendingWhatsappNotifications(): Promise<WhatsappNotificationLog[]>;
   cancelPendingWhatsappNotifications(): Promise<number>;
   updateWhatsappNotificationLog(id: string, data: Partial<WhatsappNotificationLogInsert>): Promise<void>;
+  // WhatsApp Notification Templates
+  listWhatsappNotificationTemplates(): Promise<WhatsappNotificationTemplate[]>;
+  getWhatsappNotificationTemplateByType(notificationType: string): Promise<WhatsappNotificationTemplate | undefined>;
+  updateWhatsappNotificationTemplate(id: string, data: Partial<WhatsappNotificationTemplateInsert>): Promise<WhatsappNotificationTemplate | undefined>;
+  initDefaultWhatsappNotificationTemplates(): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -4428,6 +4433,134 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
     await db.update(whatsappNotificationsLog)
       .set(data)
       .where(eq(whatsappNotificationsLog.id, id));
+  }
+
+  // WhatsApp Notification Templates
+
+  async listWhatsappNotificationTemplates(): Promise<WhatsappNotificationTemplate[]> {
+    return db.select().from(whatsappNotificationTemplates).orderBy(whatsappNotificationTemplates.notificationType);
+  }
+
+  async getWhatsappNotificationTemplateByType(notificationType: string): Promise<WhatsappNotificationTemplate | undefined> {
+    const result = await db.select().from(whatsappNotificationTemplates)
+      .where(eq(whatsappNotificationTemplates.notificationType, notificationType))
+      .limit(1);
+    return result[0];
+  }
+
+  async updateWhatsappNotificationTemplate(id: string, data: Partial<WhatsappNotificationTemplateInsert>): Promise<WhatsappNotificationTemplate | undefined> {
+    const result = await db.update(whatsappNotificationTemplates)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(whatsappNotificationTemplates.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async initDefaultWhatsappNotificationTemplates(): Promise<void> {
+    const defaultTemplates = [
+      {
+        id: randomUUID(),
+        notificationType: "credentials",
+        name: "Credenciais de Acesso",
+        description: "Enviado quando um novo usuário é criado com credenciais de acesso",
+        messageTemplate: `🎉 *Bem-vindo(a), {name}!*
+
+Seu acesso ao plano *{planName}* foi liberado!
+
+🔐 *Suas credenciais:*
+📧 Email: {email}
+🔑 Senha temporária: {tempPassword}
+
+⚠️ *Importante:* Altere sua senha no primeiro acesso.
+
+🔗 Acesse agora: {loginUrl}
+
+Qualquer dúvida, estamos à disposição!`,
+        isActive: true,
+      },
+      {
+        id: randomUUID(),
+        notificationType: "payment_confirmed",
+        name: "Confirmação de Pagamento",
+        description: "Enviado quando um pagamento é confirmado",
+        messageTemplate: `✅ *Pagamento Confirmado!*
+
+Olá, {name}!
+
+Seu pagamento do plano *{planName}* foi aprovado com sucesso! 🎉
+
+📅 Acesso válido até: {expirationDate}
+
+Aproveite todos os recursos do seu plano!
+
+Qualquer dúvida, estamos à disposição.`,
+        isActive: true,
+      },
+      {
+        id: randomUUID(),
+        notificationType: "password_reset",
+        name: "Redefinição de Senha",
+        description: "Enviado quando o usuário solicita redefinição de senha",
+        messageTemplate: `🔐 *Redefinição de Senha*
+
+Olá, {name}!
+
+Você solicitou a redefinição da sua senha.
+
+🔗 Clique no link abaixo para criar uma nova senha:
+{resetUrl}
+
+⚠️ Este link expira em 1 hora.
+
+Se você não solicitou esta alteração, ignore esta mensagem.`,
+        isActive: true,
+      },
+      {
+        id: randomUUID(),
+        notificationType: "plan_expired",
+        name: "Plano Expirado",
+        description: "Enviado quando o plano do usuário expira",
+        messageTemplate: `⚠️ *Seu Plano Expirou*
+
+Olá, {name}!
+
+Seu acesso ao plano *{planName}* expirou.
+
+Para continuar utilizando todos os recursos, renove seu plano agora!
+
+🔗 Renovar: {renewUrl}
+
+Qualquer dúvida, estamos à disposição.`,
+        isActive: true,
+      },
+      {
+        id: randomUUID(),
+        notificationType: "payment_failed",
+        name: "Falha no Pagamento",
+        description: "Enviado quando um pagamento falha",
+        messageTemplate: `❌ *Falha no Pagamento*
+
+Olá, {name}!
+
+Identificamos um problema com o pagamento do seu plano *{planName}*.
+
+📋 *Motivo:* {reason}
+
+Para regularizar sua situação, tente novamente:
+🔗 {paymentUrl}
+
+Caso tenha dúvidas, entre em contato conosco.`,
+        isActive: true,
+      },
+    ];
+
+    for (const template of defaultTemplates) {
+      const existing = await this.getWhatsappNotificationTemplateByType(template.notificationType);
+      if (!existing) {
+        await db.insert(whatsappNotificationTemplates).values(template);
+        console.log(`[templates] Created default template: ${template.notificationType}`);
+      }
+    }
   }
 }
 

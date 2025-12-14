@@ -10,11 +10,13 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { 
   CheckCircle, XCircle, Loader2, Wifi, WifiOff, RefreshCcw, 
   QrCode, Smartphone, Bell, BellOff, AlertCircle, Clock, 
-  History, Trash2, MessageSquare, Ban, RotateCcw, Settings, Save
+  History, Trash2, MessageSquare, Ban, RotateCcw, Settings, Save, FileText, Edit3
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { SiWhatsapp } from "react-icons/si";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 

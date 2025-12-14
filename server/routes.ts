@@ -404,6 +404,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   await storage.initializeDefaults();
   await storage.initializeDefaultAiConfig();
   await storage.initializeDefaultPlanos();
+  await storage.initDefaultWhatsappNotificationTemplates();
 
   /**
    * Helper function to create affiliate sale when payment is approved
@@ -7036,6 +7037,59 @@ Seja conversacional e objetivo.`;
       const cancelledCount = await storage.cancelPendingWhatsappNotifications();
       
       res.json({ success: true, cancelledCount });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // WhatsApp Notification Templates - List all templates
+  app.get("/api/notifications/whatsapp/templates", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.replace("Bearer ", "");
+      if (!token) return res.status(401).json({ error: "Token não fornecido" });
+      
+      const email = await validateSession(token);
+      if (!email) return res.status(401).json({ error: "Sessão inválida" });
+      
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin || admin.role !== "superadmin") {
+        return res.status(403).json({ error: "Acesso negado - apenas superadmin" });
+      }
+
+      const templates = await storage.listWhatsappNotificationTemplates();
+      res.json(templates);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // WhatsApp Notification Templates - Update a template
+  app.patch("/api/notifications/whatsapp/templates/:id", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.replace("Bearer ", "");
+      if (!token) return res.status(401).json({ error: "Token não fornecido" });
+      
+      const email = await validateSession(token);
+      if (!email) return res.status(401).json({ error: "Sessão inválida" });
+      
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin || admin.role !== "superadmin") {
+        return res.status(403).json({ error: "Acesso negado - apenas superadmin" });
+      }
+
+      const { id } = req.params;
+      const { messageTemplate, isActive } = req.body;
+
+      const updated = await storage.updateWhatsappNotificationTemplate(id, {
+        messageTemplate,
+        isActive,
+      });
+
+      if (!updated) {
+        return res.status(404).json({ error: "Template não encontrado" });
+      }
+
+      res.json(updated);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
