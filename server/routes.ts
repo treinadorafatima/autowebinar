@@ -685,6 +685,142 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // DEBUG: Test email sending directly
+  app.post("/api/debug/test-email", async (req, res) => {
+    try {
+      const { to } = req.body;
+      if (!to) {
+        return res.status(400).json({ error: "Email 'to' is required" });
+      }
+      
+      console.log(`[debug] Testing email send to ${to}`);
+      
+      // Try to get Resend client
+      const { Resend } = await import('resend');
+      
+      // Get API key from Replit Connectors
+      const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
+      const xReplitToken = process.env.REPL_IDENTITY 
+        ? 'repl ' + process.env.REPL_IDENTITY 
+        : process.env.WEB_REPL_RENEWAL 
+        ? 'depl ' + process.env.WEB_REPL_RENEWAL 
+        : null;
+
+      let apiKey: string | null = null;
+      
+      if (hostname && xReplitToken) {
+        console.log(`[debug] Fetching API key from Replit Connectors: ${hostname}`);
+        try {
+          const response = await fetch(
+            `https://${hostname}/api/v2/connection?include_secrets=true&connector_names=resend`,
+            {
+              headers: {
+                'Accept': 'application/json',
+                'X_REPLIT_TOKEN': xReplitToken
+              }
+            }
+          );
+          
+          if (response.ok) {
+            const data = await response.json();
+            console.log(`[debug] Connector response items:`, data.items?.length || 0);
+            const connectionSettings = data.items?.[0];
+            if (connectionSettings?.settings?.api_key) {
+              apiKey = connectionSettings.settings.api_key as string;
+              console.log(`[debug] Got API key from connector (${apiKey.substring(0, 10)}...)`);
+            } else {
+              console.log(`[debug] No api_key in connection settings`);
+            }
+          } else {
+            console.log(`[debug] Connector response not ok: ${response.status}`);
+          }
+        } catch (err: any) {
+          console.log(`[debug] Connector fetch error: ${err.message}`);
+        }
+      } else {
+        console.log(`[debug] No Replit Connectors available`);
+      }
+      
+      // Fallback to env var
+      if (!apiKey) {
+        apiKey = process.env.RESEND_API_KEY || null;
+        if (apiKey) {
+          console.log(`[debug] Using RESEND_API_KEY from env (${apiKey.substring(0, 10)}...)`);
+        }
+      }
+      
+      if (!apiKey) {
+        return res.status(500).json({ 
+          error: "No Resend API key found", 
+          hasConnectorHostname: !!hostname,
+          hasReplitToken: !!xReplitToken 
+        });
+      }
+      
+      const resend = new Resend(apiKey);
+      const fromEmail = "AutoWebinar <contato@autowebinar.shop>";
+      
+      console.log(`[debug] Sending test email from ${fromEmail} to ${to}`);
+      
+      const result = await resend.emails.send({
+        from: fromEmail,
+        to: [to],
+        subject: "Teste de Email - AutoWebinar",
+        html: `<h1>Teste de Email</h1><p>Se você recebeu este email, o sistema de emails está funcionando corretamente.</p><p>Enviado em: ${new Date().toISOString()}</p>`,
+        text: `Teste de Email\n\nSe você recebeu este email, o sistema está funcionando.\nEnviado em: ${new Date().toISOString()}`
+      });
+      
+      console.log(`[debug] Email send result:`, result);
+      
+      if (result.error) {
+        return res.json({ 
+          success: false, 
+          error: result.error,
+          from: fromEmail,
+          to: to
+        });
+      }
+      
+      return res.json({ 
+        success: true, 
+        id: result.data?.id,
+        from: fromEmail,
+        to: to
+      });
+    } catch (error: any) {
+      console.error("[debug] Test email error:", error);
+      return res.status(500).json({ 
+        error: error.message,
+        stack: error.stack?.substring(0, 500)
+      });
+    }
+  });
+
+  // DEBUG: Search users by partial email match
+  app.get("/api/debug/search-users", async (req, res) => {
+    try {
+      const search = req.query.search as string;
+      if (!search) {
+        return res.status(400).json({ error: "Search term required" });
+      }
+      
+      // Use SQL ILIKE for partial match
+      const { admins } = await import("@shared/schema");
+      const results = await db.select({
+        id: admins.id,
+        email: admins.email,
+        name: admins.name,
+        role: admins.role
+      }).from(admins).where(sql`email ILIKE ${'%' + search + '%'}`).limit(20);
+      
+      console.log(`[debug] Search for "${search}" found ${results.length} users`);
+      res.json({ count: results.length, users: results });
+    } catch (error: any) {
+      console.error("[debug] Search error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get("/api/auth/verify-reset-token/:token", async (req, res) => {
     try {
       const { token } = req.params;
