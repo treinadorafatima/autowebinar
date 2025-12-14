@@ -10,7 +10,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { 
   CheckCircle, XCircle, Loader2, Wifi, WifiOff, RefreshCcw, 
   QrCode, Smartphone, Bell, BellOff, AlertCircle, Clock, 
-  History, Trash2, MessageSquare, Ban
+  History, Trash2, MessageSquare, Ban, RotateCcw
 } from "lucide-react";
 import { SiWhatsapp } from "react-icons/si";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -35,6 +35,8 @@ interface NotificationStatus {
   status: string;
   phoneNumber?: string;
   enabled: boolean;
+  connectedAccounts: number;
+  totalAccounts: number;
 }
 
 interface WhatsAppAccount {
@@ -43,6 +45,8 @@ interface WhatsAppAccount {
   label: string;
   phoneNumber: string | null;
   status: string;
+  hourlyLimit: number;
+  messagesSentThisHour: number;
 }
 
 interface WhatsAppConnectionStatus {
@@ -152,27 +156,6 @@ export default function AdminWhatsAppNotificationsPage() {
     },
   });
 
-  const setAccountMutation = useMutation({
-    mutationFn: async (accountId: string) => {
-      return apiRequest("POST", "/api/notifications/whatsapp/account", { accountId });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/notifications/whatsapp/status"] });
-      toast({
-        title: "Conta configurada",
-        description: "Conta WhatsApp selecionada para notificações",
-      });
-      setQrPollingEnabled(true);
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Erro",
-        description: error.message || "Não foi possível configurar a conta",
-        variant: "destructive",
-      });
-    },
-  });
-
   const connectMutation = useMutation({
     mutationFn: async (accountId: string) => {
       return apiRequest("POST", `/api/whatsapp/connect/${accountId}`);
@@ -226,14 +209,12 @@ export default function AdminWhatsAppNotificationsPage() {
       });
       return res.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/notifications/whatsapp/accounts"] });
-      if (data?.id) {
-        setAccountMutation.mutate(data.id);
-      }
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications/whatsapp/status"] });
       toast({
         title: "Conta criada",
-        description: "Nova conta WhatsApp criada para notificações",
+        description: "Nova conta WhatsApp criada. Conecte via QR Code para ativar.",
       });
     },
     onError: (error: any) => {
@@ -412,6 +393,14 @@ export default function AdminWhatsAppNotificationsPage() {
             Conecte contas WhatsApp para enviar notificações. O sistema usa rotação automática entre todas as contas conectadas,
             respeitando o limite de mensagens por hora de cada uma. Quando uma conta atinge o limite, a próxima é usada automaticamente.
           </CardDescription>
+          {(notificationStatus?.connectedAccounts ?? 0) > 0 && (
+            <div className="flex items-center gap-2 mt-2" data-testid="rotation-status">
+              <Badge className="bg-primary">
+                <RotateCcw className="w-3 h-3 mr-1" />
+                Rotação: {notificationStatus?.connectedAccounts} de {notificationStatus?.totalAccounts} conta(s) ativa(s)
+              </Badge>
+            </div>
+          )}
         </CardHeader>
         <CardContent className="space-y-6">
           {!notificationStatus?.configured && accounts.length === 0 ? (
@@ -457,11 +446,17 @@ export default function AdminWhatsAppNotificationsPage() {
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         {account.status === "connected" ? (
-                          <Badge className="bg-green-500">
-                            <Wifi className="w-3 h-3 mr-1" /> Conectado
-                          </Badge>
+                          <>
+                            <Badge className="bg-green-500">
+                              <Wifi className="w-3 h-3 mr-1" /> Conectado
+                            </Badge>
+                            <Badge variant="outline" data-testid={`badge-limit-${account.id}`}>
+                              <Clock className="w-3 h-3 mr-1" />
+                              {account.messagesSentThisHour || 0}/{account.hourlyLimit || 10} msgs/hora
+                            </Badge>
+                          </>
                         ) : (
                           <Badge variant="secondary">
                             <WifiOff className="w-3 h-3 mr-1" /> Desconectado

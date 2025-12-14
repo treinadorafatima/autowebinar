@@ -6881,77 +6881,24 @@ Seja conversacional e objetivo.`;
       const accounts = await storage.listWhatsappAccountsByAdmin(admin.id);
       const { getWhatsAppStatus } = await import("./whatsapp-service");
       
-      // Get status for each account
+      // Get status for each account with hourly limit info
       const accountsWithStatus = await Promise.all(
-        accounts.map(async (acc: { id: string; name: string }) => {
+        accounts.map(async (acc: any) => {
           const status = await getWhatsAppStatus(acc.id);
           return {
             id: acc.id,
+            adminId: acc.adminId,
+            label: acc.label || acc.name,
             name: acc.name,
             status: status.status,
-            phoneNumber: status.phoneNumber,
+            phoneNumber: status.phoneNumber || acc.phoneNumber,
+            hourlyLimit: acc.hourlyLimit || 10,
+            messagesSentThisHour: acc.messagesSentThisHour || 0,
           };
         })
       );
       
       res.json(accountsWithStatus);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  // WhatsApp Notifications - Set account for notifications
-  app.post("/api/notifications/whatsapp/set-account", async (req, res) => {
-    try {
-      const token = req.headers.authorization?.replace("Bearer ", "");
-      if (!token) return res.status(401).json({ error: "Token não fornecido" });
-      
-      const email = await validateSession(token);
-      if (!email) return res.status(401).json({ error: "Sessão inválida" });
-      
-      const admin = await storage.getAdminByEmail(email);
-      if (!admin || admin.role !== "superadmin") {
-        return res.status(403).json({ error: "Acesso negado - apenas superadmin" });
-      }
-
-      const { accountId } = req.body;
-      if (!accountId) {
-        return res.status(400).json({ error: "accountId é obrigatório" });
-      }
-
-      // Verify account belongs to superadmin
-      const account = await storage.getWhatsappAccountById(accountId);
-      if (!account || account.adminId !== admin.id) {
-        return res.status(404).json({ error: "Conta não encontrada" });
-      }
-
-      const { setNotificationAccountId } = await import("./whatsapp-notifications");
-      await setNotificationAccountId(accountId);
-      
-      res.json({ success: true, accountId });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  // WhatsApp Notifications - Clear account
-  app.delete("/api/notifications/whatsapp/account", async (req, res) => {
-    try {
-      const token = req.headers.authorization?.replace("Bearer ", "");
-      if (!token) return res.status(401).json({ error: "Token não fornecido" });
-      
-      const email = await validateSession(token);
-      if (!email) return res.status(401).json({ error: "Sessão inválida" });
-      
-      const admin = await storage.getAdminByEmail(email);
-      if (!admin || admin.role !== "superadmin") {
-        return res.status(403).json({ error: "Acesso negado - apenas superadmin" });
-      }
-
-      const { clearNotificationAccountId } = await import("./whatsapp-notifications");
-      await clearNotificationAccountId();
-      
-      res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
