@@ -6,13 +6,185 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Loader2, Eye, EyeOff, Check, X, Save, CreditCard, Wallet } from "lucide-react";
-import { SiMercadopago, SiStripe, SiFacebook, SiGoogleads } from "react-icons/si";
+import { Loader2, Eye, EyeOff, Check, X, Save, CreditCard, Wallet, MessageCircle, Phone } from "lucide-react";
+import { SiMercadopago, SiStripe, SiFacebook, SiGoogleads, SiWhatsapp } from "react-icons/si";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 
 interface ConfigItem {
   chave: string;
   hasValue: boolean;
+}
+
+interface WhatsAppAccount {
+  id: string;
+  name: string;
+  status: string;
+  phoneNumber?: string;
+}
+
+interface NotificationStatus {
+  configured: boolean;
+  accountId: string | null;
+  status: string;
+  phoneNumber?: string;
+}
+
+function WhatsAppNotificationsTab() {
+  const { toast } = useToast();
+  
+  const { data: notificationStatus, isLoading: isLoadingStatus } = useQuery<NotificationStatus>({
+    queryKey: ["/api/notifications/whatsapp/status"],
+  });
+
+  const { data: accounts, isLoading: isLoadingAccounts } = useQuery<WhatsAppAccount[]>({
+    queryKey: ["/api/notifications/whatsapp/accounts"],
+  });
+
+  const setAccountMutation = useMutation({
+    mutationFn: async (accountId: string) => {
+      const res = await apiRequest("POST", "/api/notifications/whatsapp/set-account", { accountId });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications/whatsapp/status"] });
+      toast({ title: "Conta configurada com sucesso!" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro ao configurar", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const clearAccountMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("DELETE", "/api/notifications/whatsapp/account");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications/whatsapp/status"] });
+      toast({ title: "Conta removida" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro ao remover", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const isLoading = isLoadingStatus || isLoadingAccounts;
+  const connectedAccounts = accounts?.filter(acc => acc.status === "connected") || [];
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "connected":
+        return <Badge className="bg-green-500">Conectado</Badge>;
+      case "connecting":
+        return <Badge className="bg-yellow-500">Conectando</Badge>;
+      case "banned":
+        return <Badge variant="destructive">Suspenso</Badge>;
+      default:
+        return <Badge variant="secondary">Desconectado</Badge>;
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <MessageCircle className="w-5 h-5" />
+          Notificacoes WhatsApp
+        </CardTitle>
+        <CardDescription>
+          Configure uma conta WhatsApp para enviar notificacoes automaticas (pagamentos, credenciais, etc).
+          Esta conta e separada das automacoes de webinario.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="w-6 h-6 animate-spin" />
+          </div>
+        ) : (
+          <>
+            <div className="p-4 bg-muted rounded-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">Status das Notificacoes</p>
+                  <p className="text-sm text-muted-foreground">
+                    {notificationStatus?.configured 
+                      ? `Conta: ${notificationStatus.phoneNumber || notificationStatus.accountId}`
+                      : "Nenhuma conta configurada"}
+                  </p>
+                </div>
+                {notificationStatus?.configured && getStatusBadge(notificationStatus.status)}
+              </div>
+            </div>
+
+            {connectedAccounts.length === 0 ? (
+              <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                <p className="text-sm">
+                  Nenhuma conta WhatsApp conectada. Acesse a pagina de WhatsApp Marketing para conectar uma conta primeiro.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Selecione a conta para notificacoes</Label>
+                  <Select
+                    value={notificationStatus?.accountId || ""}
+                    onValueChange={(value) => {
+                      if (value) {
+                        setAccountMutation.mutate(value);
+                      }
+                    }}
+                    disabled={setAccountMutation.isPending}
+                  >
+                    <SelectTrigger data-testid="select-whatsapp-account">
+                      <SelectValue placeholder="Selecione uma conta" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {connectedAccounts.map((acc) => (
+                        <SelectItem key={acc.id} value={acc.id}>
+                          <div className="flex items-center gap-2">
+                            <Phone className="w-4 h-4" />
+                            {acc.name} ({acc.phoneNumber || "Sem numero"})
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {notificationStatus?.configured && (
+                  <Button
+                    variant="outline"
+                    onClick={() => clearAccountMutation.mutate()}
+                    disabled={clearAccountMutation.isPending}
+                    data-testid="button-clear-whatsapp-account"
+                  >
+                    {clearAccountMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    ) : null}
+                    Remover Configuracao
+                  </Button>
+                )}
+              </div>
+            )}
+
+            <div className="p-4 bg-muted rounded-lg text-sm">
+              <p className="font-medium mb-2">Notificacoes enviadas:</p>
+              <ul className="space-y-1 text-muted-foreground">
+                <li>Credenciais de acesso (novos usuarios)</li>
+                <li>Confirmacao de pagamento</li>
+                <li>Recuperacao de senha</li>
+                <li>Plano expirado</li>
+                <li>Falha no pagamento</li>
+              </ul>
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
 }
 
 export default function AdminCheckoutConfig() {
@@ -203,7 +375,7 @@ export default function AdminCheckoutConfig() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="mercadopago" className="flex items-center gap-2" data-testid="tab-mercadopago">
             <SiMercadopago className="w-4 h-4" />
             <span className="hidden sm:inline">Mercado Pago</span>
@@ -219,6 +391,10 @@ export default function AdminCheckoutConfig() {
           <TabsTrigger value="google" className="flex items-center gap-2" data-testid="tab-google">
             <SiGoogleads className="w-4 h-4" />
             <span className="hidden sm:inline">Google Ads</span>
+          </TabsTrigger>
+          <TabsTrigger value="whatsapp" className="flex items-center gap-2" data-testid="tab-whatsapp">
+            <SiWhatsapp className="w-4 h-4" />
+            <span className="hidden sm:inline">WhatsApp</span>
           </TabsTrigger>
         </TabsList>
 
@@ -399,6 +575,10 @@ export default function AdminCheckoutConfig() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="whatsapp">
+          <WhatsAppNotificationsTab />
         </TabsContent>
       </Tabs>
 

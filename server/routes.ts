@@ -6829,6 +6829,122 @@ Seja conversacional e objetivo.`;
     }
   });
 
+  // WhatsApp Notifications - Status and Configuration (superadmin only)
+  app.get("/api/notifications/whatsapp/status", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.replace("Bearer ", "");
+      if (!token) return res.status(401).json({ error: "Token não fornecido" });
+      
+      const email = await validateSession(token);
+      if (!email) return res.status(401).json({ error: "Sessão inválida" });
+      
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin || admin.role !== "superadmin") {
+        return res.status(403).json({ error: "Acesso negado - apenas superadmin" });
+      }
+
+      const { getNotificationStatus } = await import("./whatsapp-notifications");
+      const status = await getNotificationStatus();
+      res.json(status);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // WhatsApp Notifications - Get available accounts for superadmin
+  app.get("/api/notifications/whatsapp/accounts", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.replace("Bearer ", "");
+      if (!token) return res.status(401).json({ error: "Token não fornecido" });
+      
+      const email = await validateSession(token);
+      if (!email) return res.status(401).json({ error: "Sessão inválida" });
+      
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin || admin.role !== "superadmin") {
+        return res.status(403).json({ error: "Acesso negado - apenas superadmin" });
+      }
+
+      // Get all WhatsApp accounts that belong to superadmin
+      const accounts = await storage.getWhatsappAccountsByAdminId(admin.id);
+      const { getWhatsAppStatus } = await import("./whatsapp-service");
+      
+      // Get status for each account
+      const accountsWithStatus = await Promise.all(
+        accounts.map(async (acc) => {
+          const status = await getWhatsAppStatus(acc.id);
+          return {
+            id: acc.id,
+            name: acc.name,
+            status: status.status,
+            phoneNumber: status.phoneNumber,
+          };
+        })
+      );
+      
+      res.json(accountsWithStatus);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // WhatsApp Notifications - Set account for notifications
+  app.post("/api/notifications/whatsapp/set-account", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.replace("Bearer ", "");
+      if (!token) return res.status(401).json({ error: "Token não fornecido" });
+      
+      const email = await validateSession(token);
+      if (!email) return res.status(401).json({ error: "Sessão inválida" });
+      
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin || admin.role !== "superadmin") {
+        return res.status(403).json({ error: "Acesso negado - apenas superadmin" });
+      }
+
+      const { accountId } = req.body;
+      if (!accountId) {
+        return res.status(400).json({ error: "accountId é obrigatório" });
+      }
+
+      // Verify account belongs to superadmin
+      const account = await storage.getWhatsappAccountById(accountId);
+      if (!account || account.adminId !== admin.id) {
+        return res.status(404).json({ error: "Conta não encontrada" });
+      }
+
+      const { setNotificationAccountId } = await import("./whatsapp-notifications");
+      await setNotificationAccountId(accountId);
+      
+      res.json({ success: true, accountId });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // WhatsApp Notifications - Clear account
+  app.delete("/api/notifications/whatsapp/account", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.replace("Bearer ", "");
+      if (!token) return res.status(401).json({ error: "Token não fornecido" });
+      
+      const email = await validateSession(token);
+      if (!email) return res.status(401).json({ error: "Sessão inválida" });
+      
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin || admin.role !== "superadmin") {
+        return res.status(403).json({ error: "Acesso negado - apenas superadmin" });
+      }
+
+      const { clearNotificationAccountId } = await import("./whatsapp-notifications");
+      await clearNotificationAccountId();
+      
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Get public key for frontend (public route)
   app.get("/api/checkout/public-key/:gateway", async (req, res) => {
     try {
