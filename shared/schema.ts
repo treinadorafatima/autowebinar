@@ -587,6 +587,26 @@ export const emailNotificationLogInsertSchema = createInsertSchema(emailNotifica
 export type EmailNotificationLogInsert = z.infer<typeof emailNotificationLogInsertSchema>;
 
 // ============================================
+// WHATSAPP NOTIFICATIONS LOG
+// ============================================
+
+export const whatsappNotificationsLog = pgTable("whatsapp_notifications_log", {
+  id: text("id").primaryKey(),
+  notificationType: text("notification_type").notNull(),
+  recipientPhone: text("recipient_phone").notNull(),
+  recipientName: text("recipient_name"),
+  message: text("message").notNull(),
+  status: text("status").notNull().default("pending"),
+  sentAt: timestamp("sent_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  error: text("error"),
+});
+
+export type WhatsappNotificationLog = typeof whatsappNotificationsLog.$inferSelect;
+export const whatsappNotificationLogInsertSchema = createInsertSchema(whatsappNotificationsLog).omit({ id: true, createdAt: true });
+export type WhatsappNotificationLogInsert = z.infer<typeof whatsappNotificationLogInsertSchema>;
+
+// ============================================
 // EMAIL MARKETING SYSTEM
 // ============================================
 
