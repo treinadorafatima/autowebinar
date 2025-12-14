@@ -245,6 +245,27 @@ export default function AdminWhatsAppNotificationsPage() {
     },
   });
 
+  const deleteAccountMutation = useMutation({
+    mutationFn: async (accountId: string) => {
+      return apiRequest("DELETE", `/api/whatsapp/accounts/${accountId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications/whatsapp/accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications/whatsapp/status"] });
+      toast({
+        title: "Conta removida",
+        description: "A conta WhatsApp foi removida com sucesso",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro ao remover",
+        description: error.message || "Não foi possível remover a conta",
+        variant: "destructive",
+      });
+    },
+  });
+
   useEffect(() => {
     if (connectionStatus?.status === "connected") {
       setQrPollingEnabled(false);
@@ -488,7 +509,7 @@ export default function AdminWhatsAppNotificationsPage() {
                         </div>
                       </div>
                     ) : (
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 flex-wrap">
                         {account.status !== "connected" && (
                           <Button
                             variant="outline"
@@ -515,6 +536,24 @@ export default function AdminWhatsAppNotificationsPage() {
                           data-testid={`button-select-account-${account.id}`}
                         >
                           Usar para Notificações
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => {
+                            if (confirm("Tem certeza que deseja remover esta conta?")) {
+                              deleteAccountMutation.mutate(account.id);
+                            }
+                          }}
+                          disabled={deleteAccountMutation.isPending}
+                          data-testid={`button-delete-account-${account.id}`}
+                        >
+                          {deleteAccountMutation.isPending ? (
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-4 h-4 mr-2" />
+                          )}
+                          Remover
                         </Button>
                       </div>
                     )}
