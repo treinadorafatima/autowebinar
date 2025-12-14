@@ -253,6 +253,7 @@ export interface IStorage {
   updateWhatsappAccount(id: string, data: Partial<WhatsappAccountInsert>): Promise<WhatsappAccount | undefined>;
   deleteWhatsappAccount(id: string): Promise<void>;
   getNextAvailableWhatsappAccount(adminId: string): Promise<WhatsappAccount | undefined>;
+  getAvailableWhatsappAccountsForRotation(adminId: string): Promise<WhatsappAccount[]>;
   incrementWhatsappAccountMessageCount(accountId: string): Promise<void>;
   // WhatsApp Marketing - Sessions
   getWhatsappSession(adminId: string): Promise<WhatsappSession | undefined>;
@@ -3303,6 +3304,8 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
   async getNextAvailableWhatsappAccount(adminId: string): Promise<WhatsappAccount | undefined> {
     // Get today's date in YYYY-MM-DD format for counter reset check
     const today = new Date().toISOString().split('T')[0];
+    const now = new Date();
+    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
     
     // Find connected accounts ordered by priority (higher first), then by lastUsedAt (round-robin)
     const accounts = await db.select().from(whatsappAccounts)
@@ -3314,27 +3317,92 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
     
     if (accounts.length === 0) return undefined;
     
-    // Filter out accounts that have hit daily limit (reset if new day)
+    // Filter out accounts that have hit daily or hourly limit (reset if needed)
     for (const account of accounts) {
-      // Reset counter if it's a new day
+      let messagesSentToday = account.messagesSentToday;
+      let messagesSentThisHour = account.messagesSentThisHour || 0;
+      
+      // Reset daily counter if it's a new day
       if (account.lastMessageResetDate !== today) {
         await db.update(whatsappAccounts)
           .set({ 
             messagesSentToday: 0, 
+            messagesSentThisHour: 0,
             lastMessageResetDate: today,
-            updatedAt: new Date()
+            lastHourResetTime: now,
+            updatedAt: now
           })
           .where(eq(whatsappAccounts.id, account.id));
-        account.messagesSentToday = 0;
+        messagesSentToday = 0;
+        messagesSentThisHour = 0;
+      }
+      // Reset hourly counter if more than 1 hour has passed since last reset
+      else if (!account.lastHourResetTime || new Date(account.lastHourResetTime) < oneHourAgo) {
+        await db.update(whatsappAccounts)
+          .set({ 
+            messagesSentThisHour: 0,
+            lastHourResetTime: now,
+            updatedAt: now
+          })
+          .where(eq(whatsappAccounts.id, account.id));
+        messagesSentThisHour = 0;
       }
       
-      // Check if under daily limit (use account's configured limit)
-      if (account.messagesSentToday < account.dailyLimit) {
+      // Check if under both daily and hourly limits
+      const hourlyLimit = account.hourlyLimit || 10;
+      if (messagesSentToday < account.dailyLimit && messagesSentThisHour < hourlyLimit) {
         return account;
       }
     }
     
-    return undefined; // All accounts have hit their limit
+    // No account available within limits - return first account anyway (will queue/wait)
+    return accounts[0];
+  }
+  
+  async getAvailableWhatsappAccountsForRotation(adminId: string): Promise<WhatsappAccount[]> {
+    // Get today's date in YYYY-MM-DD format for counter reset check
+    const today = new Date().toISOString().split('T')[0];
+    const now = new Date();
+    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+    
+    // Find connected accounts ordered by priority (higher first), then by messages sent this hour (fewer first)
+    const accounts = await db.select().from(whatsappAccounts)
+      .where(and(
+        eq(whatsappAccounts.adminId, adminId),
+        eq(whatsappAccounts.status, "connected")
+      ))
+      .orderBy(desc(whatsappAccounts.priority), whatsappAccounts.messagesSentThisHour);
+    
+    // Process each account to ensure counters are reset if needed
+    for (const account of accounts) {
+      // Reset daily counter if it's a new day
+      if (account.lastMessageResetDate !== today) {
+        await db.update(whatsappAccounts)
+          .set({ 
+            messagesSentToday: 0, 
+            messagesSentThisHour: 0,
+            lastMessageResetDate: today,
+            lastHourResetTime: now,
+            updatedAt: now
+          })
+          .where(eq(whatsappAccounts.id, account.id));
+        account.messagesSentToday = 0;
+        account.messagesSentThisHour = 0;
+      }
+      // Reset hourly counter if more than 1 hour has passed since last reset
+      else if (!account.lastHourResetTime || new Date(account.lastHourResetTime) < oneHourAgo) {
+        await db.update(whatsappAccounts)
+          .set({ 
+            messagesSentThisHour: 0,
+            lastHourResetTime: now,
+            updatedAt: now
+          })
+          .where(eq(whatsappAccounts.id, account.id));
+        account.messagesSentThisHour = 0;
+      }
+    }
+    
+    return accounts;
   }
 
   async incrementWhatsappAccountMessageCount(accountId: string): Promise<void> {
@@ -3344,6 +3412,7 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
     await db.update(whatsappAccounts)
       .set({ 
         messagesSentToday: sql`${whatsappAccounts.messagesSentToday} + 1`,
+        messagesSentThisHour: sql`COALESCE(${whatsappAccounts.messagesSentThisHour}, 0) + 1`,
         lastUsedAt: now,
         lastMessageResetDate: today,
         updatedAt: now

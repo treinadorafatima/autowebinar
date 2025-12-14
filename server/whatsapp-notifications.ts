@@ -1,14 +1,15 @@
 /**
  * WhatsApp Notification Service
  * Envia notificações via WhatsApp para os usuários (espelha as notificações por email)
- * Usa uma conta WhatsApp separada configurada pelo superadmin (não interfere nas automações de webinário)
+ * Usa rotação automática entre todas as contas WhatsApp conectadas do superadmin
+ * com controle de limite de mensagens por hora por conta
  */
 
 import { storage } from "./storage";
 import { sendWhatsAppMessage, getWhatsAppStatus, initWhatsAppConnection } from "./whatsapp-service";
 
-const CONFIG_KEY = "NOTIFICATIONS_WHATSAPP_ACCOUNT_ID";
 const ENABLED_CONFIG_KEY = "WHATSAPP_NOTIFICATIONS_ENABLED";
+const SUPERADMIN_ID_KEY = "NOTIFICATIONS_SUPERADMIN_ID";
 const APP_NAME = "AutoWebinar";
 const APP_URL = process.env.PUBLIC_BASE_URL 
   ? process.env.PUBLIC_BASE_URL.replace(/\/$/, '')
@@ -18,15 +19,36 @@ const APP_URL = process.env.PUBLIC_BASE_URL
 const LOGIN_URL = `${APP_URL}/login`;
 
 /**
- * Verifica se o serviço de notificações WhatsApp está configurado e conectado
+ * Obtém o adminId do superadmin para buscar contas de notificação
+ */
+async function getSuperadminId(): Promise<string | null> {
+  // Primeiro tenta do config, depois busca o primeiro superadmin
+  const configuredId = await storage.getCheckoutConfig(SUPERADMIN_ID_KEY);
+  if (configuredId) return configuredId;
+  
+  // Busca o primeiro superadmin se não estiver configurado
+  const admins = await storage.listAdmins();
+  const superadmin = admins.find(a => a.role === "superadmin");
+  if (superadmin) {
+    // Cache para uso futuro
+    await storage.setCheckoutConfig(SUPERADMIN_ID_KEY, superadmin.id);
+    return superadmin.id;
+  }
+  
+  return null;
+}
+
+/**
+ * Verifica se o serviço de notificações WhatsApp está disponível
+ * Retorna true se há pelo menos uma conta conectada
  */
 export async function isWhatsAppNotificationServiceAvailable(): Promise<boolean> {
   try {
-    const accountId = await storage.getCheckoutConfig(CONFIG_KEY);
-    if (!accountId) return false;
+    const superadminId = await getSuperadminId();
+    if (!superadminId) return false;
     
-    const status = await getWhatsAppStatus(accountId);
-    return status.status === "connected";
+    const accounts = await storage.getAvailableWhatsappAccountsForRotation(superadminId);
+    return accounts.length > 0;
   } catch (error) {
     console.error("[whatsapp-notifications] Erro ao verificar disponibilidade:", error);
     return false;
@@ -34,26 +56,46 @@ export async function isWhatsAppNotificationServiceAvailable(): Promise<boolean>
 }
 
 /**
- * Obtém o ID da conta WhatsApp configurada para notificações
+ * Seleciona a próxima conta disponível para enviar mensagens
+ * Usa rotação automática baseada no limite por hora de cada conta
  */
-export async function getNotificationAccountId(): Promise<string | null> {
-  return storage.getCheckoutConfig(CONFIG_KEY);
-}
-
-/**
- * Define a conta WhatsApp para notificações
- */
-export async function setNotificationAccountId(accountId: string): Promise<void> {
-  await storage.setCheckoutConfig(CONFIG_KEY, accountId);
-  console.log(`[whatsapp-notifications] Conta de notificações configurada: ${accountId}`);
-}
-
-/**
- * Remove a configuração de conta WhatsApp para notificações
- */
-export async function clearNotificationAccountId(): Promise<void> {
-  await storage.setCheckoutConfig(CONFIG_KEY, "");
-  console.log(`[whatsapp-notifications] Conta de notificações removida`);
+async function selectAccountForSending(): Promise<{ accountId: string; label: string } | null> {
+  try {
+    const superadminId = await getSuperadminId();
+    if (!superadminId) {
+      console.log("[whatsapp-notifications] Superadmin não encontrado");
+      return null;
+    }
+    
+    const accounts = await storage.getAvailableWhatsappAccountsForRotation(superadminId);
+    if (accounts.length === 0) {
+      console.log("[whatsapp-notifications] Nenhuma conta WhatsApp conectada");
+      return null;
+    }
+    
+    // Encontrar conta que ainda está dentro do limite horário
+    for (const account of accounts) {
+      const hourlyLimit = account.hourlyLimit || 10;
+      const messagesSentThisHour = account.messagesSentThisHour || 0;
+      
+      if (messagesSentThisHour < hourlyLimit) {
+        console.log(`[whatsapp-notifications] Usando conta ${account.label} (${messagesSentThisHour}/${hourlyLimit} msgs/hora)`);
+        return { accountId: account.id, label: account.label };
+      }
+    }
+    
+    // Se todas estão no limite, usa a primeira (vai esperar o limite resetar)
+    if (accounts.length === 1) {
+      console.log(`[whatsapp-notifications] Única conta ${accounts[0].label} atingiu limite, usando mesmo assim`);
+      return { accountId: accounts[0].id, label: accounts[0].label };
+    }
+    
+    console.log("[whatsapp-notifications] Todas as contas atingiram limite horário");
+    return null;
+  } catch (error) {
+    console.error("[whatsapp-notifications] Erro ao selecionar conta:", error);
+    return null;
+  }
 }
 
 /**
@@ -78,7 +120,7 @@ export async function setWhatsAppNotificationsEnabled(enabled: boolean): Promise
 }
 
 /**
- * Envia mensagem WhatsApp usando a conta de notificações configurada
+ * Envia mensagem WhatsApp usando rotação automática entre contas conectadas
  * Retorna true se enviou com sucesso, false caso contrário
  * Nunca lança erros (safe)
  */
@@ -96,21 +138,26 @@ async function sendNotificationMessage(phone: string, message: string): Promise<
       return false;
     }
     
-    const accountId = await storage.getCheckoutConfig(CONFIG_KEY);
-    if (!accountId) {
-      console.log("[whatsapp-notifications] Nenhuma conta configurada para notificações");
+    // Selecionar conta usando rotação automática
+    const selectedAccount = await selectAccountForSending();
+    if (!selectedAccount) {
+      console.log("[whatsapp-notifications] Nenhuma conta disponível para envio");
       return false;
     }
     
+    const { accountId, label } = selectedAccount;
+    
     const status = await getWhatsAppStatus(accountId);
     if (status.status !== "connected") {
-      console.log(`[whatsapp-notifications] Conta ${accountId} não está conectada (status: ${status.status})`);
+      console.log(`[whatsapp-notifications] Conta ${label} não está conectada (status: ${status.status})`);
       return false;
     }
     
     const result = await sendWhatsAppMessage(accountId, phone, message);
     if (result.success) {
-      console.log(`[whatsapp-notifications] Mensagem enviada para ${phone}`);
+      // Incrementar contador de mensagens da conta usada
+      await storage.incrementWhatsappAccountMessageCount(accountId);
+      console.log(`[whatsapp-notifications] Mensagem enviada para ${phone} via ${label}`);
       return true;
     } else {
       console.error(`[whatsapp-notifications] Falha ao enviar para ${phone}: ${result.error}`);
@@ -340,7 +387,8 @@ Duvidas? Estamos aqui para ajudar!`;
 }
 
 /**
- * Verifica status da conta de notificações e retorna informações
+ * Verifica status das contas de notificação e retorna informações
+ * Agora retorna informações sobre todas as contas conectadas para rotação
  */
 export async function getNotificationStatus(): Promise<{
   configured: boolean;
@@ -348,28 +396,49 @@ export async function getNotificationStatus(): Promise<{
   status: string;
   phoneNumber?: string;
   enabled: boolean;
+  connectedAccounts: number;
+  totalAccounts: number;
 }> {
   try {
-    const accountId = await storage.getCheckoutConfig(CONFIG_KEY);
+    const superadminId = await getSuperadminId();
     const enabled = await isWhatsAppNotificationsEnabled();
     
-    if (!accountId) {
+    if (!superadminId) {
       return {
         configured: false,
         accountId: null,
         status: "not_configured",
         enabled,
+        connectedAccounts: 0,
+        totalAccounts: 0,
       };
     }
     
-    const status = await getWhatsAppStatus(accountId);
+    const allAccounts = await storage.listWhatsappAccountsByAdmin(superadminId);
+    const connectedAccounts = await storage.getAvailableWhatsappAccountsForRotation(superadminId);
+    
+    if (connectedAccounts.length === 0) {
+      return {
+        configured: allAccounts.length > 0,
+        accountId: null,
+        status: allAccounts.length > 0 ? "disconnected" : "not_configured",
+        enabled,
+        connectedAccounts: 0,
+        totalAccounts: allAccounts.length,
+      };
+    }
+    
+    // Retorna o primeiro account conectado para compatibilidade
+    const firstConnected = connectedAccounts[0];
     
     return {
       configured: true,
-      accountId,
-      status: status.status,
-      phoneNumber: status.phoneNumber,
+      accountId: firstConnected.id,
+      status: "connected",
+      phoneNumber: firstConnected.phoneNumber || undefined,
       enabled,
+      connectedAccounts: connectedAccounts.length,
+      totalAccounts: allAccounts.length,
     };
   } catch (error) {
     console.error("[whatsapp-notifications] Erro ao obter status:", error);
@@ -378,6 +447,8 @@ export async function getNotificationStatus(): Promise<{
       accountId: null,
       status: "error",
       enabled: false,
+      connectedAccounts: 0,
+      totalAccounts: 0,
     };
   }
 }
