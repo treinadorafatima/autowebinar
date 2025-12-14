@@ -405,6 +405,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   await storage.initializeDefaultAiConfig();
   await storage.initializeDefaultPlanos();
   await storage.initDefaultWhatsappNotificationTemplates();
+  await storage.initDefaultEmailNotificationTemplates();
 
   /**
    * Helper function to create affiliate sale when payment is approved
@@ -7084,6 +7085,71 @@ Seja conversacional e objetivo.`;
         messageTemplate,
         isActive,
       });
+
+      if (!updated) {
+        return res.status(404).json({ error: "Template não encontrado" });
+      }
+
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ============================================
+  // EMAIL NOTIFICATION TEMPLATES (SUPERADMIN)
+  // ============================================
+
+  // Email Notification Templates - List all templates
+  app.get("/api/notifications/email/templates", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.replace("Bearer ", "");
+      if (!token) return res.status(401).json({ error: "Token não fornecido" });
+      
+      const email = await validateSession(token);
+      if (!email) return res.status(401).json({ error: "Sessão inválida" });
+      
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin || admin.role !== "superadmin") {
+        return res.status(403).json({ error: "Acesso negado - apenas superadmin" });
+      }
+
+      const templates = await storage.listEmailNotificationTemplates();
+      res.json(templates);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Email Notification Templates - Update a template
+  app.patch("/api/notifications/email/templates/:id", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.replace("Bearer ", "");
+      if (!token) return res.status(401).json({ error: "Token não fornecido" });
+      
+      const email = await validateSession(token);
+      if (!email) return res.status(401).json({ error: "Sessão inválida" });
+      
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin || admin.role !== "superadmin") {
+        return res.status(403).json({ error: "Acesso negado - apenas superadmin" });
+      }
+
+      const { id } = req.params;
+      const { subject, htmlTemplate, textTemplate, isActive } = req.body;
+
+      // Validate that at least one field is provided
+      const updateData: Record<string, any> = {};
+      if (typeof subject === 'string' && subject.trim()) updateData.subject = subject.trim();
+      if (typeof htmlTemplate === 'string' && htmlTemplate.trim()) updateData.htmlTemplate = htmlTemplate.trim();
+      if (typeof textTemplate === 'string') updateData.textTemplate = textTemplate.trim();
+      if (typeof isActive === 'boolean') updateData.isActive = isActive;
+
+      if (Object.keys(updateData).length === 0) {
+        return res.status(400).json({ error: "Nenhum campo válido para atualizar" });
+      }
+
+      const updated = await storage.updateEmailNotificationTemplate(id, updateData);
 
       if (!updated) {
         return res.status(404).json({ error: "Template não encontrado" });

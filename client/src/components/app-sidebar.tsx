@@ -19,7 +19,8 @@ import {
   Shield,
   Zap,
   UserCheck,
-  Bell
+  Bell,
+  Mail
 } from "lucide-react";
 import { SiWhatsapp } from "react-icons/si";
 import logoUrl from "@assets/logo-autowebinar-preto.png";
@@ -161,6 +162,12 @@ const adminMenuItems = [
     title: "Notificações WhatsApp",
     url: "/admin/whatsapp-notifications",
     icon: Bell,
+    superadminOnly: true,
+  },
+  {
+    title: "Notificações E-mail",
+    url: "/admin/email-notifications",
+    icon: Mail,
     superadminOnly: true,
   },
 ];
