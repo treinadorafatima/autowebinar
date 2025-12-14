@@ -55,6 +55,7 @@ interface WhatsAppConnectionStatus {
 export default function AdminWhatsAppNotificationsPage() {
   const { toast } = useToast();
   const [qrPollingEnabled, setQrPollingEnabled] = useState(false);
+  const [connectingAccountId, setConnectingAccountId] = useState<string | null>(null);
   const qrPollingRef = useRef<NodeJS.Timeout | null>(null);
 
   const { data: notificationStatus, isLoading: loadingStatus, refetch: refetchStatus } = useQuery<NotificationStatus>({
@@ -84,6 +85,19 @@ export default function AdminWhatsAppNotificationsPage() {
 
   const { data: notificationQueue = [], isLoading: loadingQueue, refetch: refetchQueue } = useQuery<WhatsappNotificationLog[]>({
     queryKey: ["/api/notifications/whatsapp/queue"],
+  });
+
+  const { data: connectingAccountStatus, refetch: refetchConnectingAccount } = useQuery<WhatsAppConnectionStatus>({
+    queryKey: ["/api/whatsapp/status", "connecting", connectingAccountId],
+    queryFn: async () => {
+      if (!connectingAccountId) return { status: "disconnected" };
+      const res = await fetch(`/api/whatsapp/status?accountId=${connectingAccountId}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("adminToken")}` }
+      });
+      return res.json();
+    },
+    enabled: !!connectingAccountId,
+    refetchInterval: connectingAccountId ? 3000 : false,
   });
 
   const cancelQueueMutation = useMutation({
@@ -237,6 +251,17 @@ export default function AdminWhatsAppNotificationsPage() {
       refetchStatus();
     }
   }, [connectionStatus?.status, refetchStatus]);
+
+  useEffect(() => {
+    if (connectingAccountStatus?.status === "connected") {
+      setConnectingAccountId(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications/whatsapp/accounts"] });
+      toast({
+        title: "WhatsApp conectado",
+        description: "A conta foi conectada com sucesso",
+      });
+    }
+  }, [connectingAccountStatus?.status, toast]);
 
   useEffect(() => {
     return () => {
@@ -393,31 +418,106 @@ export default function AdminWhatsAppNotificationsPage() {
           ) : !notificationStatus?.configured && accounts.length > 0 ? (
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Selecione uma conta existente ou crie uma nova:
+                Selecione uma conta existente ou crie uma nova. Você pode conectar diretamente via QR Code:
               </p>
               <div className="grid gap-3">
                 {accounts.map((account) => (
                   <div 
                     key={account.id}
-                    className="flex items-center justify-between p-3 border rounded-lg"
+                    className="p-4 border rounded-lg space-y-4"
                   >
-                    <div className="flex items-center gap-3">
-                      <SiWhatsapp className="w-5 h-5 text-green-500" />
-                      <div>
-                        <p className="font-medium">{account.label}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {account.phoneNumber || "Não conectado"}
-                        </p>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <SiWhatsapp className="w-5 h-5 text-green-500" />
+                        <div>
+                          <p className="font-medium">{account.label}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {account.phoneNumber || "Não conectado"}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {account.status === "connected" ? (
+                          <Badge className="bg-green-500">
+                            <Wifi className="w-3 h-3 mr-1" /> Conectado
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary">
+                            <WifiOff className="w-3 h-3 mr-1" /> Desconectado
+                          </Badge>
+                        )}
                       </div>
                     </div>
-                    <Button
-                      size="sm"
-                      onClick={() => setAccountMutation.mutate(account.id)}
-                      disabled={setAccountMutation.isPending}
-                      data-testid={`button-select-account-${account.id}`}
-                    >
-                      Selecionar
-                    </Button>
+
+                    {connectingAccountId === account.id && connectingAccountStatus?.qrCode && connectingAccountStatus?.status === "qr_ready" ? (
+                      <div className="space-y-4">
+                        <div className="flex flex-col items-center gap-4 p-6 border rounded-lg bg-white dark:bg-gray-900">
+                          <QrCode className="w-8 h-8 text-muted-foreground" />
+                          <p className="text-center text-sm text-muted-foreground">
+                            Escaneie o QR Code com seu WhatsApp para conectar
+                          </p>
+                          <div className="p-4 bg-white rounded-lg">
+                            <img 
+                              src={connectingAccountStatus.qrCode} 
+                              alt="QR Code WhatsApp" 
+                              className="w-64 h-64"
+                              data-testid={`img-qr-code-${account.id}`}
+                            />
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            No WhatsApp, vá em Configurações {'>'} Dispositivos conectados {'>'} Conectar dispositivo
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            onClick={() => refetchConnectingAccount()}
+                            className="flex-1"
+                            data-testid={`button-refresh-qr-${account.id}`}
+                          >
+                            <RefreshCcw className="w-4 h-4 mr-2" />
+                            Atualizar QR Code
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            onClick={() => setConnectingAccountId(null)}
+                            data-testid={`button-cancel-connection-${account.id}`}
+                          >
+                            Cancelar
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex gap-2">
+                        {account.status !== "connected" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setConnectingAccountId(account.id);
+                              connectMutation.mutate(account.id);
+                            }}
+                            disabled={connectMutation.isPending || connectingAccountId === account.id}
+                            data-testid={`button-connect-${account.id}`}
+                          >
+                            {connectMutation.isPending && connectingAccountId === account.id ? (
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            ) : (
+                              <QrCode className="w-4 h-4 mr-2" />
+                            )}
+                            Gerar QR Code
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          onClick={() => setAccountMutation.mutate(account.id)}
+                          disabled={setAccountMutation.isPending}
+                          data-testid={`button-select-account-${account.id}`}
+                        >
+                          Usar para Notificações
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -542,54 +642,6 @@ export default function AdminWhatsAppNotificationsPage() {
               )}
             </div>
           )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Tipos de Notificações</CardTitle>
-          <CardDescription>
-            Mensagens automáticas que serão enviadas aos clientes quando ativado
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-3">
-            <div className="flex items-center gap-3 p-3 border rounded-lg">
-              <CheckCircle className="w-5 h-5 text-green-500" />
-              <div>
-                <p className="font-medium">Credenciais de Acesso</p>
-                <p className="text-sm text-muted-foreground">Enviado quando um novo usuário é criado</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 p-3 border rounded-lg">
-              <CheckCircle className="w-5 h-5 text-green-500" />
-              <div>
-                <p className="font-medium">Confirmação de Pagamento</p>
-                <p className="text-sm text-muted-foreground">Enviado quando um pagamento é confirmado</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 p-3 border rounded-lg">
-              <CheckCircle className="w-5 h-5 text-green-500" />
-              <div>
-                <p className="font-medium">Redefinição de Senha</p>
-                <p className="text-sm text-muted-foreground">Enviado quando o usuário solicita nova senha</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 p-3 border rounded-lg">
-              <CheckCircle className="w-5 h-5 text-green-500" />
-              <div>
-                <p className="font-medium">Expiração de Plano</p>
-                <p className="text-sm text-muted-foreground">Enviado quando o plano do usuário expira</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 p-3 border rounded-lg">
-              <CheckCircle className="w-5 h-5 text-green-500" />
-              <div>
-                <p className="font-medium">Boas-vindas</p>
-                <p className="text-sm text-muted-foreground">Enviado para novos usuários cadastrados</p>
-              </div>
-            </div>
-          </div>
         </CardContent>
       </Card>
 
