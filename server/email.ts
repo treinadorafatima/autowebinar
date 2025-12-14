@@ -333,7 +333,29 @@ export async function sendAccessCredentialsEmail(to: string, name: string, tempP
   try {
     const { client, fromEmail } = getResendClient();
     
-    const text = `
+    const placeholderValues: Record<string, string> = {
+      name: name || 'Usuário',
+      email: to,
+      tempPassword: tempPassword,
+      planName: planName,
+      loginUrl: LOGIN_URL,
+      appName: APP_NAME,
+    };
+    
+    const dbTemplate = await getActiveTemplate('credentials');
+    
+    let subject: string;
+    let html: string;
+    let text: string;
+    
+    if (dbTemplate) {
+      subject = replacePlaceholders(dbTemplate.subject, placeholderValues);
+      html = replacePlaceholders(dbTemplate.htmlTemplate, placeholderValues);
+      text = replacePlaceholders(dbTemplate.textTemplate || '', placeholderValues);
+      console.log(`[email] Using database template for credentials email`);
+    } else {
+      subject = `Seu acesso ao ${APP_NAME} foi liberado!`;
+      text = `
 Ola ${name},
 
 Seu acesso ao ${APP_NAME} foi liberado com sucesso!
@@ -362,7 +384,7 @@ Se tiver qualquer duvida, estamos aqui para ajudar!
 ${APP_NAME}
     `.trim();
     
-    const html = `
+      html = `
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -458,12 +480,13 @@ ${APP_NAME}
 </body>
 </html>
     `;
+    }
 
     const result = await client.emails.send({
       from: fromEmail,
       replyTo: REPLY_TO_EMAIL,
       to: [to],
-      subject: `Seu acesso ao ${APP_NAME} foi liberado!`,
+      subject,
       html,
       text,
     });
@@ -481,7 +504,26 @@ export async function sendPasswordResetEmail(to: string, name: string, resetToke
     const { client, fromEmail } = getResendClient();
     const resetUrl = `${APP_URL}/reset-password?token=${resetToken}`;
     
-    const text = `
+    const placeholderValues: Record<string, string> = {
+      name: name || 'Usuário',
+      resetUrl: resetUrl,
+      appName: APP_NAME,
+    };
+    
+    const dbTemplate = await getActiveTemplate('password_reset');
+    
+    let subject: string;
+    let html: string;
+    let text: string;
+    
+    if (dbTemplate) {
+      subject = replacePlaceholders(dbTemplate.subject, placeholderValues);
+      html = replacePlaceholders(dbTemplate.htmlTemplate, placeholderValues);
+      text = replacePlaceholders(dbTemplate.textTemplate || '', placeholderValues);
+      console.log(`[email] Using database template for password_reset email`);
+    } else {
+      subject = `Recuperacao de Senha - ${APP_NAME}`;
+      text = `
 Ola ${name},
 
 Recebemos uma solicitacao para redefinir a senha da sua conta no ${APP_NAME}.
@@ -496,7 +538,7 @@ ${APP_NAME}
 Este e um email automatico, por favor nao responda.
     `.trim();
     
-    const html = `
+      html = `
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -566,12 +608,13 @@ Este e um email automatico, por favor nao responda.
 </body>
 </html>
     `;
+    }
 
     const result = await client.emails.send({
       from: fromEmail,
       replyTo: REPLY_TO_EMAIL,
       to: [to],
-      subject: `Recuperacao de Senha - ${APP_NAME}`,
+      subject,
       html,
       text,
     });
@@ -587,8 +630,29 @@ Este e um email automatico, por favor nao responda.
 export async function sendPlanExpiredEmail(to: string, name: string, planName: string): Promise<boolean> {
   try {
     const { client, fromEmail } = getResendClient();
+    const renewUrl = `${APP_URL}/checkout`;
     
-    const text = `
+    const placeholderValues: Record<string, string> = {
+      name: name || 'Usuário',
+      planName: planName,
+      renewUrl: renewUrl,
+      appName: APP_NAME,
+    };
+    
+    const dbTemplate = await getActiveTemplate('plan_expired');
+    
+    let subject: string;
+    let html: string;
+    let text: string;
+    
+    if (dbTemplate) {
+      subject = replacePlaceholders(dbTemplate.subject, placeholderValues);
+      html = replacePlaceholders(dbTemplate.htmlTemplate, placeholderValues);
+      text = replacePlaceholders(dbTemplate.textTemplate || '', placeholderValues);
+      console.log(`[email] Using database template for plan_expired email`);
+    } else {
+      subject = `Seu plano expirou - ${APP_NAME}`;
+      text = `
 Ola ${name},
 
 O seu plano ${planName} expirou e o acesso a sua conta no ${APP_NAME} foi suspenso.
@@ -608,7 +672,7 @@ Precisa de ajuda? Entre em contato com nosso suporte.
 ${APP_NAME}
     `.trim();
     
-    const html = `
+      html = `
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -683,12 +747,13 @@ ${APP_NAME}
 </body>
 </html>
     `;
+    }
 
     const result = await client.emails.send({
       from: fromEmail,
       replyTo: REPLY_TO_EMAIL,
       to: [to],
-      subject: `Seu plano expirou - ${APP_NAME}`,
+      subject,
       html,
       text,
     });
@@ -715,7 +780,28 @@ export async function sendPaymentFailedEmail(to: string, name: string, planName:
       ? `${APP_URL}/checkout/${planoId}?${checkoutParams.toString()}`
       : `${APP_URL}/checkout?${checkoutParams.toString()}`;
     
-    const text = `
+    const placeholderValues: Record<string, string> = {
+      name: name || 'Usuário',
+      planName: planName,
+      reason: reason || 'Cartão recusado ou limite insuficiente',
+      paymentUrl: checkoutUrl,
+      appName: APP_NAME,
+    };
+    
+    const dbTemplate = await getActiveTemplate('payment_failed');
+    
+    let subject: string;
+    let html: string;
+    let text: string;
+    
+    if (dbTemplate) {
+      subject = replacePlaceholders(dbTemplate.subject, placeholderValues);
+      html = replacePlaceholders(dbTemplate.htmlTemplate, placeholderValues);
+      text = replacePlaceholders(dbTemplate.textTemplate || '', placeholderValues);
+      console.log(`[email] Using database template for payment_failed email`);
+    } else {
+      subject = `Acao necessaria: pagamento nao aprovado - ${APP_NAME}`;
+      text = `
 Ola ${name},
 
 A renovacao do seu plano ${planName} nao foi aprovada e seu acesso foi temporariamente suspenso.
@@ -737,7 +823,7 @@ Se precisar de ajuda, entre em contato com nosso suporte.
 ${APP_NAME}
     `.trim();
     
-    const html = `
+      html = `
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -828,12 +914,13 @@ ${APP_NAME}
 </body>
 </html>
     `;
+    }
 
     const result = await client.emails.send({
       from: fromEmail,
       replyTo: REPLY_TO_EMAIL,
       to: [to],
-      subject: `Acao necessaria: pagamento nao aprovado - ${APP_NAME}`,
+      subject,
       html,
       text,
     });
@@ -1005,7 +1092,28 @@ export async function sendPaymentConfirmedEmail(to: string, name: string, planNa
     const { client, fromEmail } = getResendClient();
     const formattedDate = expirationDate.toLocaleDateString('pt-BR');
     
-    const text = `
+    const placeholderValues: Record<string, string> = {
+      name: name || 'Usuário',
+      planName: planName,
+      expirationDate: formattedDate,
+      loginUrl: `${APP_URL}/admin`,
+      appName: APP_NAME,
+    };
+    
+    const dbTemplate = await getActiveTemplate('payment_confirmed');
+    
+    let subject: string;
+    let html: string;
+    let text: string;
+    
+    if (dbTemplate) {
+      subject = replacePlaceholders(dbTemplate.subject, placeholderValues);
+      html = replacePlaceholders(dbTemplate.htmlTemplate, placeholderValues);
+      text = replacePlaceholders(dbTemplate.textTemplate || '', placeholderValues);
+      console.log(`[email] Using database template for payment_confirmed email`);
+    } else {
+      subject = `Pagamento confirmado - ${APP_NAME}`;
+      text = `
 Ola ${name},
 
 Otima noticia! Seu pagamento foi confirmado com sucesso.
@@ -1024,7 +1132,7 @@ Obrigado por confiar no ${APP_NAME}!
 ${APP_NAME}
     `.trim();
     
-    const html = `
+      html = `
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -1096,12 +1204,13 @@ ${APP_NAME}
 </body>
 </html>
     `;
+    }
 
     const result = await client.emails.send({
       from: fromEmail,
       replyTo: REPLY_TO_EMAIL,
       to: [to],
-      subject: `Pagamento confirmado - ${APP_NAME}`,
+      subject,
       html,
       text,
     });
