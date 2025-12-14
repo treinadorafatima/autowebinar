@@ -21,7 +21,6 @@ interface AdminWithPlan {
   planoId: string | null;
   lastExpirationEmailSent: Date | null;
   planName?: string;
-  cpf?: string | null;
   telefone?: string | null;
 }
 
@@ -52,7 +51,6 @@ async function getAdminsExpiringInDays(days: number): Promise<AdminWithPlan[]> {
       accessExpiresAt: admins.accessExpiresAt,
       planoId: admins.planoId,
       lastExpirationEmailSent: admins.lastExpirationEmailSent,
-      cpf: admins.cpf,
       telefone: admins.telefone,
     })
     .from(admins)
@@ -137,10 +135,26 @@ async function generateRenewalPixBoleto(admin: AdminWithPlan): Promise<boolean> 
       return false;
     }
 
+    // Try to get CPF from previous approved payments for this user
+    const previousPayments = await db
+      .select({ cpf: checkoutPagamentos.cpf })
+      .from(checkoutPagamentos)
+      .where(
+        and(
+          eq(checkoutPagamentos.email, admin.email),
+          isNotNull(checkoutPagamentos.cpf),
+          eq(checkoutPagamentos.status, 'approved')
+        )
+      )
+      .orderBy(sql`${checkoutPagamentos.createdAt} DESC`)
+      .limit(1);
+    
+    const userCpf = previousPayments[0]?.cpf || null;
+
     const pagamento = await storage.createCheckoutPagamento({
       email: admin.email,
       nome: admin.name || 'Cliente',
-      cpf: admin.cpf || null,
+      cpf: userCpf,
       telefone: admin.telefone || null,
       planoId: plan.id,
       valor: plan.preco,
@@ -217,39 +231,44 @@ async function generateRenewalPixBoleto(admin: AdminWithPlan): Promise<boolean> 
     }
 
     try {
-      const boletoExpiresAt = new Date();
-      boletoExpiresAt.setDate(boletoExpiresAt.getDate() + 3);
+      // Only generate boleto if user has a valid CPF on record
+      if (!userCpf || userCpf.length < 11) {
+        console.log(`[subscription-scheduler] Skipping boleto for ${admin.email} - no CPF on record`);
+      } else {
+        const boletoExpiresAt = new Date();
+        boletoExpiresAt.setDate(boletoExpiresAt.getDate() + 3);
 
-      const boletoParams = new URLSearchParams({
-        'amount': amountInCentavos.toString(),
-        'currency': 'brl',
-        'payment_method_types[0]': 'boleto',
-        'metadata[pagamentoId]': pagamento.id,
-        'metadata[adminId]': admin.id,
-        'metadata[autoRenewal]': 'true',
-        'receipt_email': admin.email,
-        'description': `Renovação ${plan.nome}`,
-      });
-
-      const boletoResponse = await fetch('https://api.stripe.com/v1/payment_intents', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${stripeSecretKey}`,
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: boletoParams.toString(),
-      });
-
-      if (boletoResponse.ok) {
-        const boletoIntent = await boletoResponse.json();
-        
-        const cpfDigits = (admin.cpf || '').replace(/\D/g, '') || '00000000000';
-        const confirmParams = new URLSearchParams({
-          'payment_method_data[type]': 'boleto',
-          'payment_method_data[billing_details][email]': admin.email,
-          'payment_method_data[billing_details][name]': admin.name || 'Cliente',
-          'payment_method_data[boleto][tax_id]': cpfDigits,
+        const boletoParams = new URLSearchParams({
+          'amount': amountInCentavos.toString(),
+          'currency': 'brl',
+          'payment_method_types[0]': 'boleto',
+          'metadata[pagamentoId]': pagamento.id,
+          'metadata[adminId]': admin.id,
+          'metadata[autoRenewal]': 'true',
+          'receipt_email': admin.email,
+          'description': `Renovação ${plan.nome}`,
         });
+
+        const boletoResponse = await fetch('https://api.stripe.com/v1/payment_intents', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${stripeSecretKey}`,
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: boletoParams.toString(),
+        });
+
+        if (boletoResponse.ok) {
+          const boletoIntent = await boletoResponse.json();
+          
+          // Clean CPF - remove non-digits
+          const cpfDigits = userCpf.replace(/\D/g, '');
+          const confirmParams = new URLSearchParams({
+            'payment_method_data[type]': 'boleto',
+            'payment_method_data[billing_details][email]': admin.email,
+            'payment_method_data[billing_details][name]': admin.name || 'Cliente',
+            'payment_method_data[boleto][tax_id]': cpfDigits,
+          });
 
         const confirmResponse = await fetch(`https://api.stripe.com/v1/payment_intents/${boletoIntent.id}/confirm`, {
           method: 'POST',
@@ -272,9 +291,10 @@ async function generateRenewalPixBoleto(admin: AdminWithPlan): Promise<boolean> 
           const errorData = await confirmResponse.json().catch(() => ({}));
           console.error('[subscription-scheduler] Boleto confirm failed:', confirmResponse.status, errorData);
         }
-      } else {
-        const errorData = await boletoResponse.json().catch(() => ({}));
-        console.error('[subscription-scheduler] Boleto create failed:', boletoResponse.status, errorData);
+        } else {
+          const errorData = await boletoResponse.json().catch(() => ({}));
+          console.error('[subscription-scheduler] Boleto create failed:', boletoResponse.status, errorData);
+        }
       }
     } catch (boletoErr) {
       console.error('[subscription-scheduler] Error generating Boleto:', boletoErr);
