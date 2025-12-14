@@ -30,6 +30,12 @@ import {
   sendWelcomeEmailSafe,
   sendAffiliateSaleEmailSafe
 } from "./email";
+import {
+  sendWhatsAppCredentialsSafe,
+  sendWhatsAppPaymentConfirmedSafe,
+  sendWhatsAppPaymentFailedSafe,
+  sendWhatsAppPlanExpiredSafe
+} from "./whatsapp-notifications";
 
 // Helper function to generate a simple, easy-to-type temporary password
 function generateTempPassword(): string {
@@ -656,6 +662,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { sendPasswordResetEmail } = await import("./email");
       await sendPasswordResetEmail(email.toLowerCase(), admin.name || "Usuário", resetToken);
+      
+      // Send WhatsApp notification if phone available
+      if (admin.telefone) {
+        const { sendWhatsAppPasswordResetSafe } = await import("./whatsapp-notifications");
+        sendWhatsAppPasswordResetSafe(admin.telefone, admin.name || "Usuário", resetToken);
+      }
 
       console.log(`[auth] Token de recuperação criado para ${email}`);
 
@@ -8850,6 +8862,11 @@ Seja conversacional e objetivo.`;
                   
                   // Send payment confirmation email (safe - never throws)
                   sendPaymentConfirmedEmailSafe(pagamento.email, pagamento.nome, plano.nome, expirationDate);
+                  // Send WhatsApp notification if phone available (prefer admin phone for renewals)
+                  const telefoneNotif1 = admin?.telefone || pagamento.telefone;
+                  if (telefoneNotif1) {
+                    sendWhatsAppPaymentConfirmedSafe(telefoneNotif1, pagamento.nome, plano.nome, expirationDate);
+                  }
                 } else {
                   const tempPassword = generateTempPassword();
                   const bcrypt = await import('bcryptjs');
@@ -8874,6 +8891,10 @@ Seja conversacional e objetivo.`;
                   
                   // Send access credentials email for new users (safe - never throws)
                   sendAccessCredentialsEmailSafe(pagamento.email, pagamento.nome, tempPassword, plano.nome);
+                  // Send WhatsApp credentials if phone available (new user - use pagamento.telefone)
+                  if (pagamento.telefone) {
+                    sendWhatsAppCredentialsSafe(pagamento.telefone, pagamento.nome, tempPassword, plano.nome);
+                  }
                 }
               }
 
@@ -8898,6 +8919,11 @@ Seja conversacional e objetivo.`;
                   // Send plan expired email (safe - never throws)
                   const plano = await storage.getCheckoutPlanoById(pagamento.planoId);
                   sendPlanExpiredEmailSafe(pagamento.email, pagamento.nome, plano?.nome || "Seu Plano");
+                  // Send WhatsApp notification if phone available (prefer admin phone)
+                  const telefoneNotif2 = admin?.telefone || pagamento.telefone;
+                  if (telefoneNotif2) {
+                    sendWhatsAppPlanExpiredSafe(telefoneNotif2, pagamento.nome, plano?.nome || "Seu Plano");
+                  }
                 }
               }
             }
@@ -8987,6 +9013,11 @@ Seja conversacional e objetivo.`;
                   
                   // Send payment confirmation email (safe - never throws)
                   sendPaymentConfirmedEmailSafe(pagamento.email, pagamento.nome, plano.nome, expirationDate);
+                  // Send WhatsApp notification if phone available (prefer admin phone for renewals)
+                  const telefoneNotif3 = admin?.telefone || pagamento.telefone;
+                  if (telefoneNotif3) {
+                    sendWhatsAppPaymentConfirmedSafe(telefoneNotif3, pagamento.nome, plano.nome, expirationDate);
+                  }
                 } else {
                   // Create new admin
                   const tempPassword = generateTempPassword();
@@ -9012,6 +9043,10 @@ Seja conversacional e objetivo.`;
                   
                   // Send access credentials email for new users (safe - never throws)
                   sendAccessCredentialsEmailSafe(pagamento.email, pagamento.nome, tempPassword, plano.nome);
+                  // Send WhatsApp credentials if phone available (new user - use pagamento.telefone)
+                  if (pagamento.telefone) {
+                    sendWhatsAppCredentialsSafe(pagamento.telefone, pagamento.nome, tempPassword, plano.nome);
+                  }
                 }
                 
                 // Process affiliate sale if applicable (with scheduled payout)
@@ -9039,6 +9074,11 @@ Seja conversacional e objetivo.`;
                   `${errorInfo.message} ${errorInfo.action}`,
                   pagamento.planoId
                 );
+                // Send WhatsApp notification if phone available (prefer admin phone)
+                const telefoneNotif4 = admin?.telefone || pagamento.telefone;
+                if (telefoneNotif4) {
+                  sendWhatsAppPaymentFailedSafe(telefoneNotif4, pagamento.nome, plano?.nome || "Seu Plano", `${errorInfo.message}`);
+                }
               }
             }
 
@@ -9123,6 +9163,11 @@ Seja conversacional e objetivo.`;
                         
                         // Send payment confirmation email (safe - never throws)
                         sendPaymentConfirmedEmailSafe(pagamento.email, pagamento.nome, plano.nome, expirationDate);
+                        // Send WhatsApp notification if phone available (prefer admin phone for renewals)
+                        const telefoneNotif5 = admin?.telefone || pagamento.telefone;
+                        if (telefoneNotif5) {
+                          sendWhatsAppPaymentConfirmedSafe(telefoneNotif5, pagamento.nome, plano.nome, expirationDate);
+                        }
                       } else {
                         // Create new admin
                         const tempPassword = generateTempPassword();
@@ -9147,6 +9192,10 @@ Seja conversacional e objetivo.`;
                         
                         // Send access credentials email (safe - never throws)
                         sendAccessCredentialsEmailSafe(pagamento.email, pagamento.nome, tempPassword, plano.nome);
+                        // Send WhatsApp credentials if phone available (new user - use pagamento.telefone)
+                        if (pagamento.telefone) {
+                          sendWhatsAppCredentialsSafe(pagamento.telefone, pagamento.nome, tempPassword, plano.nome);
+                        }
                       }
                       
                       // Process affiliate sale if applicable
@@ -9282,6 +9331,11 @@ Seja conversacional e objetivo.`;
                 
                 // Send payment confirmation email for existing users (safe - never throws)
                 sendPaymentConfirmedEmailSafe(pagamento.email, pagamento.nome, plano.nome, expirationDate);
+                // Send WhatsApp notification if phone available (prefer admin phone for renewals)
+                const telefoneNotif6 = admin?.telefone || pagamento.telefone;
+                if (telefoneNotif6) {
+                  sendWhatsAppPaymentConfirmedSafe(telefoneNotif6, pagamento.nome, plano.nome, expirationDate);
+                }
               } else {
                 const tempPassword = generateTempPassword();
                 const bcrypt = await import('bcryptjs');
@@ -9302,6 +9356,10 @@ Seja conversacional e objetivo.`;
                 
                 // Send access credentials email for new users (safe - never throws)
                 sendAccessCredentialsEmailSafe(pagamento.email, pagamento.nome, tempPassword, plano.nome);
+                // Send WhatsApp credentials if phone available (new user - use pagamento.telefone)
+                if (pagamento.telefone) {
+                  sendWhatsAppCredentialsSafe(pagamento.telefone, pagamento.nome, tempPassword, plano.nome);
+                }
               }
               
               // Process affiliate sale if applicable (with scheduled payout)
@@ -9366,6 +9424,11 @@ Seja conversacional e objetivo.`;
                 
                 // Send payment confirmation email for existing users (safe - never throws)
                 sendPaymentConfirmedEmailSafe(pagamento.email, pagamento.nome, plano.nome, expirationDate);
+                // Send WhatsApp notification if phone available (prefer admin phone for renewals)
+                const telefoneNotif7 = admin?.telefone || pagamento.telefone;
+                if (telefoneNotif7) {
+                  sendWhatsAppPaymentConfirmedSafe(telefoneNotif7, pagamento.nome, plano.nome, expirationDate);
+                }
               } else {
                 const tempPassword = generateTempPassword();
                 const bcrypt = await import('bcryptjs');
@@ -9390,6 +9453,10 @@ Seja conversacional e objetivo.`;
                 
                 // Send access credentials email for new users (safe - never throws)
                 sendAccessCredentialsEmailSafe(pagamento.email, pagamento.nome, tempPassword, plano.nome);
+                // Send WhatsApp credentials if phone available (new user - use pagamento.telefone)
+                if (pagamento.telefone) {
+                  sendWhatsAppCredentialsSafe(pagamento.telefone, pagamento.nome, tempPassword, plano.nome);
+                }
               }
               
               // Process affiliate sale if applicable (with scheduled payout)
@@ -9443,6 +9510,11 @@ Seja conversacional e objetivo.`;
                 
                 // Send payment confirmation email (safe - never throws)
                 sendPaymentConfirmedEmailSafe(pagamento.email, pagamento.nome, plano.nome, expirationDate);
+                // Send WhatsApp notification if phone available (prefer admin phone for renewals)
+                const telefoneNotif8 = admin?.telefone || pagamento.telefone;
+                if (telefoneNotif8) {
+                  sendWhatsAppPaymentConfirmedSafe(telefoneNotif8, pagamento.nome, plano.nome, expirationDate);
+                }
               } else {
                 const tempPassword = generateTempPassword();
                 const bcrypt = await import('bcryptjs');
@@ -9465,6 +9537,10 @@ Seja conversacional e objetivo.`;
                 
                 // Send access credentials email for new users (safe - never throws)
                 sendAccessCredentialsEmailSafe(pagamento.email, pagamento.nome, tempPassword, plano.nome);
+                // Send WhatsApp credentials if phone available
+                if (pagamento.telefone) {
+                  sendWhatsAppCredentialsSafe(pagamento.telefone, pagamento.nome, tempPassword, plano.nome);
+                }
               }
 
               // Use real dates from Stripe invoice (status_transitions.paid_at is Unix timestamp)
@@ -9510,6 +9586,11 @@ Seja conversacional e objetivo.`;
               // Send plan expired email (safe - never throws)
               const plano = await storage.getCheckoutPlanoById(pagamento.planoId);
               sendPlanExpiredEmailSafe(pagamento.email, pagamento.nome, plano?.nome || "Seu Plano");
+              // Send WhatsApp notification if phone available (prefer admin phone)
+              const telefoneNotif9 = admin?.telefone || pagamento.telefone;
+              if (telefoneNotif9) {
+                sendWhatsAppPlanExpiredSafe(telefoneNotif9, pagamento.nome, plano?.nome || "Seu Plano");
+              }
             }
           }
         }
@@ -9557,6 +9638,11 @@ Seja conversacional e objetivo.`;
               failureMessage,
               pagamento.planoId
             );
+            // Send WhatsApp notification if phone available (prefer admin phone)
+            const telefoneNotif10 = admin?.telefone || pagamento.telefone;
+            if (telefoneNotif10) {
+              sendWhatsAppPaymentFailedSafe(telefoneNotif10, pagamento.nome, plano?.nome || "Seu Plano", failureMessage);
+            }
             
             console.log(`[Stripe Webhook] Sent payment failed email to ${pagamento.email}`);
           }
