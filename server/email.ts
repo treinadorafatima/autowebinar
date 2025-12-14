@@ -1,7 +1,38 @@
 import { Resend } from 'resend';
+import { storage } from './storage';
+import type { EmailNotificationTemplate } from '@shared/schema';
 
 const FROM_EMAIL = "AutoWebinar <contato@autowebinar.shop>";
 const REPLY_TO_EMAIL = "contato@autowebinar.shop";
+
+/**
+ * Replace placeholders in email template with actual values
+ * Supports placeholders like {name}, {planName}, {loginUrl}, etc.
+ */
+function replacePlaceholders(template: string, values: Record<string, string>): string {
+  let result = template;
+  for (const [key, value] of Object.entries(values)) {
+    const regex = new RegExp(`\\{${key}\\}`, 'g');
+    result = result.replace(regex, value || '');
+  }
+  return result;
+}
+
+/**
+ * Get email template from database or return null if not found/inactive
+ */
+async function getActiveTemplate(notificationType: string): Promise<EmailNotificationTemplate | null> {
+  try {
+    const template = await storage.getEmailNotificationTemplateByType(notificationType);
+    if (template && template.isActive) {
+      return template;
+    }
+    return null;
+  } catch (error) {
+    console.warn(`[email] Failed to get template for ${notificationType}, using fallback:`, error);
+    return null;
+  }
+}
 
 // Email queue for retry mechanism
 interface PendingEmail {
@@ -165,7 +196,28 @@ export async function sendWelcomeEmail(to: string, name: string): Promise<boolea
   try {
     const { client, fromEmail } = getResendClient();
     
-    const text = `
+    const placeholderValues: Record<string, string> = {
+      name: name || 'Usuário',
+      email: to,
+      appName: APP_NAME,
+      adminUrl: `${APP_URL}/admin`,
+      loginUrl: LOGIN_URL,
+    };
+    
+    const dbTemplate = await getActiveTemplate('welcome');
+    
+    let subject: string;
+    let html: string;
+    let text: string;
+    
+    if (dbTemplate) {
+      subject = replacePlaceholders(dbTemplate.subject, placeholderValues);
+      html = replacePlaceholders(dbTemplate.htmlTemplate, placeholderValues);
+      text = replacePlaceholders(dbTemplate.textTemplate || '', placeholderValues);
+      console.log(`[email] Using database template for welcome email`);
+    } else {
+      subject = `Bem-vindo ao ${APP_NAME}`;
+      text = `
 Ola ${name},
 
 Sua conta foi criada com sucesso no ${APP_NAME}!
@@ -185,9 +237,9 @@ Se tiver qualquer duvida, estamos aqui para ajudar!
 
 ---
 ${APP_NAME}
-    `.trim();
+      `.trim();
     
-    const html = `
+      html = `
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -257,13 +309,14 @@ ${APP_NAME}
   </table>
 </body>
 </html>
-    `;
+      `;
+    }
 
     const result = await client.emails.send({
       from: fromEmail,
       replyTo: REPLY_TO_EMAIL,
       to: [to],
-      subject: `Bem-vindo ao ${APP_NAME}`,
+      subject,
       html,
       text,
     });
