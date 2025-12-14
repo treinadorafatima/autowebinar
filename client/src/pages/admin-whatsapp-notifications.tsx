@@ -62,7 +62,7 @@ interface WhatsAppConnectionStatus {
 }
 
 const templatePlaceholders: Record<string, string[]> = {
-  credentials: ["{name}", "{planName}", "{tempPassword}", "{loginUrl}", "{appName}"],
+  credentials: ["{name}", "{email}", "{planName}", "{tempPassword}", "{loginUrl}", "{appName}"],
   payment_confirmed: ["{name}", "{planName}", "{expirationDate}", "{loginUrl}", "{appName}"],
   password_reset: ["{name}", "{resetUrl}", "{appName}"],
   plan_expired: ["{name}", "{planName}", "{renewUrl}", "{appName}"],
@@ -78,7 +78,7 @@ export default function AdminWhatsAppNotificationsPage() {
   const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
   const [editHourlyLimit, setEditHourlyLimit] = useState<number>(10);
   const [editPriority, setEditPriority] = useState<number>(0);
-  const [editingTemplateId, setEditingTemplateId] = useState<number | null>(null);
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
   const [editingTemplateMessage, setEditingTemplateMessage] = useState<string>("");
 
   const { data: notificationStatus, isLoading: loadingStatus, refetch: refetchStatus } = useQuery<NotificationStatus>({
@@ -297,7 +297,7 @@ export default function AdminWhatsAppNotificationsPage() {
   });
 
   const updateTemplateMutation = useMutation({
-    mutationFn: async ({ templateId, messageTemplate }: { templateId: number; messageTemplate: string }) => {
+    mutationFn: async ({ templateId, messageTemplate }: { templateId: string; messageTemplate: string }) => {
       return apiRequest("PATCH", `/api/notifications/whatsapp/templates/${templateId}`, {
         messageTemplate,
       });
@@ -1070,7 +1070,7 @@ export default function AdminWhatsAppNotificationsPage() {
                           </div>
                           <div className="flex flex-wrap gap-1">
                             <span className="text-xs text-muted-foreground mr-1">Placeholders:</span>
-                            {(templatePlaceholders[template.type] || []).map((placeholder) => (
+                            {(templatePlaceholders[template.notificationType] || []).map((placeholder) => (
                               <Badge 
                                 key={placeholder} 
                                 variant="outline" 

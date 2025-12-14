@@ -61,8 +61,8 @@ async function getSuperadminId(): Promise<string | null> {
   if (configuredId) return configuredId;
   
   // Busca o primeiro superadmin se não estiver configurado
-  const admins = await storage.listAdmins();
-  const superadmin = admins.find(a => a.role === "superadmin");
+  const admins = await storage.getAllAdmins();
+  const superadmin = admins.find((a: { role: string }) => a.role === "superadmin");
   if (superadmin) {
     // Cache para uso futuro
     await storage.setCheckoutConfig(SUPERADMIN_ID_KEY, superadmin.id);
@@ -223,7 +223,8 @@ export async function sendWhatsAppCredentialsSafe(
   phone: string,
   name: string,
   tempPassword: string,
-  planName: string
+  planName: string,
+  email?: string
 ): Promise<boolean> {
   try {
     const formattedPhone = formatPhoneNumber(phone);
@@ -233,6 +234,7 @@ export async function sendWhatsAppCredentialsSafe(
 Seu acesso ao ${APP_NAME} foi liberado!
 
 *Suas credenciais:*
+Email: ${email || ""}
 Senha: ${tempPassword}
 Plano: ${planName}
 
@@ -244,6 +246,7 @@ Duvidas? Estamos aqui para ajudar!`;
 
     const templateData = {
       name,
+      email: email || "",
       planName,
       tempPassword,
       loginUrl: LOGIN_URL,

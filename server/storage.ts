@@ -4552,6 +4552,28 @@ Para regularizar sua situação, tente novamente:
 Caso tenha dúvidas, entre em contato conosco.`,
         isActive: true,
       },
+      {
+        id: randomUUID(),
+        notificationType: "welcome",
+        name: "Boas-vindas",
+        description: "Enviado quando um novo usuário se cadastra",
+        messageTemplate: `🎉 *Bem-vindo(a) ao {appName}!*
+
+Olá, {name}!
+
+Sua conta foi criada com sucesso.
+
+📌 O que você pode fazer:
+- Criar webinários automatizados 24/7
+- Usar IA para gerar roteiros de vendas
+- Capturar leads automaticamente
+- Transcrever vídeos com IA
+
+🔗 Acesse: {adminUrl}
+
+Qualquer dúvida, estamos à disposição!`,
+        isActive: true,
+      },
     ];
 
     for (const template of defaultTemplates) {

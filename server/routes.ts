@@ -9031,7 +9031,7 @@ Seja conversacional e objetivo.`;
                   sendAccessCredentialsEmailSafe(pagamento.email, pagamento.nome, tempPassword, plano.nome);
                   // Send WhatsApp credentials if phone available (new user - use pagamento.telefone)
                   if (pagamento.telefone) {
-                    sendWhatsAppCredentialsSafe(pagamento.telefone, pagamento.nome, tempPassword, plano.nome);
+                    sendWhatsAppCredentialsSafe(pagamento.telefone, pagamento.nome, tempPassword, plano.nome, pagamento.email);
                   }
                 }
               }
@@ -9183,7 +9183,7 @@ Seja conversacional e objetivo.`;
                   sendAccessCredentialsEmailSafe(pagamento.email, pagamento.nome, tempPassword, plano.nome);
                   // Send WhatsApp credentials if phone available (new user - use pagamento.telefone)
                   if (pagamento.telefone) {
-                    sendWhatsAppCredentialsSafe(pagamento.telefone, pagamento.nome, tempPassword, plano.nome);
+                    sendWhatsAppCredentialsSafe(pagamento.telefone, pagamento.nome, tempPassword, plano.nome, pagamento.email);
                   }
                 }
                 
@@ -9332,7 +9332,7 @@ Seja conversacional e objetivo.`;
                         sendAccessCredentialsEmailSafe(pagamento.email, pagamento.nome, tempPassword, plano.nome);
                         // Send WhatsApp credentials if phone available (new user - use pagamento.telefone)
                         if (pagamento.telefone) {
-                          sendWhatsAppCredentialsSafe(pagamento.telefone, pagamento.nome, tempPassword, plano.nome);
+                          sendWhatsAppCredentialsSafe(pagamento.telefone, pagamento.nome, tempPassword, plano.nome, pagamento.email);
                         }
                       }
                       
@@ -9496,7 +9496,7 @@ Seja conversacional e objetivo.`;
                 sendAccessCredentialsEmailSafe(pagamento.email, pagamento.nome, tempPassword, plano.nome);
                 // Send WhatsApp credentials if phone available (new user - use pagamento.telefone)
                 if (pagamento.telefone) {
-                  sendWhatsAppCredentialsSafe(pagamento.telefone, pagamento.nome, tempPassword, plano.nome);
+                  sendWhatsAppCredentialsSafe(pagamento.telefone, pagamento.nome, tempPassword, plano.nome, pagamento.email);
                 }
               }
               
@@ -9593,7 +9593,7 @@ Seja conversacional e objetivo.`;
                 sendAccessCredentialsEmailSafe(pagamento.email, pagamento.nome, tempPassword, plano.nome);
                 // Send WhatsApp credentials if phone available (new user - use pagamento.telefone)
                 if (pagamento.telefone) {
-                  sendWhatsAppCredentialsSafe(pagamento.telefone, pagamento.nome, tempPassword, plano.nome);
+                  sendWhatsAppCredentialsSafe(pagamento.telefone, pagamento.nome, tempPassword, plano.nome, pagamento.email);
                 }
               }
               
@@ -9677,7 +9677,7 @@ Seja conversacional e objetivo.`;
                 sendAccessCredentialsEmailSafe(pagamento.email, pagamento.nome, tempPassword, plano.nome);
                 // Send WhatsApp credentials if phone available
                 if (pagamento.telefone) {
-                  sendWhatsAppCredentialsSafe(pagamento.telefone, pagamento.nome, tempPassword, plano.nome);
+                  sendWhatsAppCredentialsSafe(pagamento.telefone, pagamento.nome, tempPassword, plano.nome, pagamento.email);
                 }
               }
 
