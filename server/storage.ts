@@ -355,6 +355,12 @@ export interface IStorage {
   createAffiliateWithdrawal(data: AffiliateWithdrawalInsert): Promise<AffiliateWithdrawal>;
   updateAffiliateWithdrawal(id: string, data: Partial<AffiliateWithdrawalInsert>): Promise<AffiliateWithdrawal | undefined>;
   listPendingWithdrawals(): Promise<AffiliateWithdrawal[]>;
+  // WhatsApp Notification Logs
+  createWhatsappNotificationLog(log: WhatsappNotificationLogInsert): Promise<WhatsappNotificationLog>;
+  listWhatsappNotificationLogs(limit?: number): Promise<WhatsappNotificationLog[]>;
+  getPendingWhatsappNotifications(): Promise<WhatsappNotificationLog[]>;
+  cancelPendingWhatsappNotifications(): Promise<number>;
+  updateWhatsappNotificationLog(id: string, data: Partial<WhatsappNotificationLogInsert>): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -4308,6 +4314,51 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
     return db.select().from(affiliateWithdrawals)
       .where(eq(affiliateWithdrawals.status, 'pending'))
       .orderBy(affiliateWithdrawals.requestedAt);
+  }
+
+  // WhatsApp Notification Logs
+
+  async createWhatsappNotificationLog(log: WhatsappNotificationLogInsert): Promise<WhatsappNotificationLog> {
+    const id = randomUUID();
+    const newLog: WhatsappNotificationLog = {
+      id,
+      notificationType: log.notificationType,
+      recipientPhone: log.recipientPhone,
+      recipientName: log.recipientName ?? null,
+      message: log.message,
+      status: log.status ?? "pending",
+      sentAt: log.sentAt ?? null,
+      createdAt: new Date(),
+      error: log.error ?? null,
+    };
+    await db.insert(whatsappNotificationsLog).values(newLog);
+    return newLog;
+  }
+
+  async listWhatsappNotificationLogs(limit: number = 100): Promise<WhatsappNotificationLog[]> {
+    return db.select().from(whatsappNotificationsLog)
+      .orderBy(desc(whatsappNotificationsLog.createdAt))
+      .limit(limit);
+  }
+
+  async getPendingWhatsappNotifications(): Promise<WhatsappNotificationLog[]> {
+    return db.select().from(whatsappNotificationsLog)
+      .where(eq(whatsappNotificationsLog.status, 'pending'))
+      .orderBy(whatsappNotificationsLog.createdAt);
+  }
+
+  async cancelPendingWhatsappNotifications(): Promise<number> {
+    const result = await db.update(whatsappNotificationsLog)
+      .set({ status: 'cancelled' })
+      .where(eq(whatsappNotificationsLog.status, 'pending'))
+      .returning();
+    return result.length;
+  }
+
+  async updateWhatsappNotificationLog(id: string, data: Partial<WhatsappNotificationLogInsert>): Promise<void> {
+    await db.update(whatsappNotificationsLog)
+      .set(data)
+      .where(eq(whatsappNotificationsLog.id, id));
   }
 }
 

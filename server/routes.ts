@@ -6985,6 +6985,73 @@ Seja conversacional e objetivo.`;
     }
   });
 
+  // WhatsApp Notifications - Get sent messages history
+  app.get("/api/notifications/whatsapp/logs", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.replace("Bearer ", "");
+      if (!token) return res.status(401).json({ error: "Token não fornecido" });
+      
+      const email = await validateSession(token);
+      if (!email) return res.status(401).json({ error: "Sessão inválida" });
+      
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin || admin.role !== "superadmin") {
+        return res.status(403).json({ error: "Acesso negado - apenas superadmin" });
+      }
+
+      const limit = parseInt(req.query.limit as string) || 100;
+      const logs = await storage.listWhatsappNotificationLogs(limit);
+      
+      res.json(logs);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // WhatsApp Notifications - Get pending messages queue
+  app.get("/api/notifications/whatsapp/queue", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.replace("Bearer ", "");
+      if (!token) return res.status(401).json({ error: "Token não fornecido" });
+      
+      const email = await validateSession(token);
+      if (!email) return res.status(401).json({ error: "Sessão inválida" });
+      
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin || admin.role !== "superadmin") {
+        return res.status(403).json({ error: "Acesso negado - apenas superadmin" });
+      }
+
+      const pending = await storage.getPendingWhatsappNotifications();
+      
+      res.json(pending);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // WhatsApp Notifications - Cancel all pending messages
+  app.delete("/api/notifications/whatsapp/queue", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.replace("Bearer ", "");
+      if (!token) return res.status(401).json({ error: "Token não fornecido" });
+      
+      const email = await validateSession(token);
+      if (!email) return res.status(401).json({ error: "Sessão inválida" });
+      
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin || admin.role !== "superadmin") {
+        return res.status(403).json({ error: "Acesso negado - apenas superadmin" });
+      }
+
+      const cancelledCount = await storage.cancelPendingWhatsappNotifications();
+      
+      res.json({ success: true, cancelledCount });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Get public key for frontend (public route)
   app.get("/api/checkout/public-key/:gateway", async (req, res) => {
     try {
