@@ -6894,11 +6894,53 @@ Seja conversacional e objetivo.`;
             phoneNumber: status.phoneNumber || acc.phoneNumber,
             hourlyLimit: acc.hourlyLimit || 10,
             messagesSentThisHour: acc.messagesSentThisHour || 0,
+            priority: acc.priority ?? 0,
           };
         })
       );
       
       res.json(accountsWithStatus);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // WhatsApp Notifications - Update account settings (hourlyLimit, priority)
+  app.patch("/api/notifications/whatsapp/accounts/:id", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.replace("Bearer ", "");
+      if (!token) return res.status(401).json({ error: "Token não fornecido" });
+      
+      const email = await validateSession(token);
+      if (!email) return res.status(401).json({ error: "Sessão inválida" });
+      
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin || admin.role !== "superadmin") {
+        return res.status(403).json({ error: "Acesso negado - apenas superadmin" });
+      }
+
+      const { id } = req.params;
+      const { hourlyLimit, priority } = req.body;
+      
+      const updateData: any = {};
+      if (typeof hourlyLimit === "number" && hourlyLimit >= 1 && hourlyLimit <= 100) {
+        updateData.hourlyLimit = hourlyLimit;
+      }
+      if (typeof priority === "number" && priority >= 0 && priority <= 10) {
+        updateData.priority = priority;
+      }
+      
+      if (Object.keys(updateData).length === 0) {
+        return res.status(400).json({ error: "Nenhum campo válido para atualizar" });
+      }
+
+      const account = await storage.getWhatsappAccountById(id);
+      if (!account || account.adminId !== admin.id) {
+        return res.status(404).json({ error: "Conta não encontrada" });
+      }
+
+      const updated = await storage.updateWhatsappAccount(id, updateData);
+      res.json(updated);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

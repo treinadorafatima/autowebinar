@@ -10,8 +10,9 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { 
   CheckCircle, XCircle, Loader2, Wifi, WifiOff, RefreshCcw, 
   QrCode, Smartphone, Bell, BellOff, AlertCircle, Clock, 
-  History, Trash2, MessageSquare, Ban, RotateCcw
+  History, Trash2, MessageSquare, Ban, RotateCcw, Settings, Save
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { SiWhatsapp } from "react-icons/si";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format } from "date-fns";
@@ -47,6 +48,7 @@ interface WhatsAppAccount {
   status: string;
   hourlyLimit: number;
   messagesSentThisHour: number;
+  priority: number;
 }
 
 interface WhatsAppConnectionStatus {
@@ -61,6 +63,9 @@ export default function AdminWhatsAppNotificationsPage() {
   const [qrPollingEnabled, setQrPollingEnabled] = useState(false);
   const [connectingAccountId, setConnectingAccountId] = useState<string | null>(null);
   const qrPollingRef = useRef<NodeJS.Timeout | null>(null);
+  const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
+  const [editHourlyLimit, setEditHourlyLimit] = useState<number>(10);
+  const [editPriority, setEditPriority] = useState<number>(0);
 
   const { data: notificationStatus, isLoading: loadingStatus, refetch: refetchStatus } = useQuery<NotificationStatus>({
     queryKey: ["/api/notifications/whatsapp/status"],
@@ -247,6 +252,36 @@ export default function AdminWhatsAppNotificationsPage() {
     },
   });
 
+  const updateAccountMutation = useMutation({
+    mutationFn: async ({ accountId, hourlyLimit, priority }: { accountId: string; hourlyLimit: number; priority: number }) => {
+      return apiRequest("PATCH", `/api/notifications/whatsapp/accounts/${accountId}`, {
+        hourlyLimit,
+        priority,
+      });
+    },
+    onSuccess: () => {
+      setEditingAccountId(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications/whatsapp/accounts"] });
+      toast({
+        title: "Configurações salvas",
+        description: "As configurações da conta foram atualizadas",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro ao salvar",
+        description: error.message || "Não foi possível salvar as configurações",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const startEditingAccount = (account: WhatsAppAccount) => {
+    setEditingAccountId(account.id);
+    setEditHourlyLimit(account.hourlyLimit || 10);
+    setEditPriority(account.priority || 0);
+  };
+
   useEffect(() => {
     if (connectionStatus?.status === "connected") {
       setQrPollingEnabled(false);
@@ -390,8 +425,9 @@ export default function AdminWhatsAppNotificationsPage() {
             Contas WhatsApp para Notificações
           </CardTitle>
           <CardDescription>
-            Conecte contas WhatsApp para enviar notificações. O sistema usa rotação automática entre todas as contas conectadas,
-            respeitando o limite de mensagens por hora de cada uma. Quando uma conta atinge o limite, a próxima é usada automaticamente.
+            Conecte contas WhatsApp para enviar notificações. O sistema usa rotação entre todas as contas conectadas,
+            respeitando o limite de mensagens por hora de cada uma. Configure manualmente o limite e a prioridade de cada conta 
+            clicando em "Configurar". Contas com menor valor de prioridade são usadas primeiro.
           </CardDescription>
           {(notificationStatus?.connectedAccounts ?? 0) > 0 && (
             <div className="flex items-center gap-2 mt-2" data-testid="rotation-status">
@@ -462,8 +498,72 @@ export default function AdminWhatsAppNotificationsPage() {
                             <WifiOff className="w-3 h-3 mr-1" /> Desconectado
                           </Badge>
                         )}
+                        <Badge variant="outline" data-testid={`badge-priority-${account.id}`}>
+                          Prioridade: {account.priority}
+                        </Badge>
                       </div>
                     </div>
+
+                    {editingAccountId === account.id ? (
+                      <div className="p-4 border rounded-lg bg-muted/30 space-y-4">
+                        <p className="text-sm font-medium">Configurações de Rotação</p>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor={`hourlyLimit-${account.id}`}>Limite por Hora</Label>
+                            <Input
+                              id={`hourlyLimit-${account.id}`}
+                              type="number"
+                              min={1}
+                              max={100}
+                              value={editHourlyLimit}
+                              onChange={(e) => setEditHourlyLimit(parseInt(e.target.value) || 10)}
+                              data-testid={`input-hourly-limit-${account.id}`}
+                            />
+                            <p className="text-xs text-muted-foreground">Máximo de mensagens por hora (1-100)</p>
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor={`priority-${account.id}`}>Prioridade</Label>
+                            <Input
+                              id={`priority-${account.id}`}
+                              type="number"
+                              min={0}
+                              max={10}
+                              value={editPriority}
+                              onChange={(e) => setEditPriority(parseInt(e.target.value) || 0)}
+                              data-testid={`input-priority-${account.id}`}
+                            />
+                            <p className="text-xs text-muted-foreground">Menor valor = maior prioridade (0-10)</p>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => updateAccountMutation.mutate({ 
+                              accountId: account.id, 
+                              hourlyLimit: editHourlyLimit,
+                              priority: editPriority 
+                            })}
+                            disabled={updateAccountMutation.isPending}
+                            data-testid={`button-save-settings-${account.id}`}
+                          >
+                            {updateAccountMutation.isPending ? (
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            ) : (
+                              <Save className="w-4 h-4 mr-2" />
+                            )}
+                            Salvar
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setEditingAccountId(null)}
+                            data-testid={`button-cancel-edit-${account.id}`}
+                          >
+                            Cancelar
+                          </Button>
+                        </div>
+                      </div>
+                    ) : null}
 
                     {connectingAccountId === account.id && connectingAccountStatus?.qrCode && connectingAccountStatus?.status === "qr_ready" ? (
                       <div className="space-y-4">
@@ -524,6 +624,15 @@ export default function AdminWhatsAppNotificationsPage() {
                             Gerar QR Code
                           </Button>
                         )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => startEditingAccount(account)}
+                          data-testid={`button-edit-account-${account.id}`}
+                        >
+                          <Settings className="w-4 h-4 mr-2" />
+                          Configurar
+                        </Button>
                         <Button
                           variant="destructive"
                           size="sm"
