@@ -741,7 +741,10 @@ export const whatsappAccounts = pgTable("whatsapp_accounts", {
   lastUsedAt: timestamp("last_used_at"), // Última vez que foi usada para envio (round-robin)
   priority: integer("priority").notNull().default(0), // Prioridade para ordenação
   dailyLimit: integer("daily_limit").notNull().default(1000), // Limite de mensagens por dia
+  hourlyLimit: integer("hourly_limit").notNull().default(10), // Limite de mensagens por hora (para rotação)
   messagesSentToday: integer("messages_sent_today").notNull().default(0), // Contador de mensagens hoje
+  messagesSentThisHour: integer("messages_sent_this_hour").notNull().default(0), // Contador de mensagens na hora atual
+  lastHourResetTime: timestamp("last_hour_reset_time"), // Última vez que o contador horário foi resetado
   lastMessageResetDate: text("last_message_reset_date"), // Data do último reset do contador (YYYY-MM-DD)
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
