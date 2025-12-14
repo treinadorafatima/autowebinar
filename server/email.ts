@@ -1331,29 +1331,56 @@ export async function sendExpirationReminderEmail(to: string, name: string, plan
     const formattedDate = expirationDate.toLocaleDateString('pt-BR');
     const renewUrl = `${getAppUrl()}/checkout?email=${encodeURIComponent(to)}`;
     
-    const urgencyText = daysUntilExpiration === 1 ? "amanha" : `em ${daysUntilExpiration} dias`;
-    const subjectUrgency = daysUntilExpiration === 1 ? "Seu plano vence amanha!" : `Seu plano vence em ${daysUntilExpiration} dias`;
+    // Determinar qual template usar baseado nos dias até o vencimento
+    let templateType: string;
+    if (daysUntilExpiration === 0) {
+      templateType = 'expiration_reminder_today';
+    } else if (daysUntilExpiration === 1) {
+      templateType = 'expiration_reminder_1day';
+    } else {
+      templateType = 'expiration_reminder_3days';
+    }
     
-    const text = `
+    const placeholderValues: Record<string, string> = {
+      name: name || 'Usuário',
+      planName: planName,
+      expirationDate: formattedDate,
+      renewUrl: renewUrl,
+      daysLeft: String(daysUntilExpiration),
+      appName: APP_NAME,
+    };
+    
+    const dbTemplate = await getActiveTemplate(templateType);
+    
+    let subject: string;
+    let html: string;
+    let text: string;
+    
+    if (dbTemplate) {
+      subject = replacePlaceholders(dbTemplate.subject, placeholderValues);
+      html = replacePlaceholders(dbTemplate.htmlTemplate, placeholderValues);
+      text = replacePlaceholders(dbTemplate.textTemplate || '', placeholderValues);
+      console.log(`[email] Using database template for ${templateType} email`);
+    } else {
+      // Fallback para template padrão
+      const urgencyText = daysUntilExpiration === 0 ? "hoje" : daysUntilExpiration === 1 ? "amanha" : `em ${daysUntilExpiration} dias`;
+      const subjectUrgency = daysUntilExpiration === 0 ? "Seu plano vence HOJE!" : daysUntilExpiration === 1 ? "Seu plano vence amanha!" : `Seu plano vence em ${daysUntilExpiration} dias`;
+      
+      subject = `${subjectUrgency} - ${APP_NAME}`;
+      text = `
 Ola ${name},
 
 Seu plano ${planName} vence ${urgencyText} (${formattedDate}).
 
-Para continuar aproveitando todos os recursos do ${APP_NAME}, renove sua assinatura antes do vencimento:
-- Webinarios automatizados 24/7
-- Ferramentas de IA para roteiros e mensagens
-- Captura automatica de leads
-- Suporte prioritario
+Para continuar aproveitando todos os recursos do ${APP_NAME}, renove sua assinatura antes do vencimento.
 
 Renovar agora: ${renewUrl}
 
-Nao deixe seus webinarios pararem! Renove ja e continue vendendo no automatico.
-
 ---
 ${APP_NAME}
-    `.trim();
-    
-    const html = `
+      `.trim();
+      
+      html = `
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -1367,7 +1394,7 @@ ${APP_NAME}
       <td style="padding: 40px 20px;">
         <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden;">
           <tr>
-            <td style="background-color: ${daysUntilExpiration === 1 ? '#f59e0b' : '#3b82f6'}; padding: 30px; text-align: center;">
+            <td style="background-color: ${daysUntilExpiration <= 1 ? '#dc2626' : '#f59e0b'}; padding: 30px; text-align: center;">
               <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 600;">${subjectUrgency}</h1>
             </td>
           </tr>
@@ -1379,34 +1406,15 @@ ${APP_NAME}
               <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
                 Seu plano <strong>${planName}</strong> vence <strong>${urgencyText}</strong> (${formattedDate}).
               </p>
-              
-              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 25px 0; background-color: #f0f9ff; border-radius: 6px;">
-                <tr>
-                  <td style="padding: 20px;">
-                    <p style="margin: 0 0 12px; color: #0369a1; font-weight: 600; font-size: 14px;">Continue aproveitando:</p>
-                    <p style="margin: 0; color: #0369a1; font-size: 14px; line-height: 1.8;">
-                      - Webinarios automatizados 24/7<br>
-                      - Ferramentas de IA para roteiros e mensagens<br>
-                      - Captura automatica de leads<br>
-                      - Suporte prioritario
-                    </p>
-                  </td>
-                </tr>
-              </table>
-              
               <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                 <tr>
                   <td style="text-align: center; padding: 25px 0;">
-                    <a href="${renewUrl}" style="display: inline-block; background-color: ${daysUntilExpiration === 1 ? '#f59e0b' : '#3b82f6'}; color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 6px; font-weight: 600; font-size: 16px;">
+                    <a href="${renewUrl}" style="display: inline-block; background-color: ${daysUntilExpiration <= 1 ? '#dc2626' : '#f59e0b'}; color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 6px; font-weight: 600; font-size: 16px;">
                       Renovar Meu Plano
                     </a>
                   </td>
                 </tr>
               </table>
-              
-              <p style="margin: 30px 0 0; color: #6b7280; font-size: 14px; line-height: 1.6;">
-                Nao deixe seus webinarios pararem! Renove ja e continue vendendo no automatico.
-              </p>
             </td>
           </tr>
           <tr>
@@ -1422,13 +1430,14 @@ ${APP_NAME}
   </table>
 </body>
 </html>
-    `;
+      `;
+    }
 
     const result = await client.emails.send({
       from: fromEmail,
       replyTo: REPLY_TO_EMAIL,
       to: [to],
-      subject: `${subjectUrgency} - ${APP_NAME}`,
+      subject,
       html,
       text,
     });
