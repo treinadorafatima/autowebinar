@@ -4574,6 +4574,83 @@ Sua conta foi criada com sucesso.
 Qualquer dúvida, estamos à disposição!`,
         isActive: true,
       },
+      {
+        id: randomUUID(),
+        notificationType: "expiration_reminder_3days",
+        name: "Lembrete de Vencimento - 3 dias",
+        description: "Enviado 3 dias antes do vencimento do plano",
+        messageTemplate: `⚠️ *Seu plano vence em 3 dias!*
+
+Olá, {name}!
+
+Seu plano *{planName}* expira em *{expirationDate}*.
+
+Para continuar aproveitando todos os recursos sem interrupção, renove agora!
+
+🔗 Renovar: {renewUrl}
+
+Qualquer dúvida, estamos à disposição!`,
+        isActive: true,
+      },
+      {
+        id: randomUUID(),
+        notificationType: "expiration_reminder_1day",
+        name: "Lembrete de Vencimento - 1 dia",
+        description: "Enviado 1 dia antes do vencimento do plano",
+        messageTemplate: `🚨 *Seu plano vence AMANHÃ!*
+
+Olá, {name}!
+
+Seu plano *{planName}* expira em *{expirationDate}*.
+
+⚠️ *Não perca seu acesso!*
+
+Para evitar a suspensão dos seus webinários e serviços, renove agora mesmo!
+
+🔗 Renovar: {renewUrl}
+
+Qualquer dúvida, estamos à disposição!`,
+        isActive: true,
+      },
+      {
+        id: randomUUID(),
+        notificationType: "expiration_reminder_today",
+        name: "Vencimento Hoje",
+        description: "Enviado horas antes do vencimento para planos diários",
+        messageTemplate: `🔴 *Seu plano vence HOJE!*
+
+Olá, {name}!
+
+Seu plano *{planName}* vence em *{expirationDate}*.
+
+⚠️ *Renove agora para não perder o acesso!*
+
+🔗 Renovar: {renewUrl}
+
+Qualquer dúvida, estamos à disposição!`,
+        isActive: true,
+      },
+      {
+        id: randomUUID(),
+        notificationType: "auto_renewal_payment",
+        name: "Pagamento de Renovação Automática",
+        description: "Enviado com dados de pagamento para renovação",
+        messageTemplate: `💳 *Pagamento para Renovação*
+
+Olá, {name}!
+
+Para renovar seu plano *{planName}* que vence em *{expirationDate}*, utilize os dados abaixo:
+
+📋 *PIX Copia e Cola:*
+{pixCopiaCola}
+
+🔗 Ou acesse o boleto: {boletoUrl}
+
+Após o pagamento, seu acesso será renovado automaticamente!
+
+Qualquer dúvida, estamos à disposição!`,
+        isActive: true,
+      },
     ];
 
     for (const template of defaultTemplates) {
@@ -5087,6 +5164,314 @@ Motivo: {reason}
 
 Para regularizar sua situacao, tente novamente:
 {paymentUrl}
+
+---
+{appName}`,
+        isActive: true,
+      },
+      {
+        id: randomUUID(),
+        notificationType: "expiration_reminder_3days",
+        name: "Lembrete de Vencimento - 3 dias",
+        description: "Enviado 3 dias antes do vencimento do plano",
+        subject: `Seu plano vence em 3 dias - {appName}`,
+        htmlTemplate: `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Seu Plano Vence em 3 Dias - {appName}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background-color: #f4f4f5;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f5;">
+    <tr>
+      <td style="padding: 40px 20px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden;">
+          <tr>
+            <td style="background-color: #f59e0b; padding: 30px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 600;">Seu Plano Vence em 3 Dias</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 40px 30px;">
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Ola <strong>{name}</strong>,
+              </p>
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Seu plano <strong>{planName}</strong> expira em <strong>{expirationDate}</strong>.
+              </p>
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 25px 0; background-color: #fef3c7; border-radius: 6px;">
+                <tr>
+                  <td style="padding: 16px;">
+                    <p style="margin: 0; color: #92400e; font-size: 14px; line-height: 1.6;">
+                      Para continuar aproveitando todos os recursos sem interrupcao, renove agora!
+                    </p>
+                  </td>
+                </tr>
+              </table>
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                <tr>
+                  <td style="text-align: center; padding: 20px 0;">
+                    <a href="{renewUrl}" style="display: inline-block; background-color: #f59e0b; color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 6px; font-weight: 600; font-size: 16px;">
+                      Renovar Meu Plano
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color: #f8fafc; padding: 20px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0; color: #9ca3af; font-size: 12px;">
+                {appName} - Webinarios Automatizados
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`,
+        textTemplate: `Ola {name},
+
+Seu plano {planName} expira em {expirationDate}.
+
+Para continuar aproveitando todos os recursos sem interrupcao, renove agora:
+{renewUrl}
+
+---
+{appName}`,
+        isActive: true,
+      },
+      {
+        id: randomUUID(),
+        notificationType: "expiration_reminder_1day",
+        name: "Lembrete de Vencimento - 1 dia",
+        description: "Enviado 1 dia antes do vencimento do plano",
+        subject: `URGENTE: Seu plano vence AMANHA - {appName}`,
+        htmlTemplate: `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Seu Plano Vence Amanha - {appName}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background-color: #f4f4f5;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f5;">
+    <tr>
+      <td style="padding: 40px 20px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden;">
+          <tr>
+            <td style="background-color: #dc2626; padding: 30px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 600;">Seu Plano Vence AMANHA!</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 40px 30px;">
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Ola <strong>{name}</strong>,
+              </p>
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Seu plano <strong>{planName}</strong> expira em <strong>{expirationDate}</strong>.
+              </p>
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 25px 0; background-color: #fef2f2; border-radius: 6px;">
+                <tr>
+                  <td style="padding: 16px;">
+                    <p style="margin: 0; color: #991b1b; font-size: 14px; line-height: 1.6;">
+                      <strong>Nao perca seu acesso!</strong> Para evitar a suspensao dos seus webinarios e servicos, renove agora mesmo!
+                    </p>
+                  </td>
+                </tr>
+              </table>
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                <tr>
+                  <td style="text-align: center; padding: 20px 0;">
+                    <a href="{renewUrl}" style="display: inline-block; background-color: #dc2626; color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 6px; font-weight: 600; font-size: 16px;">
+                      Renovar Agora
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color: #f8fafc; padding: 20px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0; color: #9ca3af; font-size: 12px;">
+                {appName} - Webinarios Automatizados
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`,
+        textTemplate: `URGENTE: Ola {name},
+
+Seu plano {planName} expira AMANHA em {expirationDate}.
+
+Nao perca seu acesso! Para evitar a suspensao dos seus webinarios e servicos, renove agora mesmo:
+{renewUrl}
+
+---
+{appName}`,
+        isActive: true,
+      },
+      {
+        id: randomUUID(),
+        notificationType: "expiration_reminder_today",
+        name: "Vencimento Hoje",
+        description: "Enviado horas antes do vencimento para planos diários",
+        subject: `ULTIMO AVISO: Seu plano vence HOJE - {appName}`,
+        htmlTemplate: `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Seu Plano Vence Hoje - {appName}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background-color: #f4f4f5;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f5;">
+    <tr>
+      <td style="padding: 40px 20px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden;">
+          <tr>
+            <td style="background-color: #dc2626; padding: 30px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 600;">Seu Plano Vence HOJE!</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 40px 30px;">
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Ola <strong>{name}</strong>,
+              </p>
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Seu plano <strong>{planName}</strong> vence em <strong>{expirationDate}</strong>.
+              </p>
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 25px 0; background-color: #fef2f2; border-radius: 6px;">
+                <tr>
+                  <td style="padding: 16px;">
+                    <p style="margin: 0; color: #991b1b; font-size: 14px; line-height: 1.6;">
+                      <strong>Renove agora para nao perder o acesso!</strong> Apos o vencimento, seus webinarios serao pausados automaticamente.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                <tr>
+                  <td style="text-align: center; padding: 20px 0;">
+                    <a href="{renewUrl}" style="display: inline-block; background-color: #dc2626; color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 6px; font-weight: 600; font-size: 16px;">
+                      Renovar Imediatamente
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color: #f8fafc; padding: 20px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0; color: #9ca3af; font-size: 12px;">
+                {appName} - Webinarios Automatizados
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`,
+        textTemplate: `ULTIMO AVISO: Ola {name},
+
+Seu plano {planName} vence HOJE em {expirationDate}.
+
+Renove agora para nao perder o acesso! Apos o vencimento, seus webinarios serao pausados automaticamente.
+{renewUrl}
+
+---
+{appName}`,
+        isActive: true,
+      },
+      {
+        id: randomUUID(),
+        notificationType: "auto_renewal_payment",
+        name: "Pagamento de Renovação Automática",
+        description: "Enviado com dados de pagamento para renovação",
+        subject: `Dados para Renovacao do Seu Plano - {appName}`,
+        htmlTemplate: `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dados para Renovacao - {appName}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background-color: #f4f4f5;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f5;">
+    <tr>
+      <td style="padding: 40px 20px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden;">
+          <tr>
+            <td style="background-color: #3b82f6; padding: 30px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 600;">Dados para Renovacao</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 40px 30px;">
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Ola <strong>{name}</strong>,
+              </p>
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Para renovar seu plano <strong>{planName}</strong> que vence em <strong>{expirationDate}</strong>, utilize os dados abaixo:
+              </p>
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 25px 0; background-color: #ecfdf5; border-radius: 6px; border: 2px solid #10b981;">
+                <tr>
+                  <td style="padding: 20px;">
+                    <p style="margin: 0 0 12px; color: #047857; font-weight: 600; font-size: 14px;">PIX Copia e Cola:</p>
+                    <p style="margin: 0; color: #374151; font-size: 13px; line-height: 1.6; word-break: break-all; background-color: #d1fae5; padding: 10px; border-radius: 4px; font-family: monospace;">
+                      {pixCopiaCola}
+                    </p>
+                  </td>
+                </tr>
+              </table>
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                <tr>
+                  <td style="text-align: center; padding: 20px 0;">
+                    <a href="{boletoUrl}" style="display: inline-block; background-color: #3b82f6; color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 6px; font-weight: 600; font-size: 16px;">
+                      Acessar Boleto
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin: 20px 0 0; color: #6b7280; font-size: 14px; line-height: 1.6;">
+                Apos o pagamento, seu acesso sera renovado automaticamente!
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color: #f8fafc; padding: 20px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0; color: #9ca3af; font-size: 12px;">
+                {appName} - Webinarios Automatizados
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`,
+        textTemplate: `Ola {name},
+
+Para renovar seu plano {planName} que vence em {expirationDate}, utilize os dados abaixo:
+
+PIX Copia e Cola:
+{pixCopiaCola}
+
+Ou acesse o boleto: {boletoUrl}
+
+Apos o pagamento, seu acesso sera renovado automaticamente!
 
 ---
 {appName}`,
