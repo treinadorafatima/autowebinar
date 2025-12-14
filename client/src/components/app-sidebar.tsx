@@ -225,6 +225,21 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
           </SidebarGroupContent>
         </SidebarGroup>
 
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <Link href="/admin/webinars?new=1" data-testid="link-sidebar-new-webinar">
+                    <Sparkles className="w-4 h-4" />
+                    <span>Criar Transmissão</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
         <SidebarSeparator />
 
         <SidebarGroup>
@@ -275,23 +290,6 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
           </>
         )}
 
-        <SidebarSeparator />
-
-        <SidebarGroup>
-          <SidebarGroupLabel>Criar</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <Link href="/admin/webinars?new=1" data-testid="link-sidebar-new-webinar">
-                    <Sparkles className="w-4 h-4" />
-                    <span>Criar Transmissão</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
       </SidebarContent>
 
       <SidebarFooter className="p-4 border-t border-sidebar-border">
