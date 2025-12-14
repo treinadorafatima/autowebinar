@@ -1,7 +1,6 @@
 import { db } from "./db";
 import { admins, checkoutPlanos, checkoutPagamentos } from "@shared/schema";
 import { eq, and, gte, lte, isNotNull, sql } from "drizzle-orm";
-import { randomUUID } from "crypto";
 import { 
   sendExpirationReminderEmail, 
   sendExpiredRenewalEmail,
@@ -22,6 +21,44 @@ interface AdminWithPlan {
   lastExpirationEmailSent: Date | null;
   planName?: string;
   telefone?: string | null;
+}
+
+interface PlanFrequency {
+  frequencia: number;
+  frequenciaTipo: string;
+  tipoCobranca: string;
+}
+
+async function getPlanFrequency(planoId: string | null): Promise<PlanFrequency | null> {
+  if (!planoId) return null;
+  
+  try {
+    const plano = await db
+      .select({ 
+        frequencia: checkoutPlanos.frequencia, 
+        frequenciaTipo: checkoutPlanos.frequenciaTipo,
+        tipoCobranca: checkoutPlanos.tipoCobranca 
+      })
+      .from(checkoutPlanos)
+      .where(eq(checkoutPlanos.id, planoId))
+      .limit(1);
+    
+    if (!plano[0]) return null;
+    return {
+      frequencia: plano[0].frequencia || 1,
+      frequenciaTipo: plano[0].frequenciaTipo || 'months',
+      tipoCobranca: plano[0].tipoCobranca || 'unico'
+    };
+  } catch {
+    return null;
+  }
+}
+
+function isDailyPlan(planFreq: PlanFrequency | null): boolean {
+  if (!planFreq) return false;
+  return planFreq.tipoCobranca === 'recorrente' && 
+         planFreq.frequenciaTipo === 'days' && 
+         planFreq.frequencia <= 3; // Planos com ciclo de até 3 dias são considerados "diários"
 }
 
 interface RenewalPaymentData {
@@ -59,6 +96,62 @@ async function getAdminsExpiringInDays(days: number): Promise<AdminWithPlan[]> {
         isNotNull(admins.accessExpiresAt),
         gte(admins.accessExpiresAt, targetDate),
         lte(admins.accessExpiresAt, nextDay),
+        eq(admins.isActive, true)
+      )
+    );
+  
+  return results;
+}
+
+// Busca usuários cujo acesso vence nas próximas X horas (para planos diários)
+async function getAdminsExpiringInHours(hours: number): Promise<AdminWithPlan[]> {
+  const now = new Date();
+  const targetDate = new Date(now.getTime() + hours * 60 * 60 * 1000);
+  
+  const results = await db
+    .select({
+      id: admins.id,
+      name: admins.name,
+      email: admins.email,
+      accessExpiresAt: admins.accessExpiresAt,
+      planoId: admins.planoId,
+      lastExpirationEmailSent: admins.lastExpirationEmailSent,
+      telefone: admins.telefone,
+    })
+    .from(admins)
+    .where(
+      and(
+        isNotNull(admins.accessExpiresAt),
+        gte(admins.accessExpiresAt, now),
+        lte(admins.accessExpiresAt, targetDate),
+        eq(admins.isActive, true)
+      )
+    );
+  
+  return results;
+}
+
+// Busca usuários cujo acesso expirou nas últimas X horas (para planos diários)
+async function getAdminsExpiredInLastHours(hours: number): Promise<AdminWithPlan[]> {
+  const now = new Date();
+  const pastDate = new Date(now.getTime() - hours * 60 * 60 * 1000);
+  
+  const results = await db
+    .select({
+      id: admins.id,
+      name: admins.name,
+      email: admins.email,
+      accessExpiresAt: admins.accessExpiresAt,
+      planoId: admins.planoId,
+      lastExpirationEmailSent: admins.lastExpirationEmailSent,
+      telefone: admins.telefone,
+    })
+    .from(admins)
+    .where(
+      and(
+        isNotNull(admins.accessExpiresAt),
+        gte(admins.accessExpiresAt, pastDate),
+        lte(admins.accessExpiresAt, now),
         eq(admins.isActive, true)
       )
     );
@@ -146,7 +239,7 @@ async function generateRenewalPixBoleto(admin: AdminWithPlan): Promise<boolean> 
           eq(checkoutPagamentos.status, 'approved')
         )
       )
-      .orderBy(sql`${checkoutPagamentos.createdAt} DESC`)
+      .orderBy(sql`${checkoutPagamentos.criadoEm} DESC`)
       .limit(1);
     
     const userCpf = previousPayments[0]?.cpf || null;
@@ -334,7 +427,7 @@ async function generateRenewalPixBoleto(admin: AdminWithPlan): Promise<boolean> 
   }
 }
 
-function shouldSendEmail(admin: AdminWithPlan, daysType: '3days' | '1day' | 'expired'): boolean {
+function shouldSendEmail(admin: AdminWithPlan, daysType: '3days' | '1day' | 'expired' | 'daily_reminder' | 'daily_expired'): boolean {
   if (!admin.lastExpirationEmailSent) return true;
   
   const lastSent = new Date(admin.lastExpirationEmailSent);
@@ -344,6 +437,9 @@ function shouldSendEmail(admin: AdminWithPlan, daysType: '3days' | '1day' | 'exp
   if (daysType === '3days') return hoursSinceLastEmail >= 48;
   if (daysType === '1day') return hoursSinceLastEmail >= 20;
   if (daysType === 'expired') return hoursSinceLastEmail >= 20;
+  // Para planos diários: não enviar mais de 1 email a cada 4 horas
+  if (daysType === 'daily_reminder') return hoursSinceLastEmail >= 4;
+  if (daysType === 'daily_expired') return hoursSinceLastEmail >= 4;
   
   return true;
 }
@@ -352,15 +448,82 @@ async function processExpirationReminders(): Promise<void> {
   const currentHour = new Date().getHours();
   const todayStr = new Date().toISOString().split('T')[0];
   
-  if (lastRunDate === todayStr && currentHour < 8) {
-    return;
-  }
-  
   console.log(`[subscription-scheduler] Running expiration check at ${new Date().toISOString()}`);
   
   try {
+    // ==========================================
+    // PLANOS DIÁRIOS: Verifica a cada hora
+    // Envia lembrete 6 horas antes do vencimento
+    // ==========================================
+    const adminsExpiringSoon = await getAdminsExpiringInHours(6);
+    for (const admin of adminsExpiringSoon) {
+      const planFreq = await getPlanFrequency(admin.planoId);
+      
+      // Só processa se for plano diário
+      if (!isDailyPlan(planFreq)) continue;
+      
+      if (!shouldSendEmail(admin, 'daily_reminder')) {
+        console.log(`[subscription-scheduler] Skipping daily reminder for ${admin.email} - recently sent`);
+        continue;
+      }
+      
+      const planName = await getPlanName(admin.planoId);
+      const hoursLeft = Math.ceil((new Date(admin.accessExpiresAt!).getTime() - Date.now()) / (1000 * 60 * 60));
+      
+      const success = await sendExpirationReminderEmail(
+        admin.email,
+        admin.name || "Cliente",
+        planName,
+        0, // 0 dias = vence hoje
+        admin.accessExpiresAt!
+      );
+      
+      if (success) {
+        await markEmailSent(admin.id);
+        console.log(`[subscription-scheduler] Sent daily reminder to ${admin.email} - expires in ${hoursLeft} hours`);
+        await generateRenewalPixBoleto(admin);
+      }
+    }
+    
+    // Planos diários expirados nas últimas 6 horas
+    const adminsExpiredRecently = await getAdminsExpiredInLastHours(6);
+    for (const admin of adminsExpiredRecently) {
+      const planFreq = await getPlanFrequency(admin.planoId);
+      
+      // Só processa se for plano diário
+      if (!isDailyPlan(planFreq)) continue;
+      
+      if (!shouldSendEmail(admin, 'daily_expired')) {
+        console.log(`[subscription-scheduler] Skipping daily expired email for ${admin.email} - recently sent`);
+        continue;
+      }
+      
+      const planName = await getPlanName(admin.planoId);
+      const success = await sendExpiredRenewalEmail(
+        admin.email,
+        admin.name || "Cliente",
+        planName
+      );
+      
+      if (success) {
+        await markEmailSent(admin.id);
+        console.log(`[subscription-scheduler] Sent daily expired email to ${admin.email}`);
+      }
+    }
+    
+    // ==========================================
+    // PLANOS NORMAIS: Verifica 1x por dia
+    // ==========================================
+    if (lastRunDate === todayStr && currentHour < 8) {
+      return;
+    }
+    
+    // Lembrete 3 dias antes (apenas planos não-diários)
     const admins3Days = await getAdminsExpiringInDays(3);
     for (const admin of admins3Days) {
+      const planFreq = await getPlanFrequency(admin.planoId);
+      if (isDailyPlan(planFreq)) continue; // Ignora planos diários aqui
+      
       if (!shouldSendEmail(admin, '3days')) {
         console.log(`[subscription-scheduler] Skipping 3-day reminder for ${admin.email} - recently sent`);
         continue;
@@ -381,8 +544,12 @@ async function processExpirationReminders(): Promise<void> {
       }
     }
     
+    // Lembrete 1 dia antes (apenas planos não-diários)
     const admins1Day = await getAdminsExpiringInDays(1);
     for (const admin of admins1Day) {
+      const planFreq = await getPlanFrequency(admin.planoId);
+      if (isDailyPlan(planFreq)) continue; // Ignora planos diários aqui
+      
       if (!shouldSendEmail(admin, '1day')) {
         console.log(`[subscription-scheduler] Skipping 1-day reminder for ${admin.email} - recently sent`);
         continue;
@@ -404,9 +571,13 @@ async function processExpirationReminders(): Promise<void> {
       }
     }
     
+    // Aviso de expirado (apenas planos não-diários)
     if (currentHour >= 8 && currentHour < 10) {
       const expiredAdmins = await getAdminsExpiredYesterday();
       for (const admin of expiredAdmins) {
+        const planFreq = await getPlanFrequency(admin.planoId);
+        if (isDailyPlan(planFreq)) continue; // Ignora planos diários aqui
+        
         if (!shouldSendEmail(admin, 'expired')) {
           console.log(`[subscription-scheduler] Skipping expired email for ${admin.email} - recently sent`);
           continue;
