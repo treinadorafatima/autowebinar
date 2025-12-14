@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type WebinarConfig, type WebinarConfigInsert, type Admin, type AdminInsert, type UploadedVideo, type UploadedVideoInsert, type Comment, type CommentInsert, type Webinar, type WebinarInsert, type Setting, type SettingInsert, type ViewerSession, type WebinarScript, type WebinarScriptInsert, type AiConfig, type AiConfigInsert, type AiMemory, type AiMemoryInsert, type CheckoutPlano, type CheckoutPlanoInsert, type CheckoutPagamento, type CheckoutPagamentoInsert, type CheckoutConfig, type CheckoutConfigInsert, type CheckoutAssinatura, type CheckoutAssinaturaInsert, type AiChat, type AiChatInsert, type AiMessageChat, type AiMessageChatInsert, type VideoTranscription, type VideoTranscriptionInsert, type AdminEmailCredential, type AdminEmailCredentialInsert, type EmailSequence, type EmailSequenceInsert, type ScheduledEmail, type ScheduledEmailInsert, type LeadFormConfig, type LeadFormConfigInsert, type WhatsappAccount, type WhatsappAccountInsert, type WhatsappSession, type WhatsappSessionInsert, type WhatsappSequence, type WhatsappSequenceInsert, type ScheduledWhatsappMessage, type ScheduledWhatsappMessageInsert, type MediaFile, type MediaFileInsert, type LeadMessage, type LeadMessageInsert, type Lead, type WhatsappBroadcast, type WhatsappBroadcastInsert, type WhatsappBroadcastRecipient, type WhatsappBroadcastRecipientInsert, type Affiliate, type AffiliateInsert, type AffiliateLink, type AffiliateLinkInsert, type AffiliateSale, type AffiliateSaleInsert, type AffiliateConfig, type AffiliateConfigInsert, type AffiliateWithdrawal, type AffiliateWithdrawalInsert, type WhatsappNotificationLog, type WhatsappNotificationLogInsert, type WhatsappNotificationTemplate, type WhatsappNotificationTemplateInsert, admins, webinarConfigs, users, uploadedVideos, comments, webinars as webinarsTable, settings, viewerSessions, webinarScripts, aiConfigs, aiMemories, checkoutPlanos, checkoutPagamentos, checkoutConfigs, checkoutAssinaturas, aiChats, aiMessageChats, videoTranscriptions, adminEmailCredentials, emailSequences, scheduledEmails, leadFormConfigs, whatsappAccounts, whatsappSessions, whatsappNotificationsLog, whatsappSequences, scheduledWhatsappMessages, mediaFiles, webinarViewLogs, leads, leadMessages, whatsappBroadcasts, whatsappBroadcastRecipients, affiliates, affiliateLinks, affiliateSales, affiliateConfig, affiliateWithdrawals, whatsappNotificationTemplates } from "@shared/schema";
+import { type User, type InsertUser, type WebinarConfig, type WebinarConfigInsert, type Admin, type AdminInsert, type UploadedVideo, type UploadedVideoInsert, type Comment, type CommentInsert, type Webinar, type WebinarInsert, type Setting, type SettingInsert, type ViewerSession, type WebinarScript, type WebinarScriptInsert, type AiConfig, type AiConfigInsert, type AiMemory, type AiMemoryInsert, type CheckoutPlano, type CheckoutPlanoInsert, type CheckoutPagamento, type CheckoutPagamentoInsert, type CheckoutConfig, type CheckoutConfigInsert, type CheckoutAssinatura, type CheckoutAssinaturaInsert, type AiChat, type AiChatInsert, type AiMessageChat, type AiMessageChatInsert, type VideoTranscription, type VideoTranscriptionInsert, type AdminEmailCredential, type AdminEmailCredentialInsert, type EmailSequence, type EmailSequenceInsert, type ScheduledEmail, type ScheduledEmailInsert, type LeadFormConfig, type LeadFormConfigInsert, type WhatsappAccount, type WhatsappAccountInsert, type WhatsappSession, type WhatsappSessionInsert, type WhatsappSequence, type WhatsappSequenceInsert, type ScheduledWhatsappMessage, type ScheduledWhatsappMessageInsert, type MediaFile, type MediaFileInsert, type LeadMessage, type LeadMessageInsert, type Lead, type WhatsappBroadcast, type WhatsappBroadcastInsert, type WhatsappBroadcastRecipient, type WhatsappBroadcastRecipientInsert, type Affiliate, type AffiliateInsert, type AffiliateLink, type AffiliateLinkInsert, type AffiliateSale, type AffiliateSaleInsert, type AffiliateConfig, type AffiliateConfigInsert, type AffiliateWithdrawal, type AffiliateWithdrawalInsert, type WhatsappNotificationLog, type WhatsappNotificationLogInsert, type WhatsappNotificationTemplate, type WhatsappNotificationTemplateInsert, type EmailNotificationTemplate, type EmailNotificationTemplateInsert, admins, webinarConfigs, users, uploadedVideos, comments, webinars as webinarsTable, settings, viewerSessions, webinarScripts, aiConfigs, aiMemories, checkoutPlanos, checkoutPagamentos, checkoutConfigs, checkoutAssinaturas, aiChats, aiMessageChats, videoTranscriptions, adminEmailCredentials, emailSequences, scheduledEmails, leadFormConfigs, whatsappAccounts, whatsappSessions, whatsappNotificationsLog, whatsappSequences, scheduledWhatsappMessages, mediaFiles, webinarViewLogs, leads, leadMessages, whatsappBroadcasts, whatsappBroadcastRecipients, affiliates, affiliateLinks, affiliateSales, affiliateConfig, affiliateWithdrawals, whatsappNotificationTemplates, emailNotificationTemplates } from "@shared/schema";
 import * as crypto from "crypto";
 import { randomUUID } from "crypto";
 import { db } from "./db";
@@ -4581,6 +4581,527 @@ Qualquer dúvida, estamos à disposição!`,
       if (!existing) {
         await db.insert(whatsappNotificationTemplates).values(template);
         console.log(`[templates] Created default template: ${template.notificationType}`);
+      }
+    }
+  }
+
+  // ============================================
+  // EMAIL NOTIFICATION TEMPLATES (SUPERADMIN)
+  // ============================================
+
+  async listEmailNotificationTemplates(): Promise<EmailNotificationTemplate[]> {
+    return db.select().from(emailNotificationTemplates).orderBy(emailNotificationTemplates.notificationType);
+  }
+
+  async getEmailNotificationTemplateByType(notificationType: string): Promise<EmailNotificationTemplate | undefined> {
+    const result = await db.select().from(emailNotificationTemplates)
+      .where(eq(emailNotificationTemplates.notificationType, notificationType))
+      .limit(1);
+    return result[0];
+  }
+
+  async updateEmailNotificationTemplate(id: string, data: Partial<EmailNotificationTemplateInsert>): Promise<EmailNotificationTemplate | undefined> {
+    const result = await db.update(emailNotificationTemplates)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(emailNotificationTemplates.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async initDefaultEmailNotificationTemplates(): Promise<void> {
+    const APP_NAME = "AutoWebinar";
+    const APP_URL = process.env.PUBLIC_BASE_URL 
+      ? process.env.PUBLIC_BASE_URL.replace(/\/$/, '')
+      : (process.env.REPLIT_DEV_DOMAIN 
+        ? `https://${process.env.REPLIT_DEV_DOMAIN}` 
+        : "https://autowebinar.com.br");
+
+    const defaultTemplates = [
+      {
+        id: randomUUID(),
+        notificationType: "welcome",
+        name: "Boas-vindas",
+        description: "Enviado quando um novo usuário cria uma conta",
+        subject: `Bem-vindo ao {appName}`,
+        htmlTemplate: `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bem-vindo ao {appName}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background-color: #f4f4f5;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f5;">
+    <tr>
+      <td style="padding: 40px 20px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden;">
+          <tr>
+            <td style="background-color: #3b82f6; padding: 30px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 600;">Bem-vindo ao {appName}</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 40px 30px;">
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Ola <strong>{name}</strong>,
+              </p>
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Sua conta foi criada com sucesso! Agora voce tem acesso a todos os recursos da plataforma de webinarios automatizados.
+              </p>
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                <tr>
+                  <td style="text-align: center; padding: 20px 0;">
+                    <a href="{adminUrl}" style="display: inline-block; background-color: #3b82f6; color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 6px; font-weight: 600; font-size: 16px;">
+                      Acessar Minha Conta
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color: #f8fafc; padding: 20px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0; color: #9ca3af; font-size: 12px;">
+                {appName} - Webinarios Automatizados
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`,
+        textTemplate: `Ola {name},
+
+Sua conta foi criada com sucesso no {appName}!
+
+Agora voce tem acesso a todos os recursos da plataforma de webinarios automatizados.
+
+Acesse sua conta: {adminUrl}
+
+---
+{appName}`,
+        isActive: true,
+      },
+      {
+        id: randomUUID(),
+        notificationType: "credentials",
+        name: "Credenciais de Acesso",
+        description: "Enviado quando um novo usuário é criado com credenciais de acesso",
+        subject: `Seu acesso ao {appName} foi liberado!`,
+        htmlTemplate: `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Seu Acesso ao {appName}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background-color: #f4f4f5;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f5;">
+    <tr>
+      <td style="padding: 40px 20px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden;">
+          <tr>
+            <td style="background-color: #10b981; padding: 30px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 600;">Seu Acesso Foi Liberado!</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 40px 30px;">
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Ola <strong>{name}</strong>,
+              </p>
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Seu acesso ao {appName} foi liberado com sucesso!
+              </p>
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 25px 0; background-color: #ecfdf5; border-radius: 6px; border: 2px solid #10b981;">
+                <tr>
+                  <td style="padding: 20px;">
+                    <p style="margin: 0 0 12px; color: #047857; font-weight: 600; font-size: 14px;">Suas Credenciais de Acesso:</p>
+                    <p style="margin: 0 0 8px; color: #374151; font-size: 15px; line-height: 1.8;">
+                      <strong>E-mail:</strong> {email}
+                    </p>
+                    <p style="margin: 0; color: #374151; font-size: 15px; line-height: 1.8;">
+                      <strong>Senha:</strong> <span style="background-color: #d1fae5; padding: 4px 12px; border-radius: 4px; font-family: monospace; font-size: 16px; letter-spacing: 1px;">{tempPassword}</span>
+                    </p>
+                  </td>
+                </tr>
+              </table>
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 20px 0; background-color: #fef3c7; border-radius: 6px;">
+                <tr>
+                  <td style="padding: 16px;">
+                    <p style="margin: 0; color: #92400e; font-size: 14px; line-height: 1.6;">
+                      <strong>Plano:</strong> {planName}<br>
+                      <strong>Importante:</strong> Por seguranca, recomendamos que voce altere sua senha apos o primeiro login.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                <tr>
+                  <td style="text-align: center; padding: 20px 0;">
+                    <a href="{loginUrl}" style="display: inline-block; background-color: #10b981; color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 6px; font-weight: 600; font-size: 16px;">
+                      Acessar Minha Conta
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color: #f8fafc; padding: 20px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0; color: #9ca3af; font-size: 12px;">
+                {appName} - Webinarios Automatizados
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`,
+        textTemplate: `Ola {name},
+
+Seu acesso ao {appName} foi liberado com sucesso!
+
+Suas credenciais de acesso:
+E-mail: {email}
+Senha: {tempPassword}
+
+Plano: {planName}
+
+IMPORTANTE: Por seguranca, recomendamos que voce altere sua senha apos o primeiro login.
+
+Acesse sua conta agora: {loginUrl}
+
+---
+{appName}`,
+        isActive: true,
+      },
+      {
+        id: randomUUID(),
+        notificationType: "password_reset",
+        name: "Redefinição de Senha",
+        description: "Enviado quando o usuário solicita redefinição de senha",
+        subject: `Recuperacao de Senha - {appName}`,
+        htmlTemplate: `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Recuperacao de Senha - {appName}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background-color: #f4f4f5;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f5;">
+    <tr>
+      <td style="padding: 40px 20px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden;">
+          <tr>
+            <td style="background-color: #7c3aed; padding: 30px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 600;">Recuperacao de Senha</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 40px 30px;">
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Ola <strong>{name}</strong>,
+              </p>
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Recebemos uma solicitacao para redefinir a senha da sua conta no {appName}.
+              </p>
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                <tr>
+                  <td style="text-align: center; padding: 20px 0;">
+                    <a href="{resetUrl}" style="display: inline-block; background-color: #7c3aed; color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 6px; font-weight: 600; font-size: 16px;">
+                      Redefinir Minha Senha
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 30px 0; background-color: #fef3c7; border-radius: 6px;">
+                <tr>
+                  <td style="padding: 16px;">
+                    <p style="margin: 0; color: #92400e; font-size: 14px; line-height: 1.6;">
+                      <strong>Importante:</strong> Este link e valido por 1 hora. Se voce nao solicitou a redefinicao de senha, ignore este email.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color: #f8fafc; padding: 20px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0; color: #9ca3af; font-size: 12px;">
+                {appName} - Este e um email automatico.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`,
+        textTemplate: `Ola {name},
+
+Recebemos uma solicitacao para redefinir a senha da sua conta no {appName}.
+
+Para criar uma nova senha, acesse o link abaixo:
+{resetUrl}
+
+IMPORTANTE: Este link e valido por 1 hora. Se voce nao solicitou a redefinicao de senha, ignore este email.
+
+---
+{appName}`,
+        isActive: true,
+      },
+      {
+        id: randomUUID(),
+        notificationType: "payment_confirmed",
+        name: "Confirmação de Pagamento",
+        description: "Enviado quando um pagamento é confirmado",
+        subject: `Pagamento Confirmado - {appName}`,
+        htmlTemplate: `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pagamento Confirmado - {appName}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background-color: #f4f4f5;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f5;">
+    <tr>
+      <td style="padding: 40px 20px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden;">
+          <tr>
+            <td style="background-color: #10b981; padding: 30px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 600;">Pagamento Confirmado!</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 40px 30px;">
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Ola <strong>{name}</strong>,
+              </p>
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Seu pagamento foi confirmado e seu acesso ao plano <strong>{planName}</strong> esta ativo!
+              </p>
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 25px 0; background-color: #ecfdf5; border-radius: 6px;">
+                <tr>
+                  <td style="padding: 20px;">
+                    <p style="margin: 0; color: #047857; font-size: 14px; line-height: 1.6;">
+                      <strong>Plano:</strong> {planName}<br>
+                      <strong>Validade:</strong> {expirationDate}
+                    </p>
+                  </td>
+                </tr>
+              </table>
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                <tr>
+                  <td style="text-align: center; padding: 20px 0;">
+                    <a href="{loginUrl}" style="display: inline-block; background-color: #10b981; color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 6px; font-weight: 600; font-size: 16px;">
+                      Acessar Minha Conta
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color: #f8fafc; padding: 20px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0; color: #9ca3af; font-size: 12px;">
+                {appName} - Webinarios Automatizados
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`,
+        textTemplate: `Ola {name},
+
+Seu pagamento foi confirmado com sucesso!
+
+Plano: {planName}
+Validade: {expirationDate}
+
+Acesse sua conta: {loginUrl}
+
+---
+{appName}`,
+        isActive: true,
+      },
+      {
+        id: randomUUID(),
+        notificationType: "plan_expired",
+        name: "Plano Expirado",
+        description: "Enviado quando o plano do usuário expira",
+        subject: `Seu Plano Expirou - {appName}`,
+        htmlTemplate: `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Seu Plano Expirou - {appName}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background-color: #f4f4f5;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f5;">
+    <tr>
+      <td style="padding: 40px 20px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden;">
+          <tr>
+            <td style="background-color: #dc2626; padding: 30px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 600;">Seu Plano Expirou</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 40px 30px;">
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Ola <strong>{name}</strong>,
+              </p>
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                O seu plano <strong>{planName}</strong> expirou e o acesso a sua conta foi suspenso.
+              </p>
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 25px 0; background-color: #fef2f2; border-radius: 6px;">
+                <tr>
+                  <td style="padding: 16px;">
+                    <p style="margin: 0; color: #991b1b; font-size: 14px; line-height: 1.6;">
+                      Seus webinarios foram pausados e novos leads nao serao capturados.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                <strong>Nao se preocupe!</strong> Seus dados estao seguros. Renove seu plano agora.
+              </p>
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                <tr>
+                  <td style="text-align: center; padding: 20px 0;">
+                    <a href="{renewUrl}" style="display: inline-block; background-color: #dc2626; color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 6px; font-weight: 600; font-size: 16px;">
+                      Renovar Meu Plano
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color: #f8fafc; padding: 20px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0; color: #9ca3af; font-size: 12px;">
+                {appName} - Webinarios Automatizados
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`,
+        textTemplate: `Ola {name},
+
+O seu plano {planName} expirou e o acesso a sua conta foi suspenso.
+
+Seus webinarios foram pausados e novos leads nao serao capturados.
+
+Nao se preocupe! Seus dados estao seguros. Renove seu plano agora:
+{renewUrl}
+
+---
+{appName}`,
+        isActive: true,
+      },
+      {
+        id: randomUUID(),
+        notificationType: "payment_failed",
+        name: "Falha no Pagamento",
+        description: "Enviado quando um pagamento falha",
+        subject: `Problema com Pagamento - {appName}`,
+        htmlTemplate: `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Problema com Pagamento - {appName}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background-color: #f4f4f5;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f5;">
+    <tr>
+      <td style="padding: 40px 20px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden;">
+          <tr>
+            <td style="background-color: #f59e0b; padding: 30px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 600;">Problema com Pagamento</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 40px 30px;">
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Ola <strong>{name}</strong>,
+              </p>
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Identificamos um problema com o pagamento do seu plano <strong>{planName}</strong>.
+              </p>
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 25px 0; background-color: #fef3c7; border-radius: 6px;">
+                <tr>
+                  <td style="padding: 16px;">
+                    <p style="margin: 0; color: #92400e; font-size: 14px; line-height: 1.6;">
+                      <strong>Motivo:</strong> {reason}
+                    </p>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Para regularizar sua situacao, tente novamente:
+              </p>
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                <tr>
+                  <td style="text-align: center; padding: 20px 0;">
+                    <a href="{paymentUrl}" style="display: inline-block; background-color: #f59e0b; color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 6px; font-weight: 600; font-size: 16px;">
+                      Tentar Novamente
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color: #f8fafc; padding: 20px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0; color: #9ca3af; font-size: 12px;">
+                {appName} - Webinarios Automatizados
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`,
+        textTemplate: `Ola {name},
+
+Identificamos um problema com o pagamento do seu plano {planName}.
+
+Motivo: {reason}
+
+Para regularizar sua situacao, tente novamente:
+{paymentUrl}
+
+---
+{appName}`,
+        isActive: true,
+      },
+    ];
+
+    for (const template of defaultTemplates) {
+      const existing = await this.getEmailNotificationTemplateByType(template.notificationType);
+      if (!existing) {
+        await db.insert(emailNotificationTemplates).values(template);
+        console.log(`[email-templates] Created default template: ${template.notificationType}`);
       }
     }
   }
