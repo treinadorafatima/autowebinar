@@ -29,7 +29,8 @@ export default function LoginPage() {
       });
 
       if (!res.ok) {
-        throw new Error("Email ou senha incorretos");
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Email ou senha incorretos");
       }
 
       const data = await res.json();

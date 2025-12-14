@@ -520,7 +520,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const admin = await storage.getAdminByEmail(normalizeEmail(email));
       
       if (!admin) {
-        return res.status(401).json({ error: "Invalid credentials" });
+        return res.status(401).json({ error: "Usuário não encontrado, verifique o email digitado" });
       }
 
       const bcrypt = await import('bcryptjs');
@@ -646,9 +646,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const admin = await storage.getAdminByEmail(email.toLowerCase());
       
       if (!admin) {
-        return res.json({ 
-          success: true, 
-          message: "Se o e-mail estiver cadastrado, você receberá as instruções para redefinir sua senha." 
+        return res.status(404).json({ 
+          error: "Usuário não encontrado, verifique o email digitado" 
         });
       }
 
