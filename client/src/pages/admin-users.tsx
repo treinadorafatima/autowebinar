@@ -703,7 +703,8 @@ export default function AdminUsersPage() {
   }
 
   const allRegularUsers = users.filter(u => u.role !== "superadmin");
-  const activeCount = allRegularUsers.filter(u => u.isActive).length;
+  // Usuários ativos = isActive=true E plano não expirado (pagamento em dia)
+  const activeCount = allRegularUsers.filter(u => u.isActive && !isExpired(u.accessExpiresAt)).length;
   const inactiveCount = allRegularUsers.filter(u => !u.isActive).length;
   const expiredCount = allRegularUsers.filter(u => isExpired(u.accessExpiresAt)).length;
   
@@ -744,7 +745,8 @@ export default function AdminUsersPage() {
     regularUsers = regularUsers.filter(u => isExpired(u.accessExpiresAt));
   }
   if (filterActive === true) {
-    regularUsers = regularUsers.filter(u => u.isActive);
+    // Filtrar usuários ativos COM plano em dia (não expirado)
+    regularUsers = regularUsers.filter(u => u.isActive && !isExpired(u.accessExpiresAt));
   } else if (filterActive === false) {
     regularUsers = regularUsers.filter(u => !u.isActive);
   }
@@ -856,7 +858,7 @@ export default function AdminUsersPage() {
             <div>
               <p className="text-2xl font-bold">{activeCount}</p>
               <p className="text-sm text-muted-foreground">
-                Usuários Ativos
+                Planos em Dia
                 {filterActive === true && <span className="ml-1 text-green-500">(filtrado)</span>}
               </p>
             </div>
