@@ -9892,6 +9892,265 @@ Seja conversacional e objetivo.`;
     }
   });
 
+  // Sincronizar status de assinaturas do Mercado Pago (superadmin only)
+  app.post("/api/checkout/sync-mercadopago-subscriptions", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.replace("Bearer ", "");
+      if (!token) return res.status(401).json({ error: "Token não fornecido" });
+      
+      const email = await validateSession(token);
+      if (!email) return res.status(401).json({ error: "Sessão inválida" });
+      
+      const adminUser = await storage.getAdminByEmail(email);
+      if (!adminUser || adminUser.role !== "superadmin") {
+        return res.status(403).json({ error: "Acesso negado - apenas superadmin" });
+      }
+
+      const accessToken = await storage.getCheckoutConfig('MERCADOPAGO_ACCESS_TOKEN');
+      if (!accessToken) {
+        return res.status(400).json({ error: "Mercado Pago não configurado" });
+      }
+
+      // Get all payments that have a mercadopagoPaymentId (these are subscriptions/preapprovals)
+      const allPagamentos = await storage.listCheckoutPagamentos();
+      const subscriptionPagamentos = allPagamentos.filter(p => 
+        p.mercadopagoPaymentId && 
+        (p.status === 'approved' || p.status === 'pending' || p.status === 'authorized')
+      );
+
+      const results = {
+        total: subscriptionPagamentos.length,
+        synced: 0,
+        errors: 0,
+        deactivated: 0,
+        reactivated: 0,
+        details: [] as { email: string; oldStatus: string; newStatus: string; action: string }[]
+      };
+
+      for (const pagamento of subscriptionPagamentos) {
+        try {
+          const preapprovalId = pagamento.mercadopagoPaymentId;
+          
+          // Fetch current status from Mercado Pago
+          const mpResponse = await fetch(`https://api.mercadopago.com/preapproval/${preapprovalId}`, {
+            headers: { 'Authorization': `Bearer ${accessToken}` },
+          });
+
+          if (!mpResponse.ok) {
+            // Try as regular payment if preapproval fails
+            const paymentResponse = await fetch(`https://api.mercadopago.com/v1/payments/${preapprovalId}`, {
+              headers: { 'Authorization': `Bearer ${accessToken}` },
+            });
+            
+            if (!paymentResponse.ok) {
+              results.errors++;
+              continue;
+            }
+            
+            // Regular payment - skip for now (not a subscription)
+            continue;
+          }
+
+          const preapproval = await mpResponse.json();
+          const mpStatus = preapproval.status;
+          
+          // Check if status changed
+          const admin = await storage.getAdminByEmail(pagamento.email);
+          let action = 'no_change';
+          
+          if (mpStatus === 'paused' || mpStatus === 'cancelled') {
+            // Should be deactivated
+            if (admin && admin.isActive) {
+              await storage.updateAdmin(admin.id, {
+                isActive: false,
+                paymentStatus: mpStatus,
+              });
+              results.deactivated++;
+              action = 'deactivated';
+            }
+            
+            if (pagamento.status !== mpStatus && pagamento.status !== 'cancelled') {
+              await storage.updateCheckoutPagamento(pagamento.id, {
+                status: mpStatus === 'cancelled' ? 'cancelled' : 'paused',
+                statusDetail: `Assinatura ${mpStatus} (sincronizado)`,
+              });
+            }
+          } else if (mpStatus === 'authorized') {
+            // Check if there are actual payments
+            let hasPayment = false;
+            try {
+              const paymentsResponse = await fetch(
+                `https://api.mercadopago.com/preapproval/${preapprovalId}/authorized_payments`,
+                { headers: { 'Authorization': `Bearer ${accessToken}` } }
+              );
+              if (paymentsResponse.ok) {
+                const paymentsData = await paymentsResponse.json();
+                hasPayment = paymentsData.results?.some(
+                  (p: any) => p.status === 'approved' || p.status === 'authorized'
+                ) || false;
+              }
+            } catch {}
+            
+            if (hasPayment && admin && !admin.isActive) {
+              // Should be active but isn't - reactivate
+              const plano = await storage.getCheckoutPlanoById(pagamento.planoId);
+              if (plano) {
+                const expirationDate = new Date();
+                expirationDate.setDate(expirationDate.getDate() + plano.prazoDias);
+                
+                await storage.updateAdmin(admin.id, {
+                  isActive: true,
+                  paymentStatus: 'ok',
+                  accessExpiresAt: expirationDate,
+                });
+                results.reactivated++;
+                action = 'reactivated';
+              }
+            }
+          }
+          
+          results.synced++;
+          if (action !== 'no_change') {
+            results.details.push({
+              email: pagamento.email,
+              oldStatus: pagamento.status,
+              newStatus: mpStatus,
+              action,
+            });
+          }
+        } catch (err) {
+          console.error(`[Sync] Error syncing ${pagamento.email}:`, err);
+          results.errors++;
+        }
+      }
+
+      console.log(`[Sync] Mercado Pago sync complete:`, results);
+      res.json(results);
+    } catch (error: any) {
+      console.error('[Sync] Error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Sincronizar assinatura individual de um usuário (superadmin only)
+  app.post("/api/checkout/sync-user-subscription/:userEmail", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.replace("Bearer ", "");
+      if (!token) return res.status(401).json({ error: "Token não fornecido" });
+      
+      const email = await validateSession(token);
+      if (!email) return res.status(401).json({ error: "Sessão inválida" });
+      
+      const adminUser = await storage.getAdminByEmail(email);
+      if (!adminUser || adminUser.role !== "superadmin") {
+        return res.status(403).json({ error: "Acesso negado - apenas superadmin" });
+      }
+
+      const accessToken = await storage.getCheckoutConfig('MERCADOPAGO_ACCESS_TOKEN');
+      if (!accessToken) {
+        return res.status(400).json({ error: "Mercado Pago não configurado" });
+      }
+
+      const userEmail = decodeURIComponent(req.params.userEmail);
+      const userPagamentos = await storage.listCheckoutPagamentosByEmail(userEmail);
+      
+      // Find the most recent subscription payment
+      const subscriptionPayment = userPagamentos.find(p => p.mercadopagoPaymentId);
+      
+      if (!subscriptionPayment) {
+        return res.status(404).json({ error: "Nenhuma assinatura encontrada para este usuário" });
+      }
+
+      const preapprovalId = subscriptionPayment.mercadopagoPaymentId;
+      
+      // Fetch current status from Mercado Pago
+      const mpResponse = await fetch(`https://api.mercadopago.com/preapproval/${preapprovalId}`, {
+        headers: { 'Authorization': `Bearer ${accessToken}` },
+      });
+
+      if (!mpResponse.ok) {
+        const errorText = await mpResponse.text();
+        return res.status(400).json({ error: `Erro ao buscar assinatura no Mercado Pago: ${errorText}` });
+      }
+
+      const preapproval = await mpResponse.json();
+      const mpStatus = preapproval.status;
+      
+      const admin = await storage.getAdminByEmail(userEmail);
+      let action = 'no_change';
+      let message = '';
+      
+      if (mpStatus === 'paused' || mpStatus === 'cancelled') {
+        if (admin && admin.isActive) {
+          await storage.updateAdmin(admin.id, {
+            isActive: false,
+            paymentStatus: mpStatus,
+          });
+          action = 'deactivated';
+          message = `Usuário desativado - assinatura ${mpStatus} no Mercado Pago`;
+        } else {
+          message = `Usuário já estava inativo - status MP: ${mpStatus}`;
+        }
+        
+        await storage.updateCheckoutPagamento(subscriptionPayment.id, {
+          status: mpStatus === 'cancelled' ? 'cancelled' : 'paused',
+          statusDetail: `Assinatura ${mpStatus} (sincronizado)`,
+        });
+      } else if (mpStatus === 'authorized') {
+        // Check for actual payments
+        let hasPayment = false;
+        try {
+          const paymentsResponse = await fetch(
+            `https://api.mercadopago.com/preapproval/${preapprovalId}/authorized_payments`,
+            { headers: { 'Authorization': `Bearer ${accessToken}` } }
+          );
+          if (paymentsResponse.ok) {
+            const paymentsData = await paymentsResponse.json();
+            hasPayment = paymentsData.results?.some(
+              (p: any) => p.status === 'approved' || p.status === 'authorized'
+            ) || false;
+          }
+        } catch {}
+        
+        if (hasPayment) {
+          if (admin && !admin.isActive) {
+            const plano = await storage.getCheckoutPlanoById(subscriptionPayment.planoId);
+            if (plano) {
+              const expirationDate = new Date();
+              expirationDate.setDate(expirationDate.getDate() + plano.prazoDias);
+              
+              await storage.updateAdmin(admin.id, {
+                isActive: true,
+                paymentStatus: 'ok',
+                accessExpiresAt: expirationDate,
+              });
+              action = 'reactivated';
+              message = `Usuário reativado - assinatura ativa com pagamento confirmado`;
+            }
+          } else {
+            message = `Usuário já estava ativo - assinatura autorizada com pagamento`;
+          }
+        } else {
+          message = `Assinatura autorizada mas sem pagamento confirmado ainda`;
+        }
+      } else {
+        message = `Status da assinatura no Mercado Pago: ${mpStatus}`;
+      }
+
+      res.json({
+        email: userEmail,
+        mercadopagoStatus: mpStatus,
+        systemStatus: admin?.isActive ? 'active' : 'inactive',
+        action,
+        message,
+        preapprovalId,
+      });
+    } catch (error: any) {
+      console.error('[Sync User] Error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Liberar acesso manualmente (superadmin)
   app.post("/api/checkout/pagamentos/:id/liberar", async (req, res) => {
     try {

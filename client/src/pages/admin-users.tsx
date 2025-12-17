@@ -146,6 +146,17 @@ export default function AdminUsersPage() {
   const [selectedUserPayments, setSelectedUserPayments] = useState<UserPayment[]>([]);
   const [loadingPayments, setLoadingPayments] = useState(false);
   const [selectedUserForPayments, setSelectedUserForPayments] = useState<User | null>(null);
+  const [syncingAll, setSyncingAll] = useState(false);
+  const [syncingUser, setSyncingUser] = useState<string | null>(null);
+  const [showSyncResultModal, setShowSyncResultModal] = useState(false);
+  const [syncResult, setSyncResult] = useState<{
+    total: number;
+    synced: number;
+    errors: number;
+    deactivated: number;
+    reactivated: number;
+    details: { email: string; oldStatus: string; newStatus: string; action: string }[];
+  } | null>(null);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   
@@ -293,6 +304,75 @@ export default function AdminUsersPage() {
       "card": "Cartão",
     };
     return methods[method] || method;
+  }
+
+  async function syncAllMercadoPagoSubscriptions() {
+    setSyncingAll(true);
+    try {
+      const res = await fetch("/api/checkout/sync-mercadopago-subscriptions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Erro ao sincronizar");
+      }
+      
+      const result = await res.json();
+      setSyncResult(result);
+      setShowSyncResultModal(true);
+      
+      // Refresh users after sync
+      await fetchUsers();
+      
+      toast({
+        title: "Sincronização concluída",
+        description: `${result.synced} assinaturas verificadas. ${result.deactivated} desativados, ${result.reactivated} reativados.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro na sincronização",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setSyncingAll(false);
+    }
+  }
+
+  async function syncUserSubscription(user: User) {
+    setSyncingUser(user.id);
+    try {
+      const res = await fetch(`/api/checkout/sync-user-subscription/${encodeURIComponent(user.email)}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Erro ao sincronizar");
+      }
+      
+      const result = await res.json();
+      
+      // Refresh users after sync
+      await fetchUsers();
+      
+      toast({
+        title: "Sincronização concluída",
+        description: result.message,
+        variant: result.action === 'deactivated' ? 'destructive' : 'default',
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro na sincronização",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setSyncingUser(null);
+    }
   }
 
   function handlePlanoChange(planoId: string) {
@@ -898,23 +978,40 @@ export default function AdminUsersPage() {
               </CardTitle>
               <CardDescription>Usuários com acesso limitado</CardDescription>
             </div>
-            {hasActiveFilters && (
-              <div className="flex items-center gap-2">
-                <Badge variant="secondary" className="gap-1">
-                  <Filter className="w-3 h-3" />
-                  {getFilterDescription()} ({regularUsers.length})
-                </Badge>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={clearFilters}
-                  className="h-6 px-2 text-xs"
-                  data-testid="button-clear-filters"
-                >
-                  Limpar
-                </Button>
-              </div>
-            )}
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={syncAllMercadoPagoSubscriptions}
+                disabled={syncingAll}
+                className="gap-1"
+                data-testid="button-sync-all-subscriptions"
+              >
+                {syncingAll ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-4 h-4" />
+                )}
+                Sincronizar MP
+              </Button>
+              {hasActiveFilters && (
+                <>
+                  <Badge variant="secondary" className="gap-1">
+                    <Filter className="w-3 h-3" />
+                    {getFilterDescription()} ({regularUsers.length})
+                  </Badge>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearFilters}
+                    className="h-6 px-2 text-xs"
+                    data-testid="button-clear-filters"
+                  >
+                    Limpar
+                  </Button>
+                </>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -1019,6 +1116,20 @@ export default function AdminUsersPage() {
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => syncUserSubscription(user)}
+                          disabled={syncingUser === user.id}
+                          data-testid={`button-sync-${user.id}`}
+                          title="Sincronizar assinatura com Mercado Pago"
+                        >
+                          {syncingUser === user.id ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <RefreshCw className="w-4 h-4 text-blue-500" />
+                          )}
+                        </Button>
                         <Button
                           size="icon"
                           variant="ghost"
@@ -1727,6 +1838,76 @@ export default function AdminUsersPage() {
           
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowPaymentsModal(false)}>
+              Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Sync Results Modal */}
+      <Dialog open={showSyncResultModal} onOpenChange={setShowSyncResultModal}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <RefreshCw className="w-5 h-5 text-primary" />
+              Resultado da Sincronização
+            </DialogTitle>
+            <DialogDescription>
+              Verificação de status das assinaturas do Mercado Pago
+            </DialogDescription>
+          </DialogHeader>
+          
+          {syncResult && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-muted rounded-lg p-3 text-center">
+                  <p className="text-2xl font-bold">{syncResult.synced}</p>
+                  <p className="text-xs text-muted-foreground">Assinaturas Verificadas</p>
+                </div>
+                <div className="bg-muted rounded-lg p-3 text-center">
+                  <p className="text-2xl font-bold">{syncResult.errors}</p>
+                  <p className="text-xs text-muted-foreground">Erros</p>
+                </div>
+                <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-center">
+                  <p className="text-2xl font-bold text-red-700 dark:text-red-400">{syncResult.deactivated}</p>
+                  <p className="text-xs text-muted-foreground">Desativados</p>
+                </div>
+                <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3 text-center">
+                  <p className="text-2xl font-bold text-green-700 dark:text-green-400">{syncResult.reactivated}</p>
+                  <p className="text-xs text-muted-foreground">Reativados</p>
+                </div>
+              </div>
+              
+              {syncResult.details.length > 0 && (
+                <div className="border rounded-lg">
+                  <div className="p-2 bg-muted/50 border-b">
+                    <p className="text-sm font-medium">Alterações Realizadas</p>
+                  </div>
+                  <ScrollArea className="max-h-48">
+                    <div className="p-2 space-y-2">
+                      {syncResult.details.map((detail, idx) => (
+                        <div key={idx} className="flex items-center justify-between text-sm p-2 rounded bg-muted/30">
+                          <span className="truncate">{detail.email}</span>
+                          <Badge 
+                            variant="outline" 
+                            className={detail.action === 'deactivated' 
+                              ? 'bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30'
+                              : 'bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/30'
+                            }
+                          >
+                            {detail.action === 'deactivated' ? 'Desativado' : 'Reativado'}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </div>
+              )}
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSyncResultModal(false)}>
               Fechar
             </Button>
           </DialogFooter>

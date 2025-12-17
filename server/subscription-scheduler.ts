@@ -762,6 +762,111 @@ async function processFailedRecurringPaymentReminders(): Promise<void> {
   }
 }
 
+// Sync Mercado Pago subscription statuses with local database
+async function syncMercadoPagoSubscriptions(): Promise<void> {
+  console.log("[subscription-scheduler] Starting Mercado Pago subscription sync");
+  
+  try {
+    const accessToken = await storage.getCheckoutConfig('MERCADOPAGO_ACCESS_TOKEN');
+    if (!accessToken) {
+      console.log("[subscription-scheduler] Mercado Pago not configured, skipping sync");
+      return;
+    }
+
+    // Get all active/pending subscription payments
+    const allPagamentos = await db.select().from(checkoutPagamentos)
+      .where(sql`${checkoutPagamentos.mercadopagoPaymentId} IS NOT NULL AND ${checkoutPagamentos.status} IN ('approved', 'pending', 'authorized')`)
+      .orderBy(sql`${checkoutPagamentos.criadoEm} DESC`);
+
+    let synced = 0;
+    let deactivated = 0;
+    let reactivated = 0;
+
+    for (const pagamento of allPagamentos) {
+      try {
+        const preapprovalId = pagamento.mercadopagoPaymentId;
+        if (!preapprovalId) continue;
+
+        // Fetch current status from Mercado Pago
+        const mpResponse = await fetch(`https://api.mercadopago.com/preapproval/${preapprovalId}`, {
+          headers: { 'Authorization': `Bearer ${accessToken}` },
+        });
+
+        if (!mpResponse.ok) {
+          // Not a preapproval (subscription), skip
+          continue;
+        }
+
+        const preapproval = await mpResponse.json();
+        const mpStatus = preapproval.status;
+
+        const admin = await storage.getAdminByEmail(pagamento.email);
+
+        if (mpStatus === 'paused' || mpStatus === 'cancelled') {
+          // Should be deactivated
+          if (admin && admin.isActive) {
+            await storage.updateAdmin(admin.id, {
+              isActive: false,
+              paymentStatus: mpStatus,
+            });
+            deactivated++;
+            console.log(`[subscription-scheduler] Auto-deactivated ${pagamento.email} - MP status: ${mpStatus}`);
+          }
+
+          if (pagamento.status !== mpStatus && pagamento.status !== 'cancelled') {
+            await storage.updateCheckoutPagamento(pagamento.id, {
+              status: mpStatus === 'cancelled' ? 'cancelled' : 'paused',
+              statusDetail: `Assinatura ${mpStatus} (auto-sync)`,
+            });
+          }
+        } else if (mpStatus === 'authorized') {
+          // Check if there are actual payments
+          let hasPayment = false;
+          try {
+            const paymentsResponse = await fetch(
+              `https://api.mercadopago.com/preapproval/${preapprovalId}/authorized_payments`,
+              { headers: { 'Authorization': `Bearer ${accessToken}` } }
+            );
+            if (paymentsResponse.ok) {
+              const paymentsData = await paymentsResponse.json();
+              hasPayment = paymentsData.results?.some(
+                (p: any) => p.status === 'approved' || p.status === 'authorized'
+              ) || false;
+            }
+          } catch {}
+
+          if (hasPayment && admin && !admin.isActive) {
+            // Should be active but isn't - reactivate
+            const plano = await storage.getCheckoutPlanoById(pagamento.planoId);
+            if (plano) {
+              const expirationDate = new Date();
+              expirationDate.setDate(expirationDate.getDate() + plano.prazoDias);
+
+              await storage.updateAdmin(admin.id, {
+                isActive: true,
+                paymentStatus: 'ok',
+                accessExpiresAt: expirationDate,
+              });
+              reactivated++;
+              console.log(`[subscription-scheduler] Auto-reactivated ${pagamento.email}`);
+            }
+          }
+        }
+
+        synced++;
+      } catch (err) {
+        // Silent fail for individual payments, continue processing others
+      }
+    }
+
+    if (synced > 0 || deactivated > 0 || reactivated > 0) {
+      console.log(`[subscription-scheduler] MP sync complete: ${synced} checked, ${deactivated} deactivated, ${reactivated} reactivated`);
+    }
+  } catch (error) {
+    console.error("[subscription-scheduler] Error syncing Mercado Pago subscriptions:", error);
+  }
+}
+
 export function startSubscriptionScheduler(): void {
   if (schedulerInterval) {
     console.log("[subscription-scheduler] Scheduler already running");
@@ -773,6 +878,15 @@ export function startSubscriptionScheduler(): void {
   setTimeout(() => {
     processExpirationReminders();
   }, 5000);
+  
+  // Run MP sync every 6 hours
+  setTimeout(() => {
+    syncMercadoPagoSubscriptions();
+  }, 60000); // First run after 1 minute
+  
+  setInterval(() => {
+    syncMercadoPagoSubscriptions();
+  }, 6 * 60 * 60 * 1000); // Then every 6 hours
   
   schedulerInterval = setInterval(processExpirationReminders, SCHEDULER_INTERVAL_MS);
 }
