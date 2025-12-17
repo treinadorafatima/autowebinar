@@ -421,21 +421,23 @@ export default function AdminCheckoutPlanos() {
               </div>
 
               <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="prazoDias">Prazo de Acesso (dias)</Label>
-                  <Input
-                    id="prazoDias"
-                    data-testid="input-plano-prazo"
-                    type="number"
-                    value={editingPlano.prazoDias || 30}
-                    onChange={(e) =>
-                      setEditingPlano({
-                        ...editingPlano,
-                        prazoDias: parseInt(e.target.value) || 30,
-                      })
-                    }
-                  />
-                </div>
+                {editingPlano.tipoCobranca !== "recorrente" && (
+                  <div className="space-y-2">
+                    <Label htmlFor="prazoDias">Prazo de Acesso (dias)</Label>
+                    <Input
+                      id="prazoDias"
+                      data-testid="input-plano-prazo"
+                      type="number"
+                      value={editingPlano.prazoDias || 30}
+                      onChange={(e) =>
+                        setEditingPlano({
+                          ...editingPlano,
+                          prazoDias: parseInt(e.target.value) || 30,
+                        })
+                      }
+                    />
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label htmlFor="webinarLimit">Limite de Webinars</Label>
                   <Input
@@ -547,21 +549,31 @@ export default function AdminCheckoutPlanos() {
                       data-testid="input-plano-frequencia"
                       type="number"
                       value={editingPlano.frequencia || 1}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        const freq = parseInt(e.target.value) || 1;
+                        const tipo = editingPlano.frequenciaTipo || "months";
+                        const prazoDias = tipo === "days" ? freq : tipo === "months" ? freq * 30 : freq * 365;
                         setEditingPlano({
                           ...editingPlano,
-                          frequencia: parseInt(e.target.value) || 1,
-                        })
-                      }
+                          frequencia: freq,
+                          prazoDias: prazoDias,
+                        });
+                      }}
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="frequenciaTipo">Período</Label>
                     <Select
                       value={editingPlano.frequenciaTipo || "months"}
-                      onValueChange={(value) =>
-                        setEditingPlano({ ...editingPlano, frequenciaTipo: value })
-                      }
+                      onValueChange={(value) => {
+                        const freq = editingPlano.frequencia || 1;
+                        const prazoDias = value === "days" ? freq : value === "months" ? freq * 30 : freq * 365;
+                        setEditingPlano({ 
+                          ...editingPlano, 
+                          frequenciaTipo: value,
+                          prazoDias: prazoDias,
+                        });
+                      }}
                     >
                       <SelectTrigger data-testid="select-plano-frequencia-tipo">
                         <SelectValue />
@@ -572,6 +584,9 @@ export default function AdminCheckoutPlanos() {
                         <SelectItem value="years">Anos</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+                  <div className="col-span-2 text-sm text-muted-foreground">
+                    Prazo de acesso calculado automaticamente: {editingPlano.prazoDias || 30} dias
                   </div>
                 </div>
               )}
