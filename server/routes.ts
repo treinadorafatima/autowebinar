@@ -9033,15 +9033,9 @@ Seja conversacional e objetivo.`;
               if (preapproval.status === 'authorized' && hasAuthorizedPayment && plano) {
                 updateData.dataAprovacao = realApprovalDate;
                 
-                // Calculate expiration based on plan frequency
+                // Calculate expiration based on plan's prazoDias (already synced with frequency for recurring plans)
                 const expirationDate = new Date();
-                if (plano.frequenciaTipo === 'days') {
-                  expirationDate.setDate(expirationDate.getDate() + (plano.frequencia || 30));
-                } else if (plano.frequenciaTipo === 'years') {
-                  expirationDate.setFullYear(expirationDate.getFullYear() + (plano.frequencia || 1));
-                } else {
-                  expirationDate.setMonth(expirationDate.getMonth() + (plano.frequencia || 1));
-                }
+                expirationDate.setDate(expirationDate.getDate() + (plano.prazoDias || 30));
                 updateData.dataExpiracao = expirationDate;
 
                 // Create or update admin
@@ -9178,21 +9172,9 @@ Seja conversacional e objetivo.`;
               
               const plano = await storage.getCheckoutPlanoById(pagamento.planoId);
               if (plano) {
-                // Calculate expiration date
+                // Calculate expiration date using prazoDias (already synced with frequency for recurring plans)
                 const expirationDate = new Date();
-                if (plano.tipoCobranca === 'recorrente') {
-                  // For recurring, use plan frequency
-                  if (plano.frequenciaTipo === 'days') {
-                    expirationDate.setDate(expirationDate.getDate() + (plano.frequencia || 30));
-                  } else if (plano.frequenciaTipo === 'years') {
-                    expirationDate.setFullYear(expirationDate.getFullYear() + (plano.frequencia || 1));
-                  } else {
-                    expirationDate.setMonth(expirationDate.getMonth() + (plano.frequencia || 1));
-                  }
-                } else {
-                  // For one-time, use prazoDias
-                  expirationDate.setDate(expirationDate.getDate() + plano.prazoDias);
-                }
+                expirationDate.setDate(expirationDate.getDate() + (plano.prazoDias || 30));
                 updateData.dataExpiracao = expirationDate;
 
                 // Check if admin exists
@@ -9328,15 +9310,9 @@ Seja conversacional e objetivo.`;
                     const plano = await storage.getCheckoutPlanoById(pagamento.planoId);
                     
                     if (plano) {
-                      // Calculate expiration based on plan frequency
+                      // Calculate expiration using prazoDias (already synced with frequency for recurring plans)
                       const expirationDate = new Date();
-                      if (plano.frequenciaTipo === 'days') {
-                        expirationDate.setDate(expirationDate.getDate() + (plano.frequencia || 30));
-                      } else if (plano.frequenciaTipo === 'years') {
-                        expirationDate.setFullYear(expirationDate.getFullYear() + (plano.frequencia || 1));
-                      } else {
-                        expirationDate.setMonth(expirationDate.getMonth() + (plano.frequencia || 1));
-                      }
+                      expirationDate.setDate(expirationDate.getDate() + (plano.prazoDias || 30));
                       
                       // Update pagamento
                       await storage.updateCheckoutPagamento(pagamentoId, {
@@ -9684,15 +9660,9 @@ Seja conversacional e objetivo.`;
             const plano = await storage.getCheckoutPlanoById(pagamento.planoId);
             
             if (plano) {
-              // Calculate next expiration based on plan frequency
+              // Calculate next expiration using prazoDias (already synced with frequency for recurring plans)
               const expirationDate = new Date();
-              if (plano.frequenciaTipo === 'days') {
-                expirationDate.setDate(expirationDate.getDate() + (plano.frequencia || 1));
-              } else if (plano.frequenciaTipo === 'years') {
-                expirationDate.setFullYear(expirationDate.getFullYear() + (plano.frequencia || 1));
-              } else {
-                expirationDate.setMonth(expirationDate.getMonth() + (plano.frequencia || 1));
-              }
+              expirationDate.setDate(expirationDate.getDate() + (plano.prazoDias || 30));
 
               let admin = await storage.getAdminByEmail(pagamento.email);
               
