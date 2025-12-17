@@ -183,6 +183,7 @@ export interface IStorage {
   deleteCheckoutPlano(id: string): Promise<void>;
   // Checkout - Pagamentos CRUD
   listCheckoutPagamentos(): Promise<CheckoutPagamento[]>;
+  listCheckoutPagamentosByEmail(email: string): Promise<CheckoutPagamento[]>;
   getCheckoutPagamentoById(id: string): Promise<CheckoutPagamento | undefined>;
   getCheckoutPagamentoByExternalId(externalId: string, gateway: 'mercadopago' | 'stripe'): Promise<CheckoutPagamento | undefined>;
   createCheckoutPagamento(pagamento: CheckoutPagamentoInsert): Promise<CheckoutPagamento>;
@@ -2559,6 +2560,12 @@ export class DatabaseStorage implements IStorage {
   // Checkout - Pagamentos
   async listCheckoutPagamentos(): Promise<CheckoutPagamento[]> {
     return db.select().from(checkoutPagamentos).orderBy(desc(checkoutPagamentos.criadoEm));
+  }
+
+  async listCheckoutPagamentosByEmail(email: string): Promise<CheckoutPagamento[]> {
+    return db.select().from(checkoutPagamentos)
+      .where(sql`LOWER(${checkoutPagamentos.email}) = LOWER(${email})`)
+      .orderBy(desc(checkoutPagamentos.criadoEm));
   }
 
   async getCheckoutPagamentoById(id: string): Promise<CheckoutPagamento | undefined> {

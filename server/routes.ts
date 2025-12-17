@@ -9870,6 +9870,29 @@ Seja conversacional e objetivo.`;
     }
   });
 
+  // Buscar pagamentos por email de usuário (superadmin only)
+  app.get("/api/checkout/pagamentos/user/:userEmail", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.replace("Bearer ", "");
+      if (!token) return res.status(401).json({ error: "Token não fornecido" });
+      
+      const email = await validateSession(token);
+      if (!email) return res.status(401).json({ error: "Sessão inválida" });
+      
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin || admin.role !== "superadmin") {
+        return res.status(403).json({ error: "Acesso negado - apenas superadmin" });
+      }
+
+      const userEmail = decodeURIComponent(req.params.userEmail);
+      const userPagamentos = await storage.listCheckoutPagamentosByEmail(userEmail);
+      
+      res.json(userPagamentos);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Liberar acesso manualmente (superadmin)
   app.post("/api/checkout/pagamentos/:id/liberar", async (req, res) => {
     try {

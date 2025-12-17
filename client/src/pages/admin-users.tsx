@@ -50,7 +50,11 @@ import {
   CreditCard,
   History,
   TestTube2,
-  UserX
+  UserX,
+  Receipt,
+  Loader2,
+  Ban,
+  RefreshCw
 } from "lucide-react";
 import {
   Collapsible,
@@ -85,6 +89,30 @@ interface Plano {
   ativo: boolean;
 }
 
+interface UserPayment {
+  id: string;
+  email: string;
+  nome: string;
+  cpf: string | null;
+  telefone: string | null;
+  planoId: string;
+  valor: number;
+  status: string;
+  statusDetail: string | null;
+  metodoPagamento: string | null;
+  mercadopagoPaymentId: string | null;
+  stripePaymentIntentId: string | null;
+  stripeSubscriptionId: string | null;
+  gatewayErrorCode: string | null;
+  gatewayErrorMessage: string | null;
+  userFriendlyError: string | null;
+  failureAttempts: number | null;
+  lastFailureAt: string | null;
+  dataPagamento: string | null;
+  dataAprovacao: string | null;
+  criadoEm: string | null;
+}
+
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [planos, setPlanos] = useState<Plano[]>([]);
@@ -114,6 +142,10 @@ export default function AdminUsersPage() {
   });
   const [saving, setSaving] = useState(false);
   const [impersonating, setImpersonating] = useState<string | null>(null);
+  const [showPaymentsModal, setShowPaymentsModal] = useState(false);
+  const [selectedUserPayments, setSelectedUserPayments] = useState<UserPayment[]>([]);
+  const [loadingPayments, setLoadingPayments] = useState(false);
+  const [selectedUserForPayments, setSelectedUserForPayments] = useState<User | null>(null);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   
@@ -201,6 +233,66 @@ export default function AdminUsersPage() {
     } catch (error) {
       console.error("Erro ao carregar planos:", error);
     }
+  }
+
+  async function fetchUserPayments(user: User) {
+    setSelectedUserForPayments(user);
+    setLoadingPayments(true);
+    setShowPaymentsModal(true);
+    
+    try {
+      const res = await fetch(`/api/checkout/pagamentos/user/${encodeURIComponent(user.email)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      
+      if (!res.ok) {
+        throw new Error("Erro ao carregar pagamentos");
+      }
+      
+      const data = await res.json();
+      setSelectedUserPayments(data);
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message,
+        variant: "destructive",
+      });
+      setSelectedUserPayments([]);
+    } finally {
+      setLoadingPayments(false);
+    }
+  }
+  
+  function getPaymentStatusInfo(status: string): { label: string; color: string; icon: JSX.Element } {
+    switch (status) {
+      case "approved":
+        return { label: "Aprovado", color: "bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/30", icon: <CheckCircle2 className="w-3 h-3" /> };
+      case "pending":
+        return { label: "Pendente", color: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30", icon: <Clock className="w-3 h-3" /> };
+      case "rejected":
+        return { label: "Rejeitado", color: "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30", icon: <XCircle className="w-3 h-3" /> };
+      case "cancelled":
+        return { label: "Cancelado", color: "bg-gray-500/10 text-gray-700 dark:text-gray-400 border-gray-500/30", icon: <Ban className="w-3 h-3" /> };
+      case "in_process":
+        return { label: "Processando", color: "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/30", icon: <RefreshCw className="w-3 h-3" /> };
+      case "checkout_iniciado":
+        return { label: "Checkout Iniciado", color: "bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/30", icon: <CreditCard className="w-3 h-3" /> };
+      default:
+        return { label: status, color: "bg-muted text-muted-foreground", icon: <AlertCircle className="w-3 h-3" /> };
+    }
+  }
+  
+  function getPaymentMethodLabel(method: string | null): string {
+    if (!method) return "Não definido";
+    const methods: Record<string, string> = {
+      "pix": "PIX",
+      "boleto": "Boleto",
+      "credit_card": "Cartão de Crédito",
+      "debit_card": "Cartão de Débito",
+      "subscription": "Assinatura",
+      "card": "Cartão",
+    };
+    return methods[method] || method;
   }
 
   function handlePlanoChange(planoId: string) {
@@ -930,6 +1022,15 @@ export default function AdminUsersPage() {
                         <Button
                           size="icon"
                           variant="ghost"
+                          onClick={() => fetchUserPayments(user)}
+                          data-testid={`button-payments-${user.id}`}
+                          title="Ver histórico de pagamentos"
+                        >
+                          <Receipt className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
                           onClick={() => handleLoginAsUser(user.id, user.name || user.email)}
                           disabled={impersonating === user.id}
                           data-testid={`button-login-as-${user.id}`}
@@ -1457,6 +1558,176 @@ export default function AdminUsersPage() {
               data-testid="button-confirm-delete-complete"
             >
               {deletingComplete ? "Excluindo..." : "Excluir Permanentemente"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Payment History Modal */}
+      <Dialog open={showPaymentsModal} onOpenChange={setShowPaymentsModal}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Receipt className="w-5 h-5 text-primary" />
+              Histórico de Pagamentos
+            </DialogTitle>
+            <DialogDescription>
+              {selectedUserForPayments && (
+                <span className="flex items-center gap-2">
+                  <Users className="w-4 h-4" />
+                  {selectedUserForPayments.name || selectedUserForPayments.email}
+                  <span className="text-muted-foreground">({selectedUserForPayments.email})</span>
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="flex-1 overflow-y-auto">
+            {loadingPayments ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              </div>
+            ) : selectedUserPayments.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                <Receipt className="w-12 h-12 mb-4 opacity-50" />
+                <p>Nenhum pagamento encontrado para este usuário</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground mb-4">
+                  {selectedUserPayments.length} pagamento(s) encontrado(s)
+                </p>
+                
+                {selectedUserPayments.map((payment) => {
+                  const statusInfo = getPaymentStatusInfo(payment.status);
+                  const isRecurring = !!payment.stripeSubscriptionId;
+                  
+                  return (
+                    <div 
+                      key={payment.id} 
+                      className="border rounded-lg p-4 space-y-3"
+                      data-testid={`payment-card-${payment.id}`}
+                    >
+                      {/* Header */}
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                          <Badge variant="outline" className={`${statusInfo.color} flex items-center gap-1`}>
+                            {statusInfo.icon}
+                            {statusInfo.label}
+                          </Badge>
+                          {isRecurring && (
+                            <Badge variant="outline" className="text-xs bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/30">
+                              <RefreshCw className="w-3 h-3 mr-1" />
+                              Recorrente
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold text-lg">
+                            {(payment.valor / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {payment.criadoEm ? new Date(payment.criadoEm).toLocaleString('pt-BR') : 'Data não disponível'}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      {/* Details Grid */}
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
+                        <div>
+                          <p className="text-muted-foreground text-xs">Plano</p>
+                          <p className="font-medium">{getPlanoNome(payment.planoId)}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground text-xs">Método</p>
+                          <p className="font-medium">{getPaymentMethodLabel(payment.metodoPagamento)}</p>
+                        </div>
+                        {payment.dataAprovacao && (
+                          <div>
+                            <p className="text-muted-foreground text-xs">Aprovado em</p>
+                            <p className="font-medium">{new Date(payment.dataAprovacao).toLocaleString('pt-BR')}</p>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Gateway IDs */}
+                      {(payment.mercadopagoPaymentId || payment.stripePaymentIntentId) && (
+                        <div className="text-xs text-muted-foreground bg-muted/50 rounded p-2">
+                          {payment.mercadopagoPaymentId && (
+                            <p>MercadoPago ID: {payment.mercadopagoPaymentId}</p>
+                          )}
+                          {payment.stripePaymentIntentId && (
+                            <p>Stripe ID: {payment.stripePaymentIntentId}</p>
+                          )}
+                          {payment.stripeSubscriptionId && (
+                            <p>Assinatura ID: {payment.stripeSubscriptionId}</p>
+                          )}
+                        </div>
+                      )}
+                      
+                      {/* Failure Details */}
+                      {payment.status === 'rejected' && (
+                        <div className="border-t pt-3 space-y-2">
+                          <p className="text-sm font-medium text-destructive flex items-center gap-2">
+                            <XCircle className="w-4 h-4" />
+                            Detalhes da Falha
+                          </p>
+                          
+                          {payment.userFriendlyError && (
+                            <div className="bg-red-500/10 border border-red-500/30 rounded p-3">
+                              <p className="text-sm text-red-700 dark:text-red-400">
+                                {payment.userFriendlyError}
+                              </p>
+                            </div>
+                          )}
+                          
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                            {payment.gatewayErrorCode && (
+                              <div>
+                                <p className="text-muted-foreground">Código do Erro</p>
+                                <p className="font-mono bg-muted px-2 py-1 rounded">{payment.gatewayErrorCode}</p>
+                              </div>
+                            )}
+                            {payment.statusDetail && (
+                              <div>
+                                <p className="text-muted-foreground">Status Detalhe</p>
+                                <p className="font-mono bg-muted px-2 py-1 rounded">{payment.statusDetail}</p>
+                              </div>
+                            )}
+                            {payment.failureAttempts && payment.failureAttempts > 0 && (
+                              <div>
+                                <p className="text-muted-foreground">Tentativas</p>
+                                <p className="font-medium">{payment.failureAttempts} tentativa(s)</p>
+                              </div>
+                            )}
+                            {payment.lastFailureAt && (
+                              <div>
+                                <p className="text-muted-foreground">Última Falha</p>
+                                <p className="font-medium">{new Date(payment.lastFailureAt).toLocaleString('pt-BR')}</p>
+                              </div>
+                            )}
+                          </div>
+                          
+                          {payment.gatewayErrorMessage && (
+                            <div className="mt-2">
+                              <p className="text-muted-foreground text-xs">Mensagem Original do Gateway</p>
+                              <p className="text-xs font-mono bg-muted px-2 py-1 rounded mt-1 break-all">
+                                {payment.gatewayErrorMessage}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPaymentsModal(false)}>
+              Fechar
             </Button>
           </DialogFooter>
         </DialogContent>
