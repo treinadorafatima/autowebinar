@@ -715,3 +715,80 @@ export async function getNotificationStatus(): Promise<{
     };
   }
 }
+
+/**
+ * Envia lembrete de falha de pagamento recorrente via WhatsApp
+ * Safe version - nunca lança erros
+ */
+export async function sendWhatsAppRecurringPaymentFailedReminderSafe(
+  phone: string | null | undefined,
+  name: string,
+  planName: string,
+  reminderNumber: number,
+  planoId?: string
+): Promise<boolean> {
+  try {
+    if (!phone) {
+      console.warn("[whatsapp-notifications] Phone nao disponivel para lembrete de falha recorrente");
+      return false;
+    }
+
+    const enabled = await isWhatsAppNotificationsEnabled();
+    if (!enabled) {
+      console.warn("[whatsapp-notifications] Notificacoes desabilitadas, nao enviando lembrete de falha recorrente");
+      return false;
+    }
+
+    const formattedPhone = formatPhoneNumber(phone);
+    if (!formattedPhone) {
+      console.warn("[whatsapp-notifications] Numero invalido para lembrete de falha recorrente:", phone);
+      return false;
+    }
+
+    const checkoutParams = new URLSearchParams({
+      recuperacao: "true"
+    });
+    const checkoutUrl = planoId 
+      ? `${getAppUrl()}/checkout/${planoId}?${checkoutParams.toString()}`
+      : `${getAppUrl()}/checkout?${checkoutParams.toString()}`;
+
+    let urgencyText = "";
+    if (reminderNumber === 1) {
+      urgencyText = "Sua renovacao automatica nao foi aprovada.";
+    } else if (reminderNumber === 2) {
+      urgencyText = "*Seu acesso ainda esta suspenso!*";
+    } else {
+      urgencyText = "*ULTIMO AVISO!* Seu acesso sera cancelado em breve.";
+    }
+
+    const defaultMessage = `Ola ${name}!
+
+${urgencyText}
+
+A renovacao do seu plano *${planName}* nao foi aprovada.
+
+Seus dados estao seguros! Regularize para reativar:
+${checkoutUrl}
+
+O que fazer:
+- Verificar o limite do cartao
+- Atualizar forma de pagamento
+- Liberar transacao com seu banco
+
+Duvidas? Responda esta mensagem!`;
+
+    const templateData = {
+      name,
+      planName,
+      checkoutUrl,
+      reminderNumber: String(reminderNumber),
+      appName: APP_NAME,
+    };
+
+    const message = await getTemplateMessage("recurring_payment_failed_reminder", templateData, defaultMessage);
+    return await sendNotificationMessage(formattedPhone, message);
+  } catch (error) {
+    console.error("[whatsapp-notifications] Erro em sendWhatsAppRecurringPaymentFailedReminderSafe:", error);
+    return false;
+  }
+}

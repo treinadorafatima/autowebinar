@@ -3443,3 +3443,155 @@ ${APP_NAME}
     return false;
   }
 }
+
+/**
+ * Envia lembrete de falha de pagamento recorrente
+ * Usado para lembrar clientes com renovacao automatica que falhou
+ */
+export async function sendRecurringPaymentFailedReminderEmail(
+  to: string,
+  name: string,
+  planName: string,
+  reminderNumber: number,
+  planoId?: string
+): Promise<boolean> {
+  try {
+    const { client, fromEmail } = await getResendClient();
+    
+    const checkoutParams = new URLSearchParams({
+      email: to,
+      nome: name,
+      renovacao: "true"
+    });
+    const checkoutUrl = planoId 
+      ? `${getAppUrl()}/checkout/${planoId}?${checkoutParams.toString()}`
+      : `${getAppUrl()}/checkout?${checkoutParams.toString()}`;
+    
+    let urgencyText = "";
+    let subjectUrgency = "";
+    
+    if (reminderNumber === 1) {
+      urgencyText = "Sua renovacao automatica nao foi aprovada.";
+      subjectUrgency = "Atualize seu pagamento";
+    } else if (reminderNumber === 2) {
+      urgencyText = "Seu acesso ainda esta suspenso. Regularize agora!";
+      subjectUrgency = "Seu acesso foi suspenso";
+    } else {
+      urgencyText = "ULTIMO AVISO! Seu acesso sera cancelado em breve.";
+      subjectUrgency = "Ultimo aviso - Acesso sera cancelado";
+    }
+    
+    const text = `
+Ola ${name},
+
+${urgencyText}
+
+A renovacao do seu plano ${planName} nao foi aprovada e seu acesso esta temporariamente suspenso.
+
+Nao se preocupe! Seus dados e webinarios estao seguros. Assim que regularizar o pagamento, seu acesso sera reativado automaticamente.
+
+O que voce pode fazer:
+- Verificar o limite disponivel no seu cartao
+- Atualizar o metodo de pagamento
+- Entrar em contato com seu banco para liberar a transacao
+
+Regularizar agora: ${checkoutUrl}
+
+Se precisar de ajuda, entre em contato com nosso suporte.
+
+---
+${APP_NAME}
+    `.trim();
+    
+    const html = `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${subjectUrgency} - ${APP_NAME}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background-color: #f4f4f5;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f5;">
+    <tr>
+      <td style="padding: 40px 20px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden;">
+          <tr>
+            <td style="background-color: ${reminderNumber >= 3 ? '#dc2626' : '#f59e0b'}; padding: 30px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 600;">${subjectUrgency}</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 40px 30px;">
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Ola <strong>${name}</strong>,
+              </p>
+              <p style="margin: 0 0 20px; color: ${reminderNumber >= 3 ? '#dc2626' : '#f59e0b'}; font-size: 18px; font-weight: bold; line-height: 1.6;">
+                ${urgencyText}
+              </p>
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                A renovacao do seu plano <strong>${planName}</strong> nao foi aprovada e seu acesso esta temporariamente suspenso.
+              </p>
+              
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 25px 0; background-color: #ecfdf5; border-radius: 6px; border: 2px solid #10b981;">
+                <tr>
+                  <td style="padding: 20px; text-align: center;">
+                    <p style="margin: 0 0 16px; color: #047857; font-weight: 600;">
+                      Seus dados estao seguros! Regularize para reativar.
+                    </p>
+                    <a href="${checkoutUrl}" style="display: inline-block; background-color: #10b981; color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 6px; font-weight: 600; font-size: 16px;">
+                      Regularizar Agora
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 25px 0; background-color: #f8fafc; border-radius: 6px;">
+                <tr>
+                  <td style="padding: 20px;">
+                    <p style="margin: 0 0 12px; color: #374151; font-weight: 600; font-size: 14px;">O que voce pode fazer:</p>
+                    <ul style="margin: 0; padding-left: 20px; color: #374151; font-size: 14px; line-height: 1.8;">
+                      <li>Verificar o limite disponivel no seu cartao</li>
+                      <li>Atualizar o metodo de pagamento</li>
+                      <li>Entrar em contato com seu banco para liberar a transacao</li>
+                    </ul>
+                  </td>
+                </tr>
+              </table>
+              
+              <p style="margin: 30px 0 0; color: #6b7280; font-size: 14px; line-height: 1.6; text-align: center;">
+                Se precisar de ajuda, entre em contato com nosso suporte.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color: #f8fafc; padding: 20px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0; color: #9ca3af; font-size: 12px;">
+                ${APP_NAME} - Lembrete ${reminderNumber} de 3
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `;
+
+    const result = await client.emails.send({
+      from: fromEmail,
+      replyTo: REPLY_TO_EMAIL,
+      to: [to],
+      subject: `${subjectUrgency} - ${planName} - ${APP_NAME}`,
+      html,
+      text,
+    });
+
+    console.log(`[email] Email de lembrete de falha recorrente #${reminderNumber} enviado para ${to}`, result);
+    return true;
+  } catch (error) {
+    console.error(`[email] Erro ao enviar email de lembrete de falha recorrente para ${to}:`, error);
+    return false;
+  }
+}
