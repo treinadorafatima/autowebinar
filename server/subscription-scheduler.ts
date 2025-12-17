@@ -4,11 +4,13 @@ import { eq, and, gte, lte, isNotNull, sql } from "drizzle-orm";
 import { 
   sendExpirationReminderEmail, 
   sendExpiredRenewalEmail,
-  sendAutoRenewalPaymentEmail
+  sendAutoRenewalPaymentEmail,
+  sendRecurringPaymentFailedReminderEmail
 } from "./email";
 import { 
   sendWhatsAppPlanExpiredSafe,
-  sendWhatsAppExpirationReminderSafe
+  sendWhatsAppExpirationReminderSafe,
+  sendWhatsAppRecurringPaymentFailedReminderSafe
 } from "./whatsapp-notifications";
 import { storage } from "./storage";
 
@@ -644,8 +646,119 @@ async function processExpirationReminders(): Promise<void> {
     
     lastRunDate = todayStr;
     
+    // ==========================================
+    // LEMBRETES DE FALHA DE RECORRÊNCIA
+    // ==========================================
+    await processFailedRecurringPaymentReminders();
+    
   } catch (error) {
     console.error("[subscription-scheduler] Error processing expiration reminders:", error);
+  }
+}
+
+/**
+ * Processa lembretes para pagamentos recorrentes com falha
+ * Envia lembretes em 1 dia, 3 dias e 7 dias após a falha
+ */
+async function processFailedRecurringPaymentReminders(): Promise<void> {
+  try {
+    const now = new Date();
+    
+    // Buscar pagamentos com status 'rejected' que são de planos recorrentes (têm stripeSubscriptionId)
+    // e que ainda não receberam todos os 3 lembretes
+    const failedPayments = await db
+      .select({
+        id: checkoutPagamentos.id,
+        email: checkoutPagamentos.email,
+        nome: checkoutPagamentos.nome,
+        telefone: checkoutPagamentos.telefone,
+        planoId: checkoutPagamentos.planoId,
+        lastFailureAt: checkoutPagamentos.lastFailureAt,
+        failedPaymentRemindersSent: checkoutPagamentos.failedPaymentRemindersSent,
+        lastFailedPaymentReminderAt: checkoutPagamentos.lastFailedPaymentReminderAt,
+        stripeSubscriptionId: checkoutPagamentos.stripeSubscriptionId,
+      })
+      .from(checkoutPagamentos)
+      .where(
+        and(
+          eq(checkoutPagamentos.status, "rejected"),
+          isNotNull(checkoutPagamentos.stripeSubscriptionId),
+          isNotNull(checkoutPagamentos.lastFailureAt),
+          sql`${checkoutPagamentos.failedPaymentRemindersSent} < 3 OR ${checkoutPagamentos.failedPaymentRemindersSent} IS NULL`
+        )
+      );
+
+    for (const payment of failedPayments) {
+      const lastFailure = payment.lastFailureAt;
+      if (!lastFailure) continue;
+      
+      const remindersSent = payment.failedPaymentRemindersSent || 0;
+      const daysSinceFailure = Math.floor((now.getTime() - lastFailure.getTime()) / (1000 * 60 * 60 * 24));
+      
+      // Determinar qual lembrete deve ser enviado
+      let shouldSendReminder = false;
+      let reminderNumber = 0;
+      
+      if (remindersSent === 0 && daysSinceFailure >= 1) {
+        // Lembrete 1: 1 dia após a falha
+        shouldSendReminder = true;
+        reminderNumber = 1;
+      } else if (remindersSent === 1 && daysSinceFailure >= 3) {
+        // Lembrete 2: 3 dias após a falha
+        shouldSendReminder = true;
+        reminderNumber = 2;
+      } else if (remindersSent === 2 && daysSinceFailure >= 7) {
+        // Lembrete 3: 7 dias após a falha (último aviso)
+        shouldSendReminder = true;
+        reminderNumber = 3;
+      }
+      
+      if (!shouldSendReminder) continue;
+      
+      // Verificar se já enviou lembrete hoje (evitar spam)
+      if (payment.lastFailedPaymentReminderAt) {
+        const lastReminder = new Date(payment.lastFailedPaymentReminderAt);
+        const hoursSinceLastReminder = (now.getTime() - lastReminder.getTime()) / (1000 * 60 * 60);
+        if (hoursSinceLastReminder < 23) {
+          continue; // Já enviou lembrete nas últimas 23 horas
+        }
+      }
+      
+      const planName = await getPlanName(payment.planoId);
+      
+      // Enviar email
+      const emailSuccess = await sendRecurringPaymentFailedReminderEmail(
+        payment.email,
+        payment.nome,
+        planName,
+        reminderNumber,
+        payment.planoId
+      );
+      
+      // Enviar WhatsApp
+      const whatsappSuccess = await sendWhatsAppRecurringPaymentFailedReminderSafe(
+        payment.telefone,
+        payment.nome,
+        planName,
+        reminderNumber,
+        payment.planoId
+      );
+      
+      if (emailSuccess || whatsappSuccess) {
+        // Atualizar o contador de lembretes
+        await db.update(checkoutPagamentos)
+          .set({
+            failedPaymentRemindersSent: reminderNumber,
+            lastFailedPaymentReminderAt: now,
+            atualizadoEm: now,
+          })
+          .where(eq(checkoutPagamentos.id, payment.id));
+        
+        console.log(`[subscription-scheduler] Sent failed recurring payment reminder #${reminderNumber} to ${payment.email} (email: ${emailSuccess}, whatsapp: ${whatsappSuccess})`);
+      }
+    }
+  } catch (error) {
+    console.error("[subscription-scheduler] Error processing failed recurring payment reminders:", error);
   }
 }
 
