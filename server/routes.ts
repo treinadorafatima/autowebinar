@@ -10266,13 +10266,56 @@ Seja conversacional e objetivo.`;
             const emailResults = emailSearchData.results || [];
             for (const payment of emailResults) {
               if (!paymentHistory.find((p: any) => p.id === payment.id)) {
-                // Add ALL payments from this email for now (we'll filter later if needed)
                 paymentHistory.push(payment);
               }
             }
           }
         } catch (err) {
           console.error('[MP Subscription] Error searching by email:', err);
+        }
+      }
+
+      // Search by external_reference (usually the user's internal ID)
+      if (preapproval.external_reference) {
+        try {
+          const extRefSearchResponse = await fetch(
+            `https://api.mercadopago.com/v1/payments/search?external_reference=${preapproval.external_reference}&sort=date_created&criteria=desc&limit=20`,
+            { headers: { 'Authorization': `Bearer ${accessToken}` } }
+          );
+          const extRefData = await extRefSearchResponse.json();
+          console.log(`[MP Subscription] search by external_reference response: ${extRefData.results?.length || 0} results`);
+          if (extRefSearchResponse.ok) {
+            const extRefResults = extRefData.results || [];
+            for (const payment of extRefResults) {
+              if (!paymentHistory.find((p: any) => p.id === payment.id)) {
+                paymentHistory.push(payment);
+              }
+            }
+          }
+        } catch (err) {
+          console.error('[MP Subscription] Error searching by external_reference:', err);
+        }
+      }
+
+      // Search by payer_id if available
+      if (preapproval.payer_id) {
+        try {
+          const payerIdSearchResponse = await fetch(
+            `https://api.mercadopago.com/v1/payments/search?payer.id=${preapproval.payer_id}&sort=date_created&criteria=desc&limit=20`,
+            { headers: { 'Authorization': `Bearer ${accessToken}` } }
+          );
+          const payerIdData = await payerIdSearchResponse.json();
+          console.log(`[MP Subscription] search by payer_id response: ${payerIdData.results?.length || 0} results`);
+          if (payerIdSearchResponse.ok) {
+            const payerIdResults = payerIdData.results || [];
+            for (const payment of payerIdResults) {
+              if (!paymentHistory.find((p: any) => p.id === payment.id)) {
+                paymentHistory.push(payment);
+              }
+            }
+          }
+        } catch (err) {
+          console.error('[MP Subscription] Error searching by payer_id:', err);
         }
       }
       
