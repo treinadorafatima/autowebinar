@@ -2086,14 +2086,26 @@ export default function AdminUsersPage() {
                       <p>Nenhuma cobrança registrada</p>
                     </div>
                   ) : (
-                    <ScrollArea className="max-h-64">
+                    <div className="max-h-80 overflow-y-auto">
                       <div className="p-2 space-y-2">
-                        {mpDetails.paymentHistory.map((payment, idx) => (
+                        {mpDetails.paymentHistory.map((payment, idx) => {
+                          const statusLabels: Record<string, string> = {
+                            'approved': 'Aprovado',
+                            'rejected': 'Recusado',
+                            'pending': 'Pendente',
+                            'cancelled': 'Cancelado',
+                            'expired': 'Expirado',
+                            'in_process': 'Processando',
+                            'authorized': 'Autorizado',
+                          };
+                          const statusLabel = statusLabels[payment.status] || payment.status;
+                          
+                          return (
                           <div 
                             key={payment.id || idx} 
                             className={`p-3 rounded-lg border ${
                               payment.status === 'approved' ? 'bg-green-500/5 border-green-500/20' :
-                              payment.status === 'rejected' ? 'bg-red-500/5 border-red-500/20' :
+                              payment.status === 'rejected' || payment.status === 'cancelled' ? 'bg-red-500/5 border-red-500/20' :
                               'bg-muted/30'
                             }`}
                           >
@@ -2102,15 +2114,12 @@ export default function AdminUsersPage() {
                                 variant="outline"
                                 className={`text-xs ${
                                   payment.status === 'approved' ? 'bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/30' :
-                                  payment.status === 'rejected' ? 'bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30' :
-                                  payment.status === 'pending' ? 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/30' :
+                                  payment.status === 'rejected' || payment.status === 'cancelled' ? 'bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30' :
+                                  payment.status === 'pending' || payment.status === 'expired' ? 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/30' :
                                   'bg-muted'
                                 }`}
                               >
-                                {payment.status === 'approved' ? 'Aprovado' :
-                                 payment.status === 'rejected' ? 'Recusado' :
-                                 payment.status === 'pending' ? 'Pendente' :
-                                 payment.status}
+                                {statusLabel}
                               </Badge>
                               <span className="font-bold">
                                 {payment.amount?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
@@ -2134,9 +2143,10 @@ export default function AdminUsersPage() {
                               </div>
                             )}
                           </div>
-                        ))}
+                        );
+                        })}
                       </div>
-                    </ScrollArea>
+                    </div>
                   )}
                 </div>
               </div>
