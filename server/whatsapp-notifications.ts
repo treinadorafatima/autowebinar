@@ -369,12 +369,27 @@ Se voce nao solicitou isso, ignore esta mensagem.`;
  * Safe version - nunca lança erros
  */
 export async function sendWhatsAppPlanExpiredSafe(
-  phone: string,
+  phone: string | null | undefined,
   name: string,
   planName: string
 ): Promise<boolean> {
   try {
+    if (!phone) {
+      console.warn("[whatsapp-notifications] Phone nao disponivel para plano expirado");
+      return false;
+    }
+
+    const enabled = await isWhatsAppNotificationsEnabled();
+    if (!enabled) {
+      console.warn("[whatsapp-notifications] Notificacoes desabilitadas, nao enviando plano expirado");
+      return false;
+    }
+
     const formattedPhone = formatPhoneNumber(phone);
+    if (!formattedPhone) {
+      console.warn("[whatsapp-notifications] Numero invalido para plano expirado:", phone);
+      return false;
+    }
     
     const defaultMessage = `Ola ${name}!
 
@@ -557,6 +572,79 @@ Duvidas? Responda esta mensagem!`;
     return await sendNotificationMessage(formattedPhone, message);
   } catch (error) {
     console.error("[whatsapp-notifications] Erro em sendWhatsAppPaymentRecoverySafe:", error);
+    return false;
+  }
+}
+
+/**
+ * Envia lembrete de expiração via WhatsApp (antes de expirar)
+ * Safe version - nunca lança erros
+ */
+export async function sendWhatsAppExpirationReminderSafe(
+  phone: string | null | undefined,
+  name: string,
+  planName: string,
+  daysUntilExpiration: number,
+  expirationDate: Date
+): Promise<boolean> {
+  try {
+    if (!phone) {
+      console.warn("[whatsapp-notifications] Phone nao disponivel para lembrete de expiracao");
+      return false;
+    }
+
+    const enabled = await isWhatsAppNotificationsEnabled();
+    if (!enabled) {
+      console.warn("[whatsapp-notifications] Notificacoes desabilitadas, nao enviando lembrete de expiracao");
+      return false;
+    }
+
+    const formattedPhone = formatPhoneNumber(phone);
+    if (!formattedPhone) {
+      console.warn("[whatsapp-notifications] Numero invalido para lembrete de expiracao:", phone);
+      return false;
+    }
+
+    const formattedDate = expirationDate.toLocaleDateString('pt-BR');
+    
+    let urgencyText = "";
+    if (daysUntilExpiration === 0) {
+      urgencyText = "*VENCE HOJE!*";
+    } else if (daysUntilExpiration === 1) {
+      urgencyText = "*VENCE AMANHA!*";
+    } else {
+      urgencyText = `Vence em *${daysUntilExpiration} dias*`;
+    }
+
+    const defaultMessage = `Ola ${name}!
+
+${urgencyText}
+
+Seu plano *${planName}* expira em ${formattedDate}.
+
+Renove agora para nao perder o acesso:
+${getRenewUrl()}
+
+Beneficios que voce mantem:
+- Webinarios automatizados 24/7
+- Ferramentas de IA
+- Captura de leads
+
+Duvidas? Estamos aqui para ajudar!`;
+
+    const templateData = {
+      name,
+      planName,
+      daysUntilExpiration: daysUntilExpiration.toString(),
+      expirationDate: formattedDate,
+      renewUrl: getRenewUrl(),
+      appName: APP_NAME,
+    };
+
+    const message = await getTemplateMessage("expiration_reminder", templateData, defaultMessage);
+    return await sendNotificationMessage(formattedPhone, message);
+  } catch (error) {
+    console.error("[whatsapp-notifications] Erro em sendWhatsAppExpirationReminderSafe:", error);
     return false;
   }
 }

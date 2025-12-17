@@ -6,6 +6,10 @@ import {
   sendExpiredRenewalEmail,
   sendAutoRenewalPaymentEmail
 } from "./email";
+import { 
+  sendWhatsAppPlanExpiredSafe,
+  sendWhatsAppExpirationReminderSafe
+} from "./whatsapp-notifications";
 import { storage } from "./storage";
 
 const SCHEDULER_INTERVAL_MS = 3600000; // Check every hour
@@ -470,7 +474,7 @@ async function processExpirationReminders(): Promise<void> {
       const planName = await getPlanName(admin.planoId);
       const hoursLeft = Math.ceil((new Date(admin.accessExpiresAt!).getTime() - Date.now()) / (1000 * 60 * 60));
       
-      const success = await sendExpirationReminderEmail(
+      const emailSuccess = await sendExpirationReminderEmail(
         admin.email,
         admin.name || "Cliente",
         planName,
@@ -478,9 +482,18 @@ async function processExpirationReminders(): Promise<void> {
         admin.accessExpiresAt!
       );
       
-      if (success) {
+      // Enviar WhatsApp também
+      const whatsappSuccess = await sendWhatsAppExpirationReminderSafe(
+        admin.telefone,
+        admin.name || "Cliente",
+        planName,
+        0,
+        admin.accessExpiresAt!
+      );
+      
+      if (emailSuccess || whatsappSuccess) {
         await markEmailSent(admin.id);
-        console.log(`[subscription-scheduler] Sent daily reminder to ${admin.email} - expires in ${hoursLeft} hours`);
+        console.log(`[subscription-scheduler] Sent daily reminder to ${admin.email} - expires in ${hoursLeft} hours (email: ${emailSuccess}, whatsapp: ${whatsappSuccess})`);
         await generateRenewalPixBoleto(admin);
       }
     }
@@ -499,15 +512,22 @@ async function processExpirationReminders(): Promise<void> {
       }
       
       const planName = await getPlanName(admin.planoId);
-      const success = await sendExpiredRenewalEmail(
+      const emailSuccess = await sendExpiredRenewalEmail(
         admin.email,
         admin.name || "Cliente",
         planName
       );
       
-      if (success) {
+      // Enviar WhatsApp também
+      const whatsappSuccess = await sendWhatsAppPlanExpiredSafe(
+        admin.telefone,
+        admin.name || "Cliente",
+        planName
+      );
+      
+      if (emailSuccess || whatsappSuccess) {
         await markEmailSent(admin.id);
-        console.log(`[subscription-scheduler] Sent daily expired email to ${admin.email}`);
+        console.log(`[subscription-scheduler] Sent daily expired to ${admin.email} (email: ${emailSuccess}, whatsapp: ${whatsappSuccess})`);
       }
     }
     
@@ -530,7 +550,7 @@ async function processExpirationReminders(): Promise<void> {
       }
       
       const planName = await getPlanName(admin.planoId);
-      const success = await sendExpirationReminderEmail(
+      const emailSuccess = await sendExpirationReminderEmail(
         admin.email,
         admin.name || "Cliente",
         planName,
@@ -538,9 +558,18 @@ async function processExpirationReminders(): Promise<void> {
         admin.accessExpiresAt!
       );
       
-      if (success) {
+      // Enviar WhatsApp também
+      const whatsappSuccess = await sendWhatsAppExpirationReminderSafe(
+        admin.telefone,
+        admin.name || "Cliente",
+        planName,
+        3,
+        admin.accessExpiresAt!
+      );
+      
+      if (emailSuccess || whatsappSuccess) {
         await markEmailSent(admin.id);
-        console.log(`[subscription-scheduler] Sent 3-day reminder to ${admin.email}`);
+        console.log(`[subscription-scheduler] Sent 3-day reminder to ${admin.email} (email: ${emailSuccess}, whatsapp: ${whatsappSuccess})`);
       }
     }
     
@@ -556,7 +585,7 @@ async function processExpirationReminders(): Promise<void> {
       }
       
       const planName = await getPlanName(admin.planoId);
-      const success = await sendExpirationReminderEmail(
+      const emailSuccess = await sendExpirationReminderEmail(
         admin.email,
         admin.name || "Cliente",
         planName,
@@ -564,9 +593,18 @@ async function processExpirationReminders(): Promise<void> {
         admin.accessExpiresAt!
       );
       
-      if (success) {
+      // Enviar WhatsApp também
+      const whatsappSuccess = await sendWhatsAppExpirationReminderSafe(
+        admin.telefone,
+        admin.name || "Cliente",
+        planName,
+        1,
+        admin.accessExpiresAt!
+      );
+      
+      if (emailSuccess || whatsappSuccess) {
         await markEmailSent(admin.id);
-        console.log(`[subscription-scheduler] Sent 1-day reminder to ${admin.email}`);
+        console.log(`[subscription-scheduler] Sent 1-day reminder to ${admin.email} (email: ${emailSuccess}, whatsapp: ${whatsappSuccess})`);
         await generateRenewalPixBoleto(admin);
       }
     }
@@ -584,15 +622,22 @@ async function processExpirationReminders(): Promise<void> {
         }
         
         const planName = await getPlanName(admin.planoId);
-        const success = await sendExpiredRenewalEmail(
+        const emailSuccess = await sendExpiredRenewalEmail(
           admin.email,
           admin.name || "Cliente",
           planName
         );
         
-        if (success) {
+        // Enviar WhatsApp também
+        const whatsappSuccess = await sendWhatsAppPlanExpiredSafe(
+          admin.telefone,
+          admin.name || "Cliente",
+          planName
+        );
+        
+        if (emailSuccess || whatsappSuccess) {
           await markEmailSent(admin.id);
-          console.log(`[subscription-scheduler] Sent expired renewal email to ${admin.email}`);
+          console.log(`[subscription-scheduler] Sent expired renewal to ${admin.email} (email: ${emailSuccess}, whatsapp: ${whatsappSuccess})`);
         }
       }
     }
