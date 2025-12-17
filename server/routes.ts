@@ -10276,7 +10276,28 @@ Seja conversacional e objetivo.`;
         }
       }
       
-      console.log(`[MP Subscription] Total payments found: ${paymentHistory.length}`);
+      console.log(`[MP Subscription] Total payments found from MP API: ${paymentHistory.length}`);
+      
+      // If no payments from MP API, include local system payments with status approved
+      if (paymentHistory.length === 0) {
+        console.log(`[MP Subscription] No payments from MP API, checking local system payments...`);
+        const localPayments = userPagamentos.filter(p => 
+          p.status === 'approved' || p.dataAprovacao
+        );
+        console.log(`[MP Subscription] Found ${localPayments.length} approved local payments`);
+        for (const localP of localPayments) {
+          paymentHistory.push({
+            id: localP.id,
+            status: localP.status === 'approved' ? 'approved' : localP.status,
+            status_detail: localP.statusDetail || 'Pagamento local',
+            transaction_amount: localP.valor / 100, // Convert from cents
+            date_created: localP.criadoEm,
+            date_approved: localP.dataAprovacao,
+            payment_method_id: localP.metodoPagamento,
+            source: 'local', // Mark as local payment
+          });
+        }
+      }
 
       // Sort by date descending
       paymentHistory.sort((a: any, b: any) => {
