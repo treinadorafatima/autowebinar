@@ -9749,9 +9749,11 @@ Seja conversacional e objetivo.`;
             const admin = await storage.getAdminByEmail(pagamento.email);
             if (admin) {
               await storage.updateAdmin(admin.id, {
-                isActive: false,
+                // Keep isActive: true - user can login and see renewal screen
+                paymentStatus: 'cancelled',
+                accessExpiresAt: new Date(), // Expire now - frontend blocks tool access
               });
-              console.log(`[Stripe Webhook] Deactivated admin: ${pagamento.email}`);
+              console.log(`[Stripe Webhook] Marked expired for ${pagamento.email} (isActive stays true, login works)`);
               
               // Send plan expired email (safe - never throws)
               const plano = await storage.getCheckoutPlanoById(pagamento.planoId);
