@@ -10206,7 +10206,7 @@ Seja conversacional e objetivo.`;
 
       const preapproval = await mpResponse.json();
       
-      // Fetch payment history
+      // Fetch payment history from authorized_payments endpoint
       let paymentHistory: any[] = [];
       try {
         const paymentsResponse = await fetch(
@@ -10218,8 +10218,62 @@ Seja conversacional e objetivo.`;
           paymentHistory = paymentsData.results || [];
         }
       } catch (err) {
-        console.error('[MP Subscription] Error fetching payment history:', err);
+        console.error('[MP Subscription] Error fetching authorized_payments:', err);
       }
+
+      // Also search for payments by preapproval_id in payments API
+      try {
+        const searchResponse = await fetch(
+          `https://api.mercadopago.com/v1/payments/search?preapproval_id=${preapprovalId}&sort=date_created&criteria=desc`,
+          { headers: { 'Authorization': `Bearer ${accessToken}` } }
+        );
+        if (searchResponse.ok) {
+          const searchData = await searchResponse.json();
+          const searchResults = searchData.results || [];
+          // Merge payments avoiding duplicates
+          for (const payment of searchResults) {
+            if (!paymentHistory.find((p: any) => p.id === payment.id)) {
+              paymentHistory.push(payment);
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[MP Subscription] Error searching payments:', err);
+      }
+
+      // Also search by payer email if we have it
+      if (preapproval.payer_email) {
+        try {
+          const emailSearchResponse = await fetch(
+            `https://api.mercadopago.com/v1/payments/search?payer.email=${encodeURIComponent(preapproval.payer_email)}&sort=date_created&criteria=desc&limit=20`,
+            { headers: { 'Authorization': `Bearer ${accessToken}` } }
+          );
+          if (emailSearchResponse.ok) {
+            const emailSearchData = await emailSearchResponse.json();
+            const emailResults = emailSearchData.results || [];
+            // Add payments that might be related to this subscription
+            for (const payment of emailResults) {
+              if (!paymentHistory.find((p: any) => p.id === payment.id)) {
+                // Only add if it's related to this preapproval or is a subscription payment
+                if (payment.metadata?.preapproval_id === preapprovalId || 
+                    payment.description?.includes(preapproval.reason) ||
+                    payment.transaction_amount === preapproval.auto_recurring?.transaction_amount) {
+                  paymentHistory.push(payment);
+                }
+              }
+            }
+          }
+        } catch (err) {
+          console.error('[MP Subscription] Error searching by email:', err);
+        }
+      }
+
+      // Sort by date descending
+      paymentHistory.sort((a: any, b: any) => {
+        const dateA = new Date(a.date_created || 0).getTime();
+        const dateB = new Date(b.date_created || 0).getTime();
+        return dateB - dateA;
+      });
 
       // Map failure reasons to user-friendly messages
       const getFailureReason = (payment: any): string => {
