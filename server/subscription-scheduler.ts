@@ -803,17 +803,19 @@ async function syncMercadoPagoSubscriptions(): Promise<void> {
         const admin = await storage.getAdminByEmail(pagamento.email);
 
         if (mpStatus === 'paused' || mpStatus === 'cancelled' || mpStatus === 'pending') {
-          // Block access but keep login working - user needs to renew subscription
-          if (admin && (admin.isActive || admin.paymentStatus !== mpStatus)) {
+          // Mark as expired but keep isActive=true so user can login and see renewal screen
+          // Frontend will block tool access based on accessExpiresAt and paymentStatus
+          if (admin && admin.paymentStatus !== mpStatus) {
+            const wasBlocked = admin.accessExpiresAt && new Date(admin.accessExpiresAt) <= new Date();
             await storage.updateAdmin(admin.id, {
-              isActive: false,
+              // Keep isActive: true - so user can login and see renewal screen
               paymentStatus: mpStatus,
-              accessExpiresAt: new Date(), // Set expiration to now
+              accessExpiresAt: new Date(), // Set expiration to now - frontend blocks tool access
             });
-            if (admin.isActive) {
+            if (!wasBlocked) {
               deactivated++;
             }
-            console.log(`[subscription-scheduler] Blocking access for ${pagamento.email} - MP status: ${mpStatus} (login still works)`);
+            console.log(`[subscription-scheduler] Marked expired for ${pagamento.email} - MP status: ${mpStatus} (isActive stays true, login works)`);
           }
 
           if (pagamento.status !== mpStatus && pagamento.status !== 'cancelled') {

@@ -9101,14 +9101,15 @@ Seja conversacional e objetivo.`;
                 statusDetail: `Assinatura ${preapproval.status}`,
               });
 
-              // Deactivate admin if subscription cancelled OR paused
+              // Mark expired but keep isActive=true so user can login and see renewal screen
               const admin = await storage.getAdminByEmail(pagamento.email);
               if (admin) {
                 await storage.updateAdmin(admin.id, {
-                  isActive: false,
+                  // Keep isActive: true - user can login and see renewal screen
                   paymentStatus: preapproval.status === 'cancelled' ? 'cancelled' : 'paused',
+                  accessExpiresAt: new Date(), // Expire now - frontend blocks tool access
                 });
-                console.log(`[MP Webhook] Deactivated admin ${pagamento.email} due to subscription ${preapproval.status}`);
+                console.log(`[MP Webhook] Marked expired for ${pagamento.email} - subscription ${preapproval.status} (isActive stays true)`);
                 
                 // Send plan expired/paused email (safe - never throws)
                 const plano = await storage.getCheckoutPlanoById(pagamento.planoId);
@@ -9963,18 +9964,19 @@ Seja conversacional e objetivo.`;
           console.log(`[Sync] Admin ${pagamento.email}: isActive = ${admin?.isActive}, paymentStatus = ${admin?.paymentStatus}`);
           
           if (mpStatus === 'paused' || mpStatus === 'cancelled' || mpStatus === 'pending') {
-            // Block access but keep login working - user needs to renew subscription
-            if (admin && (admin.isActive || admin.paymentStatus !== mpStatus)) {
+            // Mark expired but keep isActive=true so user can login and see renewal screen
+            if (admin && admin.paymentStatus !== mpStatus) {
+              const wasExpired = admin.accessExpiresAt && new Date(admin.accessExpiresAt) <= new Date();
               await storage.updateAdmin(admin.id, {
-                isActive: false,
+                // Keep isActive: true - user can login and see renewal screen
                 paymentStatus: mpStatus,
-                accessExpiresAt: new Date(), // Set expiration to now
+                accessExpiresAt: new Date(), // Expire now - frontend blocks tool access
               });
-              if (admin.isActive) {
+              if (!wasExpired) {
                 results.deactivated++;
                 action = 'deactivated';
               }
-              console.log(`[Sync] Blocking access for ${pagamento.email} - MP status is "${mpStatus}" (login still works)`);
+              console.log(`[Sync] Marked expired for ${pagamento.email} - MP status: "${mpStatus}" (isActive stays true, login works)`);
             }
             
             if (pagamento.status !== mpStatus && pagamento.status !== 'cancelled') {
@@ -10090,17 +10092,18 @@ Seja conversacional e objetivo.`;
       let message = '';
       
       if (mpStatus === 'paused' || mpStatus === 'cancelled' || mpStatus === 'pending') {
-        // Block access but keep login working - user needs to renew subscription
-        if (admin && (admin.isActive || admin.paymentStatus !== mpStatus)) {
+        // Mark expired but keep isActive=true so user can login and see renewal screen
+        if (admin && admin.paymentStatus !== mpStatus) {
+          const wasExpired = admin.accessExpiresAt && new Date(admin.accessExpiresAt) <= new Date();
           await storage.updateAdmin(admin.id, {
-            isActive: false,
+            // Keep isActive: true - user can login and see renewal screen
             paymentStatus: mpStatus,
-            accessExpiresAt: new Date(), // Set expiration to now
+            accessExpiresAt: new Date(), // Expire now - frontend blocks tool access
           });
-          action = admin.isActive ? 'deactivated' : 'updated';
-          message = `Acesso bloqueado - assinatura ${mpStatus} no Mercado Pago (login funciona para renovar)`;
+          action = !wasExpired ? 'deactivated' : 'updated';
+          message = `Assinatura marcada como expirada - ${mpStatus} no Mercado Pago (isActive permanece true, login funciona)`;
         } else {
-          message = `Usuário já estava com acesso bloqueado - status MP: ${mpStatus}`;
+          message = `Usuário já estava com status correto - MP: ${mpStatus}`;
         }
         
         const newLocalStatus = mpStatus === 'cancelled' ? 'cancelled' : (mpStatus === 'paused' ? 'paused' : 'pending');
