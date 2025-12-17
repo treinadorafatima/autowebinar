@@ -802,8 +802,8 @@ async function syncMercadoPagoSubscriptions(): Promise<void> {
 
         const admin = await storage.getAdminByEmail(pagamento.email);
 
-        if (mpStatus === 'paused' || mpStatus === 'cancelled') {
-          // Should be deactivated
+        if (mpStatus === 'paused' || mpStatus === 'cancelled' || mpStatus === 'pending') {
+          // Should be deactivated - paused, cancelled, or never authorized (pending)
           if (admin && admin.isActive) {
             await storage.updateAdmin(admin.id, {
               isActive: false,
@@ -814,8 +814,9 @@ async function syncMercadoPagoSubscriptions(): Promise<void> {
           }
 
           if (pagamento.status !== mpStatus && pagamento.status !== 'cancelled') {
+            const newLocalStatus = mpStatus === 'cancelled' ? 'cancelled' : (mpStatus === 'paused' ? 'paused' : 'pending');
             await storage.updateCheckoutPagamento(pagamento.id, {
-              status: mpStatus === 'cancelled' ? 'cancelled' : 'paused',
+              status: newLocalStatus,
               statusDetail: `Assinatura ${mpStatus} (auto-sync)`,
             });
           }

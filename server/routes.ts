@@ -9962,8 +9962,8 @@ Seja conversacional e objetivo.`;
           
           console.log(`[Sync] Admin ${pagamento.email}: isActive = ${admin?.isActive}, paymentStatus = ${admin?.paymentStatus}`);
           
-          if (mpStatus === 'paused' || mpStatus === 'cancelled') {
-            // Should be deactivated
+          if (mpStatus === 'paused' || mpStatus === 'cancelled' || mpStatus === 'pending') {
+            // Should be deactivated - paused, cancelled, or never authorized (pending)
             if (admin && admin.isActive) {
               await storage.updateAdmin(admin.id, {
                 isActive: false,
@@ -9971,11 +9971,13 @@ Seja conversacional e objetivo.`;
               });
               results.deactivated++;
               action = 'deactivated';
+              console.log(`[Sync] DEACTIVATING ${pagamento.email} - MP status is "${mpStatus}"`);
             }
             
             if (pagamento.status !== mpStatus && pagamento.status !== 'cancelled') {
+              const newLocalStatus = mpStatus === 'cancelled' ? 'cancelled' : (mpStatus === 'paused' ? 'paused' : 'pending');
               await storage.updateCheckoutPagamento(pagamento.id, {
-                status: mpStatus === 'cancelled' ? 'cancelled' : 'paused',
+                status: newLocalStatus,
                 statusDetail: `Assinatura ${mpStatus} (sincronizado)`,
               });
             }
@@ -10084,7 +10086,8 @@ Seja conversacional e objetivo.`;
       let action = 'no_change';
       let message = '';
       
-      if (mpStatus === 'paused' || mpStatus === 'cancelled') {
+      if (mpStatus === 'paused' || mpStatus === 'cancelled' || mpStatus === 'pending') {
+        // Deactivate - paused, cancelled, or never authorized (pending)
         if (admin && admin.isActive) {
           await storage.updateAdmin(admin.id, {
             isActive: false,
@@ -10096,8 +10099,9 @@ Seja conversacional e objetivo.`;
           message = `Usuário já estava inativo - status MP: ${mpStatus}`;
         }
         
+        const newLocalStatus = mpStatus === 'cancelled' ? 'cancelled' : (mpStatus === 'paused' ? 'paused' : 'pending');
         await storage.updateCheckoutPagamento(subscriptionPayment.id, {
-          status: mpStatus === 'cancelled' ? 'cancelled' : 'paused',
+          status: newLocalStatus,
           statusDetail: `Assinatura ${mpStatus} (sincronizado)`,
         });
       } else if (mpStatus === 'authorized') {
