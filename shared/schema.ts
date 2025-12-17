@@ -460,6 +460,9 @@ export const checkoutPagamentos = pgTable("checkout_pagamentos", {
   pixExpiresAt: timestamp("pix_expires_at"), // Data/hora de expiração do PIX
   boletoExpiresAt: timestamp("boleto_expires_at"), // Data/hora de vencimento do boleto
   pixExpiredEmailSent: boolean("pix_expired_email_sent").default(false), // Se já enviou email de PIX expirado
+  // Campos para lembretes de falha de recorrência
+  failedPaymentRemindersSent: integer("failed_payment_reminders_sent").default(0), // Número de lembretes enviados (0, 1, 2, 3)
+  lastFailedPaymentReminderAt: timestamp("last_failed_payment_reminder_at"), // Data do último lembrete
   criadoEm: timestamp("criado_em").defaultNow(),
   atualizadoEm: timestamp("atualizado_em").defaultNow(),
 });
