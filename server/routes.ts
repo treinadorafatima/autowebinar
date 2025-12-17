@@ -9095,29 +9095,28 @@ Seja conversacional e objetivo.`;
               await storage.updateCheckoutPagamento(pagamentoId, updateData);
               console.log(`[MP Webhook] Updated subscription payment ${pagamentoId}`);
             } else if (preapproval.status === 'cancelled' || preapproval.status === 'paused') {
-              // Handle cancellation
+              // Handle cancellation or pause - BOTH should block access
               await storage.updateCheckoutPagamento(pagamentoId, {
-                status: 'cancelled',
+                status: preapproval.status === 'cancelled' ? 'cancelled' : 'paused',
                 statusDetail: `Assinatura ${preapproval.status}`,
               });
 
-              // Deactivate admin if subscription cancelled
-              if (preapproval.status === 'cancelled') {
-                const admin = await storage.getAdminByEmail(pagamento.email);
-                if (admin) {
-                  await storage.updateAdmin(admin.id, {
-                    isActive: false,
-                  });
-                  console.log(`[MP Webhook] Deactivated admin ${pagamento.email} due to subscription cancellation`);
-                  
-                  // Send plan expired email (safe - never throws)
-                  const plano = await storage.getCheckoutPlanoById(pagamento.planoId);
-                  sendPlanExpiredEmailSafe(pagamento.email, pagamento.nome, plano?.nome || "Seu Plano");
-                  // Send WhatsApp notification if phone available (prefer admin phone)
-                  const telefoneNotif2 = admin?.telefone || pagamento.telefone;
-                  if (telefoneNotif2) {
-                    sendWhatsAppPlanExpiredSafe(telefoneNotif2, pagamento.nome, plano?.nome || "Seu Plano");
-                  }
+              // Deactivate admin if subscription cancelled OR paused
+              const admin = await storage.getAdminByEmail(pagamento.email);
+              if (admin) {
+                await storage.updateAdmin(admin.id, {
+                  isActive: false,
+                  paymentStatus: preapproval.status === 'cancelled' ? 'cancelled' : 'paused',
+                });
+                console.log(`[MP Webhook] Deactivated admin ${pagamento.email} due to subscription ${preapproval.status}`);
+                
+                // Send plan expired/paused email (safe - never throws)
+                const plano = await storage.getCheckoutPlanoById(pagamento.planoId);
+                sendPlanExpiredEmailSafe(pagamento.email, pagamento.nome, plano?.nome || "Seu Plano");
+                // Send WhatsApp notification if phone available (prefer admin phone)
+                const telefoneNotif2 = admin?.telefone || pagamento.telefone;
+                if (telefoneNotif2) {
+                  sendWhatsAppPlanExpiredSafe(telefoneNotif2, pagamento.nome, plano?.nome || "Seu Plano");
                 }
               }
             }
