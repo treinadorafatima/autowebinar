@@ -10210,6 +10210,12 @@ Seja conversacional e objetivo.`;
       }
 
       const preapproval = await mpResponse.json();
+      console.log(`[MP Subscription] Preapproval data for ${userEmail}:`, JSON.stringify({
+        id: preapproval.id,
+        status: preapproval.status,
+        payer_email: preapproval.payer_email,
+        reason: preapproval.reason,
+      }));
       
       // Fetch payment history from authorized_payments endpoint
       let paymentHistory: any[] = [];
@@ -10218,8 +10224,9 @@ Seja conversacional e objetivo.`;
           `https://api.mercadopago.com/preapproval/${preapprovalId}/authorized_payments`,
           { headers: { 'Authorization': `Bearer ${accessToken}` } }
         );
+        const paymentsData = await paymentsResponse.json();
+        console.log(`[MP Subscription] authorized_payments response:`, JSON.stringify(paymentsData));
         if (paymentsResponse.ok) {
-          const paymentsData = await paymentsResponse.json();
           paymentHistory = paymentsData.results || [];
         }
       } catch (err) {
@@ -10232,10 +10239,10 @@ Seja conversacional e objetivo.`;
           `https://api.mercadopago.com/v1/payments/search?preapproval_id=${preapprovalId}&sort=date_created&criteria=desc`,
           { headers: { 'Authorization': `Bearer ${accessToken}` } }
         );
+        const searchData = await searchResponse.json();
+        console.log(`[MP Subscription] search by preapproval_id response: ${searchData.results?.length || 0} results`);
         if (searchResponse.ok) {
-          const searchData = await searchResponse.json();
           const searchResults = searchData.results || [];
-          // Merge payments avoiding duplicates
           for (const payment of searchResults) {
             if (!paymentHistory.find((p: any) => p.id === payment.id)) {
               paymentHistory.push(payment);
@@ -10253,18 +10260,14 @@ Seja conversacional e objetivo.`;
             `https://api.mercadopago.com/v1/payments/search?payer.email=${encodeURIComponent(preapproval.payer_email)}&sort=date_created&criteria=desc&limit=20`,
             { headers: { 'Authorization': `Bearer ${accessToken}` } }
           );
+          const emailSearchData = await emailSearchResponse.json();
+          console.log(`[MP Subscription] search by email response: ${emailSearchData.results?.length || 0} results`);
           if (emailSearchResponse.ok) {
-            const emailSearchData = await emailSearchResponse.json();
             const emailResults = emailSearchData.results || [];
-            // Add payments that might be related to this subscription
             for (const payment of emailResults) {
               if (!paymentHistory.find((p: any) => p.id === payment.id)) {
-                // Only add if it's related to this preapproval or is a subscription payment
-                if (payment.metadata?.preapproval_id === preapprovalId || 
-                    payment.description?.includes(preapproval.reason) ||
-                    payment.transaction_amount === preapproval.auto_recurring?.transaction_amount) {
-                  paymentHistory.push(payment);
-                }
+                // Add ALL payments from this email for now (we'll filter later if needed)
+                paymentHistory.push(payment);
               }
             }
           }
@@ -10272,6 +10275,8 @@ Seja conversacional e objetivo.`;
           console.error('[MP Subscription] Error searching by email:', err);
         }
       }
+      
+      console.log(`[MP Subscription] Total payments found: ${paymentHistory.length}`);
 
       // Sort by date descending
       paymentHistory.sort((a: any, b: any) => {
