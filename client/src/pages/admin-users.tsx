@@ -113,6 +113,36 @@ interface UserPayment {
   criadoEm: string | null;
 }
 
+interface MPSubscriptionDetails {
+  preapprovalId: string;
+  email: string;
+  status: string;
+  statusLabel: string;
+  statusColor: string;
+  reason: string;
+  dateCreated: string;
+  lastModified: string;
+  nextPaymentDate: string | null;
+  paymentMethod: string;
+  amount: number;
+  currency: string;
+  frequency: number;
+  frequencyType: string;
+  payerEmail: string;
+  payerId: string;
+  paymentHistory: {
+    id: string;
+    status: string;
+    statusDetail: string;
+    failureReason: string;
+    amount: number;
+    dateCreated: string;
+    dateApproved: string | null;
+    paymentMethodId: string;
+    paymentTypeId: string;
+  }[];
+}
+
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [planos, setPlanos] = useState<Plano[]>([]);
@@ -157,6 +187,10 @@ export default function AdminUsersPage() {
     reactivated: number;
     details: { email: string; oldStatus: string; newStatus: string; action: string }[];
   } | null>(null);
+  const [showMPDetailsModal, setShowMPDetailsModal] = useState(false);
+  const [mpDetails, setMPDetails] = useState<MPSubscriptionDetails | null>(null);
+  const [loadingMPDetails, setLoadingMPDetails] = useState(false);
+  const [mpDetailsUser, setMPDetailsUser] = useState<User | null>(null);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   
@@ -372,6 +406,36 @@ export default function AdminUsersPage() {
       });
     } finally {
       setSyncingUser(null);
+    }
+  }
+
+  async function fetchMPSubscriptionDetails(user: User) {
+    setMPDetailsUser(user);
+    setLoadingMPDetails(true);
+    setShowMPDetailsModal(true);
+    setMPDetails(null);
+    
+    try {
+      const res = await fetch(`/api/checkout/mercadopago/subscription/${encodeURIComponent(user.email)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Erro ao buscar detalhes");
+      }
+      
+      const data = await res.json();
+      setMPDetails(data);
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message,
+        variant: "destructive",
+      });
+      setShowMPDetailsModal(false);
+    } finally {
+      setLoadingMPDetails(false);
     }
   }
 
@@ -1129,6 +1193,15 @@ export default function AdminUsersPage() {
                           ) : (
                             <RefreshCw className="w-4 h-4 text-blue-500" />
                           )}
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => fetchMPSubscriptionDetails(user)}
+                          data-testid={`button-mp-details-${user.id}`}
+                          title="Ver detalhes da assinatura Mercado Pago"
+                        >
+                          <CreditCard className="w-4 h-4 text-green-600" />
                         </Button>
                         <Button
                           size="icon"
@@ -1908,6 +1981,175 @@ export default function AdminUsersPage() {
           
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowSyncResultModal(false)}>
+              Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Mercado Pago Subscription Details Modal */}
+      <Dialog open={showMPDetailsModal} onOpenChange={setShowMPDetailsModal}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CreditCard className="w-5 h-5 text-green-600" />
+              Detalhes da Assinatura - Mercado Pago
+            </DialogTitle>
+            <DialogDescription>
+              {mpDetailsUser && (
+                <span className="flex items-center gap-2">
+                  <Users className="w-4 h-4" />
+                  {mpDetailsUser.name || mpDetailsUser.email}
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="flex-1 overflow-y-auto">
+            {loadingMPDetails ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              </div>
+            ) : mpDetails ? (
+              <div className="space-y-6">
+                {/* Status Card */}
+                <div className="border rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-semibold">Status da Assinatura</h3>
+                    <Badge 
+                      variant="outline"
+                      className={`${
+                        mpDetails.statusColor === 'green' ? 'bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/30' :
+                        mpDetails.statusColor === 'yellow' ? 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/30' :
+                        mpDetails.statusColor === 'orange' ? 'bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/30' :
+                        mpDetails.statusColor === 'red' ? 'bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30' :
+                        'bg-muted'
+                      }`}
+                    >
+                      {mpDetails.statusLabel}
+                    </Badge>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="text-muted-foreground text-xs">Valor</p>
+                      <p className="font-medium">
+                        {mpDetails.amount?.toLocaleString('pt-BR', { style: 'currency', currency: mpDetails.currency || 'BRL' })}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground text-xs">Frequência</p>
+                      <p className="font-medium">
+                        {mpDetails.frequency === 1 ? 'Mensal' : `A cada ${mpDetails.frequency} ${mpDetails.frequencyType === 'months' ? 'meses' : 'dias'}`}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground text-xs">Método de Pagamento</p>
+                      <p className="font-medium">{mpDetails.paymentMethod}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground text-xs">Próxima Cobrança</p>
+                      <p className="font-medium">{mpDetails.nextPaymentDate || 'Não agendada'}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground text-xs">Criada em</p>
+                      <p className="font-medium">
+                        {mpDetails.dateCreated ? new Date(mpDetails.dateCreated).toLocaleDateString('pt-BR') : '-'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground text-xs">Última Atualização</p>
+                      <p className="font-medium">
+                        {mpDetails.lastModified ? new Date(mpDetails.lastModified).toLocaleString('pt-BR') : '-'}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-4 text-xs text-muted-foreground bg-muted/50 rounded p-2">
+                    <p>ID da Assinatura: {mpDetails.preapprovalId}</p>
+                    <p>Email do Pagador: {mpDetails.payerEmail}</p>
+                  </div>
+                </div>
+                
+                {/* Payment History */}
+                <div className="border rounded-lg">
+                  <div className="p-3 bg-muted/50 border-b">
+                    <h3 className="font-semibold flex items-center gap-2">
+                      <History className="w-4 h-4" />
+                      Histórico de Cobranças ({mpDetails.paymentHistory.length})
+                    </h3>
+                  </div>
+                  
+                  {mpDetails.paymentHistory.length === 0 ? (
+                    <div className="p-8 text-center text-muted-foreground">
+                      <CreditCard className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                      <p>Nenhuma cobrança registrada</p>
+                    </div>
+                  ) : (
+                    <ScrollArea className="max-h-64">
+                      <div className="p-2 space-y-2">
+                        {mpDetails.paymentHistory.map((payment, idx) => (
+                          <div 
+                            key={payment.id || idx} 
+                            className={`p-3 rounded-lg border ${
+                              payment.status === 'approved' ? 'bg-green-500/5 border-green-500/20' :
+                              payment.status === 'rejected' ? 'bg-red-500/5 border-red-500/20' :
+                              'bg-muted/30'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between mb-2">
+                              <Badge 
+                                variant="outline"
+                                className={`text-xs ${
+                                  payment.status === 'approved' ? 'bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/30' :
+                                  payment.status === 'rejected' ? 'bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30' :
+                                  payment.status === 'pending' ? 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/30' :
+                                  'bg-muted'
+                                }`}
+                              >
+                                {payment.status === 'approved' ? 'Aprovado' :
+                                 payment.status === 'rejected' ? 'Recusado' :
+                                 payment.status === 'pending' ? 'Pendente' :
+                                 payment.status}
+                              </Badge>
+                              <span className="font-bold">
+                                {payment.amount?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                              </span>
+                            </div>
+                            
+                            <div className="text-xs text-muted-foreground">
+                              <p>Data: {payment.dateCreated ? new Date(payment.dateCreated).toLocaleString('pt-BR') : '-'}</p>
+                              {payment.dateApproved && (
+                                <p>Aprovado: {new Date(payment.dateApproved).toLocaleString('pt-BR')}</p>
+                              )}
+                            </div>
+                            
+                            {payment.failureReason && (
+                              <div className="mt-2 p-2 bg-red-500/10 border border-red-500/30 rounded text-xs">
+                                <p className="font-medium text-red-700 dark:text-red-400 flex items-center gap-1">
+                                  <XCircle className="w-3 h-3" />
+                                  Motivo da Falha:
+                                </p>
+                                <p className="text-red-600 dark:text-red-300">{payment.failureReason}</p>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                <CreditCard className="w-12 h-12 mb-4 opacity-50" />
+                <p>Nenhum detalhe disponível</p>
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowMPDetailsModal(false)}>
               Fechar
             </Button>
           </DialogFooter>

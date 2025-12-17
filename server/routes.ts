@@ -10163,6 +10163,149 @@ Seja conversacional e objetivo.`;
     }
   });
 
+  // Get detailed Mercado Pago subscription info for a user
+  app.get("/api/checkout/mercadopago/subscription/:userEmail", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.replace("Bearer ", "");
+      if (!token) return res.status(401).json({ error: "Token não fornecido" });
+      
+      const email = await validateSession(token);
+      if (!email) return res.status(401).json({ error: "Sessão inválida" });
+      
+      const adminUser = await storage.getAdminByEmail(email);
+      if (!adminUser || adminUser.role !== "superadmin") {
+        return res.status(403).json({ error: "Acesso negado - apenas superadmin" });
+      }
+
+      const accessToken = await storage.getCheckoutConfig('MERCADOPAGO_ACCESS_TOKEN');
+      if (!accessToken) {
+        return res.status(400).json({ error: "Mercado Pago não configurado" });
+      }
+
+      const userEmail = decodeURIComponent(req.params.userEmail);
+      const userPagamentos = await storage.listCheckoutPagamentosByEmail(userEmail);
+      
+      // Find the most recent subscription payment
+      const subscriptionPayment = userPagamentos.find(p => p.mercadopagoPaymentId);
+      
+      if (!subscriptionPayment) {
+        return res.status(404).json({ error: "Nenhuma assinatura encontrada para este usuário" });
+      }
+
+      const preapprovalId = subscriptionPayment.mercadopagoPaymentId;
+      
+      // Fetch subscription details from Mercado Pago
+      const mpResponse = await fetch(`https://api.mercadopago.com/preapproval/${preapprovalId}`, {
+        headers: { 'Authorization': `Bearer ${accessToken}` },
+      });
+
+      if (!mpResponse.ok) {
+        const errorText = await mpResponse.text();
+        return res.status(400).json({ error: `Erro ao buscar assinatura: ${errorText}` });
+      }
+
+      const preapproval = await mpResponse.json();
+      
+      // Fetch payment history
+      let paymentHistory: any[] = [];
+      try {
+        const paymentsResponse = await fetch(
+          `https://api.mercadopago.com/preapproval/${preapprovalId}/authorized_payments`,
+          { headers: { 'Authorization': `Bearer ${accessToken}` } }
+        );
+        if (paymentsResponse.ok) {
+          const paymentsData = await paymentsResponse.json();
+          paymentHistory = paymentsData.results || [];
+        }
+      } catch (err) {
+        console.error('[MP Subscription] Error fetching payment history:', err);
+      }
+
+      // Map failure reasons to user-friendly messages
+      const getFailureReason = (payment: any): string => {
+        if (payment.status === 'approved' || payment.status === 'authorized') return '';
+        
+        const reasons: Record<string, string> = {
+          'cc_rejected_bad_filled_card_number': 'Número do cartão incorreto',
+          'cc_rejected_bad_filled_date': 'Data de validade incorreta',
+          'cc_rejected_bad_filled_other': 'Dados do cartão incorretos',
+          'cc_rejected_bad_filled_security_code': 'Código de segurança incorreto',
+          'cc_rejected_blacklist': 'Cartão não permitido',
+          'cc_rejected_call_for_authorize': 'Necessário autorizar com o banco',
+          'cc_rejected_card_disabled': 'Cartão desabilitado',
+          'cc_rejected_card_error': 'Erro no cartão',
+          'cc_rejected_duplicated_payment': 'Pagamento duplicado',
+          'cc_rejected_high_risk': 'Pagamento recusado por risco',
+          'cc_rejected_insufficient_amount': 'Saldo insuficiente',
+          'cc_rejected_invalid_installments': 'Parcelas inválidas',
+          'cc_rejected_max_attempts': 'Limite de tentativas excedido',
+          'cc_rejected_other_reason': 'Cartão recusado',
+          'pending_contingency': 'Pagamento em análise',
+          'pending_review_manual': 'Pagamento em revisão manual',
+        };
+        
+        return reasons[payment.status_detail] || payment.status_detail || 'Motivo não especificado';
+      };
+
+      // Get status label
+      const getStatusLabel = (status: string): { label: string; color: string } => {
+        const statusMap: Record<string, { label: string; color: string }> = {
+          'authorized': { label: 'Ativa', color: 'green' },
+          'paused': { label: 'Pausada', color: 'yellow' },
+          'pending': { label: 'Pendente', color: 'orange' },
+          'cancelled': { label: 'Cancelada', color: 'red' },
+        };
+        return statusMap[status] || { label: status, color: 'gray' };
+      };
+
+      // Format payment method
+      const paymentMethod = preapproval.payment_method_id 
+        ? `${preapproval.payment_method_id} - Final ${preapproval.card?.last_four_digits || '****'}`
+        : 'Não informado';
+
+      // Calculate next payment date
+      const nextPaymentDate = preapproval.next_payment_date 
+        ? new Date(preapproval.next_payment_date).toLocaleDateString('pt-BR')
+        : null;
+
+      const statusInfo = getStatusLabel(preapproval.status);
+
+      res.json({
+        preapprovalId,
+        email: userEmail,
+        status: preapproval.status,
+        statusLabel: statusInfo.label,
+        statusColor: statusInfo.color,
+        reason: preapproval.reason || 'Assinatura',
+        dateCreated: preapproval.date_created,
+        lastModified: preapproval.last_modified,
+        nextPaymentDate,
+        paymentMethod,
+        amount: preapproval.auto_recurring?.transaction_amount,
+        currency: preapproval.auto_recurring?.currency_id || 'BRL',
+        frequency: preapproval.auto_recurring?.frequency,
+        frequencyType: preapproval.auto_recurring?.frequency_type,
+        payerEmail: preapproval.payer_email,
+        payerId: preapproval.payer_id,
+        paymentHistory: paymentHistory.map((p: any) => ({
+          id: p.id,
+          status: p.status,
+          statusDetail: p.status_detail,
+          failureReason: getFailureReason(p),
+          amount: p.transaction_amount,
+          dateCreated: p.date_created,
+          dateApproved: p.date_approved,
+          paymentMethodId: p.payment_method_id,
+          paymentTypeId: p.payment_type_id,
+        })),
+        raw: preapproval, // Full response for debugging
+      });
+    } catch (error: any) {
+      console.error('[MP Subscription] Error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Liberar acesso manualmente (superadmin)
   app.post("/api/checkout/pagamentos/:id/liberar", async (req, res) => {
     try {
