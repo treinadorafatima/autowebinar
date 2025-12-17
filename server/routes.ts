@@ -9963,15 +9963,18 @@ Seja conversacional e objetivo.`;
           console.log(`[Sync] Admin ${pagamento.email}: isActive = ${admin?.isActive}, paymentStatus = ${admin?.paymentStatus}`);
           
           if (mpStatus === 'paused' || mpStatus === 'cancelled' || mpStatus === 'pending') {
-            // Should be deactivated - paused, cancelled, or never authorized (pending)
-            if (admin && admin.isActive) {
+            // Block access but keep login working - user needs to renew subscription
+            if (admin && (admin.isActive || admin.paymentStatus !== mpStatus)) {
               await storage.updateAdmin(admin.id, {
                 isActive: false,
                 paymentStatus: mpStatus,
+                accessExpiresAt: new Date(), // Set expiration to now
               });
-              results.deactivated++;
-              action = 'deactivated';
-              console.log(`[Sync] DEACTIVATING ${pagamento.email} - MP status is "${mpStatus}"`);
+              if (admin.isActive) {
+                results.deactivated++;
+                action = 'deactivated';
+              }
+              console.log(`[Sync] Blocking access for ${pagamento.email} - MP status is "${mpStatus}" (login still works)`);
             }
             
             if (pagamento.status !== mpStatus && pagamento.status !== 'cancelled') {
@@ -10087,16 +10090,17 @@ Seja conversacional e objetivo.`;
       let message = '';
       
       if (mpStatus === 'paused' || mpStatus === 'cancelled' || mpStatus === 'pending') {
-        // Deactivate - paused, cancelled, or never authorized (pending)
-        if (admin && admin.isActive) {
+        // Block access but keep login working - user needs to renew subscription
+        if (admin && (admin.isActive || admin.paymentStatus !== mpStatus)) {
           await storage.updateAdmin(admin.id, {
             isActive: false,
             paymentStatus: mpStatus,
+            accessExpiresAt: new Date(), // Set expiration to now
           });
-          action = 'deactivated';
-          message = `Usuário desativado - assinatura ${mpStatus} no Mercado Pago`;
+          action = admin.isActive ? 'deactivated' : 'updated';
+          message = `Acesso bloqueado - assinatura ${mpStatus} no Mercado Pago (login funciona para renovar)`;
         } else {
-          message = `Usuário já estava inativo - status MP: ${mpStatus}`;
+          message = `Usuário já estava com acesso bloqueado - status MP: ${mpStatus}`;
         }
         
         const newLocalStatus = mpStatus === 'cancelled' ? 'cancelled' : (mpStatus === 'paused' ? 'paused' : 'pending');

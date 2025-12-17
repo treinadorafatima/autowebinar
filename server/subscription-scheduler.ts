@@ -803,14 +803,17 @@ async function syncMercadoPagoSubscriptions(): Promise<void> {
         const admin = await storage.getAdminByEmail(pagamento.email);
 
         if (mpStatus === 'paused' || mpStatus === 'cancelled' || mpStatus === 'pending') {
-          // Should be deactivated - paused, cancelled, or never authorized (pending)
-          if (admin && admin.isActive) {
+          // Block access but keep login working - user needs to renew subscription
+          if (admin && (admin.isActive || admin.paymentStatus !== mpStatus)) {
             await storage.updateAdmin(admin.id, {
               isActive: false,
               paymentStatus: mpStatus,
+              accessExpiresAt: new Date(), // Set expiration to now
             });
-            deactivated++;
-            console.log(`[subscription-scheduler] Auto-deactivated ${pagamento.email} - MP status: ${mpStatus}`);
+            if (admin.isActive) {
+              deactivated++;
+            }
+            console.log(`[subscription-scheduler] Blocking access for ${pagamento.email} - MP status: ${mpStatus} (login still works)`);
           }
 
           if (pagamento.status !== mpStatus && pagamento.status !== 'cancelled') {
