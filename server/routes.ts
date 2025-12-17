@@ -9954,9 +9954,13 @@ Seja conversacional e objetivo.`;
           const preapproval = await mpResponse.json();
           const mpStatus = preapproval.status;
           
+          console.log(`[Sync] Checking ${pagamento.email}: MP status = "${mpStatus}", local status = "${pagamento.status}"`);
+          
           // Check if status changed
           const admin = await storage.getAdminByEmail(pagamento.email);
           let action = 'no_change';
+          
+          console.log(`[Sync] Admin ${pagamento.email}: isActive = ${admin?.isActive}, paymentStatus = ${admin?.paymentStatus}`);
           
           if (mpStatus === 'paused' || mpStatus === 'cancelled') {
             // Should be deactivated
