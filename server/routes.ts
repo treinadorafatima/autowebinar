@@ -9963,6 +9963,74 @@ Seja conversacional e objetivo.`;
     }
   });
 
+  // Recuperar pagamento - enviar email/WhatsApp de recuperação
+  app.post("/api/checkout/pagamentos/:id/recuperar", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.replace("Bearer ", "");
+      if (!token) return res.status(401).json({ error: "Token não fornecido" });
+      
+      const email = await validateSession(token);
+      if (!email) return res.status(401).json({ error: "Sessão inválida" });
+      
+      const adminUser = await storage.getAdminByEmail(email);
+      if (!adminUser || adminUser.role !== "superadmin") {
+        return res.status(403).json({ error: "Acesso negado - apenas superadmin" });
+      }
+
+      const pagamento = await storage.getCheckoutPagamentoById(req.params.id);
+      if (!pagamento) {
+        return res.status(404).json({ error: "Pagamento não encontrado" });
+      }
+
+      const plano = await storage.getCheckoutPlanoById(pagamento.planoId);
+      if (!plano) {
+        return res.status(404).json({ error: "Plano não encontrado" });
+      }
+
+      // Import email and whatsapp functions
+      const { sendPaymentRecoveryEmail, isEmailServiceAvailable } = await import("./email");
+      const { sendWhatsAppPaymentRecoverySafe, isWhatsAppNotificationsEnabled } = await import("./whatsapp-notifications");
+
+      let emailSent = false;
+      let whatsappSent = false;
+
+      // Send email recovery
+      if (isEmailServiceAvailable()) {
+        emailSent = await sendPaymentRecoveryEmail(
+          pagamento.email,
+          pagamento.nome,
+          plano.nome,
+          plano.id,
+          pagamento.valor
+        );
+      }
+
+      // Send WhatsApp recovery
+      const whatsappEnabled = await isWhatsAppNotificationsEnabled();
+      if (whatsappEnabled && pagamento.telefone) {
+        whatsappSent = await sendWhatsAppPaymentRecoverySafe(
+          pagamento.telefone,
+          pagamento.nome,
+          plano.nome,
+          plano.id,
+          pagamento.valor
+        );
+      }
+
+      // Update payment status detail to mark recovery sent
+      await storage.updateCheckoutPagamento(pagamento.id, {
+        statusDetail: `Recuperação enviada em ${new Date().toLocaleDateString('pt-BR')} - Email: ${emailSent ? 'Sim' : 'Não'}, WhatsApp: ${whatsappSent ? 'Sim' : 'Não'}`,
+      });
+
+      console.log(`[Recovery] Sent recovery for payment ${pagamento.id}: email=${emailSent}, whatsapp=${whatsappSent}`);
+
+      res.json({ success: true, emailSent, whatsappSent });
+    } catch (error: any) {
+      console.error("[Recovery] Error:", error);
+      res.status(400).json({ error: error.message });
+    }
+  });
+
   // Checkout - Relatórios
   app.get("/api/checkout/relatorios/stats", async (req, res) => {
     try {

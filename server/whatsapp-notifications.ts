@@ -495,6 +495,73 @@ Duvidas? Estamos aqui para ajudar!`;
 }
 
 /**
+ * Envia mensagem de recuperação de pagamento via WhatsApp
+ */
+export async function sendWhatsAppPaymentRecoverySafe(
+  phone: string | null | undefined,
+  name: string,
+  planName: string,
+  planoId: string,
+  amount: number
+): Promise<boolean> {
+  try {
+    if (!phone) {
+      console.warn("[whatsapp-notifications] Phone nao disponivel para enviar recuperacao");
+      return false;
+    }
+
+    const enabled = await isWhatsAppNotificationsEnabled();
+    if (!enabled) {
+      console.warn("[whatsapp-notifications] Notificacoes desabilitadas, nao enviando recuperacao");
+      return false;
+    }
+
+    const formattedPhone = formatPhoneNumber(phone);
+    if (!formattedPhone) {
+      console.warn("[whatsapp-notifications] Numero invalido para recuperacao:", phone);
+      return false;
+    }
+
+    const formattedAmount = (amount / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    const checkoutParams = new URLSearchParams({
+      recuperacao: "true"
+    });
+    const checkoutUrl = `${getAppUrl()}/checkout/${planoId}?${checkoutParams.toString()}`;
+
+    const defaultMessage = `Ola ${name}!
+
+Notamos que voce ainda nao finalizou sua compra.
+
+Plano: ${planName}
+Valor: ${formattedAmount}
+
+Seu carrinho esta esperando por voce! Finalize agora:
+${checkoutUrl}
+
+Formas de pagamento:
+- PIX (aprovacao instantanea)
+- Boleto (vence em 3 dias)
+- Cartao (ate 12x)
+
+Duvidas? Responda esta mensagem!`;
+
+    const templateData = {
+      name,
+      planName,
+      amount: formattedAmount,
+      checkoutUrl,
+      appName: APP_NAME,
+    };
+
+    const message = await getTemplateMessage("payment_recovery", templateData, defaultMessage);
+    return await sendNotificationMessage(formattedPhone, message);
+  } catch (error) {
+    console.error("[whatsapp-notifications] Erro em sendWhatsAppPaymentRecoverySafe:", error);
+    return false;
+  }
+}
+
+/**
  * Verifica status das contas de notificação e retorna informações
  * Agora retorna informações sobre todas as contas conectadas para rotação
  */

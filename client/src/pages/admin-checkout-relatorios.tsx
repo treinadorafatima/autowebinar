@@ -87,9 +87,12 @@ const statusConfig: Record<string, { label: string; variant: "default" | "second
   rejected: { label: "Rejeitado", variant: "destructive", icon: X },
   cancelled: { label: "Cancelado", variant: "destructive", icon: X },
   refunded: { label: "Reembolsado", variant: "destructive", icon: X },
+  expired: { label: "Expirado", variant: "outline", icon: Clock },
+  abandoned: { label: "Abandonado", variant: "outline", icon: X },
+  auto_renewal: { label: "Renovação Auto", variant: "secondary", icon: Clock },
 };
 
-type StatusFilter = "all" | "approved" | "pending" | "rejected";
+type StatusFilter = "all" | "approved" | "pending" | "rejected" | "expired" | "abandoned" | "auto_renewal";
 
 export default function AdminCheckoutRelatorios() {
   const { toast } = useToast();
@@ -124,9 +127,15 @@ export default function AdminCheckoutRelatorios() {
       case "approved":
         return pagamentos.filter(p => p.status === "approved");
       case "pending":
-        return pagamentos.filter(p => ["pending", "in_process", "checkout_iniciado"].includes(p.status));
+        return pagamentos.filter(p => ["pending", "in_process"].includes(p.status));
       case "rejected":
         return pagamentos.filter(p => ["rejected", "cancelled", "refunded"].includes(p.status));
+      case "expired":
+        return pagamentos.filter(p => p.status === "expired");
+      case "abandoned":
+        return pagamentos.filter(p => ["abandoned", "checkout_iniciado"].includes(p.status));
+      case "auto_renewal":
+        return pagamentos.filter(p => p.statusDetail?.includes("Auto-renewal") || p.statusDetail?.includes("Renovação"));
       default:
         return pagamentos;
     }
@@ -163,6 +172,31 @@ export default function AdminCheckoutRelatorios() {
     onError: (error: Error) => {
       toast({
         title: "Erro ao liberar acesso",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const recuperarMutation = useMutation({
+    mutationFn: async (pagamentoId: string) => {
+      const res = await apiRequest("POST", `/api/checkout/pagamentos/${pagamentoId}/recuperar`);
+      return res.json();
+    },
+    onSuccess: (data: { emailSent?: boolean; whatsappSent?: boolean }) => {
+      const messages = [];
+      if (data.emailSent) messages.push("Email");
+      if (data.whatsappSent) messages.push("WhatsApp");
+      toast({ 
+        title: "Recuperação enviada!", 
+        description: messages.length > 0 
+          ? `Notificação enviada via: ${messages.join(", ")}` 
+          : "Tentativa de recuperação processada"
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro ao enviar recuperação",
         description: error.message,
         variant: "destructive",
       });
@@ -337,6 +371,9 @@ export default function AdminCheckoutRelatorios() {
                   <SelectItem value="approved" data-testid="filter-approved">Aprovados</SelectItem>
                   <SelectItem value="pending" data-testid="filter-pending">Pendentes</SelectItem>
                   <SelectItem value="rejected" data-testid="filter-rejected">Rejeitados/Cancelados</SelectItem>
+                  <SelectItem value="expired" data-testid="filter-expired">Expirados</SelectItem>
+                  <SelectItem value="abandoned" data-testid="filter-abandoned">Abandonados</SelectItem>
+                  <SelectItem value="auto_renewal" data-testid="filter-auto-renewal">Renovações Auto</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -399,6 +436,26 @@ export default function AdminCheckoutRelatorios() {
                             <Eye className="w-4 h-4 mr-1" />
                             Detalhes
                           </Button>
+                          {["pending", "expired", "abandoned", "checkout_iniciado"].includes(pagamento.status) && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                if (confirm("Enviar email e WhatsApp de recuperação para este cliente?")) {
+                                  recuperarMutation.mutate(pagamento.id);
+                                }
+                              }}
+                              disabled={recuperarMutation.isPending}
+                              data-testid={`button-recuperar-${pagamento.id}`}
+                            >
+                              {recuperarMutation.isPending ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Mail className="w-4 h-4 mr-1" />
+                              )}
+                              Recuperar
+                            </Button>
+                          )}
                           {pagamento.status !== "approved" && !pagamento.adminId && (
                             <Button
                               variant="outline"
