@@ -400,6 +400,15 @@ export async function initWhatsAppConnection(accountId: string, adminId: string)
           const delay = getReconnectDelay(attempts);
           console.log(`[whatsapp] Reconnecting in ${delay}ms (attempt ${attempts + 1}/${MAX_RECONNECT_ATTEMPTS})`);
           
+          // Se foi timeout (408), limpar auth para forçar novo QR code
+          if (statusCode === 408) {
+            const authDir = getAuthDir(accountId);
+            if (fs.existsSync(authDir)) {
+              fs.rmSync(authDir, { recursive: true });
+              console.log(`[whatsapp] Auth cleared for account ${accountId} (QR timeout - will generate new QR)`);
+            }
+          }
+          
           connections.set(accountId, {
             ...currentConn!,
             socket: null,
