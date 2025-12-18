@@ -80,6 +80,9 @@ export default function AdminWhatsAppNotificationsPage() {
   const [editPriority, setEditPriority] = useState<number>(0);
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
   const [editingTemplateMessage, setEditingTemplateMessage] = useState<string>("");
+  const [showPairingCodeInput, setShowPairingCodeInput] = useState(false);
+  const [pairingPhoneNumber, setPairingPhoneNumber] = useState("");
+  const [generatedPairingCode, setGeneratedPairingCode] = useState<string | null>(null);
 
   const { data: notificationStatus, isLoading: loadingStatus, refetch: refetchStatus } = useQuery<NotificationStatus>({
     queryKey: ["/api/notifications/whatsapp/status"],
@@ -202,12 +205,44 @@ export default function AdminWhatsAppNotificationsPage() {
     },
   });
 
+  const pairingCodeMutation = useMutation({
+    mutationFn: async ({ accountId, phoneNumber }: { accountId: string; phoneNumber: string }) => {
+      const res = await apiRequest("POST", `/api/whatsapp/connect-pairing`, { accountId, phoneNumber });
+      return res.json();
+    },
+    onSuccess: (data: { success: boolean; pairingCode?: string; error?: string }) => {
+      if (data.success && data.pairingCode) {
+        setGeneratedPairingCode(data.pairingCode);
+        setQrPollingEnabled(true);
+        toast({
+          title: "Código gerado!",
+          description: "Digite o código no WhatsApp do seu celular",
+        });
+      } else {
+        toast({
+          title: "Erro",
+          description: data.error || "Não foi possível gerar o código",
+          variant: "destructive",
+        });
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro ao gerar código",
+        description: error.message || "Não foi possível gerar o código de pareamento",
+        variant: "destructive",
+      });
+    },
+  });
+
   const disconnectMutation = useMutation({
     mutationFn: async (accountId: string) => {
       return apiRequest("POST", `/api/whatsapp/disconnect`, { accountId });
     },
     onSuccess: () => {
       setQrPollingEnabled(false);
+      setGeneratedPairingCode(null);
+      setShowPairingCodeInput(false);
       queryClient.invalidateQueries({ queryKey: ["/api/notifications/whatsapp/status"] });
       queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/status"] });
       toast({

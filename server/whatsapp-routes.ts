@@ -5,6 +5,7 @@ import { sessions as sessionsTable } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import {
   initWhatsAppConnection,
+  initWhatsAppConnectionWithPairingCode,
   getWhatsAppStatus,
   disconnectWhatsApp,
   sendWhatsAppMessage,
@@ -126,6 +127,35 @@ export function registerWhatsAppRoutes(app: Express) {
       res.json(result);
     } catch (error: any) {
       console.error("[whatsapp-api] Error connecting:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Connect via pairing code (alternative to QR code)
+  app.post("/api/whatsapp/connect-pairing", async (req: Request, res: Response) => {
+    try {
+      const { admin, error, errorCode } = await validateSessionAndGetAdmin(req);
+      if (!admin) {
+        return res.status(errorCode || 401).json({ error: error || "Não autenticado" });
+      }
+
+      const { accountId, phoneNumber } = req.body;
+      if (!accountId) {
+        return res.status(400).json({ error: "accountId é obrigatório" });
+      }
+      if (!phoneNumber) {
+        return res.status(400).json({ error: "Número de telefone é obrigatório" });
+      }
+
+      const ownership = await validateAccountOwnership(accountId, admin.id);
+      if (!ownership.valid) {
+        return res.status(403).json({ error: ownership.error });
+      }
+
+      const result = await initWhatsAppConnectionWithPairingCode(accountId, admin.id, phoneNumber);
+      res.json(result);
+    } catch (error: any) {
+      console.error("[whatsapp-api] Error connecting with pairing code:", error);
       res.status(500).json({ error: error.message });
     }
   });

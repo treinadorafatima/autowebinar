@@ -17,7 +17,7 @@ interface WhatsAppConnection {
   socket: WASocket | null;
   qrCode: string | null;
   qrGeneratedAt: number | null;
-  status: "disconnected" | "connecting" | "qr_ready" | "connected" | "banned";
+  status: "disconnected" | "connecting" | "qr_ready" | "connected" | "banned" | "pairing_code_ready";
   phoneNumber: string | null;
   adminId: string; // Admin que possui esta conta
   accountId: string; // ID único da conta WhatsApp
@@ -501,6 +501,195 @@ export async function initWhatsAppConnection(accountId: string, adminId: string)
       isProcessingQueue: false,
     });
 
+    return {
+      success: false,
+      status: "error",
+      error: "Erro ao inicializar conexão",
+    };
+  }
+}
+
+export async function initWhatsAppConnectionWithPairingCode(
+  accountId: string, 
+  adminId: string, 
+  phoneNumber: string
+): Promise<{
+  success: boolean;
+  status: string;
+  pairingCode?: string;
+  error?: string;
+}> {
+  try {
+    const existing = connections.get(accountId);
+    
+    if (existing?.status === "banned") {
+      return {
+        success: false,
+        status: "banned",
+        error: "Esta conta foi temporariamente suspensa. Aguarde algumas horas antes de reconectar.",
+      };
+    }
+    
+    if (existing?.status === "connected" && existing.socket) {
+      return {
+        success: true,
+        status: "connected",
+      };
+    }
+
+    // Clean up any existing connection
+    if (existing?.socket) {
+      try {
+        existing.socket.end(undefined);
+      } catch (e) {
+        // Ignore
+      }
+    }
+
+    // Clear auth for fresh start
+    const authDir = getAuthDir(accountId);
+    if (fs.existsSync(authDir)) {
+      fs.rmSync(authDir, { recursive: true });
+    }
+
+    connections.set(accountId, {
+      socket: null,
+      qrCode: null,
+      qrGeneratedAt: null,
+      status: "connecting",
+      phoneNumber: null,
+      adminId,
+      accountId,
+      reconnectAttempts: 0,
+      lastMessageSentAt: 0,
+      messageQueue: existing?.messageQueue || [],
+      isProcessingQueue: false,
+    });
+
+    await storage.upsertWhatsappSessionByAccountId(accountId, adminId, {
+      status: "connecting",
+      qrCode: null,
+    });
+
+    const { state, saveCreds } = await useMultiFileAuthState(authDir);
+    const { version } = await fetchLatestBaileysVersion();
+    const browserFingerprint = getRandomBrowserFingerprint();
+
+    const socket = makeWASocket({
+      version,
+      auth: state,
+      printQRInTerminal: false,
+      browser: browserFingerprint,
+      logger,
+      syncFullHistory: false,
+      markOnlineOnConnect: false,
+      generateHighQualityLinkPreview: false,
+    });
+
+    socket.ev.on("creds.update", saveCreds);
+
+    // Request pairing code
+    const formattedPhone = phoneNumber.replace(/\D/g, "");
+    
+    return new Promise(async (resolve) => {
+      let resolved = false;
+      
+      // Set timeout for pairing code generation
+      const timeout = setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          resolve({
+            success: false,
+            status: "error",
+            error: "Tempo esgotado ao gerar código de pareamento",
+          });
+        }
+      }, 30000);
+
+      socket.ev.on("connection.update", async (update) => {
+        const { connection, lastDisconnect } = update;
+        const conn = connections.get(accountId);
+
+        if (connection === "close") {
+          const statusCode = (lastDisconnect?.error as Boom)?.output?.statusCode;
+          const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+          
+          console.log(`[whatsapp] Pairing connection closed for account ${accountId}. Status: ${statusCode}`);
+          
+          if (!resolved && !shouldReconnect) {
+            resolved = true;
+            clearTimeout(timeout);
+            resolve({
+              success: false,
+              status: "error",
+              error: "Conexão fechada durante pareamento",
+            });
+          }
+        }
+
+        if (connection === "open") {
+          const connectedPhone = socket.user?.id?.split(":")[0] || null;
+          
+          connections.set(accountId, {
+            ...conn!,
+            socket,
+            qrCode: null,
+            qrGeneratedAt: null,
+            status: "connected",
+            phoneNumber: connectedPhone,
+            reconnectAttempts: 0,
+          });
+
+          await storage.upsertWhatsappSessionByAccountId(accountId, adminId, {
+            status: "connected",
+            qrCode: null,
+            phoneNumber: connectedPhone,
+            lastConnectedAt: new Date(),
+          });
+
+          console.log(`[whatsapp] Connected via pairing code for account ${accountId}: ${connectedPhone}`);
+          
+          processMessageQueue(accountId);
+        }
+      });
+
+      try {
+        // Wait a bit for socket to initialize
+        await new Promise(r => setTimeout(r, 2000));
+        
+        const code = await socket.requestPairingCode(formattedPhone);
+        
+        connections.set(accountId, {
+          ...connections.get(accountId)!,
+          socket,
+          status: "pairing_code_ready",
+        });
+
+        console.log(`[whatsapp] Pairing code generated for account ${accountId}: ${code}`);
+        
+        resolved = true;
+        clearTimeout(timeout);
+        resolve({
+          success: true,
+          status: "pairing_code_ready",
+          pairingCode: code,
+        });
+      } catch (error: any) {
+        console.error("[whatsapp] Error requesting pairing code:", error);
+        
+        if (!resolved) {
+          resolved = true;
+          clearTimeout(timeout);
+          resolve({
+            success: false,
+            status: "error",
+            error: error.message || "Erro ao gerar código de pareamento",
+          });
+        }
+      }
+    });
+  } catch (error: any) {
+    console.error("[whatsapp] Error initializing pairing connection:", error);
     return {
       success: false,
       status: "error",
