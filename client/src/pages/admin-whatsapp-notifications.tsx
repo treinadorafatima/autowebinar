@@ -183,7 +183,7 @@ export default function AdminWhatsAppNotificationsPage() {
 
   const connectMutation = useMutation({
     mutationFn: async (accountId: string) => {
-      return apiRequest("POST", `/api/whatsapp/connect/${accountId}`);
+      return apiRequest("POST", `/api/whatsapp/connect`, { accountId });
     },
     onSuccess: () => {
       setQrPollingEnabled(true);
@@ -204,7 +204,7 @@ export default function AdminWhatsAppNotificationsPage() {
 
   const disconnectMutation = useMutation({
     mutationFn: async (accountId: string) => {
-      return apiRequest("POST", `/api/whatsapp/disconnect/${accountId}`);
+      return apiRequest("POST", `/api/whatsapp/disconnect`, { accountId });
     },
     onSuccess: () => {
       setQrPollingEnabled(false);
