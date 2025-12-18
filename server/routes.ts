@@ -10666,6 +10666,26 @@ Seja conversacional e objetivo.`;
     }
   });
 
+  app.get("/api/checkout/relatorios/vendas-por-afiliado", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.replace("Bearer ", "");
+      if (!token) return res.status(401).json({ error: "Token não fornecido" });
+      
+      const email = await validateSession(token);
+      if (!email) return res.status(401).json({ error: "Sessão inválida" });
+      
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin || admin.role !== "superadmin") {
+        return res.status(403).json({ error: "Acesso negado - apenas superadmin" });
+      }
+
+      const vendas = await storage.getCheckoutVendasPorAfiliado();
+      res.json(vendas);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // ============================================
   // USER SUBSCRIPTION MANAGEMENT ENDPOINTS
   // ============================================

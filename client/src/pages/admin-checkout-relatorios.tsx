@@ -54,6 +54,15 @@ interface VendaPorMetodo {
   valor: number;
 }
 
+interface VendaPorAfiliado {
+  afiliadoId: string;
+  afiliadoNome: string;
+  afiliadoEmail: string;
+  quantidade: number;
+  valorVendas: number;
+  valorComissao: number;
+}
+
 interface Pagamento {
   id: string;
   email: string;
@@ -110,6 +119,10 @@ export default function AdminCheckoutRelatorios() {
 
   const { data: vendasPorMetodo, isLoading: loadingMetodo } = useQuery<VendaPorMetodo[]>({
     queryKey: ["/api/checkout/relatorios/vendas-por-metodo"],
+  });
+
+  const { data: vendasPorAfiliado, isLoading: loadingAfiliado } = useQuery<VendaPorAfiliado[]>({
+    queryKey: ["/api/checkout/relatorios/vendas-por-afiliado"],
   });
 
   const { data: pagamentos, isLoading: loadingPagamentos } = useQuery<Pagamento[]>({
@@ -218,7 +231,7 @@ export default function AdminCheckoutRelatorios() {
     return statusConfig[status] || { label: status, variant: "outline" as const, icon: Clock };
   };
 
-  const isLoading = loadingStats || loadingPlano || loadingMetodo || loadingPagamentos;
+  const isLoading = loadingStats || loadingPlano || loadingMetodo || loadingAfiliado || loadingPagamentos;
 
   if (isLoading) {
     return (
@@ -349,6 +362,45 @@ export default function AdminCheckoutRelatorios() {
           </CardContent>
         </Card>
       </div>
+
+      {vendasPorAfiliado && vendasPorAfiliado.length > 0 && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Vendas por Afiliado</CardTitle>
+            <CardDescription>Performance individual de cada afiliado</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {vendasPorAfiliado.map((afiliado) => (
+                <div key={afiliado.afiliadoId} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10">
+                      <User className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="font-medium">{afiliado.afiliadoNome}</p>
+                      <p className="text-sm text-muted-foreground">{afiliado.afiliadoEmail}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm text-muted-foreground">{afiliado.quantidade} vendas</p>
+                    <div className="flex items-center gap-4">
+                      <div>
+                        <p className="text-xs text-muted-foreground">Total Vendas</p>
+                        <p className="font-bold">{formatCurrency(afiliado.valorVendas)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Comissão</p>
+                        <p className="font-bold text-green-600">{formatCurrency(afiliado.valorComissao)}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

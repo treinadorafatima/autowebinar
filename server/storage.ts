@@ -202,6 +202,7 @@ export interface IStorage {
   getCheckoutStats(): Promise<{ totalVendas: number; receitaTotal: number; ticketMedio: number; taxaConversao: number }>;
   getCheckoutVendasPorPlano(): Promise<{ planoId: string; planoNome: string; quantidade: number; valor: number }[]>;
   getCheckoutVendasPorMetodo(): Promise<{ metodo: string; quantidade: number; valor: number }[]>;
+  getCheckoutVendasPorAfiliado(): Promise<{ afiliadoId: string; afiliadoNome: string; afiliadoEmail: string; quantidade: number; valorVendas: number; valorComissao: number }[]>;
   // AI Chat History (Script Generator)
   createAiChat(chat: AiChatInsert): Promise<AiChat>;
   getAiChatById(id: string): Promise<AiChat | undefined>;
@@ -2712,23 +2713,33 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Checkout - Relatórios
+  // Helper para verificar se pagamento é considerado "vendido"
+  // Venda = status approved (pagamento confirmado pelo gateway OU liberado manualmente com status approved)
+  private isPagamentoVenda(p: { status: string; adminId: string | null }): boolean {
+    // Apenas status approved conta como venda - liberações manuais também atualizam o status para approved
+    return p.status === 'approved';
+  }
+
   async getCheckoutStats(): Promise<{ totalVendas: number; receitaTotal: number; ticketMedio: number; taxaConversao: number }> {
     const allPagamentos = await db.select().from(checkoutPagamentos);
-    const approved = allPagamentos.filter(p => p.status === 'approved');
-    const totalVendas = approved.length;
-    const receitaTotal = approved.reduce((sum, p) => sum + (p.valor || 0), 0);
+    // Vendas = status approved (pagamento confirmado ou liberado manualmente)
+    const vendas = allPagamentos.filter(p => this.isPagamentoVenda(p));
+    const totalVendas = vendas.length;
+    const receitaTotal = vendas.reduce((sum, p) => sum + (p.valor || 0), 0);
     const ticketMedio = totalVendas > 0 ? receitaTotal / totalVendas : 0;
     const taxaConversao = allPagamentos.length > 0 ? (totalVendas / allPagamentos.length) * 100 : 0;
     return { totalVendas, receitaTotal, ticketMedio, taxaConversao };
   }
 
   async getCheckoutVendasPorPlano(): Promise<{ planoId: string; planoNome: string; quantidade: number; valor: number }[]> {
-    const approved = await db.select().from(checkoutPagamentos).where(eq(checkoutPagamentos.status, 'approved'));
+    const allPagamentos = await db.select().from(checkoutPagamentos);
+    // Vendas = status approved (pagamento confirmado ou liberado manualmente)
+    const vendas = allPagamentos.filter(p => this.isPagamentoVenda(p));
     const planos = await db.select().from(checkoutPlanos);
     const planosMap = new Map(planos.map(p => [p.id, p.nome]));
     
     const result = new Map<string, { quantidade: number; valor: number }>();
-    for (const pag of approved) {
+    for (const pag of vendas) {
       const current = result.get(pag.planoId) || { quantidade: 0, valor: 0 };
       current.quantidade++;
       current.valor += pag.valor || 0;
@@ -2744,11 +2755,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getCheckoutVendasPorMetodo(): Promise<{ metodo: string; quantidade: number; valor: number }[]> {
-    const approved = await db.select().from(checkoutPagamentos).where(eq(checkoutPagamentos.status, 'approved'));
+    const allPagamentos = await db.select().from(checkoutPagamentos);
+    // Vendas = status approved (pagamento confirmado ou liberado manualmente)
+    const vendas = allPagamentos.filter(p => this.isPagamentoVenda(p));
     
     const result = new Map<string, { quantidade: number; valor: number }>();
-    for (const pag of approved) {
-      const metodo = pag.metodoPagamento || 'desconhecido';
+    for (const pag of vendas) {
+      const metodo = pag.metodoPagamento || (pag.adminId ? 'manual' : 'desconhecido');
       const current = result.get(metodo) || { quantidade: 0, valor: 0 };
       current.quantidade++;
       current.valor += pag.valor || 0;
@@ -2760,6 +2773,44 @@ export class DatabaseStorage implements IStorage {
       quantidade: data.quantidade,
       valor: data.valor,
     }));
+  }
+
+  async getCheckoutVendasPorAfiliado(): Promise<{ afiliadoId: string; afiliadoNome: string; afiliadoEmail: string; quantidade: number; valorVendas: number; valorComissao: number }[]> {
+    // Busca todas as vendas de afiliados
+    const sales = await db.select().from(affiliateSales);
+    const allAffiliates = await db.select().from(affiliates);
+    const affiliatesMap = new Map(allAffiliates.map(a => [a.id, { nome: a.name, email: a.email }]));
+    
+    // Busca pagamentos para verificar quais foram realmente aprovados
+    const allPagamentos = await db.select().from(checkoutPagamentos);
+    const approvedPagamentoIds = new Set(
+      allPagamentos.filter(p => p.status === 'approved').map(p => p.id)
+    );
+    
+    const result = new Map<string, { quantidade: number; valorVendas: number; valorComissao: number }>();
+    for (const sale of sales) {
+      // Conta apenas vendas cujo pagamento foi aprovado E não foram canceladas/reembolsadas
+      if (sale.status === 'cancelled' || sale.status === 'refunded') continue;
+      if (!approvedPagamentoIds.has(sale.pagamentoId)) continue;
+      
+      const current = result.get(sale.affiliateId) || { quantidade: 0, valorVendas: 0, valorComissao: 0 };
+      current.quantidade++;
+      current.valorVendas += sale.saleAmount || 0;
+      current.valorComissao += sale.commissionAmount || 0;
+      result.set(sale.affiliateId, current);
+    }
+    
+    return Array.from(result.entries()).map(([afiliadoId, data]) => {
+      const afiliado = affiliatesMap.get(afiliadoId);
+      return {
+        afiliadoId,
+        afiliadoNome: afiliado?.nome || 'Desconhecido',
+        afiliadoEmail: afiliado?.email || '',
+        quantidade: data.quantidade,
+        valorVendas: data.valorVendas,
+        valorComissao: data.valorComissao,
+      };
+    });
   }
 
   async initializeDefaultAiConfig(): Promise<void> {
