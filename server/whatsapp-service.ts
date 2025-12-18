@@ -33,11 +33,11 @@ const connections: Map<string, WhatsAppConnection> = new Map();
 const AUTH_DIR = path.join(process.cwd(), "whatsapp-sessions");
 
 const QR_CODE_TTL_MS = 120 * 1000; // 2 minutes for user to scan QR
-const MAX_RECONNECT_ATTEMPTS = 5;
+const MAX_RECONNECT_ATTEMPTS = 2;
 const MIN_MESSAGE_INTERVAL_MS = 3000;
 const MAX_MESSAGE_INTERVAL_MS = 8000;
 const MAX_MESSAGES_PER_MINUTE = 10;
-const RECONNECT_BASE_DELAY_MS = 5000;
+const RECONNECT_BASE_DELAY_MS = 3000;
 const MAX_QUEUE_SIZE = 50;
 const QUEUE_TIMEOUT_MS = 5 * 60 * 1000;
 const HEALTH_CHECK_INTERVAL_MS = 60 * 1000;
@@ -396,34 +396,23 @@ export async function initWhatsAppConnection(accountId: string, adminId: string)
           return;
         }
 
-        if (shouldReconnect && attempts < MAX_RECONNECT_ATTEMPTS) {
-          const delay = getReconnectDelay(attempts);
-          console.log(`[whatsapp] Reconnecting in ${delay}ms (attempt ${attempts + 1}/${MAX_RECONNECT_ATTEMPTS})`);
+        // For stream errors (515) and timeouts (408), don't auto-reconnect - let user try again
+        if ((statusCode === 408 || statusCode === 515) || !shouldReconnect || attempts >= MAX_RECONNECT_ATTEMPTS) {
+          console.log(`[whatsapp] Connection failed permanently for account ${accountId} (statusCode: ${statusCode}). User must reconnect manually.`);
           
-          // Se foi timeout (408) ou stream error (515), limpar auth para forçar novo QR code
-          if (statusCode === 408 || statusCode === 515) {
-            const authDir = getAuthDir(accountId);
-            if (fs.existsSync(authDir)) {
-              fs.rmSync(authDir, { recursive: true });
-              console.log(`[whatsapp] Auth cleared for account ${accountId} (error ${statusCode} - will generate new QR)`);
-            }
-          }
-          
-          connections.set(accountId, {
-            ...currentConn!,
-            socket: null,
-            status: "connecting",
-            reconnectAttempts: attempts + 1,
-          });
-          
-          setTimeout(() => initWhatsAppConnection(accountId, adminId), delay);
-        } else {
           if (currentConn?.messageQueue && currentConn.messageQueue.length > 0) {
             console.log(`[whatsapp] Flushing ${currentConn.messageQueue.length} queued messages for account ${accountId} (connection permanently closed)`);
             while (currentConn.messageQueue.length > 0) {
               const item = currentConn.messageQueue.shift();
-              item?.reject(new Error("Conexão encerrada permanentemente. Por favor, reconecte manualmente."));
+              item?.reject(new Error("Conexão encerrada. Por favor, tente conectar novamente."));
             }
+          }
+          
+          // Always clear auth on disconnect for clean reconnection
+          const authDir = getAuthDir(accountId);
+          if (fs.existsSync(authDir)) {
+            fs.rmSync(authDir, { recursive: true });
+            console.log(`[whatsapp] Auth cleared for account ${accountId}`);
           }
           
           connections.set(accountId, {
@@ -442,14 +431,6 @@ export async function initWhatsAppConnection(accountId: string, adminId: string)
             qrCode: null,
             phoneNumber: null,
           });
-
-          if (!shouldReconnect) {
-            const authDir = getAuthDir(accountId);
-            if (fs.existsSync(authDir)) {
-              fs.rmSync(authDir, { recursive: true });
-              console.log(`[whatsapp] Auth cleared for account ${accountId} (logged out)`);
-            }
-          }
         }
       }
 

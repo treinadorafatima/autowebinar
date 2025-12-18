@@ -392,11 +392,16 @@ export default function AdminWhatsAppNotificationsPage() {
   }, [connectionStatus?.status, refetchStatus, toast]);
 
   useEffect(() => {
-    if (qrPollingEnabled && connectionStatus?.qrExpired && notificationStatus?.accountId) {
-      console.log("[whatsapp-ui] QR expired, requesting new one...");
-      connectMutation.mutate(notificationStatus.accountId);
+    if (qrPollingEnabled && connectionStatus?.status === "disconnected") {
+      console.log("[whatsapp-ui] Connection failed, stopping poll");
+      setQrPollingEnabled(false);
+      toast({
+        title: "Conexão falhou",
+        description: "Tente escanear o QR Code novamente ou reinicie a conexão.",
+        variant: "destructive",
+      });
     }
-  }, [connectionStatus?.qrExpired, qrPollingEnabled, notificationStatus?.accountId]);
+  }, [connectionStatus?.status, qrPollingEnabled, toast]);
 
   useEffect(() => {
     if (connectingAccountStatus?.status === "connected") {
