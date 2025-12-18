@@ -2714,11 +2714,10 @@ export class DatabaseStorage implements IStorage {
 
   // Checkout - Relatórios
   // Helper para verificar se pagamento é considerado "vendido"
-  // Venda = acesso foi concedido (adminId preenchido) OU status approved
-  // Isso cobre casos onde o webhook concedeu acesso mas não atualizou status para 'approved'
+  // Venda = APENAS transações aprovadas pelo gateway (status='approved')
+  // NÃO conta liberações manuais de acesso
   private isPagamentoVenda(p: { status: string; adminId: string | null }): boolean {
-    // Venda = adminId preenchido (acesso concedido) OU status approved
-    return p.adminId !== null || p.status === 'approved';
+    return p.status === 'approved';
   }
 
   async getCheckoutStats(): Promise<{ totalVendas: number; receitaTotal: number; ticketMedio: number; taxaConversao: number }> {
