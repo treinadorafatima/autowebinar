@@ -289,6 +289,12 @@ export async function initWhatsAppConnection(accountId: string, adminId: string)
       syncFullHistory: false,
       markOnlineOnConnect: false,
       generateHighQualityLinkPreview: false,
+      connectTimeoutMs: 60000,
+      defaultQueryTimeoutMs: 60000,
+      keepAliveIntervalMs: 30000,
+      retryRequestDelayMs: 500,
+      qrTimeout: 40000,
+      emitOwnEvents: true,
     });
 
     socket.ev.on("creds.update", saveCreds);
@@ -560,6 +566,12 @@ export async function initWhatsAppConnectionWithPairingCode(
       syncFullHistory: false,
       markOnlineOnConnect: false,
       generateHighQualityLinkPreview: false,
+      connectTimeoutMs: 60000,
+      defaultQueryTimeoutMs: 60000,
+      keepAliveIntervalMs: 30000,
+      retryRequestDelayMs: 500,
+      qrTimeout: 40000,
+      emitOwnEvents: true,
     });
 
     socket.ev.on("creds.update", saveCreds);
