@@ -57,42 +57,18 @@ function getAuthDir(accountId: string): string {
 }
 
 function getRandomBrowserFingerprint(): [string, string, string] {
-  const browsers = [
-    ["Chrome", "Windows", "10"],
-    ["Firefox", "Windows", "11"],
-    ["Edge", "Windows", "10"],
-    ["Chrome", "macOS", "14"],
-    ["Safari", "macOS", "14"],
-    ["Chrome", "Linux", "Ubuntu"],
+  // Use standard browser fingerprints that WhatsApp recognizes
+  // Format: [browser name, OS name, browser version]
+  const fingerprints: [string, string, string][] = [
+    ["Chrome", "Windows", "10.0"],
+    ["Chrome", "Mac OS", "10.15.7"],
+    ["Chrome", "Linux", ""],
+    ["Firefox", "Windows", "10.0"],
+    ["Firefox", "Mac OS", "10.15.7"],
+    ["Edge", "Windows", "10.0"],
   ];
   
-  const randomIndex = Math.floor(Math.random() * browsers.length);
-  const [browser, os, version] = browsers[randomIndex];
-  
-  const chromeVersions = ["120.0.6099.109", "121.0.6167.85", "122.0.6261.57", "119.0.6045.160"];
-  const firefoxVersions = ["121.0", "122.0", "123.0"];
-  const edgeVersions = ["120.0.2210.91", "121.0.2277.83"];
-  const safariVersions = ["17.2", "17.3", "16.6"];
-  
-  let browserVersion: string;
-  switch (browser) {
-    case "Chrome":
-      browserVersion = chromeVersions[Math.floor(Math.random() * chromeVersions.length)];
-      break;
-    case "Firefox":
-      browserVersion = firefoxVersions[Math.floor(Math.random() * firefoxVersions.length)];
-      break;
-    case "Edge":
-      browserVersion = edgeVersions[Math.floor(Math.random() * edgeVersions.length)];
-      break;
-    case "Safari":
-      browserVersion = safariVersions[Math.floor(Math.random() * safariVersions.length)];
-      break;
-    default:
-      browserVersion = "120.0";
-  }
-  
-  return [`AutoWebinar ${browser}`, os, browserVersion];
+  return fingerprints[Math.floor(Math.random() * fingerprints.length)];
 }
 
 function getReconnectDelay(attempts: number): number {
