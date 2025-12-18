@@ -861,111 +861,27 @@ export default function AdminWhatsAppNotificationsPage() {
                     </Button>
                   </div>
                 </div>
-              ) : showPairingCodeInput ? (
-                <div className="space-y-4">
-                  <div className="p-6 border rounded-lg space-y-4">
-                    <div>
-                      <p className="font-medium mb-2">Conectar via Número de Telefone</p>
-                      <p className="text-sm text-muted-foreground mb-4">
-                        Digite o número de telefone do WhatsApp com código do país (ex: 5511987654321 ou +55 11 98765-4321)
-                      </p>
-                      <p className="text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 p-2 rounded mb-4">
-                        💡 Dica: Use o número que você usa para acessar WhatsApp no seu celular
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Input
-                        placeholder="5511987654321"
-                        value={pairingPhoneNumber}
-                        onChange={(e) => setPairingPhoneNumber(e.target.value)}
-                        data-testid="input-phone-number"
-                        type="tel"
-                      />
-                      <Button
-                        onClick={() => {
-                          if (notificationStatus?.accountId && pairingPhoneNumber) {
-                            pairingCodeMutation.mutate({
-                              accountId: notificationStatus.accountId,
-                              phoneNumber: pairingPhoneNumber,
-                            });
-                          }
-                        }}
-                        disabled={pairingCodeMutation.isPending || !pairingPhoneNumber}
-                        data-testid="button-generate-pairing-code"
-                      >
-                        {pairingCodeMutation.isPending ? (
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        ) : (
-                          <Smartphone className="w-4 h-4 mr-2" />
-                        )}
-                        Gerar Código
-                      </Button>
-                    </div>
-                  </div>
-
-                  {generatedPairingCode && (
-                    <div className="p-6 border rounded-lg bg-blue-50 dark:bg-blue-900/20 space-y-3">
-                      <div>
-                        <p className="font-medium text-blue-900 dark:text-blue-400">Código de Pareamento Gerado</p>
-                        <p className="text-sm text-blue-700 dark:text-blue-500">
-                          Digite este código no seu WhatsApp para conectar
-                        </p>
-                      </div>
-                      <div className="p-3 bg-white dark:bg-gray-800 rounded border border-blue-200 dark:border-blue-700 font-mono text-lg text-center font-bold">
-                        {generatedPairingCode}
-                      </div>
-                      <p className="text-xs text-blue-600 dark:text-blue-400">
-                        No WhatsApp, vá em Configurações {'>'} Dispositivos conectados {'>'} Conectar dispositivo e digite o código acima
-                      </p>
-                    </div>
-                  )}
-
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setShowPairingCodeInput(false);
-                        setPairingPhoneNumber("");
-                        setGeneratedPairingCode(null);
-                      }}
-                      className="flex-1"
-                      data-testid="button-back-to-options"
-                    >
-                      Voltar
-                    </Button>
-                  </div>
-                </div>
               ) : (
                 <div className="flex flex-col items-center gap-4 p-6 border rounded-lg">
                   <WifiOff className="w-12 h-12 text-muted-foreground" />
                   <div className="text-center">
                     <p className="font-medium">WhatsApp Desconectado</p>
                     <p className="text-sm text-muted-foreground">
-                      Escolha como conectar para começar a enviar notificações
+                      Escaneie o QR Code para conectar ao WhatsApp
                     </p>
                   </div>
-                  <div className="flex gap-2 w-full flex-wrap justify-center">
-                    <Button
-                      onClick={() => notificationStatus?.accountId && connectMutation.mutate(notificationStatus.accountId)}
-                      disabled={connectMutation.isPending}
-                      data-testid="button-connect-qr"
-                    >
-                      {connectMutation.isPending ? (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      ) : (
-                        <QrCode className="w-4 h-4 mr-2" />
-                      )}
-                      Conectar via QR Code
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => setShowPairingCodeInput(true)}
-                      data-testid="button-connect-phone"
-                    >
-                      <Smartphone className="w-4 h-4 mr-2" />
-                      Conectar via Número
-                    </Button>
-                  </div>
+                  <Button
+                    onClick={() => notificationStatus?.accountId && connectMutation.mutate(notificationStatus.accountId)}
+                    disabled={connectMutation.isPending}
+                    data-testid="button-connect-qr"
+                  >
+                    {connectMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <QrCode className="w-4 h-4 mr-2" />
+                    )}
+                    Conectar via QR Code
+                  </Button>
                 </div>
               )}
             </div>
