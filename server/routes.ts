@@ -9849,6 +9849,75 @@ Seja conversacional e objetivo.`;
     }
   });
 
+  // Deletar histórico de pagamentos com filtros (superadmin only)
+  app.delete("/api/checkout/pagamentos/historico", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.replace("Bearer ", "");
+      if (!token) return res.status(401).json({ error: "Token não fornecido" });
+      
+      const email = await validateSession(token);
+      if (!email) return res.status(401).json({ error: "Sessão inválida" });
+      
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin || admin.role !== "superadmin") {
+        return res.status(403).json({ error: "Acesso negado - apenas superadmin" });
+      }
+
+      const { dataInicio, dataFim, status } = req.body;
+
+      // Get all payments first
+      let pagamentos = await storage.listCheckoutPagamentos();
+      
+      // Apply filters
+      if (dataInicio) {
+        const inicio = new Date(dataInicio);
+        inicio.setHours(0, 0, 0, 0);
+        pagamentos = pagamentos.filter(p => new Date(p.criadoEm!) >= inicio);
+      }
+      
+      if (dataFim) {
+        const fim = new Date(dataFim);
+        fim.setHours(23, 59, 59, 999);
+        pagamentos = pagamentos.filter(p => new Date(p.criadoEm!) <= fim);
+      }
+      
+      if (status) {
+        switch (status) {
+          case "approved":
+            pagamentos = pagamentos.filter(p => p.status === "approved");
+            break;
+          case "pending":
+            pagamentos = pagamentos.filter(p => ["pending", "in_process"].includes(p.status));
+            break;
+          case "rejected":
+            pagamentos = pagamentos.filter(p => ["rejected", "cancelled", "refunded"].includes(p.status));
+            break;
+          case "expired":
+            pagamentos = pagamentos.filter(p => p.status === "expired");
+            break;
+          case "abandoned":
+            pagamentos = pagamentos.filter(p => ["abandoned", "checkout_iniciado"].includes(p.status));
+            break;
+          case "auto_renewal":
+            pagamentos = pagamentos.filter(p => p.statusDetail?.includes("Auto-renewal") || p.statusDetail?.includes("Renovação"));
+            break;
+        }
+      }
+
+      // Delete filtered payments
+      let deletados = 0;
+      for (const pagamento of pagamentos) {
+        await storage.deleteCheckoutPagamento(pagamento.id);
+        deletados++;
+      }
+
+      console.log(`[Admin] Deleted ${deletados} payment records by ${email}`);
+      res.json({ deletados });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get("/api/checkout/pagamentos/:id", async (req, res) => {
     try {
       const token = req.headers.authorization?.replace("Bearer ", "");

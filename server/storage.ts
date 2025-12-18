@@ -188,6 +188,7 @@ export interface IStorage {
   getCheckoutPagamentoByExternalId(externalId: string, gateway: 'mercadopago' | 'stripe'): Promise<CheckoutPagamento | undefined>;
   createCheckoutPagamento(pagamento: CheckoutPagamentoInsert): Promise<CheckoutPagamento>;
   updateCheckoutPagamento(id: string, data: Partial<CheckoutPagamentoInsert>): Promise<CheckoutPagamento | undefined>;
+  deleteCheckoutPagamento(id: string): Promise<void>;
   // Checkout - Configurações (criptografadas)
   getCheckoutConfig(chave: string): Promise<string | null>;
   setCheckoutConfig(chave: string, valor: string): Promise<void>;
@@ -2634,6 +2635,10 @@ export class DatabaseStorage implements IStorage {
       .where(eq(checkoutPagamentos.id, id))
       .returning();
     return updated[0];
+  }
+
+  async deleteCheckoutPagamento(id: string): Promise<void> {
+    await db.delete(checkoutPagamentos).where(eq(checkoutPagamentos.id, id));
   }
 
   // Checkout - Configurações (criptografadas)

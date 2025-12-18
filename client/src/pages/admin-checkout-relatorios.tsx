@@ -27,7 +27,9 @@ import {
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Loader2, DollarSign, ShoppingCart, TrendingUp, CreditCard, Eye, Check, Clock, X, Users, Filter, User, Mail, Phone, FileText, RefreshCw } from "lucide-react";
+import { Loader2, DollarSign, ShoppingCart, TrendingUp, CreditCard, Eye, Check, Clock, X, Users, Filter, User, Mail, Phone, FileText, RefreshCw, Trash2, ChevronLeft, ChevronRight, Calendar } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -103,11 +105,16 @@ const statusConfig: Record<string, { label: string; variant: "default" | "second
 
 type StatusFilter = "all" | "approved" | "pending" | "rejected" | "expired" | "abandoned" | "auto_renewal";
 
+const ITEMS_PER_PAGE = 10;
+
 export default function AdminCheckoutRelatorios() {
   const { toast } = useToast();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [selectedPagamento, setSelectedPagamento] = useState<Pagamento | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [dataInicio, setDataInicio] = useState<string>("");
+  const [dataFim, setDataFim] = useState<string>("");
 
   const { data: stats, isLoading: loadingStats } = useQuery<Stats>({
     queryKey: ["/api/checkout/relatorios/stats"],
@@ -136,23 +143,75 @@ export default function AdminCheckoutRelatorios() {
   const filteredPagamentos = useMemo(() => {
     if (!pagamentos) return [];
     
+    let filtered = pagamentos;
+    
+    // Filtro por status
     switch (statusFilter) {
       case "approved":
-        return pagamentos.filter(p => p.status === "approved");
+        filtered = filtered.filter(p => p.status === "approved");
+        break;
       case "pending":
-        return pagamentos.filter(p => ["pending", "in_process"].includes(p.status));
+        filtered = filtered.filter(p => ["pending", "in_process"].includes(p.status));
+        break;
       case "rejected":
-        return pagamentos.filter(p => ["rejected", "cancelled", "refunded"].includes(p.status));
+        filtered = filtered.filter(p => ["rejected", "cancelled", "refunded"].includes(p.status));
+        break;
       case "expired":
-        return pagamentos.filter(p => p.status === "expired");
+        filtered = filtered.filter(p => p.status === "expired");
+        break;
       case "abandoned":
-        return pagamentos.filter(p => ["abandoned", "checkout_iniciado"].includes(p.status));
+        filtered = filtered.filter(p => ["abandoned", "checkout_iniciado"].includes(p.status));
+        break;
       case "auto_renewal":
-        return pagamentos.filter(p => p.statusDetail?.includes("Auto-renewal") || p.statusDetail?.includes("Renovação"));
-      default:
-        return pagamentos;
+        filtered = filtered.filter(p => p.statusDetail?.includes("Auto-renewal") || p.statusDetail?.includes("Renovação"));
+        break;
     }
-  }, [pagamentos, statusFilter]);
+    
+    // Filtro por data início
+    if (dataInicio) {
+      const inicio = new Date(dataInicio);
+      inicio.setHours(0, 0, 0, 0);
+      filtered = filtered.filter(p => new Date(p.criadoEm) >= inicio);
+    }
+    
+    // Filtro por data fim
+    if (dataFim) {
+      const fim = new Date(dataFim);
+      fim.setHours(23, 59, 59, 999);
+      filtered = filtered.filter(p => new Date(p.criadoEm) <= fim);
+    }
+    
+    return filtered;
+  }, [pagamentos, statusFilter, dataInicio, dataFim]);
+
+  // Paginação
+  const totalPages = Math.ceil(filteredPagamentos.length / ITEMS_PER_PAGE);
+  const paginatedPagamentos = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredPagamentos.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredPagamentos, currentPage]);
+
+  // Reset página quando filtros mudam
+  const handleFilterChange = (value: StatusFilter) => {
+    setStatusFilter(value);
+    setCurrentPage(1);
+  };
+
+  const handleDataInicioChange = (value: string) => {
+    setDataInicio(value);
+    setCurrentPage(1);
+  };
+
+  const handleDataFimChange = (value: string) => {
+    setDataFim(value);
+    setCurrentPage(1);
+  };
+
+  const clearDateFilters = () => {
+    setDataInicio("");
+    setDataFim("");
+    setCurrentPage(1);
+  };
 
   const getUserPaymentAttempts = useMemo(() => {
     if (!selectedPagamento || !pagamentos) return [];
@@ -240,6 +299,47 @@ export default function AdminCheckoutRelatorios() {
       });
     },
   });
+
+  const deletarHistoricoMutation = useMutation({
+    mutationFn: async (params: { dataInicio?: string; dataFim?: string; status?: string }) => {
+      const res = await apiRequest("DELETE", `/api/checkout/pagamentos/historico`, params);
+      return res.json();
+    },
+    onSuccess: (data: { deletados: number }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/checkout/pagamentos"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/checkout/relatorios/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/checkout/relatorios/vendas-por-plano"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/checkout/relatorios/vendas-por-metodo"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/checkout/relatorios/vendas-por-afiliado"] });
+      toast({ 
+        title: "Histórico deletado!", 
+        description: `${data.deletados} registros removidos`
+      });
+      setCurrentPage(1);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro ao deletar histórico",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDeletarHistorico = () => {
+    const hasFilters = dataInicio || dataFim || statusFilter !== "all";
+    const msg = hasFilters 
+      ? `Deletar ${filteredPagamentos.length} registros com os filtros atuais? (Esta ação não pode ser desfeita)`
+      : "Deletar TODO o histórico de pagamentos? (Esta ação não pode ser desfeita)";
+    
+    if (confirm(msg)) {
+      deletarHistoricoMutation.mutate({
+        dataInicio: dataInicio || undefined,
+        dataFim: dataFim || undefined,
+        status: statusFilter !== "all" ? statusFilter : undefined,
+      });
+    }
+  };
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("pt-BR", {
@@ -429,30 +529,91 @@ export default function AdminCheckoutRelatorios() {
 
       <Card>
         <CardHeader>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <CardTitle>Histórico de Pagamentos</CardTitle>
-              <CardDescription>Todos os pagamentos registrados no sistema</CardDescription>
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <CardTitle>Histórico de Pagamentos</CardTitle>
+                <CardDescription>
+                  {filteredPagamentos.length} pagamentos encontrados
+                  {(dataInicio || dataFim || statusFilter !== "all") && " (filtrados)"}
+                </CardDescription>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Filter className="w-4 h-4 text-muted-foreground" />
+                <Select
+                  value={statusFilter}
+                  onValueChange={handleFilterChange}
+                >
+                  <SelectTrigger className="w-[180px]" data-testid="select-status-filter">
+                    <SelectValue placeholder="Filtrar por status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all" data-testid="filter-all">Todos</SelectItem>
+                    <SelectItem value="approved" data-testid="filter-approved">Aprovados</SelectItem>
+                    <SelectItem value="pending" data-testid="filter-pending">Pendentes</SelectItem>
+                    <SelectItem value="rejected" data-testid="filter-rejected">Rejeitados/Cancelados</SelectItem>
+                    <SelectItem value="expired" data-testid="filter-expired">Expirados</SelectItem>
+                    <SelectItem value="abandoned" data-testid="filter-abandoned">Abandonados</SelectItem>
+                    <SelectItem value="auto_renewal" data-testid="filter-auto-renewal">Renovações Auto</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleDeletarHistorico}
+                  disabled={deletarHistoricoMutation.isPending || filteredPagamentos.length === 0}
+                  data-testid="button-deletar-historico"
+                >
+                  {deletarHistoricoMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 animate-spin mr-1" />
+                  ) : (
+                    <Trash2 className="w-4 h-4 mr-1" />
+                  )}
+                  Deletar
+                </Button>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Filter className="w-4 h-4 text-muted-foreground" />
-              <Select
-                value={statusFilter}
-                onValueChange={(value) => setStatusFilter(value as StatusFilter)}
-              >
-                <SelectTrigger className="w-[180px]" data-testid="select-status-filter">
-                  <SelectValue placeholder="Filtrar por status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all" data-testid="filter-all">Todos</SelectItem>
-                  <SelectItem value="approved" data-testid="filter-approved">Aprovados</SelectItem>
-                  <SelectItem value="pending" data-testid="filter-pending">Pendentes</SelectItem>
-                  <SelectItem value="rejected" data-testid="filter-rejected">Rejeitados/Cancelados</SelectItem>
-                  <SelectItem value="expired" data-testid="filter-expired">Expirados</SelectItem>
-                  <SelectItem value="abandoned" data-testid="filter-abandoned">Abandonados</SelectItem>
-                  <SelectItem value="auto_renewal" data-testid="filter-auto-renewal">Renovações Auto</SelectItem>
-                </SelectContent>
-              </Select>
+            
+            <div className="flex flex-col sm:flex-row items-start sm:items-end gap-4 p-3 border rounded-lg bg-muted/30">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Filtrar por data:</span>
+              </div>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 flex-1">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="data-inicio" className="text-sm text-muted-foreground whitespace-nowrap">De:</Label>
+                  <Input
+                    id="data-inicio"
+                    type="date"
+                    value={dataInicio}
+                    onChange={(e) => handleDataInicioChange(e.target.value)}
+                    className="w-[160px]"
+                    data-testid="input-data-inicio"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="data-fim" className="text-sm text-muted-foreground whitespace-nowrap">Até:</Label>
+                  <Input
+                    id="data-fim"
+                    type="date"
+                    value={dataFim}
+                    onChange={(e) => handleDataFimChange(e.target.value)}
+                    className="w-[160px]"
+                    data-testid="input-data-fim"
+                  />
+                </div>
+                {(dataInicio || dataFim) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearDateFilters}
+                    data-testid="button-limpar-datas"
+                  >
+                    <X className="w-4 h-4 mr-1" />
+                    Limpar
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         </CardHeader>
@@ -469,16 +630,16 @@ export default function AdminCheckoutRelatorios() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredPagamentos.length === 0 ? (
+              {paginatedPagamentos.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                    {statusFilter === "all" 
+                    {statusFilter === "all" && !dataInicio && !dataFim
                       ? "Nenhum pagamento registrado" 
                       : "Nenhum pagamento encontrado com este filtro"}
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredPagamentos.map((pagamento) => {
+                paginatedPagamentos.map((pagamento) => {
                   const statusInfo = getStatusInfo(pagamento.status);
                   const StatusIcon = statusInfo.icon;
                   return (
@@ -586,6 +747,39 @@ export default function AdminCheckoutRelatorios() {
               )}
             </TableBody>
           </Table>
+          
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-4 py-3 border-t">
+              <p className="text-sm text-muted-foreground">
+                Mostrando {((currentPage - 1) * ITEMS_PER_PAGE) + 1} a {Math.min(currentPage * ITEMS_PER_PAGE, filteredPagamentos.length)} de {filteredPagamentos.length}
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  data-testid="button-pagina-anterior"
+                >
+                  <ChevronLeft className="w-4 h-4 mr-1" />
+                  Anterior
+                </Button>
+                <span className="text-sm px-2">
+                  Página {currentPage} de {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  data-testid="button-pagina-proxima"
+                >
+                  Próxima
+                  <ChevronRight className="w-4 h-4 ml-1" />
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
