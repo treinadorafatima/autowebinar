@@ -207,21 +207,28 @@ export default function AdminWhatsAppNotificationsPage() {
 
   const pairingCodeMutation = useMutation({
     mutationFn: async ({ accountId, phoneNumber }: { accountId: string; phoneNumber: string }) => {
-      const res = await apiRequest("POST", `/api/whatsapp/connect-pairing`, { accountId, phoneNumber });
+      // Validate phone number format
+      const cleanedPhone = phoneNumber.replace(/\D/g, "");
+      if (!cleanedPhone || cleanedPhone.length < 10) {
+        throw new Error("Número de telefone inválido. Use o formato: +55 11 98765-4321 ou apenas números com código do país");
+      }
+      
+      const res = await apiRequest("POST", `/api/whatsapp/connect-pairing`, { accountId, phoneNumber: cleanedPhone });
       return res.json();
     },
     onSuccess: (data: { success: boolean; pairingCode?: string; error?: string }) => {
       if (data.success && data.pairingCode) {
         setGeneratedPairingCode(data.pairingCode);
         setQrPollingEnabled(true);
+        setConnectingAccountId(null);
         toast({
-          title: "Código gerado!",
-          description: "Digite o código no WhatsApp do seu celular",
+          title: "Código gerado com sucesso!",
+          description: "O código é válido por 5 minutos. Digite no WhatsApp para conectar.",
         });
       } else {
         toast({
-          title: "Erro",
-          description: data.error || "Não foi possível gerar o código",
+          title: "Erro ao gerar código",
+          description: data.error || "Não foi possível gerar o código. Verifique o número de telefone.",
           variant: "destructive",
         });
       }
@@ -229,7 +236,7 @@ export default function AdminWhatsAppNotificationsPage() {
     onError: (error: any) => {
       toast({
         title: "Erro ao gerar código",
-        description: error.message || "Não foi possível gerar o código de pareamento",
+        description: error.message || "Número de telefone inválido ou erro de conexão",
         variant: "destructive",
       });
     },
@@ -860,15 +867,19 @@ export default function AdminWhatsAppNotificationsPage() {
                     <div>
                       <p className="font-medium mb-2">Conectar via Número de Telefone</p>
                       <p className="text-sm text-muted-foreground mb-4">
-                        Digite o número de telefone do WhatsApp (com código do país, ex: 55 11 98765-4321)
+                        Digite o número de telefone do WhatsApp com código do país (ex: 5511987654321 ou +55 11 98765-4321)
+                      </p>
+                      <p className="text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 p-2 rounded mb-4">
+                        💡 Dica: Use o número que você usa para acessar WhatsApp no seu celular
                       </p>
                     </div>
                     <div className="flex gap-2">
                       <Input
-                        placeholder="+55 11 98765-4321"
+                        placeholder="5511987654321"
                         value={pairingPhoneNumber}
                         onChange={(e) => setPairingPhoneNumber(e.target.value)}
                         data-testid="input-phone-number"
+                        type="tel"
                       />
                       <Button
                         onClick={() => {
