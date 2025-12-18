@@ -2714,10 +2714,11 @@ export class DatabaseStorage implements IStorage {
 
   // Checkout - Relatórios
   // Helper para verificar se pagamento é considerado "vendido"
-  // Venda = status approved (pagamento confirmado pelo gateway OU liberado manualmente com status approved)
+  // Venda = acesso foi concedido (adminId preenchido) OU status approved
+  // Isso cobre casos onde o webhook concedeu acesso mas não atualizou status para 'approved'
   private isPagamentoVenda(p: { status: string; adminId: string | null }): boolean {
-    // Apenas status approved conta como venda - liberações manuais também atualizam o status para approved
-    return p.status === 'approved';
+    // Venda = adminId preenchido (acesso concedido) OU status approved
+    return p.adminId !== null || p.status === 'approved';
   }
 
   async getCheckoutStats(): Promise<{ totalVendas: number; receitaTotal: number; ticketMedio: number; taxaConversao: number }> {
@@ -2781,17 +2782,17 @@ export class DatabaseStorage implements IStorage {
     const allAffiliates = await db.select().from(affiliates);
     const affiliatesMap = new Map(allAffiliates.map(a => [a.id, { nome: a.name, email: a.email }]));
     
-    // Busca pagamentos para verificar quais foram realmente aprovados
+    // Busca pagamentos para verificar quais foram vendas (adminId preenchido OU status approved)
     const allPagamentos = await db.select().from(checkoutPagamentos);
-    const approvedPagamentoIds = new Set(
-      allPagamentos.filter(p => p.status === 'approved').map(p => p.id)
+    const vendaPagamentoIds = new Set(
+      allPagamentos.filter(p => this.isPagamentoVenda(p)).map(p => p.id)
     );
     
     const result = new Map<string, { quantidade: number; valorVendas: number; valorComissao: number }>();
     for (const sale of sales) {
-      // Conta apenas vendas cujo pagamento foi aprovado E não foram canceladas/reembolsadas
+      // Conta apenas vendas cujo pagamento foi confirmado E não foram canceladas/reembolsadas
       if (sale.status === 'cancelled' || sale.status === 'refunded') continue;
-      if (!approvedPagamentoIds.has(sale.pagamentoId)) continue;
+      if (!vendaPagamentoIds.has(sale.pagamentoId)) continue;
       
       const current = result.get(sale.affiliateId) || { quantidade: 0, valorVendas: 0, valorComissao: 0 };
       current.quantidade++;
