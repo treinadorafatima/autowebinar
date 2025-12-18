@@ -32,7 +32,7 @@ const connections: Map<string, WhatsAppConnection> = new Map();
 
 const AUTH_DIR = path.join(process.cwd(), "whatsapp-sessions");
 
-const QR_CODE_TTL_MS = 60 * 1000;
+const QR_CODE_TTL_MS = 120 * 1000; // 2 minutes for user to scan QR
 const MAX_RECONNECT_ATTEMPTS = 5;
 const MIN_MESSAGE_INTERVAL_MS = 3000;
 const MAX_MESSAGE_INTERVAL_MS = 8000;
@@ -246,12 +246,30 @@ export async function initWhatsAppConnection(accountId: string, adminId: string)
     }
     
     if (existing?.status === "qr_ready" && existing.qrCode && existing.qrGeneratedAt) {
-      if (Date.now() - existing.qrGeneratedAt < QR_CODE_TTL_MS) {
+      const qrAge = Date.now() - existing.qrGeneratedAt;
+      if (qrAge < QR_CODE_TTL_MS) {
         return {
           success: true,
           status: "qr_ready",
           qrCode: existing.qrCode,
         };
+      } else {
+        // QR code expired - clean up old socket and session to generate fresh QR
+        console.log(`[whatsapp] QR code expired for account ${accountId}, generating new one...`);
+        if (existing.socket) {
+          try {
+            existing.socket.end(undefined);
+          } catch (e) {
+            // Ignore cleanup errors
+          }
+        }
+        // Clear auth directory to force new QR code generation
+        const authDir = getAuthDir(accountId);
+        if (fs.existsSync(authDir)) {
+          fs.rmSync(authDir, { recursive: true });
+          console.log(`[whatsapp] Auth cleared for account ${accountId} (QR expired)`);
+        }
+        connections.delete(accountId);
       }
     }
 

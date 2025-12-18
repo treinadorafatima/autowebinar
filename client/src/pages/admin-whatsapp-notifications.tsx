@@ -381,9 +381,22 @@ export default function AdminWhatsAppNotificationsPage() {
   useEffect(() => {
     if (connectionStatus?.status === "connected") {
       setQrPollingEnabled(false);
+      setGeneratedPairingCode(null);
       refetchStatus();
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications/whatsapp/accounts"] });
+      toast({
+        title: "WhatsApp conectado!",
+        description: "A conexão foi estabelecida com sucesso.",
+      });
     }
-  }, [connectionStatus?.status, refetchStatus]);
+  }, [connectionStatus?.status, refetchStatus, toast]);
+
+  useEffect(() => {
+    if (qrPollingEnabled && connectionStatus?.qrExpired && notificationStatus?.accountId) {
+      console.log("[whatsapp-ui] QR expired, requesting new one...");
+      connectMutation.mutate(notificationStatus.accountId);
+    }
+  }, [connectionStatus?.qrExpired, qrPollingEnabled, notificationStatus?.accountId]);
 
   useEffect(() => {
     if (connectingAccountStatus?.status === "connected") {
