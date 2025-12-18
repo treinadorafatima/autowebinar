@@ -56,6 +56,43 @@ function getAuthDir(accountId: string): string {
   return dir;
 }
 
+// Check if session credentials are valid (registered and complete)
+function isSessionValid(accountId: string): boolean {
+  const authDir = path.join(AUTH_DIR, accountId);
+  const credsFile = path.join(authDir, "creds.json");
+  
+  if (!fs.existsSync(credsFile)) {
+    return false;
+  }
+  
+  try {
+    const creds = JSON.parse(fs.readFileSync(credsFile, "utf-8"));
+    // Session is only valid if it was fully registered
+    if (!creds.registered) {
+      console.log(`[whatsapp] Session ${accountId} has registered=false, marking as invalid`);
+      return false;
+    }
+    // Check if essential credentials exist
+    if (!creds.signedIdentityKey || !creds.signedPreKey) {
+      console.log(`[whatsapp] Session ${accountId} missing essential keys, marking as invalid`);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.log(`[whatsapp] Error reading session ${accountId}:`, error);
+    return false;
+  }
+}
+
+// Clear invalid/stale session
+function clearStaleSession(accountId: string): void {
+  const authDir = path.join(AUTH_DIR, accountId);
+  if (fs.existsSync(authDir)) {
+    fs.rmSync(authDir, { recursive: true });
+    console.log(`[whatsapp] Cleared stale session for account ${accountId}`);
+  }
+}
+
 function getRandomBrowserFingerprint(): [string, string, string] {
   // Use standard browser fingerprints that WhatsApp recognizes
   // Format: [browser name, OS name, browser version]
@@ -293,6 +330,16 @@ export async function initWhatsAppConnection(accountId: string, adminId: string)
     });
 
     const authDir = getAuthDir(accountId);
+    
+    // Check and clear stale/invalid sessions before connecting
+    if (!isSessionValid(accountId)) {
+      clearStaleSession(accountId);
+      // Recreate the directory after clearing
+      if (!fs.existsSync(authDir)) {
+        fs.mkdirSync(authDir, { recursive: true });
+      }
+    }
+    
     const { state, saveCreds } = await useMultiFileAuthState(authDir);
     const { version } = await fetchLatestBaileysVersion();
 
@@ -729,6 +776,64 @@ export async function getWhatsAppStatus(accountId: string): Promise<{
   }
 
   return { status: "disconnected" };
+}
+
+// Reset/clear a session completely for fresh start
+export async function resetWhatsAppSession(accountId: string, adminId: string): Promise<{
+  success: boolean;
+  message: string;
+}> {
+  try {
+    const conn = connections.get(accountId);
+    
+    // Clear any pending messages
+    if (conn?.messageQueue && conn.messageQueue.length > 0) {
+      console.log(`[whatsapp] Flushing ${conn.messageQueue.length} queued messages for reset of account ${accountId}`);
+      while (conn.messageQueue.length > 0) {
+        const item = conn.messageQueue.shift();
+        item?.reject(new Error("Sessão resetada pelo usuário."));
+      }
+    }
+    
+    // Close existing socket
+    if (conn?.socket) {
+      try {
+        conn.socket.end(undefined);
+      } catch (e) {
+        // Ignore
+      }
+    }
+
+    // Remove from connections map
+    connections.delete(accountId);
+
+    // Clear auth directory
+    const authDir = path.join(AUTH_DIR, accountId);
+    if (fs.existsSync(authDir)) {
+      fs.rmSync(authDir, { recursive: true });
+      console.log(`[whatsapp] Auth directory cleared for account ${accountId}`);
+    }
+
+    // Update database status
+    await storage.upsertWhatsappSessionByAccountId(accountId, adminId, {
+      status: "disconnected",
+      qrCode: null,
+      phoneNumber: null,
+      sessionData: null,
+    });
+
+    console.log(`[whatsapp] Session reset complete for account ${accountId}`);
+    return {
+      success: true,
+      message: "Sessão resetada com sucesso. Você pode reconectar agora.",
+    };
+  } catch (error) {
+    console.error("[whatsapp] Error resetting session:", error);
+    return {
+      success: false,
+      message: "Erro ao resetar sessão.",
+    };
+  }
 }
 
 export async function disconnectWhatsApp(accountId: string, adminId: string): Promise<boolean> {

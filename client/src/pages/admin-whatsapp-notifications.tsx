@@ -266,6 +266,32 @@ export default function AdminWhatsAppNotificationsPage() {
     },
   });
 
+  const resetSessionMutation = useMutation({
+    mutationFn: async (accountId: string) => {
+      const res = await apiRequest("POST", `/api/whatsapp/reset-session`, { accountId });
+      return res.json();
+    },
+    onSuccess: (data: { success: boolean; message: string }) => {
+      setQrPollingEnabled(false);
+      setGeneratedPairingCode(null);
+      setShowPairingCodeInput(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications/whatsapp/status"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/status"] });
+      toast({
+        title: data.success ? "Sessão Resetada" : "Erro",
+        description: data.message,
+        variant: data.success ? "default" : "destructive",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro ao resetar sessão",
+        description: error.message || "Não foi possível resetar a sessão",
+        variant: "destructive",
+      });
+    },
+  });
+
   const createAccountMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", "/api/whatsapp/accounts", {
@@ -984,6 +1010,21 @@ export default function AdminWhatsAppNotificationsPage() {
                     <p className="text-xs text-muted-foreground text-center mt-2">
                       O código de pareamento é mais confiável em servidores
                     </p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => notificationStatus?.accountId && resetSessionMutation.mutate(notificationStatus.accountId)}
+                      disabled={resetSessionMutation.isPending}
+                      className="w-full mt-2 text-muted-foreground"
+                      data-testid="button-reset-session"
+                    >
+                      {resetSessionMutation.isPending ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <RotateCcw className="w-4 h-4 mr-2" />
+                      )}
+                      Problemas? Resetar Sessão
+                    </Button>
                   </div>
                 </div>
               )}

@@ -8,6 +8,7 @@ import {
   initWhatsAppConnectionWithPairingCode,
   getWhatsAppStatus,
   disconnectWhatsApp,
+  resetWhatsAppSession,
   sendWhatsAppMessage,
   sendWhatsAppMediaMessage,
   restoreWhatsAppSessions,
@@ -181,6 +182,32 @@ export function registerWhatsAppRoutes(app: Express) {
       res.json({ success });
     } catch (error: any) {
       console.error("[whatsapp-api] Error disconnecting:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Reset session - clears stale credentials for fresh reconnection
+  app.post("/api/whatsapp/reset-session", async (req: Request, res: Response) => {
+    try {
+      const { admin, error, errorCode } = await validateSessionAndGetAdmin(req);
+      if (!admin) {
+        return res.status(errorCode || 401).json({ error: error || "Não autenticado" });
+      }
+
+      const { accountId } = req.body;
+      if (!accountId) {
+        return res.status(400).json({ error: "accountId é obrigatório" });
+      }
+
+      const ownership = await validateAccountOwnership(accountId, admin.id);
+      if (!ownership.valid) {
+        return res.status(403).json({ error: ownership.error });
+      }
+
+      const result = await resetWhatsAppSession(accountId, admin.id);
+      res.json(result);
+    } catch (error: any) {
+      console.error("[whatsapp-api] Error resetting session:", error);
       res.status(500).json({ error: error.message });
     }
   });
