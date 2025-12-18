@@ -683,7 +683,7 @@ export async function getNotificationStatus(): Promise<{
     if (connectedAccounts.length === 0) {
       return {
         configured: allAccounts.length > 0,
-        accountId: null,
+        accountId: allAccounts.length > 0 ? allAccounts[0].id : null,
         status: allAccounts.length > 0 ? "disconnected" : "not_configured",
         enabled,
         connectedAccounts: 0,
