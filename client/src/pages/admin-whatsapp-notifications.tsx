@@ -879,27 +879,112 @@ export default function AdminWhatsAppNotificationsPage() {
                     </Button>
                   </div>
                 </div>
+              ) : showPairingCodeInput ? (
+                <div className="space-y-4">
+                  <div className="flex flex-col items-center gap-4 p-6 border rounded-lg bg-white dark:bg-gray-900">
+                    <Smartphone className="w-8 h-8 text-green-500" />
+                    <div className="text-center">
+                      <p className="font-medium">Conectar com Código de Pareamento</p>
+                      <p className="text-sm text-muted-foreground">
+                        Digite seu número de telefone com código do país
+                      </p>
+                    </div>
+                    {generatedPairingCode ? (
+                      <div className="text-center space-y-3">
+                        <p className="text-sm text-muted-foreground">Digite este código no WhatsApp:</p>
+                        <div className="bg-green-100 dark:bg-green-900 px-6 py-4 rounded-lg">
+                          <p className="text-3xl font-mono font-bold tracking-widest text-green-700 dark:text-green-300" data-testid="text-pairing-code">
+                            {generatedPairingCode}
+                          </p>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          No WhatsApp: Configurações {'>'} Dispositivos conectados {'>'} Conectar dispositivo {'>'} Conectar com número de telefone
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="w-full max-w-xs space-y-3">
+                        <Input
+                          type="tel"
+                          placeholder="5511999999999"
+                          value={pairingPhoneNumber}
+                          onChange={(e) => setPairingPhoneNumber(e.target.value)}
+                          className="text-center text-lg"
+                          data-testid="input-pairing-phone"
+                        />
+                        <p className="text-xs text-muted-foreground text-center">
+                          Ex: 5511999999999 (código do país + DDD + número)
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    {!generatedPairingCode && (
+                      <Button
+                        onClick={() => notificationStatus?.accountId && pairingCodeMutation.mutate({ 
+                          accountId: notificationStatus.accountId, 
+                          phoneNumber: pairingPhoneNumber 
+                        })}
+                        disabled={pairingCodeMutation.isPending || !pairingPhoneNumber}
+                        className="flex-1"
+                        data-testid="button-generate-pairing-code"
+                      >
+                        {pairingCodeMutation.isPending ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <Smartphone className="w-4 h-4 mr-2" />
+                        )}
+                        Gerar Código
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      onClick={() => {
+                        setShowPairingCodeInput(false);
+                        setGeneratedPairingCode(null);
+                        setQrPollingEnabled(false);
+                      }}
+                      data-testid="button-cancel-pairing"
+                    >
+                      Voltar
+                    </Button>
+                  </div>
+                </div>
               ) : (
                 <div className="flex flex-col items-center gap-4 p-6 border rounded-lg">
                   <WifiOff className="w-12 h-12 text-muted-foreground" />
                   <div className="text-center">
                     <p className="font-medium">WhatsApp Desconectado</p>
                     <p className="text-sm text-muted-foreground">
-                      Escaneie o QR Code para conectar ao WhatsApp
+                      Escolha um método para conectar
                     </p>
                   </div>
-                  <Button
-                    onClick={() => notificationStatus?.accountId && connectMutation.mutate(notificationStatus.accountId)}
-                    disabled={connectMutation.isPending}
-                    data-testid="button-connect-qr"
-                  >
-                    {connectMutation.isPending ? (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : (
-                      <QrCode className="w-4 h-4 mr-2" />
-                    )}
-                    Conectar via QR Code
-                  </Button>
+                  <div className="flex flex-col gap-2 w-full max-w-xs">
+                    <Button
+                      onClick={() => setShowPairingCodeInput(true)}
+                      className="w-full"
+                      data-testid="button-connect-pairing"
+                    >
+                      <Smartphone className="w-4 h-4 mr-2" />
+                      Conectar com Código (Recomendado)
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => notificationStatus?.accountId && connectMutation.mutate(notificationStatus.accountId)}
+                      disabled={connectMutation.isPending}
+                      className="w-full"
+                      data-testid="button-connect-qr"
+                    >
+                      {connectMutation.isPending ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <QrCode className="w-4 h-4 mr-2" />
+                      )}
+                      Conectar via QR Code
+                    </Button>
+                    <p className="text-xs text-muted-foreground text-center mt-2">
+                      O código de pareamento é mais confiável em servidores
+                    </p>
+                  </div>
                 </div>
               )}
             </div>
