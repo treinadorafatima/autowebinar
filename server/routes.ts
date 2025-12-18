@@ -10686,6 +10686,191 @@ Seja conversacional e objetivo.`;
     }
   });
 
+  // Resincronizar pagamento com Mercado Pago - verifica status real na API
+  app.post("/api/checkout/pagamentos/:id/resync-mp", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.replace("Bearer ", "");
+      if (!token) return res.status(401).json({ error: "Token não fornecido" });
+      
+      const email = await validateSession(token);
+      if (!email) return res.status(401).json({ error: "Sessão inválida" });
+      
+      const adminUser = await storage.getAdminByEmail(email);
+      if (!adminUser || adminUser.role !== "superadmin") {
+        return res.status(403).json({ error: "Acesso negado - apenas superadmin" });
+      }
+
+      const pagamento = await storage.getCheckoutPagamentoById(req.params.id);
+      if (!pagamento) {
+        return res.status(404).json({ error: "Pagamento não encontrado" });
+      }
+
+      const accessToken = await storage.getCheckoutConfig('MERCADOPAGO_ACCESS_TOKEN');
+      if (!accessToken) {
+        return res.status(500).json({ error: "Token do Mercado Pago não configurado" });
+      }
+
+      const preapprovalId = pagamento.mercadopagoPaymentId;
+      if (!preapprovalId) {
+        return res.status(400).json({ error: "Este pagamento não possui ID do Mercado Pago" });
+      }
+
+      console.log(`[Resync MP] Checking preapproval ${preapprovalId} for pagamento ${pagamento.id}`);
+
+      // Fetch preapproval details from MP API
+      const mpResponse = await fetch(`https://api.mercadopago.com/preapproval/${preapprovalId}`, {
+        headers: { 'Authorization': `Bearer ${accessToken}` },
+      });
+
+      if (!mpResponse.ok) {
+        const errorText = await mpResponse.text();
+        console.error('[Resync MP] Error fetching preapproval:', errorText);
+        return res.status(500).json({ error: "Erro ao buscar assinatura no Mercado Pago" });
+      }
+
+      const preapproval = await mpResponse.json();
+      console.log(`[Resync MP] Preapproval status: ${preapproval.status}`);
+
+      // Check for authorized payments
+      let hasAuthorizedPayment = false;
+      let latestApprovedPayment: any = null;
+      
+      try {
+        const paymentsResponse = await fetch(
+          `https://api.mercadopago.com/preapproval/${preapprovalId}/authorized_payments`,
+          { headers: { 'Authorization': `Bearer ${accessToken}` } }
+        );
+        
+        if (paymentsResponse.ok) {
+          const paymentsData = await paymentsResponse.json();
+          const approvedPayments = paymentsData.results?.filter(
+            (p: any) => p.status === 'approved' || p.status === 'authorized'
+          ) || [];
+          
+          hasAuthorizedPayment = approvedPayments.length > 0;
+          if (hasAuthorizedPayment) {
+            latestApprovedPayment = approvedPayments[approvedPayments.length - 1];
+          }
+          console.log(`[Resync MP] Found ${approvedPayments.length} approved payments`);
+        }
+      } catch (err) {
+        console.error('[Resync MP] Error checking authorized payments:', err);
+      }
+
+      // Update payment based on MP status
+      if (preapproval.status === 'authorized' && hasAuthorizedPayment) {
+        const plano = await storage.getCheckoutPlanoById(pagamento.planoId);
+        if (!plano) {
+          return res.status(404).json({ error: "Plano não encontrado" });
+        }
+
+        const realPaymentDate = latestApprovedPayment?.date_created 
+          ? new Date(latestApprovedPayment.date_created) 
+          : new Date();
+        const realApprovalDate = latestApprovedPayment?.date_approved 
+          ? new Date(latestApprovedPayment.date_approved) 
+          : realPaymentDate;
+
+        const expirationDate = new Date();
+        expirationDate.setDate(expirationDate.getDate() + (plano.prazoDias || 30));
+
+        // Update payment to approved
+        await storage.updateCheckoutPagamento(pagamento.id, {
+          status: 'approved',
+          statusDetail: 'Assinatura ativa - pagamento confirmado (resincronizado)',
+          dataPagamento: realPaymentDate,
+          dataAprovacao: realApprovalDate,
+          dataExpiracao: expirationDate,
+        });
+
+        // Create/update admin if needed
+        let admin = await storage.getAdminByEmail(pagamento.email);
+        if (admin) {
+          await storage.updateAdmin(admin.id, {
+            accessExpiresAt: expirationDate,
+            webinarLimit: plano.webinarLimit,
+            uploadLimit: plano.uploadLimit || plano.webinarLimit,
+            isActive: true,
+            planoId: plano.id,
+            paymentStatus: 'ok',
+            paymentFailedReason: null,
+          });
+          await storage.updateCheckoutPagamento(pagamento.id, { adminId: admin.id });
+        } else {
+          const tempPassword = Math.random().toString(36).substring(2, 10);
+          const bcrypt = await import('bcryptjs');
+          const hashedPassword = await bcrypt.hash(tempPassword, 10);
+          
+          admin = await storage.createAdmin({
+            name: pagamento.nome,
+            email: pagamento.email,
+            password: hashedPassword,
+            telefone: pagamento.telefone,
+            role: 'user',
+            webinarLimit: plano.webinarLimit,
+            uploadLimit: plano.uploadLimit || plano.webinarLimit,
+            isActive: true,
+            accessExpiresAt: expirationDate,
+            planoId: plano.id,
+            paymentStatus: 'ok',
+          });
+          await storage.updateCheckoutPagamento(pagamento.id, { adminId: admin.id });
+          
+          console.log(`[Resync MP] Created admin ${pagamento.email} with temp password`);
+        }
+
+        console.log(`[Resync MP] Successfully synced payment ${pagamento.id} to approved`);
+        res.json({ 
+          success: true, 
+          message: "Pagamento sincronizado com sucesso - status atualizado para aprovado",
+          newStatus: 'approved',
+          preapprovalStatus: preapproval.status,
+          hasPayment: true,
+        });
+      } else if (preapproval.status === 'cancelled') {
+        await storage.updateCheckoutPagamento(pagamento.id, {
+          status: 'cancelled',
+          statusDetail: 'Assinatura cancelada (resincronizado)',
+        });
+        res.json({ 
+          success: true, 
+          message: "Pagamento sincronizado - assinatura cancelada",
+          newStatus: 'cancelled',
+          preapprovalStatus: preapproval.status,
+          hasPayment: false,
+        });
+      } else if (preapproval.status === 'paused') {
+        await storage.updateCheckoutPagamento(pagamento.id, {
+          status: 'paused',
+          statusDetail: 'Assinatura pausada (resincronizado)',
+        });
+        res.json({ 
+          success: true, 
+          message: "Pagamento sincronizado - assinatura pausada",
+          newStatus: 'paused',
+          preapprovalStatus: preapproval.status,
+          hasPayment: false,
+        });
+      } else {
+        // authorized but no payment yet, or pending
+        await storage.updateCheckoutPagamento(pagamento.id, {
+          status: 'pending',
+          statusDetail: `Assinatura ${preapproval.status} - aguardando pagamento (resincronizado)`,
+        });
+        res.json({ 
+          success: true, 
+          message: "Pagamento sincronizado - ainda aguardando confirmação de pagamento",
+          newStatus: 'pending',
+          preapprovalStatus: preapproval.status,
+          hasPayment: hasAuthorizedPayment,
+        });
+      }
+    } catch (error: any) {
+      console.error("[Resync MP] Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // ============================================
   // USER SUBSCRIPTION MANAGEMENT ENDPOINTS
   // ============================================

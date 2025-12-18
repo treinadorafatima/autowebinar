@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Loader2, DollarSign, ShoppingCart, TrendingUp, CreditCard, Eye, Check, Clock, X, Users, Filter, User, Mail, Phone, FileText } from "lucide-react";
+import { Loader2, DollarSign, ShoppingCart, TrendingUp, CreditCard, Eye, Check, Clock, X, Users, Filter, User, Mail, Phone, FileText, RefreshCw } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -210,6 +210,31 @@ export default function AdminCheckoutRelatorios() {
     onError: (error: Error) => {
       toast({
         title: "Erro ao enviar recuperação",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const resyncMutation = useMutation({
+    mutationFn: async (pagamentoId: string) => {
+      const res = await apiRequest("POST", `/api/checkout/pagamentos/${pagamentoId}/resync-mp`);
+      return res.json();
+    },
+    onSuccess: (data: { message?: string; newStatus?: string }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/checkout/pagamentos"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/checkout/relatorios/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/checkout/relatorios/vendas-por-plano"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/checkout/relatorios/vendas-por-metodo"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/checkout/relatorios/vendas-por-afiliado"] });
+      toast({ 
+        title: "Sincronizado com Mercado Pago!", 
+        description: data.message || `Novo status: ${data.newStatus}`
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro ao sincronizar",
         description: error.message,
         variant: "destructive",
       });
@@ -526,6 +551,26 @@ export default function AdminCheckoutRelatorios() {
                                 <Check className="w-4 h-4 mr-1" />
                               )}
                               Liberar
+                            </Button>
+                          )}
+                          {pagamento.mercadopagoPaymentId && pagamento.status !== "approved" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                if (confirm("Consultar o status real deste pagamento no Mercado Pago?")) {
+                                  resyncMutation.mutate(pagamento.id);
+                                }
+                              }}
+                              disabled={resyncMutation.isPending}
+                              data-testid={`button-resync-${pagamento.id}`}
+                            >
+                              {resyncMutation.isPending ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <RefreshCw className="w-4 h-4 mr-1" />
+                              )}
+                              Sincronizar MP
                             </Button>
                           )}
                           {pagamento.adminId && (
