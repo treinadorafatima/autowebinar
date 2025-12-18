@@ -773,9 +773,10 @@ async function syncMercadoPagoSubscriptions(): Promise<void> {
       return;
     }
 
-    // Get all active/pending subscription payments
+    // Get all MP payments that are NOT yet approved (need sync) OR active subscriptions to monitor
+    // Include checkout_iniciado, pending, authorized, in_process, paused - anything that might need correction
     const allPagamentos = await db.select().from(checkoutPagamentos)
-      .where(sql`${checkoutPagamentos.mercadopagoPaymentId} IS NOT NULL AND ${checkoutPagamentos.status} IN ('approved', 'pending', 'authorized')`)
+      .where(sql`${checkoutPagamentos.mercadopagoPaymentId} IS NOT NULL AND ${checkoutPagamentos.status} IN ('approved', 'pending', 'authorized', 'checkout_iniciado', 'in_process', 'paused', 'auto_renewal')`)
       .orderBy(sql`${checkoutPagamentos.criadoEm} DESC`);
 
     let synced = 0;
@@ -828,6 +829,7 @@ async function syncMercadoPagoSubscriptions(): Promise<void> {
         } else if (mpStatus === 'authorized') {
           // Check if there are actual payments
           let hasPayment = false;
+          let latestApprovedPayment: any = null;
           try {
             const paymentsResponse = await fetch(
               `https://api.mercadopago.com/preapproval/${preapprovalId}/authorized_payments`,
@@ -835,26 +837,56 @@ async function syncMercadoPagoSubscriptions(): Promise<void> {
             );
             if (paymentsResponse.ok) {
               const paymentsData = await paymentsResponse.json();
-              hasPayment = paymentsData.results?.some(
+              const approvedPayments = paymentsData.results?.filter(
                 (p: any) => p.status === 'approved' || p.status === 'authorized'
-              ) || false;
+              ) || [];
+              hasPayment = approvedPayments.length > 0;
+              if (hasPayment) {
+                latestApprovedPayment = approvedPayments[approvedPayments.length - 1];
+              }
             }
           } catch {}
 
-          if (hasPayment && admin && !admin.isActive) {
-            // Should be active but isn't - reactivate
+          if (hasPayment) {
             const plano = await storage.getCheckoutPlanoById(pagamento.planoId);
             if (plano) {
-              const expirationDate = new Date();
-              expirationDate.setDate(expirationDate.getDate() + plano.prazoDias);
+              // Update payment status to approved if it wasn't already
+              if (pagamento.status !== 'approved') {
+                const realPaymentDate = latestApprovedPayment?.date_created 
+                  ? new Date(latestApprovedPayment.date_created) 
+                  : new Date();
+                const realApprovalDate = latestApprovedPayment?.date_approved 
+                  ? new Date(latestApprovedPayment.date_approved) 
+                  : realPaymentDate;
 
-              await storage.updateAdmin(admin.id, {
-                isActive: true,
-                paymentStatus: 'ok',
-                accessExpiresAt: expirationDate,
-              });
-              reactivated++;
-              console.log(`[subscription-scheduler] Auto-reactivated ${pagamento.email}`);
+                const expirationDate = new Date();
+                expirationDate.setDate(expirationDate.getDate() + (plano.prazoDias || 30));
+
+                await storage.updateCheckoutPagamento(pagamento.id, {
+                  status: 'approved',
+                  statusDetail: 'Assinatura ativa - pagamento confirmado (auto-sync)',
+                  dataPagamento: realPaymentDate,
+                  dataAprovacao: realApprovalDate,
+                  dataExpiracao: expirationDate,
+                });
+                console.log(`[subscription-scheduler] Auto-approved payment for ${pagamento.email}`);
+              }
+
+              // Reactivate admin if needed
+              if (admin && (!admin.isActive || admin.paymentStatus !== 'ok')) {
+                const expirationDate = new Date();
+                expirationDate.setDate(expirationDate.getDate() + (plano.prazoDias || 30));
+
+                await storage.updateAdmin(admin.id, {
+                  isActive: true,
+                  paymentStatus: 'ok',
+                  paymentFailedReason: null,
+                  accessExpiresAt: expirationDate,
+                  planoId: plano.id,
+                });
+                reactivated++;
+                console.log(`[subscription-scheduler] Auto-reactivated ${pagamento.email}`);
+              }
             }
           }
         }
