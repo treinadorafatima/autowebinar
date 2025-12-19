@@ -274,7 +274,8 @@ export async function initWhatsAppConnection(accountId: string, adminId: string,
       };
     }
     
-    if (existing?.status === "qr_ready" && existing.qrCode && existing.qrGeneratedAt) {
+    // Skip QR check during reconnection - we need to reconnect with saved credentials
+    if (!isReconnect && existing?.status === "qr_ready" && existing.qrCode && existing.qrGeneratedAt) {
       const qrAge = Date.now() - existing.qrGeneratedAt;
       if (qrAge < QR_CODE_TTL_MS) {
         return {
