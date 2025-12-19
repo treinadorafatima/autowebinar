@@ -49,6 +49,7 @@ interface WhatsAppAccount {
   label: string;
   phoneNumber: string | null;
   status: string;
+  scope: string;
 }
 
 interface ProviderInfo {
@@ -235,7 +236,11 @@ export default function AdminAiAgents() {
 
   const getAccountLabel = (accountId: string) => {
     const account = whatsappAccounts?.find(a => a.id === accountId);
-    return account ? `${account.label} (${account.phoneNumber || "Sem número"})` : accountId;
+    if (!account) return accountId;
+    if (account.status === "connected") {
+      return `${account.label} (${account.phoneNumber || "Conectado"})`;
+    }
+    return `${account.label} (Desconectado)`;
   };
 
   return (
@@ -451,7 +456,7 @@ export default function AdminAiAgents() {
               </div>
               
               <div className="space-y-2">
-                <Label>Conta WhatsApp</Label>
+                <Label>Conta WhatsApp (Marketing)</Label>
                 <Select 
                   value={formData.whatsappAccountId} 
                   onValueChange={(v) => setFormData({ ...formData, whatsappAccountId: v })}
@@ -461,11 +466,16 @@ export default function AdminAiAgents() {
                     <SelectValue placeholder="Selecione uma conta" />
                   </SelectTrigger>
                   <SelectContent>
-                    {whatsappAccounts?.map((account) => (
+                    {whatsappAccounts?.filter(account => account.scope === "marketing").map((account) => (
                       <SelectItem key={account.id} value={account.id}>
-                        {account.label} ({account.phoneNumber || "Sem número"})
+                        {account.label} {account.status === "connected" ? `(${account.phoneNumber || "Conectado"})` : "(Desconectado)"}
                       </SelectItem>
                     ))}
+                    {(!whatsappAccounts || whatsappAccounts.filter(a => a.scope === "marketing").length === 0) && (
+                      <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                        Nenhuma conta de Marketing disponível
+                      </div>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
