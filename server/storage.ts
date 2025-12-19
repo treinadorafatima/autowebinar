@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type WebinarConfig, type WebinarConfigInsert, type Admin, type AdminInsert, type UploadedVideo, type UploadedVideoInsert, type Comment, type CommentInsert, type Webinar, type WebinarInsert, type Setting, type SettingInsert, type ViewerSession, type WebinarScript, type WebinarScriptInsert, type AiConfig, type AiConfigInsert, type AiMemory, type AiMemoryInsert, type CheckoutPlano, type CheckoutPlanoInsert, type CheckoutPagamento, type CheckoutPagamentoInsert, type CheckoutConfig, type CheckoutConfigInsert, type CheckoutAssinatura, type CheckoutAssinaturaInsert, type AiChat, type AiChatInsert, type AiMessageChat, type AiMessageChatInsert, type VideoTranscription, type VideoTranscriptionInsert, type AdminEmailCredential, type AdminEmailCredentialInsert, type EmailSequence, type EmailSequenceInsert, type ScheduledEmail, type ScheduledEmailInsert, type LeadFormConfig, type LeadFormConfigInsert, type WhatsappAccount, type WhatsappAccountInsert, type WhatsappSession, type WhatsappSessionInsert, type WhatsappSequence, type WhatsappSequenceInsert, type ScheduledWhatsappMessage, type ScheduledWhatsappMessageInsert, type MediaFile, type MediaFileInsert, type LeadMessage, type LeadMessageInsert, type Lead, type WhatsappBroadcast, type WhatsappBroadcastInsert, type WhatsappBroadcastRecipient, type WhatsappBroadcastRecipientInsert, type WhatsappContactList, type WhatsappContactListInsert, type WhatsappContact, type WhatsappContactInsert, type Affiliate, type AffiliateInsert, type AffiliateLink, type AffiliateLinkInsert, type AffiliateSale, type AffiliateSaleInsert, type AffiliateConfig, type AffiliateConfigInsert, type AffiliateWithdrawal, type AffiliateWithdrawalInsert, type WhatsappNotificationLog, type WhatsappNotificationLogInsert, type WhatsappNotificationTemplate, type WhatsappNotificationTemplateInsert, type EmailNotificationTemplate, type EmailNotificationTemplateInsert, admins, webinarConfigs, users, uploadedVideos, comments, webinars as webinarsTable, settings, viewerSessions, webinarScripts, aiConfigs, aiMemories, checkoutPlanos, checkoutPagamentos, checkoutConfigs, checkoutAssinaturas, aiChats, aiMessageChats, videoTranscriptions, adminEmailCredentials, emailSequences, scheduledEmails, leadFormConfigs, whatsappAccounts, whatsappSessions, whatsappNotificationsLog, whatsappSequences, scheduledWhatsappMessages, mediaFiles, webinarViewLogs, leads, leadMessages, whatsappBroadcasts, whatsappBroadcastRecipients, whatsappContactLists, whatsappContacts, affiliates, affiliateLinks, affiliateSales, affiliateConfig, affiliateWithdrawals, whatsappNotificationTemplates, emailNotificationTemplates } from "@shared/schema";
+import { type User, type InsertUser, type WebinarConfig, type WebinarConfigInsert, type Admin, type AdminInsert, type UploadedVideo, type UploadedVideoInsert, type Comment, type CommentInsert, type Webinar, type WebinarInsert, type Setting, type SettingInsert, type ViewerSession, type WebinarScript, type WebinarScriptInsert, type AiConfig, type AiConfigInsert, type AiMemory, type AiMemoryInsert, type CheckoutPlano, type CheckoutPlanoInsert, type CheckoutPagamento, type CheckoutPagamentoInsert, type CheckoutConfig, type CheckoutConfigInsert, type CheckoutAssinatura, type CheckoutAssinaturaInsert, type AiChat, type AiChatInsert, type AiMessageChat, type AiMessageChatInsert, type VideoTranscription, type VideoTranscriptionInsert, type AdminEmailCredential, type AdminEmailCredentialInsert, type EmailSequence, type EmailSequenceInsert, type ScheduledEmail, type ScheduledEmailInsert, type LeadFormConfig, type LeadFormConfigInsert, type WhatsappAccount, type WhatsappAccountInsert, type WhatsappSession, type WhatsappSessionInsert, type WhatsappSequence, type WhatsappSequenceInsert, type ScheduledWhatsappMessage, type ScheduledWhatsappMessageInsert, type MediaFile, type MediaFileInsert, type LeadMessage, type LeadMessageInsert, type Lead, type WhatsappBroadcast, type WhatsappBroadcastInsert, type WhatsappBroadcastRecipient, type WhatsappBroadcastRecipientInsert, type WhatsappContactList, type WhatsappContactListInsert, type WhatsappContact, type WhatsappContactInsert, type Affiliate, type AffiliateInsert, type AffiliateLink, type AffiliateLinkInsert, type AffiliateSale, type AffiliateSaleInsert, type AffiliateConfig, type AffiliateConfigInsert, type AffiliateWithdrawal, type AffiliateWithdrawalInsert, type WhatsappNotificationLog, type WhatsappNotificationLogInsert, type WhatsappNotificationTemplate, type WhatsappNotificationTemplateInsert, type EmailNotificationTemplate, type EmailNotificationTemplateInsert, type AiAgent, type AiAgentInsert, type AiAgentFile, type AiAgentFileInsert, type AiConversation, type AiConversationInsert, type AiMessage, type AiMessageInsert, type AiUsageStats, type AiUsageStatsInsert, admins, webinarConfigs, users, uploadedVideos, comments, webinars as webinarsTable, settings, viewerSessions, webinarScripts, aiConfigs, aiMemories, checkoutPlanos, checkoutPagamentos, checkoutConfigs, checkoutAssinaturas, aiChats, aiMessageChats, videoTranscriptions, adminEmailCredentials, emailSequences, scheduledEmails, leadFormConfigs, whatsappAccounts, whatsappSessions, whatsappNotificationsLog, whatsappSequences, scheduledWhatsappMessages, mediaFiles, webinarViewLogs, leads, leadMessages, whatsappBroadcasts, whatsappBroadcastRecipients, whatsappContactLists, whatsappContacts, affiliates, affiliateLinks, affiliateSales, affiliateConfig, affiliateWithdrawals, whatsappNotificationTemplates, emailNotificationTemplates, aiAgents, aiAgentFiles, aiConversations, aiMessages, aiUsageStats } from "@shared/schema";
 import * as crypto from "crypto";
 import { randomUUID } from "crypto";
 import { db } from "./db";
@@ -382,6 +382,28 @@ export interface IStorage {
   getWhatsappNotificationTemplateByType(notificationType: string): Promise<WhatsappNotificationTemplate | undefined>;
   updateWhatsappNotificationTemplate(id: string, data: Partial<WhatsappNotificationTemplateInsert>): Promise<WhatsappNotificationTemplate | undefined>;
   initDefaultWhatsappNotificationTemplates(): Promise<void>;
+  // AI Agents
+  listAiAgentsByAdmin(adminId: string): Promise<AiAgent[]>;
+  getAiAgentById(id: string): Promise<AiAgent | undefined>;
+  getAiAgentByWhatsappAccount(whatsappAccountId: string): Promise<AiAgent | undefined>;
+  createAiAgent(data: AiAgentInsert): Promise<AiAgent>;
+  updateAiAgent(id: string, data: Partial<AiAgentInsert>): Promise<AiAgent | undefined>;
+  deleteAiAgent(id: string): Promise<void>;
+  // AI Agent Files
+  listAiAgentFiles(agentId: string): Promise<AiAgentFile[]>;
+  createAiAgentFile(data: AiAgentFileInsert): Promise<AiAgentFile>;
+  deleteAiAgentFile(id: string): Promise<void>;
+  // AI Conversations
+  listAiConversationsByAgent(agentId: string, limit?: number): Promise<AiConversation[]>;
+  getAiConversationById(id: string): Promise<AiConversation | undefined>;
+  getOrCreateAiConversation(agentId: string, contactJid: string, contactName?: string, contactPhone?: string): Promise<AiConversation>;
+  updateAiConversation(id: string, data: Partial<AiConversationInsert>): Promise<AiConversation | undefined>;
+  // AI Messages
+  listAiMessagesByConversation(conversationId: string, limit?: number): Promise<AiMessage[]>;
+  createAiMessage(data: AiMessageInsert): Promise<AiMessage>;
+  // AI Usage Stats
+  getOrCreateAiUsageStats(agentId: string, date: string): Promise<AiUsageStats>;
+  incrementAiUsageStats(agentId: string, date: string, messages?: number, tokens?: number, conversations?: number, errors?: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -5805,6 +5827,201 @@ Apos o pagamento, seu acesso sera renovado automaticamente!
         console.log(`[email-templates] Created default template: ${template.notificationType}`);
       }
     }
+  }
+
+  // ============================================
+  // AI AGENTS IMPLEMENTATION
+  // ============================================
+
+  async listAiAgentsByAdmin(adminId: string): Promise<AiAgent[]> {
+    return db.select().from(aiAgents).where(eq(aiAgents.adminId, adminId)).orderBy(desc(aiAgents.createdAt));
+  }
+
+  async getAiAgentById(id: string): Promise<AiAgent | undefined> {
+    const result = await db.select().from(aiAgents).where(eq(aiAgents.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getAiAgentByWhatsappAccount(whatsappAccountId: string): Promise<AiAgent | undefined> {
+    const result = await db.select().from(aiAgents)
+      .where(and(eq(aiAgents.whatsappAccountId, whatsappAccountId), eq(aiAgents.isActive, true)))
+      .limit(1);
+    return result[0];
+  }
+
+  async createAiAgent(data: AiAgentInsert): Promise<AiAgent> {
+    const id = randomUUID();
+    const agent: AiAgent = {
+      id,
+      adminId: data.adminId,
+      whatsappAccountId: data.whatsappAccountId,
+      name: data.name,
+      description: data.description ?? null,
+      provider: data.provider ?? "openai",
+      apiKey: data.apiKey,
+      model: data.model ?? "gpt-4o-mini",
+      systemPrompt: data.systemPrompt,
+      temperature: data.temperature ?? 70,
+      maxTokens: data.maxTokens ?? 1000,
+      responseDelayMs: data.responseDelayMs ?? 2000,
+      memoryLength: data.memoryLength ?? 10,
+      isActive: data.isActive ?? true,
+      workingHoursEnabled: data.workingHoursEnabled ?? false,
+      workingHoursStart: data.workingHoursStart ?? "09:00",
+      workingHoursEnd: data.workingHoursEnd ?? "18:00",
+      workingDays: data.workingDays ?? "1,2,3,4,5",
+      awayMessage: data.awayMessage ?? "Olá! No momento estou fora do horário de atendimento. Retornarei em breve!",
+      escalationKeywords: data.escalationKeywords ?? "",
+      escalationMessage: data.escalationMessage ?? "Vou transferir você para um atendente humano.",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    await db.insert(aiAgents).values(agent);
+    return agent;
+  }
+
+  async updateAiAgent(id: string, data: Partial<AiAgentInsert>): Promise<AiAgent | undefined> {
+    const result = await db.update(aiAgents)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(aiAgents.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteAiAgent(id: string): Promise<void> {
+    await db.delete(aiAgents).where(eq(aiAgents.id, id));
+  }
+
+  // AI Agent Files
+  async listAiAgentFiles(agentId: string): Promise<AiAgentFile[]> {
+    return db.select().from(aiAgentFiles).where(eq(aiAgentFiles.agentId, agentId)).orderBy(desc(aiAgentFiles.createdAt));
+  }
+
+  async createAiAgentFile(data: AiAgentFileInsert): Promise<AiAgentFile> {
+    const id = randomUUID();
+    const file: AiAgentFile = {
+      id,
+      agentId: data.agentId,
+      fileName: data.fileName,
+      fileUrl: data.fileUrl,
+      fileType: data.fileType,
+      fileSize: data.fileSize ?? 0,
+      extractedText: data.extractedText ?? null,
+      createdAt: new Date(),
+    };
+    await db.insert(aiAgentFiles).values(file);
+    return file;
+  }
+
+  async deleteAiAgentFile(id: string): Promise<void> {
+    await db.delete(aiAgentFiles).where(eq(aiAgentFiles.id, id));
+  }
+
+  // AI Conversations
+  async listAiConversationsByAgent(agentId: string, limit: number = 50): Promise<AiConversation[]> {
+    return db.select().from(aiConversations)
+      .where(eq(aiConversations.agentId, agentId))
+      .orderBy(desc(aiConversations.lastMessageAt))
+      .limit(limit);
+  }
+
+  async getAiConversationById(id: string): Promise<AiConversation | undefined> {
+    const result = await db.select().from(aiConversations).where(eq(aiConversations.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getOrCreateAiConversation(agentId: string, contactJid: string, contactName?: string, contactPhone?: string): Promise<AiConversation> {
+    const existing = await db.select().from(aiConversations)
+      .where(and(eq(aiConversations.agentId, agentId), eq(aiConversations.contactJid, contactJid)))
+      .limit(1);
+    
+    if (existing[0]) {
+      return existing[0];
+    }
+
+    const id = randomUUID();
+    const conversation: AiConversation = {
+      id,
+      agentId,
+      contactJid,
+      contactName: contactName ?? null,
+      contactPhone: contactPhone ?? null,
+      status: "active",
+      totalMessages: 0,
+      totalTokensUsed: 0,
+      lastMessageAt: new Date(),
+      createdAt: new Date(),
+    };
+    await db.insert(aiConversations).values(conversation);
+    return conversation;
+  }
+
+  async updateAiConversation(id: string, data: Partial<AiConversationInsert>): Promise<AiConversation | undefined> {
+    const result = await db.update(aiConversations)
+      .set(data)
+      .where(eq(aiConversations.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // AI Messages
+  async listAiMessagesByConversation(conversationId: string, limit: number = 50): Promise<AiMessage[]> {
+    return db.select().from(aiMessages)
+      .where(eq(aiMessages.conversationId, conversationId))
+      .orderBy(desc(aiMessages.createdAt))
+      .limit(limit);
+  }
+
+  async createAiMessage(data: AiMessageInsert): Promise<AiMessage> {
+    const id = randomUUID();
+    const message: AiMessage = {
+      id,
+      conversationId: data.conversationId,
+      role: data.role,
+      content: data.content,
+      tokensUsed: data.tokensUsed ?? 0,
+      processingTimeMs: data.processingTimeMs ?? null,
+      errorMessage: data.errorMessage ?? null,
+      createdAt: new Date(),
+    };
+    await db.insert(aiMessages).values(message);
+    return message;
+  }
+
+  // AI Usage Stats
+  async getOrCreateAiUsageStats(agentId: string, date: string): Promise<AiUsageStats> {
+    const existing = await db.select().from(aiUsageStats)
+      .where(and(eq(aiUsageStats.agentId, agentId), eq(aiUsageStats.date, date)))
+      .limit(1);
+    
+    if (existing[0]) {
+      return existing[0];
+    }
+
+    const id = randomUUID();
+    const stats: AiUsageStats = {
+      id,
+      agentId,
+      date,
+      messagesCount: 0,
+      tokensUsed: 0,
+      conversationsCount: 0,
+      errorsCount: 0,
+    };
+    await db.insert(aiUsageStats).values(stats);
+    return stats;
+  }
+
+  async incrementAiUsageStats(agentId: string, date: string, messages: number = 0, tokens: number = 0, conversations: number = 0, errors: number = 0): Promise<void> {
+    await this.getOrCreateAiUsageStats(agentId, date);
+    await db.update(aiUsageStats)
+      .set({
+        messagesCount: sql`${aiUsageStats.messagesCount} + ${messages}`,
+        tokensUsed: sql`${aiUsageStats.tokensUsed} + ${tokens}`,
+        conversationsCount: sql`${aiUsageStats.conversationsCount} + ${conversations}`,
+        errorsCount: sql`${aiUsageStats.errorsCount} + ${errors}`,
+      })
+      .where(and(eq(aiUsageStats.agentId, agentId), eq(aiUsageStats.date, date)));
   }
 }
 

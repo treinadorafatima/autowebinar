@@ -127,6 +127,79 @@ function getRandomMessageDelay(): number {
   return MIN_MESSAGE_INTERVAL_MS + Math.random() * (MAX_MESSAGE_INTERVAL_MS - MIN_MESSAGE_INTERVAL_MS);
 }
 
+async function handleIncomingMessage(accountId: string, senderPhone: string, textContent: string): Promise<void> {
+  try {
+    const account = await storage.getWhatsappAccountById(accountId);
+    if (!account) {
+      console.log(`[whatsapp-ai] Account not found: ${accountId}`);
+      return;
+    }
+    
+    const agent = await storage.getAiAgentByWhatsappAccount(accountId);
+    if (!agent || !agent.isActive) {
+      console.log(`[whatsapp-ai] No active AI agent for account ${accountId}`);
+      return;
+    }
+    
+    const { processMessage, checkWorkingHours, checkEscalationKeywords } = await import("./ai-processor");
+    
+    if (!checkWorkingHours(agent)) {
+      console.log(`[whatsapp-ai] Outside working hours for agent ${agent.id}`);
+      return;
+    }
+    
+    if (checkEscalationKeywords(agent, textContent)) {
+      if (agent.escalationMessage) {
+        await sendWhatsAppMessage(accountId, senderPhone, agent.escalationMessage);
+        console.log(`[whatsapp-ai] Escalation triggered for ${senderPhone}`);
+      }
+      return;
+    }
+    
+    const contactJid = senderPhone + "@s.whatsapp.net";
+    const conversation = await storage.getOrCreateAiConversation(agent.id, contactJid, undefined, senderPhone);
+    
+    await storage.createAiMessage({
+      conversationId: conversation.id,
+      role: "user",
+      content: textContent,
+      tokensUsed: 0,
+    });
+    
+    const recentMessages = await storage.listAiMessagesByConversation(conversation.id, agent.memoryLength);
+    
+    const response = await processMessage(agent, textContent, recentMessages);
+    
+    if (response.error) {
+      console.error(`[whatsapp-ai] AI processing error for ${senderPhone}:`, response.error);
+      return;
+    }
+    
+    await storage.createAiMessage({
+      conversationId: conversation.id,
+      role: "assistant",
+      content: response.content,
+      tokensUsed: response.tokensUsed,
+    });
+    
+    await storage.updateAiConversation(conversation.id, {
+      totalMessages: (conversation.totalMessages || 0) + 2,
+      totalTokensUsed: (conversation.totalTokensUsed || 0) + response.tokensUsed,
+      lastMessageAt: new Date(),
+    });
+    
+    if (agent.responseDelayMs > 0) {
+      await new Promise(resolve => setTimeout(resolve, agent.responseDelayMs));
+    }
+    
+    await sendWhatsAppMessage(accountId, senderPhone, response.content);
+    console.log(`[whatsapp-ai] Sent AI response to ${senderPhone} (${response.tokensUsed} tokens)`);
+    
+  } catch (error) {
+    console.error(`[whatsapp-ai] Error handling message from ${senderPhone}:`, error);
+  }
+}
+
 async function processMessageQueue(accountId: string): Promise<void> {
   const conn = connections.get(accountId);
   if (!conn || conn.isProcessingQueue) return;
@@ -512,6 +585,30 @@ export async function initWhatsAppConnection(accountId: string, adminId: string,
         console.log(`[whatsapp] Connected for account ${accountId}: ${phoneNumber}`);
         
         processMessageQueue(accountId);
+      }
+    });
+
+    socket.ev.on("messages.upsert", async ({ messages: incomingMessages, type }) => {
+      if (type !== "notify") return;
+      
+      for (const message of incomingMessages) {
+        if (!message.message || message.key.fromMe) continue;
+        
+        const senderJid = message.key.remoteJid;
+        if (!senderJid || senderJid.includes("@g.us")) continue;
+        
+        const senderPhone = senderJid.split("@")[0];
+        const textContent = message.message?.conversation || 
+                           message.message?.extendedTextMessage?.text || 
+                           "";
+        
+        if (!textContent.trim()) continue;
+        
+        console.log(`[whatsapp] Message received from ${senderPhone} on account ${accountId}: "${textContent.substring(0, 50)}..."`);
+        
+        handleIncomingMessage(accountId, senderPhone, textContent).catch(err => {
+          console.error(`[whatsapp] Error handling incoming message:`, err);
+        });
       }
     });
 

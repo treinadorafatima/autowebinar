@@ -10,6 +10,7 @@ import { storage } from "./storage";
 import { webinarConfigInsertSchema, adminInsertSchema, webinarInsertSchema, sessions as sessionsTable, leads, webinarScriptInsertSchema, uploadedVideos, webinars as webinarsTable } from "@shared/schema";
 import { registerEmailMarketingRoutes } from "./email-marketing";
 import { registerWhatsAppRoutes } from "./whatsapp-routes";
+import { registerAiAgentsRoutes } from "./ai-agents-routes";
 import { rescheduleSequencesForWebinar, cancelAllSequencesForWebinar } from "./sequence-sync";
 import { renderDomainsService } from "./render-domains";
 import multer from "multer";
@@ -13608,6 +13609,9 @@ Seja conversacional e objetivo.`;
 
   // Register WhatsApp Marketing routes
   registerWhatsAppRoutes(app);
+
+  // Register AI Agents routes
+  registerAiAgentsRoutes(app);
 
   const httpServer = createServer(app);
   return httpServer;

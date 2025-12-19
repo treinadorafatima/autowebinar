@@ -20,7 +20,8 @@ import {
   Zap,
   UserCheck,
   Bell,
-  Mail
+  Mail,
+  Bot
 } from "lucide-react";
 import { SiWhatsapp } from "react-icons/si";
 import logoUrl from "@assets/logo-autowebinar-preto.png";
@@ -90,6 +91,12 @@ const mainMenuItems = [
     title: "WhatsApp Marketing",
     url: "/admin/whatsapp-marketing",
     icon: SiWhatsapp,
+    superadminOnly: false,
+  },
+  {
+    title: "Agentes de IA",
+    url: "/admin/ai-agents",
+    icon: Bot,
     superadminOnly: false,
   },
   {

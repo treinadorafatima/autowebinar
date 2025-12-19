@@ -1103,3 +1103,103 @@ export const affiliateWithdrawals = pgTable("affiliate_withdrawals", {
 export type AffiliateWithdrawal = typeof affiliateWithdrawals.$inferSelect;
 export const affiliateWithdrawalInsertSchema = createInsertSchema(affiliateWithdrawals).omit({ id: true, createdAt: true, updatedAt: true });
 export type AffiliateWithdrawalInsert = z.infer<typeof affiliateWithdrawalInsertSchema>;
+
+// ============================================
+// AI AGENTS SYSTEM
+// ============================================
+
+// AI Agents table - main agent configuration
+export const aiAgents = pgTable("ai_agents", {
+  id: text("id").primaryKey(),
+  adminId: text("admin_id").notNull(), // FK para admins
+  whatsappAccountId: text("whatsapp_account_id").notNull(), // FK para whatsapp_accounts
+  name: text("name").notNull(), // Nome do agente (ex: "Assistente de Vendas")
+  description: text("description"), // Descrição do agente
+  provider: text("provider").notNull().default("openai"), // openai, gemini, deepseek, grok
+  apiKey: text("api_key").notNull(), // Chave API do provedor (criptografada)
+  model: text("model").notNull().default("gpt-4o-mini"), // Modelo específico
+  systemPrompt: text("system_prompt").notNull(), // Prompt do sistema (personalidade)
+  temperature: integer("temperature").notNull().default(70), // 0-100 (divide por 100 para usar)
+  maxTokens: integer("max_tokens").notNull().default(1000), // Máximo de tokens por resposta
+  responseDelayMs: integer("response_delay_ms").notNull().default(2000), // Delay para simular digitação
+  memoryLength: integer("memory_length").notNull().default(10), // Quantas mensagens manter no contexto
+  isActive: boolean("is_active").notNull().default(true),
+  workingHoursEnabled: boolean("working_hours_enabled").notNull().default(false),
+  workingHoursStart: text("working_hours_start").default("09:00"), // HH:MM
+  workingHoursEnd: text("working_hours_end").default("18:00"), // HH:MM
+  workingDays: text("working_days").default("1,2,3,4,5"), // Dias da semana (1=seg, 7=dom)
+  awayMessage: text("away_message").default("Olá! No momento estou fora do horário de atendimento. Retornarei em breve!"),
+  escalationKeywords: text("escalation_keywords").default(""), // Palavras-chave para escalar (separadas por vírgula)
+  escalationMessage: text("escalation_message").default("Vou transferir você para um atendente humano."),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type AiAgent = typeof aiAgents.$inferSelect;
+export const aiAgentInsertSchema = createInsertSchema(aiAgents).omit({ id: true, createdAt: true, updatedAt: true });
+export type AiAgentInsert = z.infer<typeof aiAgentInsertSchema>;
+
+// AI Agent Files table - files for context (RAG)
+export const aiAgentFiles = pgTable("ai_agent_files", {
+  id: text("id").primaryKey(),
+  agentId: text("agent_id").notNull(), // FK para ai_agents
+  fileName: text("file_name").notNull(),
+  fileUrl: text("file_url").notNull(),
+  fileType: text("file_type").notNull(), // pdf, txt, docx
+  fileSize: integer("file_size").notNull().default(0), // Em bytes
+  extractedText: text("extracted_text"), // Texto extraído do arquivo
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type AiAgentFile = typeof aiAgentFiles.$inferSelect;
+export const aiAgentFileInsertSchema = createInsertSchema(aiAgentFiles).omit({ id: true, createdAt: true });
+export type AiAgentFileInsert = z.infer<typeof aiAgentFileInsertSchema>;
+
+// AI Conversations table - tracks conversations per contact
+export const aiConversations = pgTable("ai_conversations", {
+  id: text("id").primaryKey(),
+  agentId: text("agent_id").notNull(), // FK para ai_agents
+  contactJid: text("contact_jid").notNull(), // JID do contato no WhatsApp
+  contactName: text("contact_name"), // Nome do contato (se disponível)
+  contactPhone: text("contact_phone"), // Telefone limpo
+  status: text("status").notNull().default("active"), // active, archived, escalated
+  totalMessages: integer("total_messages").notNull().default(0),
+  totalTokensUsed: integer("total_tokens_used").notNull().default(0),
+  lastMessageAt: timestamp("last_message_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type AiConversation = typeof aiConversations.$inferSelect;
+export const aiConversationInsertSchema = createInsertSchema(aiConversations).omit({ id: true, createdAt: true });
+export type AiConversationInsert = z.infer<typeof aiConversationInsertSchema>;
+
+// AI Messages table - individual messages in conversations
+export const aiMessages = pgTable("ai_messages", {
+  id: text("id").primaryKey(),
+  conversationId: text("conversation_id").notNull(), // FK para ai_conversations
+  role: text("role").notNull(), // user, assistant
+  content: text("content").notNull(),
+  tokensUsed: integer("tokens_used").notNull().default(0),
+  processingTimeMs: integer("processing_time_ms"), // Tempo de processamento
+  errorMessage: text("error_message"), // Erro se houver
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type AiMessage = typeof aiMessages.$inferSelect;
+export const aiMessageInsertSchema = createInsertSchema(aiMessages).omit({ id: true, createdAt: true });
+export type AiMessageInsert = z.infer<typeof aiMessageInsertSchema>;
+
+// AI Usage Stats table - daily usage tracking per agent
+export const aiUsageStats = pgTable("ai_usage_stats", {
+  id: text("id").primaryKey(),
+  agentId: text("agent_id").notNull(), // FK para ai_agents
+  date: text("date").notNull(), // YYYY-MM-DD
+  messagesCount: integer("messages_count").notNull().default(0),
+  tokensUsed: integer("tokens_used").notNull().default(0),
+  conversationsCount: integer("conversations_count").notNull().default(0),
+  errorsCount: integer("errors_count").notNull().default(0),
+});
+
+export type AiUsageStats = typeof aiUsageStats.$inferSelect;
+export const aiUsageStatsInsertSchema = createInsertSchema(aiUsageStats).omit({ id: true });
+export type AiUsageStatsInsert = z.infer<typeof aiUsageStatsInsertSchema>;
