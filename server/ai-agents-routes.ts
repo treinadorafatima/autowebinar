@@ -324,4 +324,33 @@ export function registerAiAgentsRoutes(app: Express) {
       res.status(500).json({ error: error.message });
     }
   });
+
+  app.post("/api/ai-agents/cleanup-messages", async (req: Request, res: Response) => {
+    try {
+      const { admin, error, errorCode } = await validateSessionAndGetAdmin(req);
+      if (!admin || admin.role !== "superadmin") {
+        return res.status(403).json({ error: "Apenas superadmin pode executar esta ação" });
+      }
+
+      const result = await storage.cleanupOldAiMessages();
+      res.json({ 
+        success: true, 
+        message: `Processados ${result.agentsProcessed} agentes, ${result.messagesDeleted} mensagens removidas`
+      });
+    } catch (error: any) {
+      console.error("[ai-agents] Error cleaning up messages:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  setInterval(async () => {
+    try {
+      const result = await storage.cleanupOldAiMessages();
+      if (result.messagesDeleted > 0) {
+        console.log(`[ai-agents] Cleanup automático: ${result.messagesDeleted} mensagens antigas removidas de ${result.agentsProcessed} agentes`);
+      }
+    } catch (error) {
+      console.error("[ai-agents] Erro no cleanup automático:", error);
+    }
+  }, 24 * 60 * 60 * 1000);
 }

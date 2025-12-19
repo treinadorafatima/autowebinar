@@ -1123,6 +1123,7 @@ export const aiAgents = pgTable("ai_agents", {
   maxTokens: integer("max_tokens").notNull().default(1000), // Máximo de tokens por resposta
   responseDelayMs: integer("response_delay_ms").notNull().default(2000), // Delay para simular digitação
   memoryLength: integer("memory_length").notNull().default(10), // Quantas mensagens manter no contexto
+  memoryRetentionDays: integer("memory_retention_days").notNull().default(30), // Dias para manter histórico (0 = indefinido)
   isActive: boolean("is_active").notNull().default(true),
   workingHoursEnabled: boolean("working_hours_enabled").notNull().default(false),
   workingHoursStart: text("working_hours_start").default("09:00"), // HH:MM

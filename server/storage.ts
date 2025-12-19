@@ -5865,11 +5865,13 @@ Apos o pagamento, seu acesso sera renovado automaticamente!
       maxTokens: data.maxTokens ?? 1000,
       responseDelayMs: data.responseDelayMs ?? 2000,
       memoryLength: data.memoryLength ?? 10,
+      memoryRetentionDays: data.memoryRetentionDays ?? 30,
       isActive: data.isActive ?? true,
       workingHoursEnabled: data.workingHoursEnabled ?? false,
       workingHoursStart: data.workingHoursStart ?? "09:00",
       workingHoursEnd: data.workingHoursEnd ?? "18:00",
       workingDays: data.workingDays ?? "1,2,3,4,5",
+      timezone: data.timezone ?? "America/Sao_Paulo",
       awayMessage: data.awayMessage ?? "Olá! No momento estou fora do horário de atendimento. Retornarei em breve!",
       escalationKeywords: data.escalationKeywords ?? "",
       escalationMessage: data.escalationMessage ?? "Vou transferir você para um atendente humano.",
@@ -6022,6 +6024,47 @@ Apos o pagamento, seu acesso sera renovado automaticamente!
         errorsCount: sql`${aiUsageStats.errorsCount} + ${errors}`,
       })
       .where(and(eq(aiUsageStats.agentId, agentId), eq(aiUsageStats.date, date)));
+  }
+
+  async cleanupOldAiMessages(): Promise<{ agentsProcessed: number; messagesDeleted: number }> {
+    const agents = await db.select().from(aiAgents);
+    let totalMessagesDeleted = 0;
+    let agentsProcessed = 0;
+
+    for (const agent of agents) {
+      const conversations = await db.select().from(aiConversations)
+        .where(eq(aiConversations.agentId, agent.id));
+
+      for (const conversation of conversations) {
+        if (agent.memoryRetentionDays > 0) {
+          const cutoffDate = new Date();
+          cutoffDate.setDate(cutoffDate.getDate() - agent.memoryRetentionDays);
+
+          const deletedByDate = await db.delete(aiMessages)
+            .where(and(
+              eq(aiMessages.conversationId, conversation.id),
+              lte(aiMessages.createdAt, cutoffDate)
+            ))
+            .returning();
+          totalMessagesDeleted += deletedByDate.length;
+        }
+
+        const allMessages = await db.select().from(aiMessages)
+          .where(eq(aiMessages.conversationId, conversation.id))
+          .orderBy(desc(aiMessages.createdAt));
+        
+        if (allMessages.length > agent.memoryLength) {
+          const messagesToDelete = allMessages.slice(agent.memoryLength);
+          for (const msg of messagesToDelete) {
+            await db.delete(aiMessages).where(eq(aiMessages.id, msg.id));
+            totalMessagesDeleted++;
+          }
+        }
+      }
+      agentsProcessed++;
+    }
+
+    return { agentsProcessed, messagesDeleted: totalMessagesDeleted };
   }
 }
 

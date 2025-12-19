@@ -32,6 +32,7 @@ interface AiAgent {
   temperature: number;
   maxTokens: number;
   memoryLength: number;
+  memoryRetentionDays: number;
   responseDelayMs: number;
   isActive: boolean;
   workingHoursEnabled: boolean;
@@ -89,6 +90,7 @@ export default function AdminAiAgents() {
     temperature: 70,
     maxTokens: 1024,
     memoryLength: 10,
+    memoryRetentionDays: 30,
     responseDelayMs: 2000,
     isActive: true,
     workingHoursEnabled: false,
@@ -182,6 +184,7 @@ export default function AdminAiAgents() {
       temperature: 70,
       maxTokens: 1024,
       memoryLength: 10,
+      memoryRetentionDays: 30,
       responseDelayMs: 2000,
       isActive: true,
       workingHoursEnabled: false,
@@ -207,6 +210,7 @@ export default function AdminAiAgents() {
       temperature: agent.temperature,
       maxTokens: agent.maxTokens,
       memoryLength: agent.memoryLength,
+      memoryRetentionDays: agent.memoryRetentionDays || 30,
       responseDelayMs: agent.responseDelayMs,
       isActive: agent.isActive,
       workingHoursEnabled: agent.workingHoursEnabled,
@@ -568,7 +572,7 @@ export default function AdminAiAgents() {
               </p>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label>Temperatura ({formData.temperature}%)</Label>
                 <Slider
@@ -595,9 +599,11 @@ export default function AdminAiAgents() {
                   data-testid="input-max-tokens"
                 />
               </div>
+            </div>
 
+            <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label>Memória (msgs)</Label>
+                <Label>Contexto (mensagens)</Label>
                 <Input
                   type="number"
                   value={formData.memoryLength}
@@ -606,6 +612,24 @@ export default function AdminAiAgents() {
                   max={50}
                   data-testid="input-memory-length"
                 />
+                <p className="text-xs text-muted-foreground">
+                  Quantidade de mensagens recentes que o agente lembra
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Retenção de Memória (dias)</Label>
+                <Input
+                  type="number"
+                  value={formData.memoryRetentionDays}
+                  onChange={(e) => setFormData({ ...formData, memoryRetentionDays: parseInt(e.target.value) || 30 })}
+                  min={0}
+                  max={365}
+                  data-testid="input-memory-retention"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Mensagens mais antigas serão apagadas (0 = manter sempre)
+                </p>
               </div>
             </div>
 
