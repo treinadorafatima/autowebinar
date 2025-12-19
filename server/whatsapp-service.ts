@@ -435,8 +435,18 @@ export async function initWhatsAppConnection(accountId: string, adminId: string)
           return;
         }
 
-        // For stream errors (515) and timeouts (408), don't auto-reconnect - let user try again
-        if ((statusCode === 408 || statusCode === 515) || !shouldReconnect || attempts >= MAX_RECONNECT_ATTEMPTS) {
+        // Error 515 (restartRequired) is NORMAL - reconnect automatically with saved credentials
+        if (statusCode === DisconnectReason.restartRequired) {
+          console.log(`[whatsapp] Restart required (515) for account ${accountId}. Reconnecting with saved credentials...`);
+          // Simply reconnect - the credentials are already saved
+          setTimeout(() => {
+            initWhatsAppConnection(accountId, adminId);
+          }, 2000);
+          return;
+        }
+
+        // For other errors, check if we should reconnect
+        if (!shouldReconnect || (statusCode !== 408 && attempts >= MAX_RECONNECT_ATTEMPTS)) {
           console.log(`[whatsapp] Connection failed permanently for account ${accountId} (statusCode: ${statusCode}). User must reconnect manually.`);
           
           if (currentConn?.messageQueue && currentConn.messageQueue.length > 0) {
@@ -447,11 +457,13 @@ export async function initWhatsAppConnection(accountId: string, adminId: string)
             }
           }
           
-          // Always clear auth on disconnect for clean reconnection
-          const authDir = getAuthDir(accountId);
-          if (fs.existsSync(authDir)) {
-            fs.rmSync(authDir, { recursive: true });
-            console.log(`[whatsapp] Auth cleared for account ${accountId}`);
+          // Only clear auth on actual logout, not on temporary disconnects
+          if (statusCode === DisconnectReason.loggedOut) {
+            const authDir = getAuthDir(accountId);
+            if (fs.existsSync(authDir)) {
+              fs.rmSync(authDir, { recursive: true });
+              console.log(`[whatsapp] Auth cleared for account ${accountId} (logged out)`);
+            }
           }
           
           connections.set(accountId, {
@@ -638,10 +650,16 @@ export async function initWhatsAppConnectionWithPairingCode(
 
         if (connection === "close") {
           const statusCode = (lastDisconnect?.error as Boom)?.output?.statusCode;
-          const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
           
           console.log(`[whatsapp] Pairing connection closed for account ${accountId}. Status: ${statusCode}`);
           
+          // Error 515 (restart required) is expected - just wait for reconnection
+          if (statusCode === 515 || statusCode === DisconnectReason.restartRequired) {
+            console.log(`[whatsapp] Restart required (515) during pairing for account ${accountId}. Waiting...`);
+            return;
+          }
+          
+          const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
           if (!resolved && !shouldReconnect) {
             resolved = true;
             clearTimeout(timeout);
