@@ -16,7 +16,8 @@ import {
   CheckCircle, XCircle, Loader2, Send, Trash2, Plus, Edit, 
   Clock, QrCode, Smartphone, Wifi, WifiOff, RefreshCcw, ArrowLeft,
   Upload, FileAudio, FileVideo, FileText, Image, Mic, Info, Check,
-  Radio, Play, Pause, X, Users, Calendar, Filter, Eye
+  Radio, Play, Pause, X, Users, Calendar, Filter, Eye, Download,
+  FileSpreadsheet, List, History
 } from "lucide-react";
 import { SiWhatsapp } from "react-icons/si";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -107,6 +108,25 @@ interface BroadcastPreview {
   leads: { id: string; name: string; whatsapp: string; capturedAt: string }[];
 }
 
+interface WhatsappContactList {
+  id: string;
+  adminId: string;
+  name: string;
+  description: string | null;
+  totalContacts: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface WhatsappContact {
+  id: string;
+  listId: string;
+  name: string;
+  phone: string;
+  email: string | null;
+  createdAt: string;
+}
+
 const PHASES = [
   { value: "pre", label: "Pré-Webinar", description: "Antes do evento começar" },
   { value: "during", label: "Durante", description: "Durante o webinar" },
@@ -142,6 +162,408 @@ const convertDHMToMinutes = (days: number, hours: number, minutes: number, timin
   const totalMinutes = (days * 24 * 60) + (hours * 60) + minutes;
   return timing === "before" ? -totalMinutes : totalMinutes;
 };
+
+function ContactListsTab() {
+  const { toast } = useToast();
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [importName, setImportName] = useState("");
+  const [importDescription, setImportDescription] = useState("");
+  const [importData, setImportData] = useState<any[]>([]);
+  const [importFileName, setImportFileName] = useState("");
+  const [showContactsDialog, setShowContactsDialog] = useState(false);
+  const [selectedList, setSelectedList] = useState<WhatsappContactList | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const { data: contactLists, isLoading } = useQuery<WhatsappContactList[]>({
+    queryKey: ["/api/whatsapp/contact-lists"],
+  });
+
+  const { data: contacts, isLoading: loadingContacts } = useQuery<WhatsappContact[]>({
+    queryKey: ["/api/whatsapp/contact-lists", selectedList?.id, "contacts"],
+    enabled: !!selectedList,
+  });
+
+  const importMutation = useMutation({
+    mutationFn: async (data: { name: string; description: string; data: any[] }) => {
+      const res = await apiRequest("POST", "/api/whatsapp/contact-lists/import", data);
+      return res.json();
+    },
+    onSuccess: (result: any) => {
+      toast({ 
+        title: "Lista importada", 
+        description: `${result.imported} contatos importados com sucesso${result.totalErrors > 0 ? `. ${result.totalErrors} erros.` : ""}` 
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/contact-lists"] });
+      setShowImportDialog(false);
+      resetImport();
+    },
+    onError: (error: any) => {
+      toast({ title: "Erro ao importar", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("DELETE", `/api/whatsapp/contact-lists/${id}`);
+    },
+    onSuccess: () => {
+      toast({ title: "Lista excluída" });
+      queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/contact-lists"] });
+    },
+    onError: (error: any) => {
+      toast({ title: "Erro ao excluir", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const resetImport = () => {
+    setImportName("");
+    setImportDescription("");
+    setImportData([]);
+    setImportFileName("");
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImportFileName(file.name);
+    
+    try {
+      const XLSX = await import("xlsx");
+      const arrayBuffer = await file.arrayBuffer();
+      const workbook = XLSX.read(arrayBuffer, { type: "array" });
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      const data = XLSX.utils.sheet_to_json(worksheet);
+      
+      setImportData(data);
+      setImportName(file.name.replace(/\.(xlsx?|csv)$/i, ""));
+      setShowImportDialog(true);
+    } catch (error: any) {
+      toast({ title: "Erro ao ler arquivo", description: error.message, variant: "destructive" });
+    }
+    
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const downloadTemplate = async () => {
+    try {
+      const token = localStorage.getItem("adminToken");
+      const res = await fetch("/api/whatsapp/contact-lists/template", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Erro ao baixar modelo");
+      
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "modelo_contatos.xlsx";
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (error: any) {
+      toast({ title: "Erro ao baixar modelo", description: error.message, variant: "destructive" });
+    }
+  };
+
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <List className="w-5 h-5" />
+            Listas de Contatos
+          </CardTitle>
+          <CardDescription>
+            Importe listas de contatos de arquivos Excel para enviar mensagens em massa
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button onClick={downloadTemplate} variant="outline" data-testid="button-download-template">
+              <Download className="w-4 h-4 mr-2" />
+              Baixar Modelo Excel
+            </Button>
+            <input
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              className="hidden"
+              ref={fileInputRef}
+              onChange={handleFileChange}
+            />
+            <Button onClick={() => fileInputRef.current?.click()} data-testid="button-import-excel">
+              <Upload className="w-4 h-4 mr-2" />
+              Importar Planilha
+            </Button>
+          </div>
+
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : contactLists && contactLists.length > 0 ? (
+            <div className="space-y-3">
+              {contactLists.map((list) => (
+                <div
+                  key={list.id}
+                  className="flex items-center justify-between p-4 bg-muted/50 rounded-lg gap-4"
+                  data-testid={`contact-list-${list.id}`}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <FileSpreadsheet className="w-4 h-4 text-green-500 shrink-0" />
+                      <span className="font-medium truncate">{list.name}</span>
+                    </div>
+                    {list.description && (
+                      <p className="text-sm text-muted-foreground mt-1 truncate">{list.description}</p>
+                    )}
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {list.totalContacts} contatos | Importado em {new Date(list.createdAt).toLocaleDateString("pt-BR")}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => { setSelectedList(list); setShowContactsDialog(true); }}
+                      data-testid={`button-view-contacts-${list.id}`}
+                    >
+                      <Eye className="w-4 h-4 mr-1" />
+                      Ver
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => {
+                        if (confirm("Tem certeza que deseja excluir esta lista?")) {
+                          deleteMutation.mutate(list.id);
+                        }
+                      }}
+                      disabled={deleteMutation.isPending}
+                      data-testid={`button-delete-list-${list.id}`}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <FileSpreadsheet className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+              <h3 className="text-lg font-medium mb-2">Nenhuma lista importada</h3>
+              <p className="text-muted-foreground text-sm mb-4">
+                Baixe o modelo Excel, preencha com seus contatos e importe aqui
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Importar Lista de Contatos</DialogTitle>
+            <DialogDescription>
+              {importData.length} contatos encontrados em "{importFileName}"
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Nome da Lista</Label>
+              <Input
+                value={importName}
+                onChange={(e) => setImportName(e.target.value)}
+                placeholder="Ex: Leads Novembro 2024"
+                data-testid="input-list-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Descrição (opcional)</Label>
+              <Input
+                value={importDescription}
+                onChange={(e) => setImportDescription(e.target.value)}
+                placeholder="Ex: Contatos do evento de lançamento"
+                data-testid="input-list-description"
+              />
+            </div>
+            {importData.length > 0 && (
+              <div className="p-3 bg-muted rounded-lg text-sm">
+                <p className="font-medium mb-2">Preview:</p>
+                <div className="space-y-1 max-h-32 overflow-y-auto">
+                  {importData.slice(0, 5).map((row, i) => (
+                    <div key={i} className="text-muted-foreground">
+                      {row.nome || row.name || row.Nome || "?"} - {row.telefone || row.phone || row.Telefone || "?"}
+                    </div>
+                  ))}
+                  {importData.length > 5 && (
+                    <p className="text-muted-foreground">... e mais {importData.length - 5} contatos</p>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => { setShowImportDialog(false); resetImport(); }}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => importMutation.mutate({ name: importName, description: importDescription, data: importData })}
+              disabled={!importName || importData.length === 0 || importMutation.isPending}
+              data-testid="button-confirm-import"
+            >
+              {importMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
+              Importar {importData.length} Contatos
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showContactsDialog} onOpenChange={setShowContactsDialog}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>{selectedList?.name}</DialogTitle>
+            <DialogDescription>{selectedList?.totalContacts} contatos</DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto">
+            {loadingContacts ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : contacts && contacts.length > 0 ? (
+              <div className="space-y-2">
+                {contacts.map((contact) => (
+                  <div key={contact.id} className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                    <Users className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">{contact.name}</p>
+                      <p className="text-sm text-muted-foreground">{contact.phone}</p>
+                    </div>
+                    {contact.email && (
+                      <span className="text-xs text-muted-foreground truncate max-w-32">{contact.email}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-center py-8 text-muted-foreground">Nenhum contato encontrado</p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+function BroadcastHistoryTab() {
+  const { data: broadcasts, isLoading } = useQuery<WhatsAppBroadcast[]>({
+    queryKey: ["/api/whatsapp/broadcasts"],
+  });
+
+  const getStatusBadge = (status: string) => {
+    const variants: Record<string, { className: string; label: string }> = {
+      draft: { className: "bg-gray-500/10 text-gray-500", label: "Rascunho" },
+      pending: { className: "bg-yellow-500/10 text-yellow-500", label: "Pendente" },
+      running: { className: "bg-blue-500/10 text-blue-500", label: "Enviando" },
+      paused: { className: "bg-orange-500/10 text-orange-500", label: "Pausado" },
+      completed: { className: "bg-green-500/10 text-green-500", label: "Concluído" },
+      cancelled: { className: "bg-red-500/10 text-red-500", label: "Cancelado" },
+    };
+    const v = variants[status] || variants.draft;
+    return <Badge className={v.className}>{v.label}</Badge>;
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <History className="w-5 h-5" />
+          Histórico de Envios
+        </CardTitle>
+        <CardDescription>
+          Veja o histórico completo de todos os envios em massa realizados
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : broadcasts && broadcasts.length > 0 ? (
+          <div className="space-y-4">
+            {broadcasts.map((broadcast) => (
+              <div
+                key={broadcast.id}
+                className="p-4 bg-muted/50 rounded-lg space-y-3"
+                data-testid={`broadcast-history-${broadcast.id}`}
+              >
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                  <div className="flex items-center gap-3">
+                    <Radio className="w-5 h-5 text-green-500" />
+                    <div>
+                      <h4 className="font-medium">{broadcast.name}</h4>
+                      <p className="text-sm text-muted-foreground">
+                        Criado em {new Date(broadcast.createdAt).toLocaleDateString("pt-BR", {
+                          day: "2-digit",
+                          month: "2-digit",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                  {getStatusBadge(broadcast.status)}
+                </div>
+                
+                <div className="grid grid-cols-3 gap-4 text-center">
+                  <div className="p-2 bg-background rounded-lg">
+                    <p className="text-2xl font-bold">{broadcast.totalRecipients}</p>
+                    <p className="text-xs text-muted-foreground">Total</p>
+                  </div>
+                  <div className="p-2 bg-green-500/10 rounded-lg">
+                    <p className="text-2xl font-bold text-green-500">{broadcast.sentCount}</p>
+                    <p className="text-xs text-muted-foreground">Enviados</p>
+                  </div>
+                  <div className="p-2 bg-red-500/10 rounded-lg">
+                    <p className="text-2xl font-bold text-red-500">{broadcast.failedCount}</p>
+                    <p className="text-xs text-muted-foreground">Falhas</p>
+                  </div>
+                </div>
+
+                {broadcast.messageText && (
+                  <div className="p-3 bg-background rounded-lg">
+                    <p className="text-xs text-muted-foreground mb-1">Mensagem:</p>
+                    <p className="text-sm whitespace-pre-wrap line-clamp-3">{broadcast.messageText}</p>
+                  </div>
+                )}
+
+                {(broadcast.startedAt || broadcast.completedAt) && (
+                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                    {broadcast.startedAt && (
+                      <span>Iniciado: {new Date(broadcast.startedAt).toLocaleString("pt-BR")}</span>
+                    )}
+                    {broadcast.completedAt && (
+                      <span>Concluído: {new Date(broadcast.completedAt).toLocaleString("pt-BR")}</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-12">
+            <History className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+            <h3 className="text-lg font-medium mb-2">Nenhum envio realizado</h3>
+            <p className="text-muted-foreground text-sm">
+              Os envios em massa que você realizar aparecerão aqui
+            </p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function AdminWhatsAppMarketing() {
   const { toast } = useToast();
@@ -998,29 +1420,37 @@ export default function AdminWhatsAppMarketing() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid grid-cols-6 w-full max-w-4xl">
+          <TabsList className="grid grid-cols-8 w-full max-w-5xl">
             <TabsTrigger value="accounts" data-testid="tab-accounts">
-              <SiWhatsapp className="w-4 h-4 mr-2" />
+              <SiWhatsapp className="w-4 h-4 mr-1" />
               Contas
             </TabsTrigger>
             <TabsTrigger value="connection" data-testid="tab-connection">
-              <Smartphone className="w-4 h-4 mr-2" />
+              <Smartphone className="w-4 h-4 mr-1" />
               Conexão
             </TabsTrigger>
             <TabsTrigger value="sequences" data-testid="tab-sequences">
-              <Clock className="w-4 h-4 mr-2" />
+              <Clock className="w-4 h-4 mr-1" />
               Sequências
             </TabsTrigger>
             <TabsTrigger value="broadcasts" data-testid="tab-broadcasts">
-              <Radio className="w-4 h-4 mr-2" />
-              Envios em Massa
+              <Radio className="w-4 h-4 mr-1" />
+              Envios
+            </TabsTrigger>
+            <TabsTrigger value="contact-lists" data-testid="tab-contact-lists">
+              <List className="w-4 h-4 mr-1" />
+              Listas
+            </TabsTrigger>
+            <TabsTrigger value="history" data-testid="tab-history">
+              <History className="w-4 h-4 mr-1" />
+              Histórico
             </TabsTrigger>
             <TabsTrigger value="files" data-testid="tab-files">
-              <Image className="w-4 h-4 mr-2" />
+              <Image className="w-4 h-4 mr-1" />
               Arquivos
             </TabsTrigger>
             <TabsTrigger value="test" data-testid="tab-test">
-              <Send className="w-4 h-4 mr-2" />
+              <Send className="w-4 h-4 mr-1" />
               Testar
             </TabsTrigger>
           </TabsList>
@@ -2051,7 +2481,7 @@ export default function AdminWhatsAppMarketing() {
                     <WifiOff className="w-8 h-8 mx-auto mb-2 opacity-50" />
                     <p className="text-sm">Nenhuma conta conectada</p>
                     <Button 
-                      variant="link" 
+                      variant="ghost" 
                       onClick={() => setActiveTab("accounts")}
                       className="mt-2"
                     >
@@ -2061,6 +2491,14 @@ export default function AdminWhatsAppMarketing() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="contact-lists" className="space-y-6">
+            <ContactListsTab />
+          </TabsContent>
+
+          <TabsContent value="history" className="space-y-6">
+            <BroadcastHistoryTab />
           </TabsContent>
 
           <TabsContent value="files" className="space-y-6">
