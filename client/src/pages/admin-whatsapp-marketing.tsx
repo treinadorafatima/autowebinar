@@ -908,28 +908,6 @@ export default function AdminWhatsAppMarketing() {
     },
   });
 
-  const fixScopeMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/whatsapp/accounts/fix-scope", {});
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || "Erro ao corrigir scopes");
-      }
-      return res.json();
-    },
-    onSuccess: (data) => {
-      toast({ 
-        title: "Scopes corrigidos", 
-        description: data.message 
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/accounts"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/accounts/marketing"] });
-    },
-    onError: (error: any) => {
-      toast({ title: "Erro ao corrigir scopes", description: error.message, variant: "destructive" });
-    },
-  });
-
   const handleValidateCloudApi = async () => {
     if (!cloudApiConfig.accessToken || !cloudApiConfig.phoneNumberId) {
       toast({ title: "Preencha o Access Token e Phone Number ID", variant: "destructive" });
@@ -1570,15 +1548,6 @@ export default function AdminWhatsAppMarketing() {
                     Limite atingido
                   </span>
                 )}
-                <Button 
-                  variant="outline"
-                  onClick={() => fixScopeMutation.mutate()}
-                  disabled={fixScopeMutation.isPending}
-                  data-testid="button-fix-scope"
-                >
-                  {fixScopeMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                  Corrigir Scopes
-                </Button>
                 <Button 
                   onClick={() => setShowNewAccountDialog(true)} 
                   disabled={accountLimit && !accountLimit.canCreate}
