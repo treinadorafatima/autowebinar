@@ -443,6 +443,24 @@ export function registerWhatsAppRoutes(app: Express) {
     }
   });
 
+  // Get only marketing accounts (for AI Agents)
+  app.get("/api/whatsapp/accounts/marketing", async (req: Request, res: Response) => {
+    try {
+      const { admin, error, errorCode } = await validateSessionAndGetAdmin(req);
+      if (!admin) {
+        return res.status(errorCode || 401).json({ error: error || "Não autenticado" });
+      }
+
+      const accounts = await storage.listWhatsappAccountsByAdmin(admin.id);
+      // Filter only marketing accounts (scope = 'marketing' or no scope set - defaults to marketing)
+      const marketingAccounts = accounts.filter(a => a.scope === "marketing" || !a.scope);
+      res.json(marketingAccounts);
+    } catch (error: any) {
+      console.error("[whatsapp-api] Error listing marketing accounts:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.post("/api/whatsapp/accounts", async (req: Request, res: Response) => {
     try {
       const { admin, error, errorCode } = await validateSessionAndGetAdmin(req);

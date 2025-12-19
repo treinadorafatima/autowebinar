@@ -107,7 +107,7 @@ export default function AdminAiAgents() {
   });
 
   const { data: whatsappAccounts } = useQuery<WhatsAppAccount[]>({
-    queryKey: ["/api/whatsapp/accounts"],
+    queryKey: ["/api/whatsapp/accounts/marketing"],
   });
 
   const createMutation = useMutation({
@@ -466,12 +466,12 @@ export default function AdminAiAgents() {
                     <SelectValue placeholder="Selecione uma conta" />
                   </SelectTrigger>
                   <SelectContent>
-                    {whatsappAccounts?.filter(account => account.scope === "marketing").map((account) => (
+                    {whatsappAccounts?.map((account) => (
                       <SelectItem key={account.id} value={account.id}>
                         {account.label} {account.status === "connected" ? `(${account.phoneNumber || "Conectado"})` : "(Desconectado)"}
                       </SelectItem>
                     ))}
-                    {(!whatsappAccounts || whatsappAccounts.filter(a => a.scope === "marketing").length === 0) && (
+                    {(!whatsappAccounts || whatsappAccounts.length === 0) && (
                       <div className="px-2 py-1.5 text-sm text-muted-foreground">
                         Nenhuma conta de Marketing disponível
                       </div>
