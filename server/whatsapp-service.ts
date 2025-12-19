@@ -241,7 +241,7 @@ function isSpamOrBanError(error: any): boolean {
   return banIndicators.some(indicator => errorStr.includes(indicator));
 }
 
-export async function initWhatsAppConnection(accountId: string, adminId: string): Promise<{
+export async function initWhatsAppConnection(accountId: string, adminId: string, isReconnect: boolean = false): Promise<{
   success: boolean;
   status: string;
   qrCode?: string;
@@ -324,12 +324,15 @@ export async function initWhatsAppConnection(accountId: string, adminId: string)
     const authDir = getAuthDir(accountId);
     
     // Check and clear stale/invalid sessions before connecting
-    if (!isSessionValid(accountId)) {
+    // Skip this check during reconnection (after 515) to preserve credentials
+    if (!isReconnect && !isSessionValid(accountId)) {
       clearStaleSession(accountId);
       // Recreate the directory after clearing
       if (!fs.existsSync(authDir)) {
         fs.mkdirSync(authDir, { recursive: true });
       }
+    } else if (isReconnect) {
+      console.log(`[whatsapp] Reconnecting account ${accountId} with existing credentials...`);
     }
     
     const { state, saveCreds } = await useMultiFileAuthState(authDir);
@@ -438,9 +441,9 @@ export async function initWhatsAppConnection(accountId: string, adminId: string)
         // Error 515 (restartRequired) is NORMAL - reconnect automatically with saved credentials
         if (statusCode === DisconnectReason.restartRequired) {
           console.log(`[whatsapp] Restart required (515) for account ${accountId}. Reconnecting with saved credentials...`);
-          // Simply reconnect - the credentials are already saved
+          // Simply reconnect - pass isReconnect=true to skip session validation
           setTimeout(() => {
-            initWhatsAppConnection(accountId, adminId);
+            initWhatsAppConnection(accountId, adminId, true);
           }, 2000);
           return;
         }
