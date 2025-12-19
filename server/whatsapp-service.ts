@@ -850,6 +850,25 @@ export async function resetWhatsAppSession(accountId: string, adminId: string): 
   }
 }
 
+// Soft disconnect - closes socket but PRESERVES credentials for reconnection after restart
+export async function softCloseWhatsApp(accountId: string): Promise<void> {
+  try {
+    const conn = connections.get(accountId);
+    if (conn?.socket) {
+      try {
+        conn.socket.end(undefined);
+      } catch (e) {
+        // Ignore errors during soft close
+      }
+    }
+    connections.delete(accountId);
+    console.log(`[whatsapp] Soft closed connection for account ${accountId} (credentials preserved)`);
+  } catch (error) {
+    console.error("[whatsapp] Error in soft close:", error);
+  }
+}
+
+// Hard disconnect - logs out from WhatsApp and CLEARS all credentials (user-initiated)
 export async function disconnectWhatsApp(accountId: string, adminId: string): Promise<boolean> {
   try {
     const conn = connections.get(accountId);
@@ -862,6 +881,7 @@ export async function disconnectWhatsApp(accountId: string, adminId: string): Pr
       }
     }
     
+    // Logout invalidates the session on WhatsApp servers
     if (conn?.socket) {
       await conn.socket.logout();
     }
@@ -874,12 +894,13 @@ export async function disconnectWhatsApp(accountId: string, adminId: string): Pr
       phoneNumber: null,
     });
 
+    // Clear credentials since this is a user-initiated disconnect
     const authDir = getAuthDir(accountId);
     if (fs.existsSync(authDir)) {
       fs.rmSync(authDir, { recursive: true });
     }
 
-    console.log(`[whatsapp] Disconnected for account ${accountId}`);
+    console.log(`[whatsapp] Disconnected and cleared credentials for account ${accountId}`);
     return true;
   } catch (error) {
     console.error("[whatsapp] Error disconnecting:", error);
@@ -1266,28 +1287,52 @@ export async function sendWhatsAppMediaMessage(
 
 export async function restoreWhatsAppSessions(): Promise<void> {
   try {
+    // Get all sessions from database (any status)
     const sessions = await storage.getActiveWhatsappSessions();
+    let restoredCount = 0;
     
-    for (const session of sessions) {
-      if (session.status === "connected" && session.accountId) {
-        console.log(`[whatsapp] Restoring session for account ${session.accountId} (admin: ${session.adminId})`);
+    // Also check for session folders on disk that might not be in DB
+    const sessionFolders = fs.existsSync(AUTH_DIR) 
+      ? fs.readdirSync(AUTH_DIR).filter(f => fs.statSync(path.join(AUTH_DIR, f)).isDirectory())
+      : [];
+    
+    // Create a map of accountId -> session for quick lookup
+    const sessionMap = new Map(sessions.map(s => [s.accountId, s]));
+    
+    // Restore sessions that have valid credentials on disk
+    for (const accountId of sessionFolders) {
+      // Skip if credentials are not valid (not registered)
+      if (!isSessionValid(accountId)) {
+        console.log(`[whatsapp] Skipping account ${accountId} - no valid credentials on disk`);
+        continue;
+      }
+      
+      // Find matching session in database
+      const session = sessionMap.get(accountId);
+      if (!session) {
+        console.log(`[whatsapp] Found orphaned session folder ${accountId} - no matching DB record`);
+        continue;
+      }
+      
+      console.log(`[whatsapp] Restoring session for account ${accountId} (admin: ${session.adminId}) from disk credentials`);
+      
+      // Small delay between connections to avoid rate limiting
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      try {
+        await initWhatsAppConnection(accountId, session.adminId);
+        restoredCount++;
+      } catch (error) {
+        console.error(`[whatsapp] Failed to restore session for account ${accountId}:`, error);
         
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        try {
-          await initWhatsAppConnection(session.accountId, session.adminId);
-        } catch (error) {
-          console.error(`[whatsapp] Failed to restore session for account ${session.accountId}:`, error);
-          
-          await storage.upsertWhatsappSessionByAccountId(session.accountId, session.adminId, {
-            status: "disconnected",
-            qrCode: null,
-          });
-        }
+        await storage.upsertWhatsappSessionByAccountId(accountId, session.adminId, {
+          status: "disconnected",
+          qrCode: null,
+        });
       }
     }
     
-    console.log(`[whatsapp] Session restoration complete. Restored ${sessions.length} sessions.`);
+    console.log(`[whatsapp] Session restoration complete. Restored ${restoredCount} sessions from ${sessionFolders.length} folders.`);
   } catch (error) {
     console.error("[whatsapp] Error restoring sessions:", error);
   }
@@ -1659,3 +1704,28 @@ export async function disconnectByProvider(
   // Default: Baileys
   return disconnectWhatsApp(accountId, adminId);
 }
+
+// Gracefully close all WhatsApp connections on server shutdown
+// This preserves credentials for reconnection after restart
+export async function gracefulShutdown(): Promise<void> {
+  console.log("[whatsapp] Graceful shutdown initiated - closing connections without clearing credentials...");
+  
+  const accountIds = Array.from(connections.keys());
+  
+  for (const accountId of accountIds) {
+    await softCloseWhatsApp(accountId);
+  }
+  
+  console.log(`[whatsapp] Graceful shutdown complete - ${accountIds.length} connections closed, credentials preserved`);
+}
+
+// Register shutdown handlers
+process.on("SIGTERM", async () => {
+  console.log("[whatsapp] Received SIGTERM signal");
+  await gracefulShutdown();
+});
+
+process.on("SIGINT", async () => {
+  console.log("[whatsapp] Received SIGINT signal");
+  await gracefulShutdown();
+});
