@@ -452,8 +452,8 @@ export function registerWhatsAppRoutes(app: Express) {
       }
 
       const accounts = await storage.listWhatsappAccountsByAdmin(admin.id);
-      // Filter only marketing accounts (scope = 'marketing' or no scope set - defaults to marketing)
-      const marketingAccounts = accounts.filter(a => a.scope === "marketing" || !a.scope);
+      // Filter only marketing accounts - must have scope explicitly set to 'marketing'
+      const marketingAccounts = accounts.filter(a => a.scope === "marketing");
       res.json(marketingAccounts);
     } catch (error: any) {
       console.error("[whatsapp-api] Error listing marketing accounts:", error);
