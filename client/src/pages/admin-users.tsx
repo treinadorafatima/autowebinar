@@ -1651,10 +1651,10 @@ export default function AdminUsersPage() {
                 data-testid="input-edit-expires"
               />
               <p className="text-xs text-muted-foreground">Deixe em branco para acesso permanente</p>
-              {editingUser?.accessExpiresAt && (
+              {formData.accessExpiresAt && (
                 <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
                   <AlertCircle className="w-3 h-3" />
-                  Expira em {new Date(editingUser.accessExpiresAt).toLocaleDateString("pt-BR")}
+                  Expira em {new Date(formData.accessExpiresAt + "T00:00:00").toLocaleDateString("pt-BR")}
                 </p>
               )}
             </div>
