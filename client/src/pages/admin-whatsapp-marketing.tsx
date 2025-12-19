@@ -2235,157 +2235,13 @@ export default function AdminWhatsAppMarketing() {
             <div className="flex items-center justify-between gap-4 flex-wrap">
               <h2 className="text-lg font-semibold">Envios em Massa</h2>
               <Button 
-                onClick={() => {
-                  if (!previewLeads || previewLeads.count === 0) {
-                    toast({ title: "Visualize os leads primeiro", description: "Selecione os filtros e clique em 'Visualizar Leads' antes de criar um envio", variant: "destructive" });
-                    return;
-                  }
-                  setShowNewBroadcastDialog(true);
-                }}
+                onClick={() => setShowNewBroadcastDialog(true)}
                 data-testid="button-new-broadcast"
               >
                 <Plus className="w-4 h-4 mr-2" />
                 Novo Envio
               </Button>
             </div>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Filter className="w-5 h-5" />
-                  Filtros de Leads
-                </CardTitle>
-                <CardDescription>
-                  Selecione o webinar e filtre os leads por data de sessão
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label>Webinar</Label>
-                    <Select value={broadcastWebinarId} onValueChange={setBroadcastWebinarId}>
-                      <SelectTrigger data-testid="select-broadcast-webinar">
-                        <SelectValue placeholder="Selecione um webinar" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {webinars?.map((webinar) => (
-                          <SelectItem key={webinar.id} value={webinar.id}>
-                            {webinar.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Tipo de Filtro</Label>
-                    <Select value={broadcastFilterType} onValueChange={(v) => setBroadcastFilterType(v as any)}>
-                      <SelectTrigger data-testid="select-filter-type">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todos os leads</SelectItem>
-                        <SelectItem value="date_range">Intervalo de datas</SelectItem>
-                        <SelectItem value="session">Data de sessão específica</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                {broadcastFilterType === "date_range" && (
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label>Data Inicial</Label>
-                      <Input
-                        type="date"
-                        value={broadcastDateStart}
-                        onChange={(e) => setBroadcastDateStart(e.target.value)}
-                        data-testid="input-date-start"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Data Final</Label>
-                      <Input
-                        type="date"
-                        value={broadcastDateEnd}
-                        onChange={(e) => setBroadcastDateEnd(e.target.value)}
-                        data-testid="input-date-end"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {broadcastFilterType === "session" && (
-                  <div className="space-y-2">
-                    <Label>Data da Sessão</Label>
-                    <Select value={broadcastSessionDate} onValueChange={setBroadcastSessionDate}>
-                      <SelectTrigger data-testid="select-session-date">
-                        <SelectValue placeholder="Selecione uma data" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {sessionDates?.map((date) => (
-                          <SelectItem key={date} value={date}>
-                            {new Date(date).toLocaleDateString("pt-BR")}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-
-                <div className="flex items-center gap-4 flex-wrap">
-                  <Button 
-                    variant="outline" 
-                    onClick={handlePreviewLeads}
-                    disabled={loadingPreview || !broadcastWebinarId}
-                    data-testid="button-preview-leads"
-                  >
-                    {loadingPreview ? (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : (
-                      <Eye className="w-4 h-4 mr-2" />
-                    )}
-                    Visualizar Leads
-                  </Button>
-
-                  {previewLeads && (
-                    <div className="flex items-center gap-2">
-                      <Users className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-sm">
-                        <span className="font-medium">{previewLeads.count}</span> leads encontrados
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {previewLeads && previewLeads.leads.length > 0 && (
-                  <div className="border rounded-lg overflow-hidden">
-                    <div className="bg-muted p-2 text-sm font-medium">
-                      Prévia dos leads (mostrando até 50)
-                    </div>
-                    <div className="max-h-48 overflow-y-auto">
-                      <table className="w-full text-sm">
-                        <thead className="bg-muted/50 sticky top-0">
-                          <tr>
-                            <th className="text-left p-2">Nome</th>
-                            <th className="text-left p-2">WhatsApp</th>
-                            <th className="text-left p-2">Capturado em</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {previewLeads.leads.map((lead) => (
-                            <tr key={lead.id} className="border-t">
-                              <td className="p-2">{lead.name}</td>
-                              <td className="p-2">{lead.whatsapp}</td>
-                              <td className="p-2">{new Date(lead.capturedAt).toLocaleDateString("pt-BR")}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
 
             <Card>
               <CardHeader>
@@ -3332,11 +3188,11 @@ export default function AdminWhatsAppMarketing() {
         </Dialog>
 
         <Dialog open={showNewBroadcastDialog} onOpenChange={setShowNewBroadcastDialog}>
-          <DialogContent className="max-w-lg">
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Novo Envio em Massa</DialogTitle>
               <DialogDescription>
-                Configure o envio para {broadcastSourceType === "webinar" ? (previewLeads?.count || 0) + " leads do webinar" : "sua lista de contatos"}
+                Selecione a fonte dos contatos e configure a mensagem
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
@@ -3344,7 +3200,10 @@ export default function AdminWhatsAppMarketing() {
                 <Label>Fonte dos Contatos</Label>
                 <Select 
                   value={broadcastSourceType} 
-                  onValueChange={(v) => setBroadcastSourceType(v as "webinar" | "contact_list")}
+                  onValueChange={(v) => {
+                    setBroadcastSourceType(v as "webinar" | "contact_list");
+                    setPreviewLeads(null);
+                  }}
                 >
                   <SelectTrigger data-testid="select-broadcast-source">
                     <SelectValue />
@@ -3355,6 +3214,106 @@ export default function AdminWhatsAppMarketing() {
                   </SelectContent>
                 </Select>
               </div>
+
+              {broadcastSourceType === "webinar" && (
+                <div className="space-y-4 p-3 border rounded-lg bg-muted/30">
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Webinar</Label>
+                      <Select value={broadcastWebinarId} onValueChange={(v) => { setBroadcastWebinarId(v); setPreviewLeads(null); }}>
+                        <SelectTrigger data-testid="select-broadcast-webinar">
+                          <SelectValue placeholder="Selecione um webinar" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {webinars?.map((webinar) => (
+                            <SelectItem key={webinar.id} value={webinar.id}>
+                              {webinar.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Filtro</Label>
+                      <Select value={broadcastFilterType} onValueChange={(v) => { setBroadcastFilterType(v as any); setPreviewLeads(null); }}>
+                        <SelectTrigger data-testid="select-filter-type">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos os leads</SelectItem>
+                          <SelectItem value="date_range">Intervalo de datas</SelectItem>
+                          <SelectItem value="session">Data de sessão</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {broadcastFilterType === "date_range" && (
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label>Data Inicial</Label>
+                        <Input
+                          type="date"
+                          value={broadcastDateStart}
+                          onChange={(e) => { setBroadcastDateStart(e.target.value); setPreviewLeads(null); }}
+                          data-testid="input-date-start"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Data Final</Label>
+                        <Input
+                          type="date"
+                          value={broadcastDateEnd}
+                          onChange={(e) => { setBroadcastDateEnd(e.target.value); setPreviewLeads(null); }}
+                          data-testid="input-date-end"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {broadcastFilterType === "session" && (
+                    <div className="space-y-2">
+                      <Label>Data da Sessão</Label>
+                      <Select value={broadcastSessionDate} onValueChange={(v) => { setBroadcastSessionDate(v); setPreviewLeads(null); }}>
+                        <SelectTrigger data-testid="select-session-date">
+                          <SelectValue placeholder="Selecione uma data" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {sessionDates?.map((date) => (
+                            <SelectItem key={date} value={date}>
+                              {new Date(date).toLocaleDateString("pt-BR")}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-3">
+                    <Button 
+                      type="button"
+                      variant="outline" 
+                      size="sm"
+                      onClick={handlePreviewLeads}
+                      disabled={loadingPreview || !broadcastWebinarId}
+                      data-testid="button-preview-leads"
+                    >
+                      {loadingPreview ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Eye className="w-4 h-4 mr-2" />
+                      )}
+                      Buscar Leads
+                    </Button>
+                    {previewLeads && (
+                      <Badge variant="secondary">
+                        <Users className="w-3 h-3 mr-1" />
+                        {previewLeads.count} leads
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {broadcastSourceType === "contact_list" && (
                 <div className="space-y-2">
@@ -3560,7 +3519,7 @@ export default function AdminWhatsAppMarketing() {
                   !newBroadcast.name || 
                   (newBroadcast.messageType === "text" && !newBroadcast.messageText) ||
                   (newBroadcast.messageType !== "text" && !newBroadcast.mediaUrl) ||
-                  (broadcastSourceType === "webinar" && !broadcastWebinarId) ||
+                  (broadcastSourceType === "webinar" && (!broadcastWebinarId || !previewLeads || previewLeads.count === 0)) ||
                   (broadcastSourceType === "contact_list" && !broadcastContactListId)
                 }
                 data-testid="button-create-broadcast"
