@@ -3634,19 +3634,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Read file from disk and upload to storage
       const fileBuffer = readFileSync(req.file.path);
-      const fileId = await storage.uploadMediaFile(fileBuffer, req.file.originalname, mimeType);
-      const url = storage.getMediaFileUrl(fileId);
+      const uploadResult = await storage.uploadMediaFile(fileBuffer, req.file.originalname, mimeType);
+      const url = storage.getMediaFileUrl(uploadResult.fileId, uploadResult.provider);
       
-      // Determine storage provider based on what's configured
-      let storageProvider = 'local';
-      let storagePath = fileId;
-      if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY) {
-        storageProvider = 'supabase';
-        storagePath = `media/${fileId}`;
-      } else if (process.env.CLOUDFLARE_ACCOUNT_ID) {
-        storageProvider = 'r2';
-        storagePath = `media/${fileId}`;
-      }
+      // Determine correct storage path based on provider
+      // Local: just the fileId (no folder prefix)
+      // Supabase/R2: media/fileId (with folder prefix)
+      const storagePath = uploadResult.provider === 'local' 
+        ? uploadResult.fileId 
+        : `media/${uploadResult.fileId}`;
       
       // Save to media_files table for user's file manager
       const mediaFile = await storage.createMediaFile({
@@ -3655,7 +3651,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         mimeType: mimeType,
         sizeBytes: req.file.size,
         mediaType: mediaType,
-        storageProvider: storageProvider,
+        storageProvider: uploadResult.provider,
         storagePath: storagePath,
         publicUrl: url,
       });
@@ -3665,8 +3661,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         unlinkSync(req.file.path);
       }
       
-      console.log(`[upload-file] File uploaded: ${fileId} -> ${url} (id: ${mediaFile.id})`);
-      res.json({ url, fileId, mediaType, mimeType, mediaId: mediaFile.id });
+      console.log(`[upload-file] File uploaded: ${uploadResult.fileId} -> ${url} (provider: ${uploadResult.provider}, id: ${mediaFile.id})`);
+      res.json({ url, fileId: uploadResult.fileId, mediaType, mimeType, mediaId: mediaFile.id });
     } catch (error: any) {
       console.error("[upload-file] Error:", error);
       // Clean up temp file on error
@@ -3832,6 +3828,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(404).json({ error: "Image not found" });
     } catch (error: any) {
       console.error("[images] Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Serve uploaded media files from R2 storage (for WhatsApp)
+  app.get("/api/media/r2/:filename", async (req, res) => {
+    try {
+      const filename = req.params.filename;
+      const ext = path.extname(filename).toLowerCase();
+      const mimeTypes: Record<string, string> = {
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+        ".gif": "image/gif",
+        ".webp": "image/webp",
+        ".ogg": "audio/ogg",
+        ".mp3": "audio/mpeg",
+        ".m4a": "audio/mp4",
+        ".wav": "audio/wav",
+        ".opus": "audio/opus",
+        ".mp4": "video/mp4",
+        ".3gp": "video/3gpp",
+        ".pdf": "application/pdf",
+      };
+      
+      // Fetch from R2
+      const mediaBuffer = await storage.getMediaFromR2(filename);
+      if (mediaBuffer) {
+        res.setHeader("Content-Type", mimeTypes[ext] || "application/octet-stream");
+        res.setHeader("Cache-Control", "public, max-age=31536000");
+        return res.send(mediaBuffer);
+      }
+      
+      return res.status(404).json({ error: "Media file not found in R2" });
+    } catch (error: any) {
+      console.error("[media-r2] Error:", error);
       res.status(500).json({ error: error.message });
     }
   });

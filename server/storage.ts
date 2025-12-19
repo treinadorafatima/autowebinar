@@ -138,9 +138,10 @@ export interface IStorage {
   deleteImage(imageId: string): Promise<void>;
   getImageUrl(imageId: string): string;
   getImageFromR2(filename: string): Promise<Buffer | null>;
+  getMediaFromR2(filename: string): Promise<Buffer | null>;
   // Generic Media Files (for WhatsApp)
-  uploadMediaFile(buffer: Buffer, filename: string, mimeType: string): Promise<string>;
-  getMediaFileUrl(fileId: string): string;
+  uploadMediaFile(buffer: Buffer, filename: string, mimeType: string): Promise<{ fileId: string; provider: 'supabase' | 'r2' | 'local' }>;
+  getMediaFileUrl(fileId: string, provider?: 'supabase' | 'r2' | 'local'): string;
   // SEO Images (organized by owner/webinar)
   uploadSeoImage(buffer: Buffer, originalFilename: string, ownerId: string, webinarId: string, type: 'favicon' | 'share'): Promise<string>;
   deleteSeoImagesByWebinar(ownerId: string, webinarId: string): Promise<void>;
@@ -2029,7 +2030,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Generic media file upload for WhatsApp (audio, video, image, document)
-  async uploadMediaFile(buffer: Buffer, originalFilename: string, mimeType: string): Promise<string> {
+  // Returns object with fileId and provider info for correct URL construction
+  async uploadMediaFile(buffer: Buffer, originalFilename: string, mimeType: string): Promise<{ fileId: string; provider: 'supabase' | 'r2' | 'local' }> {
     const ext = originalFilename.split('.').pop() || 'bin';
     const fileId = `media_${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
     
@@ -2049,7 +2051,7 @@ export class DatabaseStorage implements IStorage {
           console.error(`[storage] Supabase media upload error:`, error);
         } else {
           console.log(`[storage] Media uploaded to Supabase: ${fileId}`);
-          return fileId;
+          return { fileId, provider: 'supabase' };
         }
       } catch (error) {
         console.error("[storage] Supabase media upload failed, trying R2:", error);
@@ -2067,7 +2069,7 @@ export class DatabaseStorage implements IStorage {
         });
         await r2Client.send(command);
         console.log(`[storage] Media uploaded to R2: ${fileId}`);
-        return fileId;
+        return { fileId, provider: 'r2' };
       } catch (error) {
         console.error("[storage] R2 media upload failed, falling back to disk:", error);
       }
@@ -2083,14 +2085,26 @@ export class DatabaseStorage implements IStorage {
     fs.writeFileSync(filePath, buffer);
     console.log(`[storage] Media saved to disk: ${filePath}`);
     
-    return fileId;
+    return { fileId, provider: 'local' };
   }
 
-  getMediaFileUrl(fileId: string): string {
+  getMediaFileUrl(fileId: string, provider?: 'supabase' | 'r2' | 'local'): string {
+    // If provider is specified, use it directly
+    if (provider === 'supabase' && supabaseUrl) {
+      return `${supabaseUrl}/storage/v1/object/public/webinar-images/media/${fileId}`;
+    }
+    if (provider === 'r2') {
+      // R2 files need to be served via signed URL or proxy
+      return `/api/media/r2/${fileId}`;
+    }
+    if (provider === 'local') {
+      return `/api/media/${fileId}`;
+    }
+    
+    // Fallback: try to guess based on configuration (legacy support)
     if (supabaseClient && supabaseUrl) {
       return `${supabaseUrl}/storage/v1/object/public/webinar-images/media/${fileId}`;
     }
-    // Fallback to local URL - served by /api/media endpoint
     return `/api/media/${fileId}`;
   }
 
@@ -2251,6 +2265,33 @@ export class DatabaseStorage implements IStorage {
       return Buffer.concat(chunks);
     } catch (error) {
       console.log(`[storage] Image not found in R2: ${filename}`);
+      return null;
+    }
+  }
+
+  async getMediaFromR2(filename: string): Promise<Buffer | null> {
+    if (!r2Client) {
+      return null;
+    }
+
+    try {
+      const response = await r2Client.send(new GetObjectCommand({
+        Bucket: 'webinar-videos',
+        Key: `media/${filename}`,
+      }));
+
+      if (!response.Body) {
+        return null;
+      }
+
+      const chunks: Uint8Array[] = [];
+      for await (const chunk of response.Body as any) {
+        chunks.push(chunk);
+      }
+      console.log(`[storage] Media retrieved from R2: ${filename}`);
+      return Buffer.concat(chunks);
+    } catch (error) {
+      console.log(`[storage] Media not found in R2: ${filename}`);
       return null;
     }
   }
