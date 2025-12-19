@@ -747,7 +747,7 @@ export default function AdminWhatsAppMarketing() {
       });
       return res.json();
     },
-    enabled: !!broadcastWebinarId && activeTab === "broadcasts",
+    enabled: !!broadcastWebinarId && (activeTab === "broadcasts" || showNewBroadcastDialog),
   });
 
   const { data: broadcastContactLists } = useQuery<WhatsappContactList[]>({
