@@ -3425,28 +3425,52 @@ export default function AdminWhatsAppMarketing() {
                   <Label>Arquivo de Mídia</Label>
                   <div className="border-2 border-dashed rounded-lg p-4">
                     {newBroadcast.mediaUrl ? (
-                      <div className="flex items-center gap-3">
-                        <div className="flex-1">
-                          <p className="font-medium text-sm truncate">{newBroadcast.mediaFileName}</p>
-                          <p className="text-xs text-muted-foreground truncate">{newBroadcast.mediaUrl}</p>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm truncate">{newBroadcast.mediaFileName}</p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="icon"
+                            onClick={() => setNewBroadcast({
+                              ...newBroadcast,
+                              mediaUrl: "",
+                              mediaFileName: "",
+                              mediaMimeType: ""
+                            })}
+                            data-testid="button-remove-broadcast-media"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
                         </div>
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => setNewBroadcast({
-                            ...newBroadcast,
-                            mediaUrl: "",
-                            mediaFileName: "",
-                            mediaMimeType: ""
-                          })}
-                          data-testid="button-remove-broadcast-media"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                        {newBroadcast.messageType === "audio" && (
+                          <audio controls className="w-full h-10" src={newBroadcast.mediaUrl}>
+                            Seu navegador não suporta o elemento de áudio.
+                          </audio>
+                        )}
+                        {newBroadcast.messageType === "image" && (
+                          <img 
+                            src={newBroadcast.mediaUrl} 
+                            alt="Preview" 
+                            className="max-h-32 rounded-lg object-contain mx-auto"
+                          />
+                        )}
+                        {newBroadcast.messageType === "video" && (
+                          <video controls className="w-full max-h-32 rounded-lg" src={newBroadcast.mediaUrl}>
+                            Seu navegador não suporta o elemento de vídeo.
+                          </video>
+                        )}
+                        {newBroadcast.messageType === "document" && (
+                          <div className="flex items-center gap-2 p-2 bg-muted rounded">
+                            <FileText className="w-5 h-5 text-muted-foreground" />
+                            <span className="text-sm text-muted-foreground">Documento pronto para envio</span>
+                          </div>
+                        )}
                       </div>
                     ) : (
-                      <label className="cursor-pointer">
+                      <label className="cursor-pointer block">
                         <div className="flex flex-col items-center gap-2 text-muted-foreground">
                           <Upload className="w-8 h-8" />
                           <span className="text-sm">Clique para enviar</span>
