@@ -792,3 +792,189 @@ Duvidas? Responda esta mensagem!`;
     return false;
   }
 }
+
+/**
+ * Envia notificação de PIX gerado via WhatsApp
+ * Safe version - nunca lança erros
+ */
+export async function sendWhatsAppPixGeneratedSafe(
+  phone: string | null | undefined,
+  name: string,
+  planName: string,
+  amount: number,
+  pixCopiaCola: string,
+  expirationTime: string
+): Promise<boolean> {
+  try {
+    if (!phone) {
+      console.warn("[whatsapp-notifications] Phone nao disponivel para PIX gerado");
+      return false;
+    }
+
+    const enabled = await isWhatsAppNotificationsEnabled();
+    if (!enabled) {
+      console.warn("[whatsapp-notifications] Notificacoes desabilitadas, nao enviando PIX gerado");
+      return false;
+    }
+
+    const formattedPhone = formatPhoneNumber(phone);
+    if (!formattedPhone) {
+      console.warn("[whatsapp-notifications] Numero invalido para PIX gerado:", phone);
+      return false;
+    }
+
+    const formattedAmount = (amount / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+    const defaultMessage = `Ola ${name}!
+
+Seu PIX para o plano *${planName}* foi gerado!
+
+*Valor:* ${formattedAmount}
+*Expira em:* ${expirationTime}
+
+*PIX Copia e Cola:*
+${pixCopiaCola}
+
+Apos o pagamento, seu acesso sera liberado automaticamente!
+
+Duvidas? Responda esta mensagem!`;
+
+    const templateData = {
+      name,
+      planName,
+      amount: formattedAmount,
+      expirationTime,
+      pixCopiaCola,
+      appName: APP_NAME,
+    };
+
+    const message = await getTemplateMessage("pix_generated", templateData, defaultMessage);
+    return await sendNotificationMessage(formattedPhone, message);
+  } catch (error) {
+    console.error("[whatsapp-notifications] Erro em sendWhatsAppPixGeneratedSafe:", error);
+    return false;
+  }
+}
+
+/**
+ * Envia notificação de Boleto gerado via WhatsApp
+ * Safe version - nunca lança erros
+ */
+export async function sendWhatsAppBoletoGeneratedSafe(
+  phone: string | null | undefined,
+  name: string,
+  planName: string,
+  amount: number,
+  boletoUrl: string,
+  dueDate: string
+): Promise<boolean> {
+  try {
+    if (!phone) {
+      console.warn("[whatsapp-notifications] Phone nao disponivel para boleto gerado");
+      return false;
+    }
+
+    const enabled = await isWhatsAppNotificationsEnabled();
+    if (!enabled) {
+      console.warn("[whatsapp-notifications] Notificacoes desabilitadas, nao enviando boleto gerado");
+      return false;
+    }
+
+    const formattedPhone = formatPhoneNumber(phone);
+    if (!formattedPhone) {
+      console.warn("[whatsapp-notifications] Numero invalido para boleto gerado:", phone);
+      return false;
+    }
+
+    const formattedAmount = (amount / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+    const defaultMessage = `Ola ${name}!
+
+Seu boleto para o plano *${planName}* foi gerado!
+
+*Valor:* ${formattedAmount}
+*Vencimento:* ${dueDate}
+
+Acesse o boleto: ${boletoUrl}
+
+Apos a compensacao (1-3 dias uteis), seu acesso sera liberado!
+
+Duvidas? Responda esta mensagem!`;
+
+    const templateData = {
+      name,
+      planName,
+      amount: formattedAmount,
+      dueDate,
+      boletoUrl,
+      appName: APP_NAME,
+    };
+
+    const message = await getTemplateMessage("boleto_generated", templateData, defaultMessage);
+    return await sendNotificationMessage(formattedPhone, message);
+  } catch (error) {
+    console.error("[whatsapp-notifications] Erro em sendWhatsAppBoletoGeneratedSafe:", error);
+    return false;
+  }
+}
+
+/**
+ * Envia notificação de pagamento pendente via WhatsApp
+ * Safe version - nunca lança erros
+ */
+export async function sendWhatsAppPaymentPendingSafe(
+  phone: string | null | undefined,
+  name: string,
+  planName: string,
+  paymentMethod: string,
+  planoId?: string
+): Promise<boolean> {
+  try {
+    if (!phone) {
+      console.warn("[whatsapp-notifications] Phone nao disponivel para pagamento pendente");
+      return false;
+    }
+
+    const enabled = await isWhatsAppNotificationsEnabled();
+    if (!enabled) {
+      console.warn("[whatsapp-notifications] Notificacoes desabilitadas, nao enviando pagamento pendente");
+      return false;
+    }
+
+    const formattedPhone = formatPhoneNumber(phone);
+    if (!formattedPhone) {
+      console.warn("[whatsapp-notifications] Numero invalido para pagamento pendente:", phone);
+      return false;
+    }
+
+    const checkoutUrl = planoId 
+      ? `${getAppUrl()}/checkout/${planoId}`
+      : `${getAppUrl()}/checkout`;
+
+    const defaultMessage = `Ola ${name}!
+
+Seu pagamento do plano *${planName}* esta sendo processado.
+
+*Metodo:* ${paymentMethod}
+
+Assim que for confirmado, voce recebera uma nova mensagem.
+
+Se preferir outra forma de pagamento: ${checkoutUrl}
+
+Duvidas? Responda esta mensagem!`;
+
+    const templateData = {
+      name,
+      planName,
+      paymentMethod,
+      checkoutUrl,
+      appName: APP_NAME,
+    };
+
+    const message = await getTemplateMessage("payment_pending", templateData, defaultMessage);
+    return await sendNotificationMessage(formattedPhone, message);
+  } catch (error) {
+    console.error("[whatsapp-notifications] Erro em sendWhatsAppPaymentPendingSafe:", error);
+    return false;
+  }
+}

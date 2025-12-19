@@ -68,6 +68,16 @@ const templatePlaceholders: Record<string, string[]> = {
   plan_expired: ["{name}", "{planName}", "{renewUrl}", "{appName}"],
   payment_failed: ["{name}", "{planName}", "{reason}", "{paymentUrl}", "{appName}"],
   welcome: ["{name}", "{adminUrl}", "{appName}"],
+  expiration_reminder_3days: ["{name}", "{planName}", "{expirationDate}", "{renewUrl}", "{appName}"],
+  expiration_reminder_1day: ["{name}", "{planName}", "{expirationDate}", "{renewUrl}", "{appName}"],
+  expiration_reminder_today: ["{name}", "{planName}", "{expirationDate}", "{renewUrl}", "{appName}"],
+  expiration_reminder: ["{name}", "{planName}", "{expirationDate}", "{daysUntilExpiration}", "{renewUrl}", "{appName}"],
+  auto_renewal_payment: ["{name}", "{planName}", "{expirationDate}", "{pixCopiaCola}", "{boletoUrl}", "{appName}"],
+  payment_recovery: ["{name}", "{planName}", "{amount}", "{checkoutUrl}", "{appName}"],
+  payment_pending: ["{name}", "{planName}", "{paymentMethod}", "{checkoutUrl}", "{appName}"],
+  pix_generated: ["{name}", "{planName}", "{amount}", "{expirationTime}", "{pixCopiaCola}", "{appName}"],
+  boleto_generated: ["{name}", "{planName}", "{amount}", "{dueDate}", "{boletoUrl}", "{appName}"],
+  recurring_payment_failed_reminder: ["{name}", "{planName}", "{checkoutUrl}", "{reminderNumber}", "{appName}"],
 };
 
 export default function AdminWhatsAppNotificationsPage() {

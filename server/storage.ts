@@ -4714,6 +4714,133 @@ Após o pagamento, seu acesso será renovado automaticamente!
 Qualquer dúvida, estamos à disposição!`,
         isActive: true,
       },
+      {
+        id: randomUUID(),
+        notificationType: "payment_recovery",
+        name: "Recuperação de Pagamento (PIX Expirado)",
+        description: "Enviado quando um PIX expira ou para recuperar carrinho abandonado",
+        messageTemplate: `⚠️ *Seu PIX expirou!*
+
+Olá, {name}!
+
+O PIX para o plano *{planName}* expirou, mas você ainda pode finalizar sua compra!
+
+💰 Valor: {amount}
+
+🔗 Finalize agora: {checkoutUrl}
+
+Você pode pagar com:
+✅ PIX (aprovação instantânea)
+✅ Boleto (vence em 3 dias)
+✅ Cartão (até 12x)
+
+Qualquer dúvida, estamos à disposição!`,
+        isActive: true,
+      },
+      {
+        id: randomUUID(),
+        notificationType: "payment_pending",
+        name: "Pagamento Pendente",
+        description: "Enviado quando um pagamento está pendente aguardando confirmação",
+        messageTemplate: `⏳ *Pagamento Pendente*
+
+Olá, {name}!
+
+Seu pagamento do plano *{planName}* está sendo processado.
+
+📋 *Método:* {paymentMethod}
+
+Assim que for confirmado, você receberá uma nova mensagem.
+
+Se preferir outra forma de pagamento:
+🔗 {checkoutUrl}
+
+Qualquer dúvida, estamos à disposição!`,
+        isActive: true,
+      },
+      {
+        id: randomUUID(),
+        notificationType: "pix_generated",
+        name: "PIX Gerado",
+        description: "Enviado quando um PIX é gerado para pagamento",
+        messageTemplate: `📱 *PIX Gerado!*
+
+Olá, {name}!
+
+Seu PIX para o plano *{planName}* foi gerado!
+
+💰 Valor: {amount}
+⏰ Expira em: {expirationTime}
+
+📋 *PIX Copia e Cola:*
+{pixCopiaCola}
+
+Após o pagamento, seu acesso será liberado automaticamente!
+
+Qualquer dúvida, estamos à disposição!`,
+        isActive: true,
+      },
+      {
+        id: randomUUID(),
+        notificationType: "boleto_generated",
+        name: "Boleto Gerado",
+        description: "Enviado quando um boleto é gerado para pagamento",
+        messageTemplate: `📄 *Boleto Gerado!*
+
+Olá, {name}!
+
+Seu boleto para o plano *{planName}* foi gerado!
+
+💰 Valor: {amount}
+📅 Vencimento: {dueDate}
+
+🔗 Acesse o boleto: {boletoUrl}
+
+Após a compensação (1-3 dias úteis), seu acesso será liberado!
+
+Qualquer dúvida, estamos à disposição!`,
+        isActive: true,
+      },
+      {
+        id: randomUUID(),
+        notificationType: "recurring_payment_failed_reminder",
+        name: "Lembrete de Falha de Renovação",
+        description: "Enviado quando a renovação automática falha (lembretes progressivos)",
+        messageTemplate: `⚠️ *Atenção com sua renovação!*
+
+Olá, {name}!
+
+A renovação do seu plano *{planName}* não foi aprovada.
+
+Seus dados estão seguros! Regularize para reativar:
+🔗 {checkoutUrl}
+
+O que fazer:
+✅ Verificar o limite do cartão
+✅ Atualizar forma de pagamento
+✅ Liberar transação com seu banco
+
+Qualquer dúvida, estamos à disposição!`,
+        isActive: true,
+      },
+      {
+        id: randomUUID(),
+        notificationType: "expiration_reminder",
+        name: "Lembrete de Expiração (Genérico)",
+        description: "Enviado como lembrete geral antes do vencimento do plano",
+        messageTemplate: `⏰ *Seu plano vence em breve!*
+
+Olá, {name}!
+
+Seu plano *{planName}* expira em *{expirationDate}* ({daysUntilExpiration} dias).
+
+Para continuar aproveitando todos os recursos sem interrupção, renove agora!
+
+🔗 Renovar: {renewUrl}
+
+Qualquer dúvida, estamos à disposição!`,
+        isActive: true,
+      },
     ];
 
     for (const template of defaultTemplates) {

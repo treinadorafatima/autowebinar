@@ -8104,10 +8104,17 @@ Seja conversacional e objetivo.`;
         updateData.gatewayErrorMessage = errorInfo.message;
         updateData.userFriendlyError = `${errorInfo.message} ${errorInfo.action}`;
         
-        // Send pending payment email with PIX/Boleto alternatives
+        // Send pending payment email and WhatsApp with PIX/Boleto alternatives
         import("./email").then(({ sendPaymentPendingEmail }) => {
           sendPaymentPendingEmail(pagamento.email, pagamento.nome, plano.nome, 'credit_card', pagamento.planoId).catch(err => {
             console.error(`[MP Subscription] Error sending pending payment email:`, err);
+          });
+        });
+        
+        // Send WhatsApp notification
+        import("./whatsapp-notifications").then(({ sendWhatsAppPaymentPendingSafe }) => {
+          sendWhatsAppPaymentPendingSafe(pagamento.telefone, pagamento.nome, plano.nome, 'Cartão de Crédito', pagamento.planoId).catch(err => {
+            console.error(`[MP Subscription] Error sending pending payment WhatsApp:`, err);
           });
         });
       }
@@ -8247,11 +8254,18 @@ Seja conversacional e objetivo.`;
 
       await storage.updateCheckoutPagamento(pagamentoId, updateData);
 
-      // If subscription authorized but no payment confirmed, send pending email
+      // If subscription authorized but no payment confirmed, send pending email and WhatsApp
       if (mpData.status === 'authorized' && !hasConfirmedPayment) {
         import("./email").then(({ sendPaymentPendingEmail }) => {
           sendPaymentPendingEmail(pagamento.email, pagamento.nome, plano.nome, 'credit_card', pagamento.planoId).catch(err => {
             console.error(`[MP Subscription] Error sending pending payment email:`, err);
+          });
+        });
+        
+        // Send WhatsApp notification
+        import("./whatsapp-notifications").then(({ sendWhatsAppPaymentPendingSafe }) => {
+          sendWhatsAppPaymentPendingSafe(pagamento.telefone, pagamento.nome, plano.nome, 'Cartão de Crédito', pagamento.planoId).catch(err => {
+            console.error(`[MP Subscription] Error sending pending payment WhatsApp:`, err);
           });
         });
       }
@@ -8398,7 +8412,8 @@ Seja conversacional e objetivo.`;
 
       await storage.updateCheckoutPagamento(pagamentoId, updateData);
 
-      // Send email with payment instructions
+      // Send email and WhatsApp with payment instructions
+      const methodName = method === 'pix' ? 'PIX' : 'Boleto';
       import("./email").then(({ sendPaymentPendingEmail }) => {
         sendPaymentPendingEmail(
           payerEmail || pagamento.email, 
@@ -8408,6 +8423,19 @@ Seja conversacional e objetivo.`;
           pagamento.planoId
         ).catch(err => {
           console.error(`[MP Subscription ${method.toUpperCase()}] Error sending pending email:`, err);
+        });
+      });
+      
+      // Send WhatsApp notification
+      import("./whatsapp-notifications").then(({ sendWhatsAppPaymentPendingSafe }) => {
+        sendWhatsAppPaymentPendingSafe(
+          pagamento.telefone, 
+          payerName || pagamento.nome, 
+          plano.nome, 
+          methodName, 
+          pagamento.planoId
+        ).catch(err => {
+          console.error(`[MP Subscription ${method.toUpperCase()}] Error sending pending WhatsApp:`, err);
         });
       });
 
@@ -8755,7 +8783,7 @@ Seja conversacional e objetivo.`;
         pixExpiresAt: expiresAt,
       });
 
-      // Send PIX generated email
+      // Send PIX generated email and WhatsApp
       if (pixAction?.data) {
         import("./email").then(({ sendPixGeneratedEmail }) => {
           sendPixGeneratedEmail(
@@ -8768,6 +8796,21 @@ Seja conversacional e objetivo.`;
             plano.preco
           ).catch(err => {
             console.error(`[Stripe PIX] Error sending PIX generated email:`, err);
+          });
+        });
+        
+        // Send WhatsApp notification
+        import("./whatsapp-notifications").then(({ sendWhatsAppPixGeneratedSafe }) => {
+          const expirationTimeStr = expiresAt.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+          sendWhatsAppPixGeneratedSafe(
+            pagamento.telefone,
+            pagamento.nome,
+            plano.nome,
+            plano.preco,
+            pixAction.data,
+            expirationTimeStr
+          ).catch(err => {
+            console.error(`[Stripe PIX] Error sending PIX generated WhatsApp:`, err);
           });
         });
       }
@@ -8878,8 +8921,10 @@ Seja conversacional e objetivo.`;
         boletoExpiresAt: boletoAction?.expires_at ? new Date(boletoAction.expires_at * 1000) : expiresAt,
       });
 
-      // Send Boleto generated email
+      // Send Boleto generated email and WhatsApp
       if (boletoAction?.hosted_voucher_url) {
+        const boletoExpiresDate = boletoAction.expires_at ? new Date(boletoAction.expires_at * 1000) : expiresAt;
+        
         import("./email").then(({ sendBoletoGeneratedEmail }) => {
           sendBoletoGeneratedEmail(
             pagamento.email,
@@ -8887,10 +8932,25 @@ Seja conversacional e objetivo.`;
             plano.nome,
             boletoAction.hosted_voucher_url,
             boletoAction.number || null,
-            boletoAction.expires_at ? new Date(boletoAction.expires_at * 1000) : expiresAt,
+            boletoExpiresDate,
             plano.preco
           ).catch(err => {
             console.error(`[Stripe Boleto] Error sending Boleto generated email:`, err);
+          });
+        });
+        
+        // Send WhatsApp notification
+        import("./whatsapp-notifications").then(({ sendWhatsAppBoletoGeneratedSafe }) => {
+          const dueDateStr = boletoExpiresDate.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+          sendWhatsAppBoletoGeneratedSafe(
+            pagamento.telefone,
+            pagamento.nome,
+            plano.nome,
+            plano.preco,
+            boletoAction.hosted_voucher_url,
+            dueDateStr
+          ).catch(err => {
+            console.error(`[Stripe Boleto] Error sending Boleto generated WhatsApp:`, err);
           });
         });
       }

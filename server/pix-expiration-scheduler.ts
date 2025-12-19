@@ -2,6 +2,7 @@ import { db } from "./db";
 import { checkoutPagamentos, checkoutPlanos } from "@shared/schema";
 import { eq, and, lte, isNull, or } from "drizzle-orm";
 import { sendPixExpiredRecoveryEmail } from "./email";
+import { sendWhatsAppPaymentRecoverySafe } from "./whatsapp-notifications";
 
 const SCHEDULER_INTERVAL_MS = 300000; // Check every 5 minutes
 let schedulerInterval: NodeJS.Timeout | null = null;
@@ -10,6 +11,7 @@ interface ExpiredPixPayment {
   id: string;
   email: string;
   nome: string;
+  telefone: string | null;
   planoId: string;
   valor: number;
   pixExpiresAt: Date;
@@ -24,6 +26,7 @@ async function getExpiredPixPayments(): Promise<ExpiredPixPayment[]> {
       id: checkoutPagamentos.id,
       email: checkoutPagamentos.email,
       nome: checkoutPagamentos.nome,
+      telefone: checkoutPagamentos.telefone,
       planoId: checkoutPagamentos.planoId,
       valor: checkoutPagamentos.valor,
       pixExpiresAt: checkoutPagamentos.pixExpiresAt,
@@ -105,11 +108,20 @@ async function processExpiredPixPayments(): Promise<void> {
           payment.valor
         );
 
-        if (emailSent) {
+        // Enviar WhatsApp também (não bloqueia se falhar)
+        const whatsappSent = await sendWhatsAppPaymentRecoverySafe(
+          payment.telefone,
+          payment.nome,
+          planName,
+          payment.planoId,
+          payment.valor
+        );
+
+        if (emailSent || whatsappSent) {
           await markExpiredEmailSent(payment.id);
-          console.log(`[pix-expiration-scheduler] Recovery email sent successfully to ${payment.email}`);
+          console.log(`[pix-expiration-scheduler] Recovery sent to ${payment.email} - Email: ${emailSent}, WhatsApp: ${whatsappSent}`);
         } else {
-          console.error(`[pix-expiration-scheduler] Failed to send recovery email to ${payment.email}`);
+          console.error(`[pix-expiration-scheduler] Failed to send recovery to ${payment.email}`);
         }
       } catch (error) {
         console.error(`[pix-expiration-scheduler] Error processing payment ${payment.id}:`, error);
