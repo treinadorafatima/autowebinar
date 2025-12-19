@@ -11,7 +11,7 @@ import { storage } from "./storage";
 import * as fs from "fs";
 import * as path from "path";
 
-const logger = pino({ level: "error" });
+const logger = pino({ level: "debug" });
 
 interface WhatsAppConnection {
   socket: WASocket | null;
