@@ -761,6 +761,7 @@ export const whatsappAccounts = pgTable("whatsapp_accounts", {
   phoneNumber: text("phone_number"), // Número conectado
   status: text("status").notNull().default("disconnected"), // 'disconnected', 'connecting', 'qr_ready', 'connected', 'banned'
   qrCode: text("qr_code"), // QR code atual para conexão (apenas Baileys)
+  scope: text("scope").notNull().default("marketing"), // 'notifications' (lembretes webinar) ou 'marketing' (sequências/broadcasts)
   
   // Provider: 'baileys' (padrão) ou 'cloud_api' (API oficial Meta)
   provider: text("provider").notNull().default("baileys"), // 'baileys' | 'cloud_api'
