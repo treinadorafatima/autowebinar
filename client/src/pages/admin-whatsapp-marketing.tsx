@@ -1047,7 +1047,7 @@ export default function AdminWhatsAppMarketing() {
       toast({ title: "Envio em massa criado com sucesso" });
       queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/broadcasts"] });
       setShowNewBroadcastDialog(false);
-      setNewBroadcast({ name: "", messageText: "", messageType: "text", mediaUrl: "", mediaFileName: "", mediaMimeType: "" });
+      setNewBroadcast({ name: "", messageText: "", messageType: "text", mediaUrl: "", mediaFileName: "", mediaMimeType: "", sendAsVoiceNote: false });
       setPreviewLeads(null);
     },
     onError: (error: any) => {
@@ -1329,6 +1329,64 @@ export default function AdminWhatsAppMarketing() {
           mediaMimeType: file.type,
         });
       }
+      toast({ title: "Arquivo enviado com sucesso" });
+    } catch (error: any) {
+      toast({ title: "Erro no upload", description: error.message, variant: "destructive" });
+    } finally {
+      setUploadingMedia(false);
+    }
+  };
+
+  const handleBroadcastMediaUpload = async (file: File) => {
+    const messageType = newBroadcast.messageType;
+    if (messageType === "text") return;
+    const mediaType = messageType as keyof typeof MEDIA_LIMITS;
+    
+    const limits = MEDIA_LIMITS[mediaType];
+    if (!limits) {
+      toast({ title: "Tipo de mídia inválido", variant: "destructive" });
+      return;
+    }
+
+    if (file.size > limits.maxSize) {
+      toast({ 
+        title: "Arquivo muito grande", 
+        description: `O limite para ${mediaType} é ${limits.label}`,
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    if (!limits.formats.includes(file.type)) {
+      toast({ 
+        title: "Formato não suportado", 
+        description: `Formatos aceitos: ${limits.extensions}`,
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    setUploadingMedia(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("type", "whatsapp-media");
+
+      const res = await fetch("/api/upload-file", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${localStorage.getItem("adminToken")}` },
+        body: formData,
+      });
+
+      if (!res.ok) throw new Error("Erro no upload");
+      const data = await res.json();
+
+      setNewBroadcast({
+        ...newBroadcast,
+        mediaUrl: data.url,
+        mediaFileName: file.name,
+        mediaMimeType: file.type,
+      });
       toast({ title: "Arquivo enviado com sucesso" });
     } catch (error: any) {
       toast({ title: "Erro no upload", description: error.message, variant: "destructive" });
@@ -3333,19 +3391,93 @@ export default function AdminWhatsAppMarketing() {
                   data-testid="input-broadcast-name"
                 />
               </div>
+
               <div className="space-y-2">
-                <Label>Mensagem</Label>
-                <Textarea
-                  placeholder="Digite a mensagem... Use {{nome}} para personalizar"
-                  value={newBroadcast.messageText}
-                  onChange={(e) => setNewBroadcast({ ...newBroadcast, messageText: e.target.value })}
-                  rows={6}
-                  data-testid="input-broadcast-message"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Merge tags: {"{{nome}}"} = nome do contato | {"{{telefone}}"} = telefone
-                </p>
+                <Label>Tipo de Mensagem</Label>
+                <div className="grid grid-cols-5 gap-2">
+                  {MESSAGE_TYPES.map((type) => {
+                    const Icon = type.icon;
+                    return (
+                      <Button
+                        key={type.value}
+                        type="button"
+                        variant={newBroadcast.messageType === type.value ? "default" : "outline"}
+                        className="flex flex-col h-auto py-3 gap-1"
+                        onClick={() => setNewBroadcast({ 
+                          ...newBroadcast, 
+                          messageType: type.value,
+                          mediaUrl: "",
+                          mediaFileName: "",
+                          mediaMimeType: ""
+                        })}
+                        data-testid={`button-broadcast-type-${type.value}`}
+                      >
+                        <Icon className="w-4 h-4" />
+                        <span className="text-xs">{type.label}</span>
+                      </Button>
+                    );
+                  })}
+                </div>
               </div>
+
+              {newBroadcast.messageType !== "text" && (
+                <div className="space-y-2">
+                  <Label>Arquivo de Mídia</Label>
+                  <div className="border-2 border-dashed rounded-lg p-4">
+                    {newBroadcast.mediaUrl ? (
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1">
+                          <p className="font-medium text-sm truncate">{newBroadcast.mediaFileName}</p>
+                          <p className="text-xs text-muted-foreground truncate">{newBroadcast.mediaUrl}</p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => setNewBroadcast({
+                            ...newBroadcast,
+                            mediaUrl: "",
+                            mediaFileName: "",
+                            mediaMimeType: ""
+                          })}
+                          data-testid="button-remove-broadcast-media"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <label className="cursor-pointer">
+                        <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                          <Upload className="w-8 h-8" />
+                          <span className="text-sm">Clique para enviar</span>
+                          <span className="text-xs">
+                            {MEDIA_LIMITS[newBroadcast.messageType as keyof typeof MEDIA_LIMITS]?.extensions || ""}
+                            {" - Máx: "}
+                            {MEDIA_LIMITS[newBroadcast.messageType as keyof typeof MEDIA_LIMITS]?.label || ""}
+                          </span>
+                        </div>
+                        <input
+                          type="file"
+                          className="hidden"
+                          accept={MEDIA_LIMITS[newBroadcast.messageType as keyof typeof MEDIA_LIMITS]?.formats.join(",")}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleBroadcastMediaUpload(file);
+                          }}
+                          disabled={uploadingMedia}
+                          data-testid="input-broadcast-media-upload"
+                        />
+                        {uploadingMedia && (
+                          <div className="flex items-center gap-2 mt-2 justify-center">
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <span className="text-sm">Enviando...</span>
+                          </div>
+                        )}
+                      </label>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {newBroadcast.messageType === "audio" && (
                 <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
@@ -3362,6 +3494,23 @@ export default function AdminWhatsAppMarketing() {
                   </div>
                 </div>
               )}
+
+              <div className="space-y-2">
+                <Label>{newBroadcast.messageType === "text" ? "Mensagem" : "Legenda (opcional)"}</Label>
+                <Textarea
+                  placeholder={newBroadcast.messageType === "text" 
+                    ? "Digite a mensagem... Use {{nome}} para personalizar"
+                    : "Digite uma legenda para a mídia (opcional)..."
+                  }
+                  value={newBroadcast.messageText}
+                  onChange={(e) => setNewBroadcast({ ...newBroadcast, messageText: e.target.value })}
+                  rows={newBroadcast.messageType === "text" ? 6 : 3}
+                  data-testid="input-broadcast-message"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Merge tags: {"{{nome}}"} = nome do contato | {"{{telefone}}"} = telefone
+                </p>
+              </div>
 
               {broadcastSourceType === "webinar" && previewLeads && (
                 <div className="bg-muted/50 p-3 rounded-lg">
@@ -3385,7 +3534,8 @@ export default function AdminWhatsAppMarketing() {
                 disabled={
                   createBroadcastMutation.isPending || 
                   !newBroadcast.name || 
-                  !newBroadcast.messageText ||
+                  (newBroadcast.messageType === "text" && !newBroadcast.messageText) ||
+                  (newBroadcast.messageType !== "text" && !newBroadcast.mediaUrl) ||
                   (broadcastSourceType === "webinar" && !broadcastWebinarId) ||
                   (broadcastSourceType === "contact_list" && !broadcastContactListId)
                 }
