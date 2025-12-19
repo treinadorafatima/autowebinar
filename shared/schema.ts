@@ -897,17 +897,51 @@ export type WebinarViewLogInsert = z.infer<typeof webinarViewLogInsertSchema>;
 // WHATSAPP BROADCAST (ENVIOS EM MASSA)
 // ============================================
 
+// WhatsApp Contact Lists - Listas de contatos importados via Excel
+export const whatsappContactLists = pgTable("whatsapp_contact_lists", {
+  id: text("id").primaryKey(),
+  adminId: text("admin_id").notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  totalContacts: integer("total_contacts").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type WhatsappContactList = typeof whatsappContactLists.$inferSelect;
+export const whatsappContactListInsertSchema = createInsertSchema(whatsappContactLists).omit({ id: true, createdAt: true, updatedAt: true });
+export type WhatsappContactListInsert = z.infer<typeof whatsappContactListInsertSchema>;
+
+// WhatsApp Contacts - Contatos individuais de cada lista
+export const whatsappContacts = pgTable("whatsapp_contacts", {
+  id: text("id").primaryKey(),
+  listId: text("list_id").notNull(),
+  name: text("name").notNull(),
+  phone: text("phone").notNull(),
+  email: text("email"),
+  customField1: text("custom_field_1"),
+  customField2: text("custom_field_2"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type WhatsappContact = typeof whatsappContacts.$inferSelect;
+export const whatsappContactInsertSchema = createInsertSchema(whatsappContacts).omit({ id: true, createdAt: true });
+export type WhatsappContactInsert = z.infer<typeof whatsappContactInsertSchema>;
+
 // WhatsApp Broadcasts - Envios em massa com filtros e rotação de contas
 export const whatsappBroadcasts = pgTable("whatsapp_broadcasts", {
   id: text("id").primaryKey(),
   adminId: text("admin_id").notNull(),
-  webinarId: text("webinar_id").notNull(),
+  webinarId: text("webinar_id"),
+  contactListId: text("contact_list_id"),
+  sourceType: text("source_type").notNull().default("webinar"),
   name: text("name").notNull(),
   messageText: text("message_text").notNull(),
   messageType: text("message_type").notNull().default("text"),
   mediaUrl: text("media_url"),
   mediaFileName: text("media_file_name"),
   mediaMimeType: text("media_mime_type"),
+  sendAsVoiceNote: boolean("send_as_voice_note").notNull().default(false),
   filterType: text("filter_type").notNull().default("all"),
   filterDateStart: text("filter_date_start"),
   filterDateEnd: text("filter_date_end"),
