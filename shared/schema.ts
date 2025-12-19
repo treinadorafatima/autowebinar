@@ -1128,6 +1128,7 @@ export const aiAgents = pgTable("ai_agents", {
   workingHoursStart: text("working_hours_start").default("09:00"), // HH:MM
   workingHoursEnd: text("working_hours_end").default("18:00"), // HH:MM
   workingDays: text("working_days").default("1,2,3,4,5"), // Dias da semana (1=seg, 7=dom)
+  timezone: text("timezone").default("America/Sao_Paulo"), // IANA timezone (ex: America/Sao_Paulo)
   awayMessage: text("away_message").default("Olá! No momento estou fora do horário de atendimento. Retornarei em breve!"),
   escalationKeywords: text("escalation_keywords").default(""), // Palavras-chave para escalar (separadas por vírgula)
   escalationMessage: text("escalation_message").default("Vou transferir você para um atendente humano."),

@@ -38,6 +38,7 @@ interface AiAgent {
   workingHoursStart: string;
   workingHoursEnd: string;
   workingDays: string;
+  timezone: string;
   escalationKeywords: string | null;
   escalationMessage: string | null;
   createdAt: string;
@@ -94,6 +95,7 @@ export default function AdminAiAgents() {
     workingHoursStart: "09:00",
     workingHoursEnd: "18:00",
     workingDays: "1,2,3,4,5",
+    timezone: "America/Sao_Paulo",
     escalationKeywords: "",
     escalationMessage: "",
   });
@@ -186,6 +188,7 @@ export default function AdminAiAgents() {
       workingHoursStart: "09:00",
       workingHoursEnd: "18:00",
       workingDays: "1,2,3,4,5",
+      timezone: "America/Sao_Paulo",
       escalationKeywords: "",
       escalationMessage: "",
     });
@@ -210,6 +213,7 @@ export default function AdminAiAgents() {
       workingHoursStart: agent.workingHoursStart || "09:00",
       workingHoursEnd: agent.workingHoursEnd || "18:00",
       workingDays: agent.workingDays || "1,2,3,4,5",
+      timezone: agent.timezone || "America/Sao_Paulo",
       escalationKeywords: agent.escalationKeywords || "",
       escalationMessage: agent.escalationMessage || "",
     });
@@ -658,7 +662,7 @@ export default function AdminAiAgents() {
 
                   <div className="space-y-2">
                     <Label>Dias de Funcionamento</Label>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap">
                       {DAYS_OF_WEEK.map((day) => {
                         const isSelected = formData.workingDays.split(",").includes(day.value);
                         return (
@@ -682,6 +686,33 @@ export default function AdminAiAgents() {
                         );
                       })}
                     </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Fuso Horário</Label>
+                    <Select 
+                      value={formData.timezone} 
+                      onValueChange={(v) => setFormData({ ...formData, timezone: v })}
+                    >
+                      <SelectTrigger data-testid="select-timezone">
+                        <SelectValue placeholder="Selecione o fuso horário" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="America/Sao_Paulo">Brasília (GMT-3)</SelectItem>
+                        <SelectItem value="America/Manaus">Manaus (GMT-4)</SelectItem>
+                        <SelectItem value="America/Rio_Branco">Acre (GMT-5)</SelectItem>
+                        <SelectItem value="America/Noronha">Fernando de Noronha (GMT-2)</SelectItem>
+                        <SelectItem value="America/New_York">Nova York (GMT-5)</SelectItem>
+                        <SelectItem value="America/Los_Angeles">Los Angeles (GMT-8)</SelectItem>
+                        <SelectItem value="Europe/London">Londres (GMT+0)</SelectItem>
+                        <SelectItem value="Europe/Lisbon">Lisboa (GMT+0)</SelectItem>
+                        <SelectItem value="Europe/Paris">Paris (GMT+1)</SelectItem>
+                        <SelectItem value="Asia/Tokyo">Tóquio (GMT+9)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Os horários serão calculados neste fuso horário
+                    </p>
                   </div>
                 </div>
               )}

@@ -1,4 +1,5 @@
 import type { AiAgent, AiMessage } from "@shared/schema";
+import { toZonedTime } from "date-fns-tz";
 
 interface AIResponse {
   content: string;
@@ -195,8 +196,11 @@ export function checkWorkingHours(agent: AiAgent): boolean {
     return true;
   }
 
+  const timezone = (agent as any).timezone || "America/Sao_Paulo";
   const now = new Date();
-  const currentDay = now.getDay() || 7;
+  const zonedNow = toZonedTime(now, timezone);
+  
+  const currentDay = zonedNow.getDay() || 7;
   const workingDays = (agent.workingDays || "1,2,3,4,5").split(",").map(d => parseInt(d));
   
   if (!workingDays.includes(currentDay)) {
@@ -206,7 +210,7 @@ export function checkWorkingHours(agent: AiAgent): boolean {
   const [startHour, startMinute] = (agent.workingHoursStart || "09:00").split(":").map(n => parseInt(n));
   const [endHour, endMinute] = (agent.workingHoursEnd || "18:00").split(":").map(n => parseInt(n));
 
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const currentMinutes = zonedNow.getHours() * 60 + zonedNow.getMinutes();
   const startMinutes = startHour * 60 + startMinute;
   const endMinutes = endHour * 60 + endMinute;
 
