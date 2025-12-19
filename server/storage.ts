@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type WebinarConfig, type WebinarConfigInsert, type Admin, type AdminInsert, type UploadedVideo, type UploadedVideoInsert, type Comment, type CommentInsert, type Webinar, type WebinarInsert, type Setting, type SettingInsert, type ViewerSession, type WebinarScript, type WebinarScriptInsert, type AiConfig, type AiConfigInsert, type AiMemory, type AiMemoryInsert, type CheckoutPlano, type CheckoutPlanoInsert, type CheckoutPagamento, type CheckoutPagamentoInsert, type CheckoutConfig, type CheckoutConfigInsert, type CheckoutAssinatura, type CheckoutAssinaturaInsert, type AiChat, type AiChatInsert, type AiMessageChat, type AiMessageChatInsert, type VideoTranscription, type VideoTranscriptionInsert, type AdminEmailCredential, type AdminEmailCredentialInsert, type EmailSequence, type EmailSequenceInsert, type ScheduledEmail, type ScheduledEmailInsert, type LeadFormConfig, type LeadFormConfigInsert, type WhatsappAccount, type WhatsappAccountInsert, type WhatsappSession, type WhatsappSessionInsert, type WhatsappSequence, type WhatsappSequenceInsert, type ScheduledWhatsappMessage, type ScheduledWhatsappMessageInsert, type MediaFile, type MediaFileInsert, type LeadMessage, type LeadMessageInsert, type Lead, type WhatsappBroadcast, type WhatsappBroadcastInsert, type WhatsappBroadcastRecipient, type WhatsappBroadcastRecipientInsert, type Affiliate, type AffiliateInsert, type AffiliateLink, type AffiliateLinkInsert, type AffiliateSale, type AffiliateSaleInsert, type AffiliateConfig, type AffiliateConfigInsert, type AffiliateWithdrawal, type AffiliateWithdrawalInsert, type WhatsappNotificationLog, type WhatsappNotificationLogInsert, type WhatsappNotificationTemplate, type WhatsappNotificationTemplateInsert, type EmailNotificationTemplate, type EmailNotificationTemplateInsert, admins, webinarConfigs, users, uploadedVideos, comments, webinars as webinarsTable, settings, viewerSessions, webinarScripts, aiConfigs, aiMemories, checkoutPlanos, checkoutPagamentos, checkoutConfigs, checkoutAssinaturas, aiChats, aiMessageChats, videoTranscriptions, adminEmailCredentials, emailSequences, scheduledEmails, leadFormConfigs, whatsappAccounts, whatsappSessions, whatsappNotificationsLog, whatsappSequences, scheduledWhatsappMessages, mediaFiles, webinarViewLogs, leads, leadMessages, whatsappBroadcasts, whatsappBroadcastRecipients, affiliates, affiliateLinks, affiliateSales, affiliateConfig, affiliateWithdrawals, whatsappNotificationTemplates, emailNotificationTemplates } from "@shared/schema";
+import { type User, type InsertUser, type WebinarConfig, type WebinarConfigInsert, type Admin, type AdminInsert, type UploadedVideo, type UploadedVideoInsert, type Comment, type CommentInsert, type Webinar, type WebinarInsert, type Setting, type SettingInsert, type ViewerSession, type WebinarScript, type WebinarScriptInsert, type AiConfig, type AiConfigInsert, type AiMemory, type AiMemoryInsert, type CheckoutPlano, type CheckoutPlanoInsert, type CheckoutPagamento, type CheckoutPagamentoInsert, type CheckoutConfig, type CheckoutConfigInsert, type CheckoutAssinatura, type CheckoutAssinaturaInsert, type AiChat, type AiChatInsert, type AiMessageChat, type AiMessageChatInsert, type VideoTranscription, type VideoTranscriptionInsert, type AdminEmailCredential, type AdminEmailCredentialInsert, type EmailSequence, type EmailSequenceInsert, type ScheduledEmail, type ScheduledEmailInsert, type LeadFormConfig, type LeadFormConfigInsert, type WhatsappAccount, type WhatsappAccountInsert, type WhatsappSession, type WhatsappSessionInsert, type WhatsappSequence, type WhatsappSequenceInsert, type ScheduledWhatsappMessage, type ScheduledWhatsappMessageInsert, type MediaFile, type MediaFileInsert, type LeadMessage, type LeadMessageInsert, type Lead, type WhatsappBroadcast, type WhatsappBroadcastInsert, type WhatsappBroadcastRecipient, type WhatsappBroadcastRecipientInsert, type WhatsappContactList, type WhatsappContactListInsert, type WhatsappContact, type WhatsappContactInsert, type Affiliate, type AffiliateInsert, type AffiliateLink, type AffiliateLinkInsert, type AffiliateSale, type AffiliateSaleInsert, type AffiliateConfig, type AffiliateConfigInsert, type AffiliateWithdrawal, type AffiliateWithdrawalInsert, type WhatsappNotificationLog, type WhatsappNotificationLogInsert, type WhatsappNotificationTemplate, type WhatsappNotificationTemplateInsert, type EmailNotificationTemplate, type EmailNotificationTemplateInsert, admins, webinarConfigs, users, uploadedVideos, comments, webinars as webinarsTable, settings, viewerSessions, webinarScripts, aiConfigs, aiMemories, checkoutPlanos, checkoutPagamentos, checkoutConfigs, checkoutAssinaturas, aiChats, aiMessageChats, videoTranscriptions, adminEmailCredentials, emailSequences, scheduledEmails, leadFormConfigs, whatsappAccounts, whatsappSessions, whatsappNotificationsLog, whatsappSequences, scheduledWhatsappMessages, mediaFiles, webinarViewLogs, leads, leadMessages, whatsappBroadcasts, whatsappBroadcastRecipients, whatsappContactLists, whatsappContacts, affiliates, affiliateLinks, affiliateSales, affiliateConfig, affiliateWithdrawals, whatsappNotificationTemplates, emailNotificationTemplates } from "@shared/schema";
 import * as crypto from "crypto";
 import { randomUUID } from "crypto";
 import { db } from "./db";
@@ -318,6 +318,17 @@ export interface IStorage {
   updateWhatsappBroadcastRecipient(id: string, data: Partial<WhatsappBroadcastRecipientInsert>): Promise<WhatsappBroadcastRecipient | undefined>;
   getPendingBroadcastRecipients(broadcastId: string, limit?: number): Promise<WhatsappBroadcastRecipient[]>;
   countBroadcastRecipientsByStatus(broadcastId: string): Promise<{ pending: number; sent: number; failed: number }>;
+  // WhatsApp Contact Lists
+  listWhatsappContactLists(adminId: string): Promise<WhatsappContactList[]>;
+  getWhatsappContactListById(id: string): Promise<WhatsappContactList | undefined>;
+  createWhatsappContactList(data: WhatsappContactListInsert): Promise<WhatsappContactList>;
+  updateWhatsappContactList(id: string, data: Partial<WhatsappContactListInsert>): Promise<WhatsappContactList | undefined>;
+  deleteWhatsappContactList(id: string): Promise<void>;
+  // WhatsApp Contacts
+  listWhatsappContactsByList(listId: string): Promise<WhatsappContact[]>;
+  createWhatsappContact(data: WhatsappContactInsert): Promise<WhatsappContact>;
+  createWhatsappContactsBulk(data: WhatsappContactInsert[]): Promise<number>;
+  deleteWhatsappContactsByList(listId: string): Promise<void>;
   // Leads filtering for broadcasts
   listLeadsWithWhatsappByWebinar(webinarId: string, filters?: { dateStart?: string; dateEnd?: string; sessionDate?: string }): Promise<Lead[]>;
   getDistinctSessionDatesByWebinar(webinarId: string): Promise<string[]>;
@@ -4053,6 +4064,83 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
       sent: recipients.filter(r => r.status === 'sent').length,
       failed: recipients.filter(r => r.status === 'failed').length,
     };
+  }
+
+  // WhatsApp Contact Lists
+
+  async listWhatsappContactLists(adminId: string): Promise<WhatsappContactList[]> {
+    return db.select()
+      .from(whatsappContactLists)
+      .where(eq(whatsappContactLists.adminId, adminId))
+      .orderBy(desc(whatsappContactLists.createdAt));
+  }
+
+  async getWhatsappContactListById(id: string): Promise<WhatsappContactList | undefined> {
+    const result = await db.select()
+      .from(whatsappContactLists)
+      .where(eq(whatsappContactLists.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async createWhatsappContactList(data: WhatsappContactListInsert): Promise<WhatsappContactList> {
+    const id = randomUUID();
+    const list = {
+      ...data,
+      id,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    await db.insert(whatsappContactLists).values(list);
+    return list as WhatsappContactList;
+  }
+
+  async updateWhatsappContactList(id: string, data: Partial<WhatsappContactListInsert>): Promise<WhatsappContactList | undefined> {
+    const result = await db.update(whatsappContactLists)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(whatsappContactLists.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteWhatsappContactList(id: string): Promise<void> {
+    await db.delete(whatsappContacts).where(eq(whatsappContacts.listId, id));
+    await db.delete(whatsappContactLists).where(eq(whatsappContactLists.id, id));
+  }
+
+  // WhatsApp Contacts
+
+  async listWhatsappContactsByList(listId: string): Promise<WhatsappContact[]> {
+    return db.select()
+      .from(whatsappContacts)
+      .where(eq(whatsappContacts.listId, listId))
+      .orderBy(whatsappContacts.createdAt);
+  }
+
+  async createWhatsappContact(data: WhatsappContactInsert): Promise<WhatsappContact> {
+    const id = randomUUID();
+    const contact = {
+      ...data,
+      id,
+      createdAt: new Date(),
+    };
+    await db.insert(whatsappContacts).values(contact);
+    return contact as WhatsappContact;
+  }
+
+  async createWhatsappContactsBulk(data: WhatsappContactInsert[]): Promise<number> {
+    if (data.length === 0) return 0;
+    const contacts = data.map(d => ({
+      ...d,
+      id: randomUUID(),
+      createdAt: new Date(),
+    }));
+    await db.insert(whatsappContacts).values(contacts);
+    return contacts.length;
+  }
+
+  async deleteWhatsappContactsByList(listId: string): Promise<void> {
+    await db.delete(whatsappContacts).where(eq(whatsappContacts.listId, listId));
   }
 
   // Leads filtering for broadcasts

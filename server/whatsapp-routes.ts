@@ -667,6 +667,185 @@ export function registerWhatsAppRoutes(app: Express) {
   });
 
   // ============================================
+  // WHATSAPP CONTACT LISTS (LISTAS IMPORTADAS)
+  // ============================================
+
+  // List contact lists for admin
+  app.get("/api/whatsapp/contact-lists", async (req: Request, res: Response) => {
+    try {
+      const { admin, error, errorCode } = await validateSessionAndGetAdmin(req);
+      if (!admin) {
+        return res.status(errorCode || 401).json({ error: error || "Não autenticado" });
+      }
+
+      const lists = await storage.listWhatsappContactLists(admin.id);
+      res.json(lists);
+    } catch (error: any) {
+      console.error("[whatsapp-api] Error listing contact lists:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get contacts from a list
+  app.get("/api/whatsapp/contact-lists/:id/contacts", async (req: Request, res: Response) => {
+    try {
+      const { admin, error, errorCode } = await validateSessionAndGetAdmin(req);
+      if (!admin) {
+        return res.status(errorCode || 401).json({ error: error || "Não autenticado" });
+      }
+
+      const list = await storage.getWhatsappContactListById(req.params.id);
+      if (!list || list.adminId !== admin.id) {
+        return res.status(404).json({ error: "Lista não encontrada" });
+      }
+
+      const contacts = await storage.listWhatsappContactsByList(req.params.id);
+      res.json(contacts);
+    } catch (error: any) {
+      console.error("[whatsapp-api] Error listing contacts:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Download Excel template
+  app.get("/api/whatsapp/contact-lists/template", async (req: Request, res: Response) => {
+    try {
+      const { admin, error, errorCode } = await validateSessionAndGetAdmin(req);
+      if (!admin) {
+        return res.status(errorCode || 401).json({ error: error || "Não autenticado" });
+      }
+
+      const XLSX = await import("xlsx");
+      
+      const templateData = [
+        { nome: "João Silva", telefone: "5511999999999", email: "joao@email.com" },
+        { nome: "Maria Santos", telefone: "5521988888888", email: "maria@email.com" },
+        { nome: "Pedro Costa", telefone: "5531977777777", email: "" },
+      ];
+      
+      const worksheet = XLSX.utils.json_to_sheet(templateData);
+      worksheet["!cols"] = [{ wch: 25 }, { wch: 18 }, { wch: 30 }];
+      
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Contatos");
+      
+      const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+      
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", "attachment; filename=modelo_contatos.xlsx");
+      res.send(buffer);
+    } catch (error: any) {
+      console.error("[whatsapp-api] Error generating template:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Import contacts from Excel
+  app.post("/api/whatsapp/contact-lists/import", async (req: Request, res: Response) => {
+    try {
+      const { admin, error, errorCode } = await validateSessionAndGetAdmin(req);
+      if (!admin) {
+        return res.status(errorCode || 401).json({ error: error || "Não autenticado" });
+      }
+
+      const { name, description, data } = req.body;
+      
+      if (!name || !data || !Array.isArray(data)) {
+        return res.status(400).json({ error: "Nome e dados são obrigatórios" });
+      }
+
+      // Validate and normalize contacts
+      const validContacts: { name: string; phone: string; email?: string }[] = [];
+      const errors: string[] = [];
+      
+      for (let i = 0; i < data.length; i++) {
+        const row = data[i];
+        const rowNum = i + 2; // Excel rows start at 1 + header row
+        
+        const name = String(row.nome || row.name || row.Nome || row.Name || "").trim();
+        let phone = String(row.telefone || row.phone || row.Telefone || row.Phone || row.whatsapp || row.WhatsApp || "").trim();
+        const email = String(row.email || row.Email || "").trim();
+        
+        if (!name) {
+          errors.push(`Linha ${rowNum}: Nome vazio`);
+          continue;
+        }
+        
+        // Normalize phone: remove non-digits, ensure starts with country code
+        phone = phone.replace(/\D/g, "");
+        if (phone.length < 10) {
+          errors.push(`Linha ${rowNum}: Telefone inválido (${phone})`);
+          continue;
+        }
+        
+        // Add Brazil country code if not present
+        if (!phone.startsWith("55") && phone.length === 11) {
+          phone = "55" + phone;
+        }
+        
+        validContacts.push({ name, phone, email: email || undefined });
+      }
+      
+      if (validContacts.length === 0) {
+        return res.status(400).json({ 
+          error: "Nenhum contato válido encontrado",
+          errors: errors.slice(0, 10)
+        });
+      }
+
+      // Create contact list
+      const list = await storage.createWhatsappContactList({
+        adminId: admin.id,
+        name,
+        description: description || null,
+        totalContacts: validContacts.length,
+      });
+
+      // Bulk insert contacts
+      await storage.createWhatsappContactsBulk(
+        validContacts.map(c => ({
+          listId: list.id,
+          name: c.name,
+          phone: c.phone,
+          email: c.email || null,
+        }))
+      );
+
+      res.json({
+        success: true,
+        list,
+        imported: validContacts.length,
+        errors: errors.slice(0, 10),
+        totalErrors: errors.length,
+      });
+    } catch (error: any) {
+      console.error("[whatsapp-api] Error importing contacts:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Delete contact list
+  app.delete("/api/whatsapp/contact-lists/:id", async (req: Request, res: Response) => {
+    try {
+      const { admin, error, errorCode } = await validateSessionAndGetAdmin(req);
+      if (!admin) {
+        return res.status(errorCode || 401).json({ error: error || "Não autenticado" });
+      }
+
+      const list = await storage.getWhatsappContactListById(req.params.id);
+      if (!list || list.adminId !== admin.id) {
+        return res.status(404).json({ error: "Lista não encontrada" });
+      }
+
+      await storage.deleteWhatsappContactList(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[whatsapp-api] Error deleting contact list:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ============================================
   // WHATSAPP BROADCASTS (ENVIOS EM MASSA)
   // ============================================
 
