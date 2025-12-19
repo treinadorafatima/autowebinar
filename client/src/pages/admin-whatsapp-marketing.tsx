@@ -3279,11 +3279,18 @@ export default function AdminWhatsAppMarketing() {
                           <SelectValue placeholder="Selecione uma data" />
                         </SelectTrigger>
                         <SelectContent>
-                          {sessionDates?.map((date) => (
-                            <SelectItem key={date} value={date}>
-                              {new Date(date).toLocaleDateString("pt-BR")}
-                            </SelectItem>
-                          ))}
+                          {sessionDates && sessionDates.length > 0 ? (
+                            sessionDates.map((date) => (
+                              <SelectItem key={date} value={date}>
+                                {new Date(date + 'T00:00:00').toLocaleDateString("pt-BR")}
+                              </SelectItem>
+                            ))
+                          ) : (
+                            <div className="px-2 py-4 text-sm text-muted-foreground text-center">
+                              Nenhuma data disponível. <br />
+                              Verifique se há leads com WhatsApp cadastrados.
+                            </div>
+                          )}
                         </SelectContent>
                       </Select>
                     </div>

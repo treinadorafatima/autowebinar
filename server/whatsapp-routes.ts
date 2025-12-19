@@ -898,6 +898,7 @@ export function registerWhatsAppRoutes(app: Express) {
       }
 
       const dates = await storage.getDistinctSessionDatesByWebinar(req.params.webinarId);
+      console.log(`[whatsapp-api] Session dates for webinar ${req.params.webinarId}:`, dates);
       res.json(dates);
     } catch (error: any) {
       console.error("[whatsapp-api] Error getting dates:", error);
