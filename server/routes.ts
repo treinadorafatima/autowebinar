@@ -9597,6 +9597,16 @@ Seja conversacional e objetivo.`;
                         });
                         console.log(`[MP Webhook] PAYMENT CONFIRMED - Updated admin ${pagamento.email}`);
                         
+                        // Reactivate subscription if it was in payment_failed status
+                        const assinatura = await storage.getCheckoutAssinaturaByAdminId(admin.id);
+                        if (assinatura && assinatura.status !== 'active') {
+                          await storage.updateCheckoutAssinatura(assinatura.id, {
+                            status: 'active',
+                            proximoPagamento: expirationDate,
+                          });
+                          console.log(`[MP Webhook] Reactivated subscription ${assinatura.id} from ${assinatura.status} to active`);
+                        }
+                        
                         // Send payment confirmation email (safe - never throws)
                         sendPaymentConfirmedEmailSafe(pagamento.email, pagamento.nome, plano.nome, expirationDate);
                         // Send WhatsApp notification if phone available (prefer admin phone for renewals)
