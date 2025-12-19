@@ -11,7 +11,7 @@ import { storage } from "./storage";
 import * as fs from "fs";
 import * as path from "path";
 
-const logger = pino({ level: "warn" });
+const logger = pino({ level: "error" });
 
 interface WhatsAppConnection {
   socket: WASocket | null;
@@ -96,16 +96,8 @@ function clearStaleSession(accountId: string): void {
 function getRandomBrowserFingerprint(): [string, string, string] {
   // Use standard browser fingerprints that WhatsApp recognizes
   // Format: [browser name, OS name, browser version]
-  const fingerprints: [string, string, string][] = [
-    ["Chrome", "Windows", "10.0"],
-    ["Chrome", "Mac OS", "10.15.7"],
-    ["Chrome", "Linux", ""],
-    ["Firefox", "Windows", "10.0"],
-    ["Firefox", "Mac OS", "10.15.7"],
-    ["Edge", "Windows", "10.0"],
-  ];
-  
-  return fingerprints[Math.floor(Math.random() * fingerprints.length)];
+  // Chrome on Linux is most reliable for server environments
+  return ["Chrome", "Linux", "120.0.0.0"];
 }
 
 function getReconnectDelay(attempts: number): number {
@@ -354,11 +346,11 @@ export async function initWhatsAppConnection(accountId: string, adminId: string)
       syncFullHistory: false,
       markOnlineOnConnect: false,
       generateHighQualityLinkPreview: false,
-      connectTimeoutMs: 60000,
-      defaultQueryTimeoutMs: 60000,
-      keepAliveIntervalMs: 30000,
-      retryRequestDelayMs: 500,
-      qrTimeout: 40000,
+      connectTimeoutMs: 120000,
+      defaultQueryTimeoutMs: 90000,
+      keepAliveIntervalMs: 25000,
+      retryRequestDelayMs: 1000,
+      qrTimeout: 50000,
       emitOwnEvents: true,
     });
 
@@ -612,11 +604,11 @@ export async function initWhatsAppConnectionWithPairingCode(
       syncFullHistory: false,
       markOnlineOnConnect: false,
       generateHighQualityLinkPreview: false,
-      connectTimeoutMs: 60000,
-      defaultQueryTimeoutMs: 60000,
-      keepAliveIntervalMs: 30000,
-      retryRequestDelayMs: 500,
-      qrTimeout: 40000,
+      connectTimeoutMs: 120000,
+      defaultQueryTimeoutMs: 90000,
+      keepAliveIntervalMs: 25000,
+      retryRequestDelayMs: 1000,
+      qrTimeout: 50000,
       emitOwnEvents: true,
     });
 
