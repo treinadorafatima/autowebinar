@@ -3274,25 +3274,12 @@ export default function AdminWhatsAppMarketing() {
                   {broadcastFilterType === "session" && (
                     <div className="space-y-2">
                       <Label>Data da Sessão</Label>
-                      <Select value={broadcastSessionDate} onValueChange={(v) => { setBroadcastSessionDate(v); setPreviewLeads(null); }}>
-                        <SelectTrigger data-testid="select-session-date">
-                          <SelectValue placeholder="Selecione uma data" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {sessionDates && sessionDates.length > 0 ? (
-                            sessionDates.map((date) => (
-                              <SelectItem key={date} value={date}>
-                                {new Date(date + 'T00:00:00').toLocaleDateString("pt-BR")}
-                              </SelectItem>
-                            ))
-                          ) : (
-                            <div className="px-2 py-4 text-sm text-muted-foreground text-center">
-                              Nenhuma data disponível. <br />
-                              Verifique se há leads com WhatsApp cadastrados.
-                            </div>
-                          )}
-                        </SelectContent>
-                      </Select>
+                      <Input
+                        type="date"
+                        value={broadcastSessionDate}
+                        onChange={(e) => { setBroadcastSessionDate(e.target.value); setPreviewLeads(null); }}
+                        data-testid="input-session-date"
+                      />
                     </div>
                   )}
 
