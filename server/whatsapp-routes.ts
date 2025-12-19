@@ -468,10 +468,14 @@ export function registerWhatsAppRoutes(app: Express) {
         return res.status(errorCode || 401).json({ error: error || "Não autenticado" });
       }
 
-      const { label, dailyLimit, priority } = req.body;
+      const { label, dailyLimit, priority, scope } = req.body;
       if (!label) {
         return res.status(400).json({ error: "Label é obrigatório" });
       }
+      
+      // Validate scope if provided
+      const validScopes = ["marketing", "notifications"];
+      const accountScope = scope && validScopes.includes(scope) ? scope : "marketing";
 
       const isSuperadmin = admin.role === "superadmin";
       
@@ -503,6 +507,7 @@ export function registerWhatsAppRoutes(app: Express) {
         dailyLimit: dailyLimit || 100,
         priority: priority || 0,
         status: "disconnected",
+        scope: accountScope,
       });
 
       res.json(account);

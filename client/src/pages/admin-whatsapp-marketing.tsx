@@ -815,7 +815,7 @@ export default function AdminWhatsAppMarketing() {
 
   const createAccountMutation = useMutation({
     mutationFn: async (data: { label: string; dailyLimit: number; priority: number }) => {
-      const res = await apiRequest("POST", "/api/whatsapp/accounts", data);
+      const res = await apiRequest("POST", "/api/whatsapp/accounts", { ...data, scope: "marketing" });
       if (!res.ok) {
         const errorData = await res.json();
         throw new Error(errorData.error || "Erro ao criar conta");

@@ -309,6 +309,7 @@ export default function AdminWhatsAppNotificationsPage() {
         dailyLimit: 500,
         priority: 1,
         provider: "baileys",
+        scope: "notifications",
       });
       return res.json();
     },

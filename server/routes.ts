@@ -6914,13 +6914,14 @@ Seja conversacional e objetivo.`;
         return res.status(403).json({ error: "Acesso negado - apenas superadmin" });
       }
 
-      // Get all WhatsApp accounts that belong to superadmin
-      const accounts = await storage.listWhatsappAccountsByAdmin(admin.id);
+      // Get all WhatsApp accounts that belong to superadmin - filter only notification accounts
+      const allAccounts = await storage.listWhatsappAccountsByAdmin(admin.id);
+      const notificationAccounts = allAccounts.filter((a: any) => a.scope === "notifications");
       const { getWhatsAppStatus } = await import("./whatsapp-service");
       
       // Get status for each account with hourly limit info
       const accountsWithStatus = await Promise.all(
-        accounts.map(async (acc: any) => {
+        notificationAccounts.map(async (acc: any) => {
           const status = await getWhatsAppStatus(acc.id);
           return {
             id: acc.id,
