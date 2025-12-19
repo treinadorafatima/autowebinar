@@ -609,7 +609,9 @@ export default function AdminWhatsAppMarketing() {
   });
 
   // Broadcast states
+  const [broadcastSourceType, setBroadcastSourceType] = useState<"webinar" | "contact_list">("webinar");
   const [broadcastWebinarId, setBroadcastWebinarId] = useState<string>("");
+  const [broadcastContactListId, setBroadcastContactListId] = useState<string>("");
   const [broadcastFilterType, setBroadcastFilterType] = useState<"all" | "date_range" | "session">("all");
   const [broadcastDateStart, setBroadcastDateStart] = useState<string>("");
   const [broadcastDateEnd, setBroadcastDateEnd] = useState<string>("");
@@ -622,6 +624,7 @@ export default function AdminWhatsAppMarketing() {
     mediaUrl: "",
     mediaFileName: "",
     mediaMimeType: "",
+    sendAsVoiceNote: false,
   });
   const [previewLeads, setPreviewLeads] = useState<BroadcastPreview | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
@@ -745,6 +748,11 @@ export default function AdminWhatsAppMarketing() {
       return res.json();
     },
     enabled: !!broadcastWebinarId && activeTab === "broadcasts",
+  });
+
+  const { data: broadcastContactLists } = useQuery<WhatsappContactList[]>({
+    queryKey: ["/api/whatsapp/contact-lists"],
+    enabled: activeTab === "broadcasts",
   });
 
   useEffect(() => {
@@ -1159,22 +1167,31 @@ export default function AdminWhatsAppMarketing() {
       toast({ title: "Preencha a mensagem", variant: "destructive" });
       return;
     }
-    if (!broadcastWebinarId) {
+    
+    if (broadcastSourceType === "webinar" && !broadcastWebinarId) {
       toast({ title: "Selecione um webinar", variant: "destructive" });
       return;
     }
+    if (broadcastSourceType === "contact_list" && !broadcastContactListId) {
+      toast({ title: "Selecione uma lista de contatos", variant: "destructive" });
+      return;
+    }
+
     createBroadcastMutation.mutate({
-      webinarId: broadcastWebinarId,
+      sourceType: broadcastSourceType,
+      webinarId: broadcastSourceType === "webinar" ? broadcastWebinarId : undefined,
+      contactListId: broadcastSourceType === "contact_list" ? broadcastContactListId : undefined,
       name: newBroadcast.name,
       messageText: newBroadcast.messageText,
       messageType: newBroadcast.messageType,
       mediaUrl: newBroadcast.mediaUrl || undefined,
       mediaFileName: newBroadcast.mediaFileName || undefined,
       mediaMimeType: newBroadcast.mediaMimeType || undefined,
-      filterType: broadcastFilterType,
-      filterDateStart: broadcastFilterType === "date_range" ? broadcastDateStart : undefined,
-      filterDateEnd: broadcastFilterType === "date_range" ? broadcastDateEnd : undefined,
-      filterSessionDate: broadcastFilterType === "session" ? broadcastSessionDate : undefined,
+      sendAsVoiceNote: newBroadcast.sendAsVoiceNote,
+      filterType: broadcastSourceType === "webinar" ? broadcastFilterType : undefined,
+      filterDateStart: broadcastSourceType === "webinar" && broadcastFilterType === "date_range" ? broadcastDateStart : undefined,
+      filterDateEnd: broadcastSourceType === "webinar" && broadcastFilterType === "date_range" ? broadcastDateEnd : undefined,
+      filterSessionDate: broadcastSourceType === "webinar" && broadcastFilterType === "session" ? broadcastSessionDate : undefined,
     });
   };
 
@@ -3261,10 +3278,52 @@ export default function AdminWhatsAppMarketing() {
             <DialogHeader>
               <DialogTitle>Novo Envio em Massa</DialogTitle>
               <DialogDescription>
-                Crie um novo envio para os {previewLeads?.count || 0} leads selecionados
+                Configure o envio para {broadcastSourceType === "webinar" ? (previewLeads?.count || 0) + " leads do webinar" : "sua lista de contatos"}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Fonte dos Contatos</Label>
+                <Select 
+                  value={broadcastSourceType} 
+                  onValueChange={(v) => setBroadcastSourceType(v as "webinar" | "contact_list")}
+                >
+                  <SelectTrigger data-testid="select-broadcast-source">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="webinar">Leads de Webinar</SelectItem>
+                    <SelectItem value="contact_list">Lista Importada</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {broadcastSourceType === "contact_list" && (
+                <div className="space-y-2">
+                  <Label>Lista de Contatos</Label>
+                  <Select 
+                    value={broadcastContactListId} 
+                    onValueChange={setBroadcastContactListId}
+                  >
+                    <SelectTrigger data-testid="select-broadcast-contact-list">
+                      <SelectValue placeholder="Selecione uma lista" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {broadcastContactLists?.map(list => (
+                        <SelectItem key={list.id} value={list.id}>
+                          {list.name} ({list.totalContacts} contatos)
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {(!broadcastContactLists || broadcastContactLists.length === 0) && (
+                    <p className="text-xs text-muted-foreground">
+                      Nenhuma lista importada. Vá para a aba "Listas" para importar.
+                    </p>
+                  )}
+                </div>
+              )}
+
               <div className="space-y-2">
                 <Label>Nome do Envio</Label>
                 <Input
@@ -3277,27 +3336,59 @@ export default function AdminWhatsAppMarketing() {
               <div className="space-y-2">
                 <Label>Mensagem</Label>
                 <Textarea
-                  placeholder="Digite a mensagem... Use {nome} para personalizar"
+                  placeholder="Digite a mensagem... Use {{nome}} para personalizar"
                   value={newBroadcast.messageText}
                   onChange={(e) => setNewBroadcast({ ...newBroadcast, messageText: e.target.value })}
                   rows={6}
                   data-testid="input-broadcast-message"
                 />
-                <p className="text-xs text-muted-foreground">Use {"{nome}"} para inserir o nome do lead</p>
+                <p className="text-xs text-muted-foreground">
+                  Merge tags: {"{{nome}}"} = nome do contato | {"{{telefone}}"} = telefone
+                </p>
               </div>
-              {previewLeads && (
+
+              {newBroadcast.messageType === "audio" && (
+                <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
+                  <Switch
+                    checked={newBroadcast.sendAsVoiceNote}
+                    onCheckedChange={(checked) => setNewBroadcast({ ...newBroadcast, sendAsVoiceNote: checked })}
+                    data-testid="switch-voice-note"
+                  />
+                  <div>
+                    <Label className="text-sm">Enviar como gravação de voz</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Aparece como "bolinha" ao invés de player de áudio
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {broadcastSourceType === "webinar" && previewLeads && (
                 <div className="bg-muted/50 p-3 rounded-lg">
                   <p className="text-sm"><strong>{previewLeads.count}</strong> leads serão enviados</p>
                 </div>
               )}
+              {broadcastSourceType === "contact_list" && broadcastContactListId && (
+                <div className="bg-muted/50 p-3 rounded-lg">
+                  <p className="text-sm">
+                    <strong>{broadcastContactLists?.find(l => l.id === broadcastContactListId)?.totalContacts || 0}</strong> contatos serão enviados
+                  </p>
+                </div>
+              )}
             </div>
-            <DialogFooter>
+            <DialogFooter className="gap-2">
               <Button variant="outline" onClick={() => setShowNewBroadcastDialog(false)}>Cancelar</Button>
               <Button 
                 onClick={() => {
                   handleCreateBroadcast();
                 }}
-                disabled={createBroadcastMutation.isPending || !newBroadcast.name || !newBroadcast.messageText}
+                disabled={
+                  createBroadcastMutation.isPending || 
+                  !newBroadcast.name || 
+                  !newBroadcast.messageText ||
+                  (broadcastSourceType === "webinar" && !broadcastWebinarId) ||
+                  (broadcastSourceType === "contact_list" && !broadcastContactListId)
+                }
                 data-testid="button-create-broadcast"
               >
                 {createBroadcastMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}

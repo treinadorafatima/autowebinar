@@ -946,46 +946,87 @@ export function registerWhatsAppRoutes(app: Express) {
       }
 
       const { 
-        webinarId, name, messageText, messageType = 'text', 
+        name, messageText, messageType = 'text', 
         mediaUrl, mediaFileName, mediaMimeType,
-        filterType = 'all', filterDateStart, filterDateEnd, filterSessionDate 
+        sourceType = 'webinar',
+        webinarId, contactListId,
+        filterType = 'all', filterDateStart, filterDateEnd, filterSessionDate,
+        sendAsVoiceNote = false,
       } = req.body;
 
-      if (!webinarId || !name || !messageText) {
-        return res.status(400).json({ error: "webinarId, name e messageText são obrigatórios" });
+      if (!name || !messageText) {
+        return res.status(400).json({ error: "name e messageText são obrigatórios" });
       }
 
-      // Get leads based on filters
-      const filters: { dateStart?: string; dateEnd?: string; sessionDate?: string } = {};
-      if (filterType === 'date_range') {
-        if (filterDateStart) filters.dateStart = filterDateStart;
-        if (filterDateEnd) filters.dateEnd = filterDateEnd;
-      } else if (filterType === 'session' && filterSessionDate) {
-        filters.sessionDate = filterSessionDate;
-      }
+      let recipients: { id?: string; phone: string; name: string | null; sessionDate?: string | null }[] = [];
 
-      const leads = await storage.listLeadsWithWhatsappByWebinar(webinarId, filters);
-      if (leads.length === 0) {
-        return res.status(400).json({ error: "Nenhum lead com WhatsApp encontrado para os filtros selecionados" });
+      if (sourceType === 'contact_list') {
+        if (!contactListId) {
+          return res.status(400).json({ error: "contactListId é obrigatório para listas importadas" });
+        }
+        
+        const contactList = await storage.getWhatsappContactListById(contactListId);
+        if (!contactList || contactList.adminId !== admin.id) {
+          return res.status(404).json({ error: "Lista de contatos não encontrada" });
+        }
+        
+        const contacts = await storage.listWhatsappContactsByList(contactListId);
+        if (contacts.length === 0) {
+          return res.status(400).json({ error: "Lista de contatos está vazia" });
+        }
+        
+        recipients = contacts.map(c => ({
+          id: c.id,
+          phone: c.phone,
+          name: c.name,
+          sessionDate: null,
+        }));
+      } else {
+        if (!webinarId) {
+          return res.status(400).json({ error: "webinarId é obrigatório para leads de webinar" });
+        }
+
+        const filters: { dateStart?: string; dateEnd?: string; sessionDate?: string } = {};
+        if (filterType === 'date_range') {
+          if (filterDateStart) filters.dateStart = filterDateStart;
+          if (filterDateEnd) filters.dateEnd = filterDateEnd;
+        } else if (filterType === 'session' && filterSessionDate) {
+          filters.sessionDate = filterSessionDate;
+        }
+
+        const leads = await storage.listLeadsWithWhatsappByWebinar(webinarId, filters);
+        if (leads.length === 0) {
+          return res.status(400).json({ error: "Nenhum lead com WhatsApp encontrado para os filtros selecionados" });
+        }
+        
+        recipients = leads.map(lead => ({
+          id: lead.id,
+          phone: lead.whatsapp!,
+          name: lead.name || null,
+          sessionDate: lead.capturedAt?.toISOString().split('T')[0] || null,
+        }));
       }
 
       // Create broadcast
       const broadcast = await storage.createWhatsappBroadcast({
         adminId: admin.id,
-        webinarId,
+        webinarId: sourceType === 'webinar' ? webinarId : null,
+        contactListId: sourceType === 'contact_list' ? contactListId : null,
+        sourceType,
         name,
         messageText,
         messageType,
         mediaUrl: mediaUrl || null,
         mediaFileName: mediaFileName || null,
         mediaMimeType: mediaMimeType || null,
-        filterType,
+        sendAsVoiceNote: sendAsVoiceNote || false,
+        filterType: sourceType === 'webinar' ? filterType : null,
         filterDateStart: filterDateStart || null,
         filterDateEnd: filterDateEnd || null,
         filterSessionDate: filterSessionDate || null,
         status: 'draft',
-        totalRecipients: leads.length,
-        pendingCount: leads.length,
+        totalRecipients: recipients.length,
+        pendingCount: recipients.length,
         sentCount: 0,
         failedCount: 0,
         startedAt: null,
@@ -993,12 +1034,13 @@ export function registerWhatsAppRoutes(app: Express) {
       });
 
       // Create recipients
-      const recipientData = leads.map(lead => ({
+      const recipientData = recipients.map(r => ({
         broadcastId: broadcast.id,
-        leadId: lead.id,
-        phone: lead.whatsapp!,
-        name: lead.name || null,
-        sessionDate: lead.capturedAt?.toISOString().split('T')[0] || null,
+        leadId: sourceType === 'webinar' ? r.id! : null,
+        contactId: sourceType === 'contact_list' ? r.id! : null,
+        phone: r.phone,
+        name: r.name,
+        sessionDate: r.sessionDate || null,
         accountId: null,
         status: 'pending' as const,
         attempts: 0,
@@ -1294,7 +1336,14 @@ async function startBroadcastOrchestrator(broadcastId: string, adminId: string) 
             attempts: (recipient.attempts || 0) + 1,
           });
 
-          const messageText = broadcast.messageText.replace(/\{nome\}/gi, recipient.name || 'Olá');
+          // Process merge tags - support both {{tag}} and {tag} syntax
+          let messageText = broadcast.messageText
+            .replace(/\{\{nome\}\}/gi, recipient.name || 'Olá')
+            .replace(/\{nome\}/gi, recipient.name || 'Olá')
+            .replace(/\{\{telefone\}\}/gi, recipient.phone || '')
+            .replace(/\{telefone\}/gi, recipient.phone || '')
+            .replace(/\{\{name\}\}/gi, recipient.name || 'Hi')
+            .replace(/\{name\}/gi, recipient.name || 'Hi');
           
           if (broadcast.messageType === 'text') {
             await sendWhatsAppMessage(selectedAccount.id, recipient.phone, messageText);
@@ -1305,6 +1354,7 @@ async function startBroadcastOrchestrator(broadcastId: string, adminId: string) 
               caption: messageText,
               fileName: broadcast.mediaFileName || undefined,
               mimetype: broadcast.mediaMimeType || undefined,
+              ptt: broadcast.messageType === 'audio' && broadcast.sendAsVoiceNote === true,
             };
             await sendWhatsAppMediaMessage(selectedAccount.id, recipient.phone, mediaMessage);
           }

@@ -965,7 +965,8 @@ export type WhatsappBroadcastInsert = z.infer<typeof whatsappBroadcastInsertSche
 export const whatsappBroadcastRecipients = pgTable("whatsapp_broadcast_recipients", {
   id: text("id").primaryKey(),
   broadcastId: text("broadcast_id").notNull(),
-  leadId: text("lead_id").notNull(),
+  leadId: text("lead_id"), // Nullable: used for webinar leads
+  contactId: text("contact_id"), // Nullable: used for imported contact lists
   phone: text("phone").notNull(),
   name: text("name"),
   sessionDate: text("session_date"),

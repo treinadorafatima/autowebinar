@@ -978,6 +978,7 @@ export interface MediaMessage {
   caption?: string;
   fileName?: string;
   mimetype?: string;
+  ptt?: boolean; // Push-to-talk: true sends audio as voice note (round bubble)
 }
 
 // WhatsApp media limits (in bytes)
@@ -1226,7 +1227,7 @@ export async function sendWhatsAppMediaMessage(
         messageContent = {
           audio: buffer,
           mimetype: media.mimetype || "audio/ogg; codecs=opus",
-          ptt: true,
+          ptt: media.ptt !== undefined ? media.ptt : true, // Default to voice note
         };
         break;
         
