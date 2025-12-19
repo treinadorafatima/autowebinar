@@ -461,6 +461,56 @@ export function registerWhatsAppRoutes(app: Express) {
     }
   });
 
+  // Fix scope for existing accounts based on label patterns (superadmin only)
+  app.post("/api/whatsapp/accounts/fix-scope", async (req: Request, res: Response) => {
+    try {
+      const { admin, error, errorCode } = await validateSessionAndGetAdmin(req);
+      if (!admin || admin.role !== "superadmin") {
+        return res.status(403).json({ error: "Apenas superadmin pode executar esta ação" });
+      }
+
+      const accounts = await storage.listWhatsappAccountsByAdmin(admin.id);
+      const results: { id: string; label: string; oldScope: string; newScope: string }[] = [];
+      
+      // Patterns that indicate notification accounts
+      const notificationPatterns = [
+        /notifica/i,
+        /sistema/i,
+        /notification/i,
+        /lembrete/i,
+        /reminder/i,
+      ];
+
+      for (const account of accounts) {
+        const isNotificationAccount = notificationPatterns.some(pattern => 
+          pattern.test(account.label || "")
+        );
+        
+        const newScope = isNotificationAccount ? "notifications" : "marketing";
+        
+        // Only update if scope is different
+        if (account.scope !== newScope) {
+          await storage.updateWhatsappAccount(account.id, { scope: newScope });
+          results.push({
+            id: account.id,
+            label: account.label || "",
+            oldScope: account.scope || "undefined",
+            newScope,
+          });
+        }
+      }
+
+      res.json({
+        success: true,
+        message: `${results.length} conta(s) atualizada(s)`,
+        updated: results,
+      });
+    } catch (error: any) {
+      console.error("[whatsapp-api] Error fixing account scopes:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.post("/api/whatsapp/accounts", async (req: Request, res: Response) => {
     try {
       const { admin, error, errorCode } = await validateSessionAndGetAdmin(req);
@@ -549,12 +599,15 @@ export function registerWhatsAppRoutes(app: Express) {
         return res.status(403).json({ error: ownership.error });
       }
 
-      const { label, dailyLimit, priority } = req.body;
+      const { label, dailyLimit, priority, scope } = req.body;
       const updateData: Record<string, any> = {};
       
       if (label !== undefined) updateData.label = label;
       if (dailyLimit !== undefined) updateData.dailyLimit = dailyLimit;
       if (priority !== undefined) updateData.priority = priority;
+      if (scope !== undefined && ["marketing", "notifications"].includes(scope)) {
+        updateData.scope = scope;
+      }
 
       const updated = await storage.updateWhatsappAccount(req.params.id, updateData);
       res.json(updated);
