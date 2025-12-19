@@ -969,6 +969,7 @@ export const whatsappBroadcastRecipients = pgTable("whatsapp_broadcast_recipient
   contactId: text("contact_id"), // Nullable: used for imported contact lists
   phone: text("phone").notNull(),
   name: text("name"),
+  email: text("email"), // Email for merge tags
   sessionDate: text("session_date"),
   accountId: text("account_id"),
   status: text("status").notNull().default("pending"),

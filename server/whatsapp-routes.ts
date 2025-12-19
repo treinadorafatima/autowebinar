@@ -958,7 +958,7 @@ export function registerWhatsAppRoutes(app: Express) {
         return res.status(400).json({ error: "name e messageText são obrigatórios" });
       }
 
-      let recipients: { id?: string; phone: string; name: string | null; sessionDate?: string | null }[] = [];
+      let recipients: { id?: string; phone: string; name: string | null; email?: string | null; sessionDate?: string | null }[] = [];
 
       if (sourceType === 'contact_list') {
         if (!contactListId) {
@@ -979,6 +979,7 @@ export function registerWhatsAppRoutes(app: Express) {
           id: c.id,
           phone: c.phone,
           name: c.name,
+          email: (c as any).email || null,
           sessionDate: null,
         }));
       } else {
@@ -1003,6 +1004,7 @@ export function registerWhatsAppRoutes(app: Express) {
           id: lead.id,
           phone: lead.whatsapp!,
           name: lead.name || null,
+          email: lead.email || null,
           sessionDate: lead.capturedAt?.toISOString().split('T')[0] || null,
         }));
       }
@@ -1040,6 +1042,7 @@ export function registerWhatsAppRoutes(app: Express) {
         contactId: sourceType === 'contact_list' ? r.id! : null,
         phone: r.phone,
         name: r.name,
+        email: r.email || null,
         sessionDate: r.sessionDate || null,
         accountId: null,
         status: 'pending' as const,
@@ -1342,6 +1345,8 @@ async function startBroadcastOrchestrator(broadcastId: string, adminId: string) 
             .replace(/\{nome\}/gi, recipient.name || 'Olá')
             .replace(/\{\{telefone\}\}/gi, recipient.phone || '')
             .replace(/\{telefone\}/gi, recipient.phone || '')
+            .replace(/\{\{email\}\}/gi, recipient.email || '')
+            .replace(/\{email\}/gi, recipient.email || '')
             .replace(/\{\{name\}\}/gi, recipient.name || 'Hi')
             .replace(/\{name\}/gi, recipient.name || 'Hi');
           

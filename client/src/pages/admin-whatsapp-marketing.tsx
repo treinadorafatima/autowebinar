@@ -3491,7 +3491,7 @@ export default function AdminWhatsAppMarketing() {
                   data-testid="input-broadcast-message"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Merge tags: {"{{nome}}"} = nome do contato | {"{{telefone}}"} = telefone
+                  Merge tags: {"{{nome}}"} = nome | {"{{email}}"} = email | {"{{telefone}}"} = telefone
                 </p>
               </div>
 
