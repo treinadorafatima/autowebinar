@@ -189,6 +189,9 @@ export default function Checkout() {
   const [recurringPaymentMethod, setRecurringPaymentMethod] = useState<"card" | "pix" | "boleto">("card");
   const [recurringPixData, setRecurringPixData] = useState<{qrCode: string; qrCodeBase64: string; expiresAt: string} | null>(null);
   const [recurringBoletoData, setRecurringBoletoData] = useState<{url: string; barcode: string; expiresAt: string} | null>(null);
+  const [hybridPaymentMethod, setHybridPaymentMethod] = useState<"card" | "pix" | "boleto">("card");
+  const [hybridPixData, setHybridPixData] = useState<{qrCode: string; qrCodeBase64?: string; expiresAt: string; imageUrl?: string} | null>(null);
+  const [hybridBoletoData, setHybridBoletoData] = useState<{url: string; barcode: string; expiresAt: string} | null>(null);
 
   const { data: planos, isLoading: loadingPlanos } = useQuery<Plano[]>({
     queryKey: ["/api/checkout/planos/ativos"],
@@ -296,7 +299,7 @@ export default function Checkout() {
         num_items: 1,
       });
 
-      if (data.gateway === "stripe" && data.clientSecret) {
+      if ((data.gateway === "stripe" || data.gateway === "hibrido") && data.clientSecret) {
         setStripeClientSecret(data.clientSecret);
       }
       
@@ -432,6 +435,43 @@ export default function Checkout() {
       toast({
         title: data.method === 'pix' ? "Pix gerado com sucesso!" : "Boleto gerado com sucesso!",
         description: "Efetue o pagamento para ativar sua assinatura.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro ao gerar pagamento",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Mutation for hybrid mode PIX/Boleto generation (via Mercado Pago)
+  const gerarPixBoletoHibridoMutation = useMutation({
+    mutationFn: async (method: "pix" | "boleto") => {
+      const res = await apiRequest("POST", "/api/checkout/hibrido/pix-boleto", {
+        pagamentoId,
+        method,
+      });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      if (data.method === 'pix' && data.pix) {
+        setHybridPixData({
+          qrCode: data.pix.qrCode,
+          qrCodeBase64: data.pix.qrCodeBase64,
+          expiresAt: data.pix.expiresAt,
+        });
+      } else if (data.method === 'boleto' && data.boleto) {
+        setHybridBoletoData({
+          url: data.boleto.url,
+          barcode: data.boleto.barcode,
+          expiresAt: data.boleto.expiresAt,
+        });
+      }
+      toast({
+        title: data.method === 'pix' ? "Pix gerado com sucesso!" : "Boleto gerado com sucesso!",
+        description: "Efetue o pagamento para ativar seu plano.",
       });
     },
     onError: (error: Error) => {
@@ -1030,6 +1070,7 @@ export default function Checkout() {
   const beneficios = getBeneficios(selectedPlano.beneficios);
   const isProcessing = iniciarMutation.isPending || processarPagamentoMpMutation.isPending || isProcessingPayment;
   const isMercadoPago = selectedPlano.gateway === "mercadopago";
+  const isHibrido = selectedPlano.gateway === "hibrido";
   const isRecorrente = selectedPlano.tipoCobranca === "recorrente";
 
   return (
@@ -1237,6 +1278,12 @@ export default function Checkout() {
                     </div>
                     {isMercadoPago ? (
                       <SiMercadopago className="w-8 h-8 text-[#00b1ea]" />
+                    ) : isHibrido ? (
+                      <div className="flex items-center gap-1">
+                        <SiStripe className="w-6 h-6 text-[#635bff]" />
+                        <span className="text-xs text-slate-400">+</span>
+                        <SiMercadopago className="w-6 h-6 text-[#00b1ea]" />
+                      </div>
                     ) : (
                       <SiStripe className="w-8 h-8 text-[#635bff]" />
                     )}
@@ -1474,7 +1521,229 @@ export default function Checkout() {
                         <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
                       </div>
                     )
-                  ) : !isMercadoPago && stripePromise && stripeClientSecret ? (
+                  ) : isHibrido && pagamentoId ? (
+                    <>
+                      <div className="mb-6">
+                        <Label className="text-sm font-medium text-slate-700 mb-3 block">Escolha a forma de pagamento</Label>
+                        <div className="grid grid-cols-3 gap-3">
+                          <button
+                            type="button"
+                            onClick={() => { setHybridPaymentMethod("card"); setHybridPixData(null); setHybridBoletoData(null); }}
+                            className={`p-4 rounded-lg border-2 transition-all flex flex-col items-center gap-2 ${
+                              hybridPaymentMethod === "card" 
+                                ? "border-blue-500 bg-blue-50" 
+                                : "border-slate-200 hover:border-slate-300"
+                            }`}
+                            data-testid="button-hybrid-method-card"
+                          >
+                            <CreditCard className={`w-6 h-6 ${hybridPaymentMethod === "card" ? "text-blue-500" : "text-slate-400"}`} />
+                            <span className={`text-sm font-medium ${hybridPaymentMethod === "card" ? "text-blue-700" : "text-slate-600"}`}>Cartão</span>
+                            <span className="text-xs text-slate-400">via Stripe</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setHybridPaymentMethod("pix"); setHybridBoletoData(null); }}
+                            className={`p-4 rounded-lg border-2 transition-all flex flex-col items-center gap-2 ${
+                              hybridPaymentMethod === "pix" 
+                                ? "border-emerald-500 bg-emerald-50" 
+                                : "border-slate-200 hover:border-slate-300"
+                            }`}
+                            data-testid="button-hybrid-method-pix"
+                          >
+                            <QrCode className={`w-6 h-6 ${hybridPaymentMethod === "pix" ? "text-emerald-500" : "text-slate-400"}`} />
+                            <span className={`text-sm font-medium ${hybridPaymentMethod === "pix" ? "text-emerald-700" : "text-slate-600"}`}>Pix</span>
+                            <span className="text-xs text-slate-400">via MP</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setHybridPaymentMethod("boleto"); setHybridPixData(null); }}
+                            className={`p-4 rounded-lg border-2 transition-all flex flex-col items-center gap-2 ${
+                              hybridPaymentMethod === "boleto" 
+                                ? "border-orange-500 bg-orange-50" 
+                                : "border-slate-200 hover:border-slate-300"
+                            }`}
+                            data-testid="button-hybrid-method-boleto"
+                          >
+                            <Barcode className={`w-6 h-6 ${hybridPaymentMethod === "boleto" ? "text-orange-500" : "text-slate-400"}`} />
+                            <span className={`text-sm font-medium ${hybridPaymentMethod === "boleto" ? "text-orange-700" : "text-slate-600"}`}>Boleto</span>
+                            <span className="text-xs text-slate-400">via MP</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {hybridPaymentMethod === "card" && stripePromise && stripeClientSecret ? (
+                        <Elements 
+                          stripe={stripePromise} 
+                          options={{ 
+                            clientSecret: stripeClientSecret,
+                            appearance: {
+                              theme: 'stripe',
+                              variables: {
+                                colorPrimary: '#635bff',
+                                colorBackground: '#ffffff',
+                                colorText: '#1e293b',
+                                fontFamily: 'system-ui, -apple-system, sans-serif',
+                                borderRadius: '8px',
+                              },
+                            },
+                          }}
+                        >
+                          <StripeCheckoutForm 
+                            onSuccess={() => {
+                              const successParams = new URLSearchParams({ gateway: 'hibrido' });
+                              if (affiliateCode) successParams.set('ref', affiliateCode);
+                              if (selectedPlano) {
+                                successParams.set('planoId', String(selectedPlano.id));
+                                successParams.set('plano', selectedPlano.nome);
+                                successParams.set('valor', String(selectedPlano.preco / 100));
+                              }
+                              setLocation(`/pagamento/sucesso?${successParams.toString()}`);
+                            }}
+                            onError={(error) => toast({ title: "Erro", description: error, variant: "destructive" })}
+                            isProcessing={isProcessingPayment}
+                            setIsProcessing={setIsProcessingPayment}
+                            returnUrlParams={(() => {
+                              const params = new URLSearchParams();
+                              if (affiliateCode) params.set('ref', affiliateCode);
+                              if (selectedPlano) {
+                                params.set('planoId', String(selectedPlano.id));
+                                params.set('plano', selectedPlano.nome);
+                                params.set('valor', String(selectedPlano.preco / 100));
+                              }
+                              return params;
+                            })()}
+                          />
+                        </Elements>
+                      ) : hybridPaymentMethod === "card" ? (
+                        <div className="flex items-center justify-center py-12">
+                          <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+                        </div>
+                      ) : null}
+
+                      {hybridPaymentMethod === "pix" && (
+                        <div className="space-y-4">
+                          {!hybridPixData ? (
+                            <div className="text-center">
+                              <Button
+                                onClick={() => gerarPixBoletoHibridoMutation.mutate("pix")}
+                                disabled={gerarPixBoletoHibridoMutation.isPending}
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-6 text-lg"
+                                data-testid="button-generate-hybrid-pix"
+                              >
+                                {gerarPixBoletoHibridoMutation.isPending ? (
+                                  <>
+                                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                                    Gerando Pix...
+                                  </>
+                                ) : (
+                                  <>
+                                    <QrCode className="w-5 h-5 mr-2" />
+                                    Gerar QR Code Pix
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="text-center space-y-4">
+                              <div className="bg-white p-4 rounded-lg border inline-block">
+                                {hybridPixData.qrCodeBase64 && (
+                                  <img 
+                                    src={`data:image/png;base64,${hybridPixData.qrCodeBase64}`} 
+                                    alt="QR Code Pix" 
+                                    className="w-48 h-48 mx-auto"
+                                  />
+                                )}
+                              </div>
+                              <div className="space-y-2">
+                                <p className="text-sm text-slate-600">Ou copie o código Pix:</p>
+                                <div className="flex gap-2 max-w-md mx-auto">
+                                  <Input 
+                                    value={hybridPixData.qrCode} 
+                                    readOnly 
+                                    className="text-xs"
+                                  />
+                                  <Button
+                                    variant="outline"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(hybridPixData.qrCode);
+                                      toast({ title: "Código copiado!" });
+                                    }}
+                                    data-testid="button-copy-hybrid-pix"
+                                  >
+                                    Copiar
+                                  </Button>
+                                </div>
+                              </div>
+                              <p className="text-xs text-slate-500">
+                                Válido até: {new Date(hybridPixData.expiresAt).toLocaleString('pt-BR')}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {hybridPaymentMethod === "boleto" && (
+                        <div className="space-y-4">
+                          {!hybridBoletoData ? (
+                            <div className="text-center">
+                              <Button
+                                onClick={() => gerarPixBoletoHibridoMutation.mutate("boleto")}
+                                disabled={gerarPixBoletoHibridoMutation.isPending}
+                                className="bg-orange-600 hover:bg-orange-700 text-white px-8 py-6 text-lg"
+                                data-testid="button-generate-hybrid-boleto"
+                              >
+                                {gerarPixBoletoHibridoMutation.isPending ? (
+                                  <>
+                                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                                    Gerando Boleto...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Barcode className="w-5 h-5 mr-2" />
+                                    Gerar Boleto
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="text-center space-y-4">
+                              <div className="p-4 bg-slate-50 rounded-lg">
+                                <p className="text-sm text-slate-600 mb-2">Código de barras:</p>
+                                <div className="flex gap-2 max-w-md mx-auto">
+                                  <Input 
+                                    value={hybridBoletoData.barcode} 
+                                    readOnly 
+                                    className="text-xs font-mono"
+                                  />
+                                  <Button
+                                    variant="outline"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(hybridBoletoData.barcode);
+                                      toast({ title: "Código copiado!" });
+                                    }}
+                                    data-testid="button-copy-hybrid-boleto"
+                                  >
+                                    Copiar
+                                  </Button>
+                                </div>
+                              </div>
+                              <Button
+                                onClick={() => window.open(hybridBoletoData.url, '_blank')}
+                                className="bg-orange-600 hover:bg-orange-700"
+                                data-testid="button-open-hybrid-boleto"
+                              >
+                                <Barcode className="w-4 h-4 mr-2" />
+                                Abrir Boleto
+                              </Button>
+                              <p className="text-xs text-slate-500">
+                                Vencimento: {new Date(hybridBoletoData.expiresAt).toLocaleDateString('pt-BR')}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  ) : !isMercadoPago && !isHibrido && stripePromise && stripeClientSecret ? (
                     <Elements 
                       stripe={stripePromise} 
                       options={{ 
@@ -1561,7 +1830,7 @@ export default function Checkout() {
                 <div className="space-y-3">
                   <p className="text-sm font-medium text-slate-300">Formas de Pagamento Aceitas:</p>
                   <p className="text-white text-sm font-semibold">
-                    {isMercadoPago ? "Cartão, Pix ou Boleto" : "Cartão ou Boleto"}
+                    {isMercadoPago || isHibrido ? "Cartão, Pix ou Boleto" : "Cartão ou Boleto"}
                   </p>
                   <div className="space-y-2">
                     <div className="flex items-center gap-3 p-3 bg-white/5 rounded-lg">
@@ -1572,7 +1841,7 @@ export default function Checkout() {
                         <SiMastercard className="w-6 h-6" />
                       </div>
                     </div>
-                    {isMercadoPago && (
+                    {(isMercadoPago || isHibrido) && (
                       <div className="flex items-center gap-3 p-3 bg-white/5 rounded-lg">
                         <QrCode className="w-5 h-5 text-emerald-400" />
                         <span>Pix</span>

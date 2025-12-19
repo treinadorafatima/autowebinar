@@ -518,6 +518,7 @@ export default function AdminCheckoutPlanos() {
                     <SelectContent>
                       <SelectItem value="mercadopago">Mercado Pago</SelectItem>
                       <SelectItem value="stripe">Stripe</SelectItem>
+                      <SelectItem value="hibrido">Híbrido (Cartão via Stripe + PIX/Boleto via MP)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

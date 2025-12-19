@@ -7340,7 +7340,7 @@ Seja conversacional e objetivo.`;
       let subscriptionId = null;
       let mpInitPoint = null;
       
-      if (plano.gateway === 'stripe') {
+      if (plano.gateway === 'stripe' || plano.gateway === 'hibrido') {
         const stripeSecretKey = await storage.getCheckoutConfig('STRIPE_SECRET_KEY');
         if (stripeSecretKey) {
           try {
@@ -8442,6 +8442,206 @@ Seja conversacional e objetivo.`;
       res.json(responseData);
     } catch (error: any) {
       console.error('[MP Subscription Pix/Boleto] Error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Checkout - Gerar Pix/Boleto via Mercado Pago para modo Híbrido (pagamento único)
+  app.post("/api/checkout/hibrido/pix-boleto", async (req, res) => {
+    try {
+      const { pagamentoId, method } = req.body;
+      
+      if (!method || !['pix', 'boleto'].includes(method)) {
+        return res.status(400).json({ error: "Método de pagamento inválido" });
+      }
+
+      const pagamento = await storage.getCheckoutPagamentoById(pagamentoId);
+      if (!pagamento) {
+        return res.status(404).json({ error: "Pagamento não encontrado" });
+      }
+
+      const plano = await storage.getCheckoutPlanoById(pagamento.planoId);
+      if (!plano) {
+        return res.status(404).json({ error: "Plano não encontrado" });
+      }
+
+      // Verify this is a hybrid plan
+      if (plano.gateway !== 'hibrido') {
+        return res.status(400).json({ error: "Este endpoint é apenas para planos híbridos" });
+      }
+
+      const accessToken = await storage.getCheckoutConfig('MERCADOPAGO_ACCESS_TOKEN');
+      if (!accessToken) {
+        return res.status(500).json({ error: "Mercado Pago não configurado" });
+      }
+
+      // Get base URL for webhooks
+      const protocol = req.headers['x-forwarded-proto'] || 'https';
+      const host = req.headers['x-forwarded-host'] || req.headers.host;
+      const baseUrl = `${protocol}://${host}`;
+
+      // Clean document number
+      const docNumber = (pagamento.cpf || '').replace(/\D/g, '');
+      const docType = docNumber.length === 14 ? 'CNPJ' : 'CPF';
+
+      // Set expiration date based on method
+      const expirationDate = new Date();
+      if (method === 'pix') {
+        expirationDate.setMinutes(expirationDate.getMinutes() + 30); // 30 minutes for pix
+      } else {
+        expirationDate.setDate(expirationDate.getDate() + 3); // 3 days for boleto
+      }
+
+      // Create a direct payment request for Pix/Boleto
+      const paymentRequest: any = {
+        transaction_amount: plano.preco / 100,
+        description: plano.nome,
+        payment_method_id: method === 'pix' ? 'pix' : 'bolbradesco',
+        date_of_expiration: expirationDate.toISOString(),
+        external_reference: pagamentoId,
+        notification_url: `${baseUrl}/webhook/mercadopago`,
+        payer: {
+          email: pagamento.email,
+          first_name: (pagamento.nome || '').split(' ')[0],
+          last_name: (pagamento.nome || '').split(' ').slice(1).join(' ') || '',
+          identification: {
+            type: docType,
+            number: docNumber,
+          },
+        },
+      };
+
+      console.log(`[Hybrid ${method.toUpperCase()}] Creating payment:`, JSON.stringify(paymentRequest, null, 2));
+
+      const mpResponse = await fetch('https://api.mercadopago.com/v1/payments', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+          'X-Idempotency-Key': `${pagamentoId}-hybrid-${method}-${Date.now()}`,
+        },
+        body: JSON.stringify(paymentRequest),
+      });
+
+      const mpData = await mpResponse.json();
+      console.log(`[Hybrid ${method.toUpperCase()}] Response:`, JSON.stringify(mpData, null, 2));
+
+      if (!mpResponse.ok) {
+        console.error(`[Hybrid ${method.toUpperCase()}] Error:`, mpData);
+        return res.status(400).json({ 
+          error: mpData.message || `Erro ao gerar ${method === 'pix' ? 'Pix' : 'Boleto'}`,
+          details: mpData,
+        });
+      }
+
+      // Update payment record with Pix/Boleto data
+      const updateData: any = {
+        status: 'pending',
+        statusDetail: mpData.status,
+        metodoPagamento: method,
+        mercadopagoPaymentId: mpData.id?.toString(),
+        tipoAssinatura: 'unico',
+      };
+
+      let responseData: any = { method, paymentId: mpData.id };
+
+      if (method === 'pix') {
+        const pixData = mpData.point_of_interaction?.transaction_data;
+        if (pixData) {
+          updateData.pixQrCode = pixData.qr_code;
+          updateData.pixCopiaCola = pixData.qr_code;
+          updateData.pixExpiresAt = expirationDate;
+          
+          responseData.pix = {
+            qrCode: pixData.qr_code,
+            qrCodeBase64: pixData.qr_code_base64,
+            expiresAt: expirationDate.toISOString(),
+          };
+        }
+      } else {
+        // Boleto
+        const boletoUrl = mpData.transaction_details?.external_resource_url;
+        const barcode = mpData.barcode?.content;
+        
+        updateData.boletoUrl = boletoUrl;
+        updateData.boletoCodigo = barcode;
+        updateData.boletoExpiresAt = expirationDate;
+        
+        responseData.boleto = {
+          url: boletoUrl,
+          barcode: barcode || '',
+          expiresAt: expirationDate.toISOString(),
+        };
+      }
+
+      await storage.updateCheckoutPagamento(pagamentoId, updateData);
+
+      // Send notifications
+      const methodName = method === 'pix' ? 'PIX' : 'Boleto';
+      
+      if (method === 'pix' && responseData.pix) {
+        // Send PIX generated notifications
+        import("./email").then(({ sendPixGeneratedEmail }) => {
+          sendPixGeneratedEmail(
+            pagamento.email,
+            pagamento.nome,
+            plano.nome,
+            responseData.pix.qrCode,
+            null,
+            expirationDate,
+            plano.preco
+          ).catch(err => {
+            console.error(`[Hybrid PIX] Error sending PIX generated email:`, err);
+          });
+        });
+        
+        import("./whatsapp-notifications").then(({ sendWhatsAppPixGeneratedSafe }) => {
+          const expirationTimeStr = expirationDate.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+          sendWhatsAppPixGeneratedSafe(
+            pagamento.telefone,
+            pagamento.nome,
+            plano.nome,
+            plano.preco,
+            responseData.pix.qrCode,
+            expirationTimeStr
+          ).catch(err => {
+            console.error(`[Hybrid PIX] Error sending PIX generated WhatsApp:`, err);
+          });
+        });
+      } else if (method === 'boleto' && responseData.boleto) {
+        // Send Boleto generated notifications
+        import("./email").then(({ sendBoletoGeneratedEmail }) => {
+          sendBoletoGeneratedEmail(
+            pagamento.email,
+            pagamento.nome,
+            plano.nome,
+            responseData.boleto.url,
+            responseData.boleto.barcode,
+            expirationDate,
+            plano.preco
+          ).catch(err => {
+            console.error(`[Hybrid Boleto] Error sending Boleto generated email:`, err);
+          });
+        });
+        
+        import("./whatsapp-notifications").then(({ sendWhatsAppBoletoGeneratedSafe }) => {
+          const dueDateStr = expirationDate.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+          sendWhatsAppBoletoGeneratedSafe(
+            pagamento.telefone,
+            pagamento.nome,
+            plano.nome,
+            plano.preco,
+            responseData.boleto.url,
+            dueDateStr
+          ).catch(err => {
+            console.error(`[Hybrid Boleto] Error sending Boleto generated WhatsApp:`, err);
+          });
+        });
+      }
+
+      res.json(responseData);
+    } catch (error: any) {
+      console.error('[Hybrid Pix/Boleto] Error:', error);
       res.status(500).json({ error: error.message });
     }
   });
