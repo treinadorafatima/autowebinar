@@ -981,20 +981,11 @@ export default function AdminWhatsAppNotificationsPage() {
                   <div className="text-center">
                     <p className="font-medium">WhatsApp Desconectado</p>
                     <p className="text-sm text-muted-foreground">
-                      Escolha um método para conectar
+                      Clique para gerar o QR Code de conexão
                     </p>
                   </div>
                   <div className="flex flex-col gap-2 w-full max-w-xs">
                     <Button
-                      onClick={() => setShowPairingCodeInput(true)}
-                      className="w-full"
-                      data-testid="button-connect-pairing"
-                    >
-                      <Smartphone className="w-4 h-4 mr-2" />
-                      Conectar com Código (Recomendado)
-                    </Button>
-                    <Button
-                      variant="outline"
                       onClick={() => notificationStatus?.accountId && connectMutation.mutate(notificationStatus.accountId)}
                       disabled={connectMutation.isPending}
                       className="w-full"
@@ -1007,9 +998,6 @@ export default function AdminWhatsAppNotificationsPage() {
                       )}
                       Conectar via QR Code
                     </Button>
-                    <p className="text-xs text-muted-foreground text-center mt-2">
-                      O código de pareamento é mais confiável em servidores
-                    </p>
                     <Button
                       variant="ghost"
                       size="sm"
