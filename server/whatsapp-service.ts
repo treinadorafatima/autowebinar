@@ -169,7 +169,13 @@ async function handleIncomingMessage(accountId: string, senderPhone: string, tex
     const recentMessages = await storage.listAiMessagesByConversation(conversation.id, agent.memoryLength);
     const knowledgeFiles = await storage.listAiAgentFiles(agent.id);
     
-    const response = await processMessage(agent, textContent, recentMessages, knowledgeFiles);
+    const calendarContext = agent.calendarEnabled ? {
+      adminId: agent.adminId,
+      contactPhone: senderPhone,
+      contactName: conversation.contactName || undefined,
+    } : undefined;
+    
+    const response = await processMessage(agent, textContent, recentMessages, knowledgeFiles, calendarContext);
     
     if (response.error) {
       console.error(`[whatsapp-ai] AI processing error for ${senderPhone}:`, response.error);

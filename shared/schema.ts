@@ -1133,6 +1133,9 @@ export const aiAgents = pgTable("ai_agents", {
   awayMessage: text("away_message").default("Olá! No momento estou fora do horário de atendimento. Retornarei em breve!"),
   escalationKeywords: text("escalation_keywords").default(""), // Palavras-chave para escalar (separadas por vírgula)
   escalationMessage: text("escalation_message").default("Vou transferir você para um atendente humano."),
+  calendarEnabled: boolean("calendar_enabled").notNull().default(false), // Habilitar agendamentos via calendário
+  calendarDuration: integer("calendar_duration").notNull().default(60), // Duração padrão do agendamento em minutos
+  calendarInstructions: text("calendar_instructions").default(""), // Instruções adicionais para o agente sobre agendamentos
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

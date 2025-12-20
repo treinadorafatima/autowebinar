@@ -411,6 +411,7 @@ export interface IStorage {
   updateGoogleCalendarToken(adminId: string, data: Partial<GoogleCalendarTokenInsert>): Promise<void>;
   // Calendar Events
   listCalendarEventsByAdmin(adminId: string, from?: Date, to?: Date): Promise<CalendarEvent[]>;
+  listCalendarEventsByAdminAndPhone(adminId: string, phone: string): Promise<CalendarEvent[]>;
   getCalendarEventById(id: string): Promise<CalendarEvent | undefined>;
   getCalendarEventByGoogleId(googleEventId: string, adminId: string): Promise<CalendarEvent | undefined>;
   createCalendarEvent(data: CalendarEventInsert): Promise<CalendarEvent>;
@@ -6154,6 +6155,15 @@ Apos o pagamento, seu acesso sera renovado automaticamente!
     }
 
     return await query;
+  }
+
+  async listCalendarEventsByAdminAndPhone(adminId: string, phone: string): Promise<CalendarEvent[]> {
+    return await db.select().from(calendarEvents)
+      .where(and(
+        eq(calendarEvents.adminId, adminId),
+        eq(calendarEvents.attendeePhone, phone)
+      ))
+      .orderBy(desc(calendarEvents.startTime));
   }
 
   async getCalendarEventById(id: string): Promise<CalendarEvent | undefined> {
