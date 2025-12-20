@@ -366,15 +366,18 @@ export function registerAiAgentsRoutes(app: Express) {
       }
 
       const { fileName, fileUrl, fileType, fileSize, extractedText } = req.body;
-      if (!fileName || !fileUrl || !fileType) {
-        return res.status(400).json({ error: "fileName, fileUrl e fileType são obrigatórios" });
+      if (!fileName) {
+        return res.status(400).json({ error: "fileName é obrigatório" });
+      }
+      if (!fileUrl && !extractedText) {
+        return res.status(400).json({ error: "Informe uma URL ou conteúdo de texto" });
       }
 
       const file = await storage.createAiAgentFile({
         agentId: agent.id,
         fileName,
-        fileUrl,
-        fileType,
+        fileUrl: fileUrl || "text://inline",
+        fileType: fileType || "text",
         fileSize: fileSize || 0,
         extractedText: extractedText || null,
       });
