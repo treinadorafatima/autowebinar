@@ -24,9 +24,10 @@ import { Progress } from "@/components/ui/progress";
 const WIZARD_STEPS = [
   { id: 1, title: "Identidade", description: "Nome e conta WhatsApp", icon: Bot },
   { id: 2, title: "Inteligência", description: "Provedor e modelo de IA", icon: Brain },
-  { id: 3, title: "Personalidade", description: "Prompt e base de conhecimento", icon: Sparkles },
-  { id: 4, title: "Memória", description: "Comportamento e respostas", icon: Zap },
-  { id: 5, title: "Disponibilidade", description: "Horários e escalação", icon: Calendar },
+  { id: 3, title: "Personalidade", description: "Prompt do sistema", icon: Sparkles },
+  { id: 4, title: "Conhecimento", description: "Base de arquivos e textos", icon: FileText },
+  { id: 5, title: "Memória", description: "Comportamento e respostas", icon: Zap },
+  { id: 6, title: "Disponibilidade", description: "Horários e escalação", icon: Calendar },
 ];
 
 const EXAMPLE_PROMPT = `Você é o Assistente Virtual da [Nome da Empresa], especialista em atendimento acolhedor.
@@ -123,6 +124,10 @@ export default function AdminAiAgents() {
   const [isProcessingFile, setIsProcessingFile] = useState(false);
   const [wizardStep, setWizardStep] = useState(1);
   const [pendingFiles, setPendingFiles] = useState<Array<{ fileName: string; fileUrl: string; extractedText?: string }>>([]);
+  const [promptGeneratorOpen, setPromptGeneratorOpen] = useState(false);
+  const [promptContext, setPromptContext] = useState("");
+  const [promptFiles, setPromptFiles] = useState<Array<{ name: string; content: string }>>([]);
+  const [isGeneratingPrompt, setIsGeneratingPrompt] = useState(false);
   
   const [formData, setFormData] = useState({
     whatsappAccountId: "",
@@ -342,6 +347,8 @@ export default function AdminAiAgents() {
         return true;
       case 5:
         return true;
+      case 6:
+        return true;
       default:
         return false;
     }
@@ -431,7 +438,7 @@ export default function AdminAiAgents() {
       toast({ title: messages[wizardStep] || "Preencha os campos obrigatórios", variant: "destructive" });
       return;
     }
-    if (wizardStep < 5) {
+    if (wizardStep < 6) {
       setWizardStep(wizardStep + 1);
     }
   };
@@ -913,23 +920,192 @@ export default function AdminAiAgents() {
                     </div>
                   </div>
 
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setFormData({ ...formData, systemPrompt: EXAMPLE_PROMPT })}
-                    className="w-full"
-                    data-testid="button-use-example"
-                  >
-                    <Sparkles className="h-4 w-4 mr-2" />
-                    Usar Exemplo como Base
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setFormData({ ...formData, systemPrompt: EXAMPLE_PROMPT })}
+                      className="flex-1"
+                      data-testid="button-use-example"
+                    >
+                      <FileText className="h-4 w-4 mr-2" />
+                      Usar Exemplo
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="default"
+                      onClick={() => setPromptGeneratorOpen(true)}
+                      className="flex-1"
+                      data-testid="button-open-generator"
+                    >
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      Gerador com IA
+                    </Button>
+                  </div>
 
-                  <div className="space-y-4 p-4 border rounded-lg">
-                    <Label className="flex items-center gap-2">
-                      <FileText className="h-4 w-4" />
-                      Base de Conhecimento (opcional)
-                    </Label>
-                    
+                  {promptGeneratorOpen && (
+                    <div className="space-y-4 p-4 border-2 border-primary/30 rounded-lg bg-primary/5">
+                      <div className="flex items-center justify-between">
+                        <Label className="flex items-center gap-2 font-semibold">
+                          <Sparkles className="h-4 w-4 text-primary" />
+                          Gerador de Prompt com IA
+                        </Label>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            setPromptGeneratorOpen(false);
+                            setPromptContext("");
+                            setPromptFiles([]);
+                          }}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      
+                      <p className="text-sm text-muted-foreground">
+                        Descreva seu negócio, produtos, serviços e como deseja que a IA atenda seus clientes. 
+                        Você pode anexar arquivos com informações adicionais.
+                      </p>
+
+                      {promptFiles.length > 0 && (
+                        <div className="space-y-2">
+                          <Label className="text-sm">Arquivos anexados ({promptFiles.length})</Label>
+                          <div className="flex flex-wrap gap-2">
+                            {promptFiles.map((file, index) => (
+                              <Badge key={index} variant="secondary" className="gap-1">
+                                <File className="h-3 w-3" />
+                                {file.name}
+                                <button
+                                  type="button"
+                                  onClick={() => setPromptFiles(promptFiles.filter((_, i) => i !== index))}
+                                  className="ml-1 hover:text-destructive"
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="space-y-2">
+                        <Label className="text-sm">Importar Arquivos (opcional)</Label>
+                        <input
+                          type="file"
+                          accept=".txt,.md,.csv,.json,.pdf"
+                          multiple
+                          onChange={async (e) => {
+                            const files = e.target.files;
+                            if (!files) return;
+                            
+                            for (const file of Array.from(files)) {
+                              try {
+                                const text = await file.text();
+                                setPromptFiles(prev => [...prev, { 
+                                  name: file.name, 
+                                  content: text.substring(0, 15000)
+                                }]);
+                              } catch (err) {
+                                toast({ title: `Erro ao ler ${file.name}`, variant: "destructive" });
+                              }
+                            }
+                            e.target.value = "";
+                          }}
+                          className="block w-full text-sm text-muted-foreground file:mr-2 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:font-medium file:bg-primary file:text-primary-foreground hover:file:bg-primary/90 file:cursor-pointer cursor-pointer"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Anexe FAQ, catálogos, políticas, scripts - máx. 15.000 caracteres por arquivo
+                        </p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Descreva seu negócio e como deseja o atendimento *</Label>
+                        <Textarea
+                          placeholder="Ex: Sou uma loja de roupas femininas em São Paulo. Vendemos vestidos, blusas e acessórios. Quero um atendimento amigável, que ajude as clientes a escolher peças, informe sobre tamanhos, preços e formas de pagamento. O tom deve ser descontraído mas profissional..."
+                          value={promptContext}
+                          onChange={(e) => setPromptContext(e.target.value)}
+                          className="min-h-[120px]"
+                          data-testid="input-prompt-context"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          {promptContext.length} caracteres
+                        </p>
+                      </div>
+
+                      <Button
+                        type="button"
+                        onClick={async () => {
+                          if (!promptContext.trim()) {
+                            toast({ title: "Descreva seu negócio primeiro", variant: "destructive" });
+                            return;
+                          }
+                          if (!formData.apiKey) {
+                            toast({ title: "Configure a chave de API na etapa anterior", variant: "destructive" });
+                            return;
+                          }
+                          
+                          setIsGeneratingPrompt(true);
+                          try {
+                            const response = await fetch("/api/ai-agents/generate-prompt", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                provider: formData.provider,
+                                model: formData.model,
+                                apiKey: formData.apiKey,
+                                context: promptContext,
+                                files: promptFiles,
+                              }),
+                            });
+                            
+                            if (!response.ok) {
+                              const error = await response.json();
+                              throw new Error(error.message || "Erro ao gerar prompt");
+                            }
+                            
+                            const data = await response.json();
+                            setFormData({ ...formData, systemPrompt: data.prompt });
+                            setPromptGeneratorOpen(false);
+                            setPromptContext("");
+                            setPromptFiles([]);
+                            toast({ title: "Prompt gerado com sucesso!" });
+                          } catch (err: any) {
+                            toast({ title: err.message || "Erro ao gerar prompt", variant: "destructive" });
+                          } finally {
+                            setIsGeneratingPrompt(false);
+                          }
+                        }}
+                        disabled={isGeneratingPrompt || !promptContext.trim()}
+                        className="w-full"
+                        data-testid="button-generate-prompt"
+                      >
+                        {isGeneratingPrompt ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Gerando Prompt...
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="h-4 w-4 mr-2" />
+                            Gerar Prompt com IA
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {wizardStep === 4 && (
+              <div className="space-y-6">
+                <div className="text-center mb-4">
+                  <h3 className="text-lg font-semibold">Base de Conhecimento</h3>
+                  <p className="text-sm text-muted-foreground">Adicione informações que o agente deve consultar</p>
+                </div>
+
+                <div className="space-y-4">
                     <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg text-xs space-y-2">
                       <p className="font-medium text-blue-600 dark:text-blue-400">Como usar a Base de Conhecimento:</p>
                       <ul className="list-disc list-inside text-muted-foreground space-y-1">
@@ -938,7 +1114,7 @@ export default function AdminAiAgents() {
                         <li><strong>URL:</strong> Link direto para .txt ou .pdf hospedado na web</li>
                       </ul>
                       <p className="text-amber-600 dark:text-amber-400 mt-1">
-                        Links do Google Drive/Dropbox não funcionam diretamente. Copie o texto do arquivo e cole aqui.
+                        O agente SEMPRE consulta a base de conhecimento antes de responder.
                       </p>
                     </div>
 
@@ -1087,7 +1263,7 @@ export default function AdminAiAgents() {
               </div>
             )}
 
-            {wizardStep === 4 && (
+            {wizardStep === 5 && (
               <div className="space-y-6">
                 <div className="text-center mb-4">
                   <h3 className="text-lg font-semibold">Memória e Comportamento</h3>
@@ -1179,7 +1355,7 @@ export default function AdminAiAgents() {
               </div>
             )}
 
-            {wizardStep === 5 && (
+            {wizardStep === 6 && (
               <div className="space-y-6">
                 <div className="text-center mb-4">
                   <h3 className="text-lg font-semibold">Disponibilidade e Escalação</h3>
@@ -1385,7 +1561,7 @@ export default function AdminAiAgents() {
                   Salvar
                 </Button>
               )}
-              {wizardStep < 5 ? (
+              {wizardStep < 6 ? (
                 <Button 
                   onClick={handleWizardNext}
                   className="flex-1 sm:flex-none"
