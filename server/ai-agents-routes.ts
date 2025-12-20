@@ -342,7 +342,7 @@ export function registerAiAgentsRoutes(app: Express) {
         return res.status(403).json({ error: "Acesso negado" });
       }
 
-      const files = await storage.getAiAgentFiles(agent.id);
+      const files = await storage.listAiAgentFiles(agent.id);
       res.json(files);
     } catch (error: any) {
       console.error("[ai-agents] Error listing files:", error);
