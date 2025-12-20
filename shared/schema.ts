@@ -1205,3 +1205,46 @@ export const aiUsageStats = pgTable("ai_usage_stats", {
 export type AiUsageStats = typeof aiUsageStats.$inferSelect;
 export const aiUsageStatsInsertSchema = createInsertSchema(aiUsageStats).omit({ id: true });
 export type AiUsageStatsInsert = z.infer<typeof aiUsageStatsInsertSchema>;
+
+// Google Calendar Tokens - tokens OAuth per user for calendar integration
+export const googleCalendarTokens = pgTable("google_calendar_tokens", {
+  id: text("id").primaryKey(),
+  adminId: text("admin_id").notNull().unique(), // FK para admins (1 token por usuário)
+  accessToken: text("access_token").notNull(), // Token de acesso (criptografado)
+  refreshToken: text("refresh_token").notNull(), // Token de refresh (criptografado)
+  expiryDate: integer("expiry_date"), // Unix timestamp de expiração
+  calendarId: text("calendar_id").notNull().default("primary"), // ID do calendário
+  isConnected: boolean("is_connected").notNull().default(true),
+  lastSyncAt: timestamp("last_sync_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type GoogleCalendarToken = typeof googleCalendarTokens.$inferSelect;
+export const googleCalendarTokenInsertSchema = createInsertSchema(googleCalendarTokens).omit({ id: true, createdAt: true, updatedAt: true });
+export type GoogleCalendarTokenInsert = z.infer<typeof googleCalendarTokenInsertSchema>;
+
+// Calendar Events - local cache of calendar events
+export const calendarEvents = pgTable("calendar_events", {
+  id: text("id").primaryKey(),
+  adminId: text("admin_id").notNull(), // FK para admins
+  googleEventId: text("google_event_id"), // ID do evento no Google Calendar
+  title: text("title").notNull(),
+  description: text("description"),
+  startTime: timestamp("start_time").notNull(),
+  endTime: timestamp("end_time").notNull(),
+  location: text("location"),
+  attendeeEmail: text("attendee_email"),
+  attendeeName: text("attendee_name"),
+  attendeePhone: text("attendee_phone"),
+  status: text("status").notNull().default("confirmed"), // confirmed, cancelled, rescheduled
+  source: text("source").notNull().default("manual"), // manual, whatsapp, api
+  metadata: text("metadata"), // JSON com dados extras
+  syncedAt: timestamp("synced_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type CalendarEvent = typeof calendarEvents.$inferSelect;
+export const calendarEventInsertSchema = createInsertSchema(calendarEvents).omit({ id: true, createdAt: true, updatedAt: true });
+export type CalendarEventInsert = z.infer<typeof calendarEventInsertSchema>;
