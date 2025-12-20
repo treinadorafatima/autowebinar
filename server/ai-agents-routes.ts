@@ -317,7 +317,8 @@ export function registerAiAgentsRoutes(app: Express) {
         return res.status(400).json({ error: "Mensagem é obrigatória" });
       }
 
-      const response = await processMessage(agent, message, []);
+      const knowledgeFiles = await storage.listAiAgentFiles(agent.id);
+      const response = await processMessage(agent, message, [], knowledgeFiles);
       res.json(response);
     } catch (error: any) {
       console.error("[ai-agents] Error testing agent:", error);

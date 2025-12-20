@@ -1,4 +1,4 @@
-import type { AiAgent, AiMessage } from "@shared/schema";
+import type { AiAgent, AiMessage, AiAgentFile } from "@shared/schema";
 import { toZonedTime } from "date-fns-tz";
 
 interface AIResponse {
@@ -11,6 +11,23 @@ interface AIResponse {
 interface ChatMessage {
   role: "user" | "assistant" | "system";
   content: string;
+}
+
+function buildSystemPromptWithKnowledge(agent: AiAgent, knowledgeFiles: AiAgentFile[]): string {
+  let systemPrompt = agent.systemPrompt;
+  
+  if (knowledgeFiles && knowledgeFiles.length > 0) {
+    const knowledgeSection = knowledgeFiles
+      .filter(f => f.extractedText)
+      .map(f => `### ${f.fileName}\n${f.extractedText}`)
+      .join("\n\n");
+    
+    if (knowledgeSection) {
+      systemPrompt += `\n\n=== BASE DE CONHECIMENTO ===\nUse as informações abaixo como referência para responder. SEMPRE consulte esta base antes de responder:\n\n${knowledgeSection}\n\n=== FIM DA BASE DE CONHECIMENTO ===`;
+    }
+  }
+  
+  return systemPrompt;
 }
 
 async function callOpenAI(apiKey: string, model: string, messages: ChatMessage[], maxTokens: number, temperature: number): Promise<AIResponse> {
@@ -143,11 +160,14 @@ async function callGrok(apiKey: string, model: string, messages: ChatMessage[], 
 export async function processMessage(
   agent: AiAgent,
   userMessage: string,
-  conversationHistory: AiMessage[]
+  conversationHistory: AiMessage[],
+  knowledgeFiles: AiAgentFile[] = []
 ): Promise<AIResponse> {
   try {
+    const fullSystemPrompt = buildSystemPromptWithKnowledge(agent, knowledgeFiles);
+    
     const messages: ChatMessage[] = [
-      { role: "system", content: agent.systemPrompt },
+      { role: "system", content: fullSystemPrompt },
     ];
 
     const recentHistory = conversationHistory.slice(-agent.memoryLength);

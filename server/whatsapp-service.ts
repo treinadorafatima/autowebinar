@@ -167,8 +167,9 @@ async function handleIncomingMessage(accountId: string, senderPhone: string, tex
     });
     
     const recentMessages = await storage.listAiMessagesByConversation(conversation.id, agent.memoryLength);
+    const knowledgeFiles = await storage.listAiAgentFiles(agent.id);
     
-    const response = await processMessage(agent, textContent, recentMessages);
+    const response = await processMessage(agent, textContent, recentMessages, knowledgeFiles);
     
     if (response.error) {
       console.error(`[whatsapp-ai] AI processing error for ${senderPhone}:`, response.error);
