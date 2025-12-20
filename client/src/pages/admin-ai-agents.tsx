@@ -1371,6 +1371,20 @@ export default function AdminAiAgents() {
             </div>
             
             <div className="flex gap-2 w-full sm:w-auto sm:ml-auto">
+              {editingAgent && (
+                <Button 
+                  variant="secondary"
+                  onClick={handleSubmit}
+                  disabled={updateMutation.isPending}
+                  data-testid="button-save-now"
+                >
+                  {updateMutation.isPending && (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  )}
+                  <Check className="h-4 w-4 mr-1" />
+                  Salvar
+                </Button>
+              )}
               {wizardStep < 5 ? (
                 <Button 
                   onClick={handleWizardNext}
