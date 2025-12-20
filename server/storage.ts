@@ -593,7 +593,20 @@ export class DatabaseStorage implements IStorage {
     await db.delete(checkoutPagamentos).where(eq(checkoutPagamentos.adminId, id));
     await db.delete(checkoutAssinaturas).where(eq(checkoutAssinaturas.adminId, id));
     
-    // 12. Finally, delete the admin account
+    // 12. Delete AI Agents data (agents, conversations, messages, files, stats)
+    const userAiAgents = await db.select().from(aiAgents).where(eq(aiAgents.adminId, id));
+    for (const agent of userAiAgents) {
+      const agentConversations = await db.select().from(aiConversations).where(eq(aiConversations.agentId, agent.id));
+      for (const conv of agentConversations) {
+        await db.delete(aiMessages).where(eq(aiMessages.conversationId, conv.id));
+      }
+      await db.delete(aiConversations).where(eq(aiConversations.agentId, agent.id));
+      await db.delete(aiAgentFiles).where(eq(aiAgentFiles.agentId, agent.id));
+      await db.delete(aiUsageStats).where(eq(aiUsageStats.agentId, agent.id));
+    }
+    await db.delete(aiAgents).where(eq(aiAgents.adminId, id));
+    
+    // 13. Finally, delete the admin account
     await db.delete(admins).where(eq(admins.id, id));
     
     console.log(`[deleteAdminCompletely] Deleted admin ${id}: ${deletedWebinars} webinars, ${deletedVideos} videos, ${deletedComments} comments`);
