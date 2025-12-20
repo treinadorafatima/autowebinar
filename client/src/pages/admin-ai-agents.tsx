@@ -138,11 +138,10 @@ export default function AdminAiAgents() {
       const res = await apiRequest("POST", "/api/ai-agents", data);
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (newAgent: AiAgent) => {
       queryClient.invalidateQueries({ queryKey: ["/api/ai-agents"] });
-      setShowCreateDialog(false);
-      resetForm();
-      toast({ title: "Agente criado com sucesso!" });
+      setEditingAgent(newAgent);
+      toast({ title: "Agente criado! Agora você pode adicionar arquivos de contexto." });
     },
     onError: (error: any) => {
       toast({ title: "Erro ao criar agente", description: error.message, variant: "destructive" });
