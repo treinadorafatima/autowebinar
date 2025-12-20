@@ -348,11 +348,7 @@ export default function AdminAiAgents() {
 
   const addPendingFile = () => {
     if (!newFileName) {
-      toast({ title: "Informe um nome para o arquivo", variant: "destructive" });
-      return;
-    }
-    if (!newFileUrl && !newFileText) {
-      toast({ title: "Informe uma URL ou conteúdo de texto", variant: "destructive" });
+      toast({ title: "Informe um nome para o contexto", variant: "destructive" });
       return;
     }
     setPendingFiles([...pendingFiles, {
@@ -886,9 +882,18 @@ export default function AdminAiAgents() {
                       <FileText className="h-4 w-4" />
                       Base de Conhecimento (opcional)
                     </Label>
-                    <p className="text-xs text-muted-foreground">
-                      Adicione textos ou URLs que o agente pode usar como referência
-                    </p>
+                    
+                    <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg text-xs space-y-2">
+                      <p className="font-medium text-blue-600 dark:text-blue-400">Como usar a Base de Conhecimento:</p>
+                      <ul className="list-disc list-inside text-muted-foreground space-y-1">
+                        <li><strong>Nome:</strong> Identifica o contexto (ex: "FAQ", "Tabela de Preços")</li>
+                        <li><strong>Texto:</strong> Cole o conteúdo diretamente - FAQ, políticas, scripts</li>
+                        <li><strong>URL:</strong> Link direto para .txt ou .pdf hospedado na web</li>
+                      </ul>
+                      <p className="text-amber-600 dark:text-amber-400 mt-1">
+                        Links do Google Drive/Dropbox não funcionam diretamente. Copie o texto do arquivo e cole aqui.
+                      </p>
+                    </div>
 
                     {editingAgent && agentFiles && agentFiles.length > 0 && (
                       <div className="space-y-2">
@@ -973,11 +978,7 @@ export default function AdminAiAgents() {
                         variant="outline"
                         onClick={editingAgent ? () => {
                           if (!newFileName) {
-                            toast({ title: "Informe um nome", variant: "destructive" });
-                            return;
-                          }
-                          if (!newFileUrl && !newFileText) {
-                            toast({ title: "Informe URL ou texto", variant: "destructive" });
+                            toast({ title: "Informe um nome para o contexto", variant: "destructive" });
                             return;
                           }
                           addFileMutation.mutate({
@@ -987,7 +988,7 @@ export default function AdminAiAgents() {
                             extractedText: newFileText || undefined,
                           });
                         } : addPendingFile}
-                        disabled={addFileMutation.isPending}
+                        disabled={addFileMutation.isPending || !newFileName}
                         data-testid="button-add-file"
                       >
                         <Plus className="h-4 w-4 mr-2" />
