@@ -16,7 +16,7 @@ import {
   Bot, Plus, Edit, Trash2, Check, X, Loader2, 
   TestTube, Send, MessageSquare, Settings, Clock,
   Key, Cpu, AlertTriangle, CheckCircle, Info, FileText, Upload, File,
-  ChevronRight, ChevronLeft, Sparkles, Brain, Zap, Calendar
+  ChevronRight, ChevronLeft, Sparkles, Brain, Zap, Calendar, Link2
 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { Progress } from "@/components/ui/progress";
@@ -120,6 +120,7 @@ export default function AdminAiAgents() {
   const [newFileName, setNewFileName] = useState("");
   const [newFileUrl, setNewFileUrl] = useState("");
   const [newFileText, setNewFileText] = useState("");
+  const [isProcessingFile, setIsProcessingFile] = useState(false);
   const [wizardStep, setWizardStep] = useState(1);
   const [pendingFiles, setPendingFiles] = useState<Array<{ fileName: string; fileUrl: string; extractedText?: string }>>([]);
   
@@ -351,6 +352,10 @@ export default function AdminAiAgents() {
       toast({ title: "Informe um nome para o contexto", variant: "destructive" });
       return;
     }
+    if (!newFileUrl && !newFileText) {
+      toast({ title: "Informe uma URL ou cole o texto do arquivo", variant: "destructive" });
+      return;
+    }
     setPendingFiles([...pendingFiles, {
       fileName: newFileName,
       fileUrl: newFileUrl || "text://inline",
@@ -364,6 +369,48 @@ export default function AdminAiAgents() {
 
   const removePendingFile = (index: number) => {
     setPendingFiles(pendingFiles.filter((_, i) => i !== index));
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const allowedTypes = ['.txt', '.md', '.csv', '.json'];
+    const extension = '.' + file.name.split('.').pop()?.toLowerCase();
+    
+    if (!allowedTypes.includes(extension)) {
+      toast({ 
+        title: "Formato não suportado", 
+        description: "Use arquivos .txt, .md, .csv ou .json. Para PDF/DOCX, copie e cole o texto.",
+        variant: "destructive" 
+      });
+      event.target.value = '';
+      return;
+    }
+
+    setIsProcessingFile(true);
+    try {
+      const text = await file.text();
+      if (text.length > 50000) {
+        toast({ 
+          title: "Arquivo muito grande", 
+          description: "O texto foi cortado para 50.000 caracteres",
+          variant: "default" 
+        });
+        setNewFileText(text.substring(0, 50000));
+      } else {
+        setNewFileText(text);
+      }
+      if (!newFileName) {
+        setNewFileName(file.name.replace(/\.[^/.]+$/, ""));
+      }
+      toast({ title: "Arquivo carregado!", description: `${file.name} - ${text.length} caracteres` });
+    } catch (error) {
+      toast({ title: "Erro ao ler arquivo", variant: "destructive" });
+    } finally {
+      setIsProcessingFile(false);
+      event.target.value = '';
+    }
   };
 
   const handleSubmit = async () => {
@@ -941,9 +988,9 @@ export default function AdminAiAgents() {
                       </div>
                     )}
 
-                    <div className="space-y-3 pt-2 border-t">
+                    <div className="space-y-4 pt-2 border-t">
                       <div className="space-y-2">
-                        <Label>Nome do Contexto</Label>
+                        <Label>Nome do Contexto *</Label>
                         <Input
                           placeholder="Ex: FAQ de Vendas, Política de Devolução"
                           value={newFileName}
@@ -951,34 +998,68 @@ export default function AdminAiAgents() {
                           data-testid="input-new-file-name"
                         />
                       </div>
-                      
-                      <div className="space-y-2">
-                        <Label>URL do Arquivo (opcional)</Label>
-                        <Input
-                          placeholder="https://exemplo.com/arquivo.pdf"
-                          value={newFileUrl}
-                          onChange={(e) => setNewFileUrl(e.target.value)}
-                          data-testid="input-new-file-url"
-                        />
+
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div className="space-y-2 p-3 border rounded-lg">
+                          <Label className="flex items-center gap-2 text-sm font-medium">
+                            <Upload className="h-4 w-4" />
+                            Importar Arquivo
+                          </Label>
+                          <input
+                            type="file"
+                            accept=".txt,.md,.csv,.json"
+                            onChange={handleFileUpload}
+                            disabled={isProcessingFile}
+                            className="block w-full text-sm text-muted-foreground file:mr-2 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:font-medium file:bg-primary file:text-primary-foreground hover:file:bg-primary/90 file:cursor-pointer cursor-pointer"
+                            data-testid="input-file-upload"
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Formatos: .txt, .md, .csv, .json
+                          </p>
+                        </div>
+
+                        <div className="space-y-2 p-3 border rounded-lg">
+                          <Label className="flex items-center gap-2 text-sm font-medium">
+                            <Link2 className="h-4 w-4" />
+                            Link Externo
+                          </Label>
+                          <Input
+                            placeholder="https://site.com/arquivo.txt"
+                            value={newFileUrl}
+                            onChange={(e) => setNewFileUrl(e.target.value)}
+                            data-testid="input-new-file-url"
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Link direto para .txt ou .pdf
+                          </p>
+                        </div>
                       </div>
 
                       <div className="space-y-2">
                         <Label>Ou cole o texto diretamente</Label>
                         <Textarea
-                          placeholder="Cole aqui FAQ, instruções, políticas..."
+                          placeholder="Cole aqui FAQ, instruções, políticas, scripts de atendimento..."
                           value={newFileText}
                           onChange={(e) => setNewFileText(e.target.value)}
-                          className="min-h-[80px]"
+                          className="min-h-[100px]"
                           data-testid="input-new-file-text"
                         />
+                        {newFileText && (
+                          <p className="text-xs text-muted-foreground">
+                            {newFileText.length.toLocaleString()} caracteres
+                          </p>
+                        )}
                       </div>
 
                       <Button
                         type="button"
-                        variant="outline"
                         onClick={editingAgent ? () => {
                           if (!newFileName) {
                             toast({ title: "Informe um nome para o contexto", variant: "destructive" });
+                            return;
+                          }
+                          if (!newFileUrl && !newFileText) {
+                            toast({ title: "Importe um arquivo, informe um link ou cole o texto", variant: "destructive" });
                             return;
                           }
                           addFileMutation.mutate({
@@ -988,11 +1069,16 @@ export default function AdminAiAgents() {
                             extractedText: newFileText || undefined,
                           });
                         } : addPendingFile}
-                        disabled={addFileMutation.isPending || !newFileName}
+                        disabled={addFileMutation.isPending || !newFileName || (!newFileUrl && !newFileText)}
+                        className="w-full"
                         data-testid="button-add-file"
                       >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Adicionar à Base
+                        {isProcessingFile ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Plus className="h-4 w-4 mr-2" />
+                        )}
+                        Adicionar à Base de Conhecimento
                       </Button>
                     </div>
                   </div>
