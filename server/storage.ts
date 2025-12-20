@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type WebinarConfig, type WebinarConfigInsert, type Admin, type AdminInsert, type UploadedVideo, type UploadedVideoInsert, type Comment, type CommentInsert, type Webinar, type WebinarInsert, type Setting, type SettingInsert, type ViewerSession, type WebinarScript, type WebinarScriptInsert, type AiConfig, type AiConfigInsert, type AiMemory, type AiMemoryInsert, type CheckoutPlano, type CheckoutPlanoInsert, type CheckoutPagamento, type CheckoutPagamentoInsert, type CheckoutConfig, type CheckoutConfigInsert, type CheckoutAssinatura, type CheckoutAssinaturaInsert, type AiChat, type AiChatInsert, type AiMessageChat, type AiMessageChatInsert, type VideoTranscription, type VideoTranscriptionInsert, type AdminEmailCredential, type AdminEmailCredentialInsert, type EmailSequence, type EmailSequenceInsert, type ScheduledEmail, type ScheduledEmailInsert, type LeadFormConfig, type LeadFormConfigInsert, type WhatsappAccount, type WhatsappAccountInsert, type WhatsappSession, type WhatsappSessionInsert, type WhatsappSequence, type WhatsappSequenceInsert, type ScheduledWhatsappMessage, type ScheduledWhatsappMessageInsert, type MediaFile, type MediaFileInsert, type LeadMessage, type LeadMessageInsert, type Lead, type WhatsappBroadcast, type WhatsappBroadcastInsert, type WhatsappBroadcastRecipient, type WhatsappBroadcastRecipientInsert, type WhatsappContactList, type WhatsappContactListInsert, type WhatsappContact, type WhatsappContactInsert, type Affiliate, type AffiliateInsert, type AffiliateLink, type AffiliateLinkInsert, type AffiliateSale, type AffiliateSaleInsert, type AffiliateConfig, type AffiliateConfigInsert, type AffiliateWithdrawal, type AffiliateWithdrawalInsert, type WhatsappNotificationLog, type WhatsappNotificationLogInsert, type WhatsappNotificationTemplate, type WhatsappNotificationTemplateInsert, type EmailNotificationTemplate, type EmailNotificationTemplateInsert, type AiAgent, type AiAgentInsert, type AiAgentFile, type AiAgentFileInsert, type AiConversation, type AiConversationInsert, type AiMessage, type AiMessageInsert, type AiUsageStats, type AiUsageStatsInsert, admins, webinarConfigs, users, uploadedVideos, comments, webinars as webinarsTable, settings, viewerSessions, webinarScripts, aiConfigs, aiMemories, checkoutPlanos, checkoutPagamentos, checkoutConfigs, checkoutAssinaturas, aiChats, aiMessageChats, videoTranscriptions, adminEmailCredentials, emailSequences, scheduledEmails, leadFormConfigs, whatsappAccounts, whatsappSessions, whatsappNotificationsLog, whatsappSequences, scheduledWhatsappMessages, mediaFiles, webinarViewLogs, leads, leadMessages, whatsappBroadcasts, whatsappBroadcastRecipients, whatsappContactLists, whatsappContacts, affiliates, affiliateLinks, affiliateSales, affiliateConfig, affiliateWithdrawals, whatsappNotificationTemplates, emailNotificationTemplates, aiAgents, aiAgentFiles, aiConversations, aiMessages, aiUsageStats } from "@shared/schema";
+import { type User, type InsertUser, type WebinarConfig, type WebinarConfigInsert, type Admin, type AdminInsert, type UploadedVideo, type UploadedVideoInsert, type Comment, type CommentInsert, type Webinar, type WebinarInsert, type Setting, type SettingInsert, type ViewerSession, type WebinarScript, type WebinarScriptInsert, type AiConfig, type AiConfigInsert, type AiMemory, type AiMemoryInsert, type CheckoutPlano, type CheckoutPlanoInsert, type CheckoutPagamento, type CheckoutPagamentoInsert, type CheckoutConfig, type CheckoutConfigInsert, type CheckoutAssinatura, type CheckoutAssinaturaInsert, type AiChat, type AiChatInsert, type AiMessageChat, type AiMessageChatInsert, type VideoTranscription, type VideoTranscriptionInsert, type AdminEmailCredential, type AdminEmailCredentialInsert, type EmailSequence, type EmailSequenceInsert, type ScheduledEmail, type ScheduledEmailInsert, type LeadFormConfig, type LeadFormConfigInsert, type WhatsappAccount, type WhatsappAccountInsert, type WhatsappSession, type WhatsappSessionInsert, type WhatsappSequence, type WhatsappSequenceInsert, type ScheduledWhatsappMessage, type ScheduledWhatsappMessageInsert, type MediaFile, type MediaFileInsert, type LeadMessage, type LeadMessageInsert, type Lead, type WhatsappBroadcast, type WhatsappBroadcastInsert, type WhatsappBroadcastRecipient, type WhatsappBroadcastRecipientInsert, type WhatsappContactList, type WhatsappContactListInsert, type WhatsappContact, type WhatsappContactInsert, type Affiliate, type AffiliateInsert, type AffiliateLink, type AffiliateLinkInsert, type AffiliateSale, type AffiliateSaleInsert, type AffiliateConfig, type AffiliateConfigInsert, type AffiliateWithdrawal, type AffiliateWithdrawalInsert, type WhatsappNotificationLog, type WhatsappNotificationLogInsert, type WhatsappNotificationTemplate, type WhatsappNotificationTemplateInsert, type EmailNotificationTemplate, type EmailNotificationTemplateInsert, type AiAgent, type AiAgentInsert, type AiAgentFile, type AiAgentFileInsert, type AiConversation, type AiConversationInsert, type AiMessage, type AiMessageInsert, type AiUsageStats, type AiUsageStatsInsert, type GoogleCalendarToken, type GoogleCalendarTokenInsert, type CalendarEvent, type CalendarEventInsert, admins, webinarConfigs, users, uploadedVideos, comments, webinars as webinarsTable, settings, viewerSessions, webinarScripts, aiConfigs, aiMemories, checkoutPlanos, checkoutPagamentos, checkoutConfigs, checkoutAssinaturas, aiChats, aiMessageChats, videoTranscriptions, adminEmailCredentials, emailSequences, scheduledEmails, leadFormConfigs, whatsappAccounts, whatsappSessions, whatsappNotificationsLog, whatsappSequences, scheduledWhatsappMessages, mediaFiles, webinarViewLogs, leads, leadMessages, whatsappBroadcasts, whatsappBroadcastRecipients, whatsappContactLists, whatsappContacts, affiliates, affiliateLinks, affiliateSales, affiliateConfig, affiliateWithdrawals, whatsappNotificationTemplates, emailNotificationTemplates, aiAgents, aiAgentFiles, aiConversations, aiMessages, aiUsageStats, googleCalendarTokens, calendarEvents } from "@shared/schema";
 import * as crypto from "crypto";
 import { randomUUID } from "crypto";
 import { db } from "./db";
@@ -404,6 +404,18 @@ export interface IStorage {
   // AI Usage Stats
   getOrCreateAiUsageStats(agentId: string, date: string): Promise<AiUsageStats>;
   incrementAiUsageStats(agentId: string, date: string, messages?: number, tokens?: number, conversations?: number, errors?: number): Promise<void>;
+  // Google Calendar Tokens
+  getGoogleCalendarToken(adminId: string): Promise<GoogleCalendarToken | undefined>;
+  upsertGoogleCalendarToken(adminId: string, data: GoogleCalendarTokenInsert): Promise<GoogleCalendarToken>;
+  deleteGoogleCalendarToken(adminId: string): Promise<void>;
+  updateGoogleCalendarToken(adminId: string, data: Partial<GoogleCalendarTokenInsert>): Promise<void>;
+  // Calendar Events
+  listCalendarEventsByAdmin(adminId: string, from?: Date, to?: Date): Promise<CalendarEvent[]>;
+  getCalendarEventById(id: string): Promise<CalendarEvent | undefined>;
+  getCalendarEventByGoogleId(googleEventId: string, adminId: string): Promise<CalendarEvent | undefined>;
+  createCalendarEvent(data: CalendarEventInsert): Promise<CalendarEvent>;
+  updateCalendarEvent(id: string, data: Partial<CalendarEventInsert>): Promise<CalendarEvent | undefined>;
+  deleteCalendarEvent(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -6078,6 +6090,123 @@ Apos o pagamento, seu acesso sera renovado automaticamente!
     }
 
     return { agentsProcessed, messagesDeleted: totalMessagesDeleted };
+  }
+
+  // Google Calendar Token methods
+  async getGoogleCalendarToken(adminId: string): Promise<GoogleCalendarToken | undefined> {
+    const result = await db.select().from(googleCalendarTokens)
+      .where(eq(googleCalendarTokens.adminId, adminId))
+      .limit(1);
+    return result[0];
+  }
+
+  async upsertGoogleCalendarToken(adminId: string, data: GoogleCalendarTokenInsert): Promise<GoogleCalendarToken> {
+    const existing = await this.getGoogleCalendarToken(adminId);
+    if (existing) {
+      await db.update(googleCalendarTokens)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(googleCalendarTokens.adminId, adminId));
+      const updated = await this.getGoogleCalendarToken(adminId);
+      return updated!;
+    } else {
+      const id = randomUUID();
+      const token: GoogleCalendarToken = {
+        id,
+        adminId,
+        accessToken: data.accessToken,
+        refreshToken: data.refreshToken,
+        expiryDate: data.expiryDate ?? null,
+        calendarId: data.calendarId ?? "primary",
+        isConnected: data.isConnected ?? true,
+        lastSyncAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      await db.insert(googleCalendarTokens).values(token);
+      return token;
+    }
+  }
+
+  async deleteGoogleCalendarToken(adminId: string): Promise<void> {
+    await db.delete(googleCalendarTokens).where(eq(googleCalendarTokens.adminId, adminId));
+  }
+
+  async updateGoogleCalendarToken(adminId: string, data: Partial<GoogleCalendarTokenInsert>): Promise<void> {
+    await db.update(googleCalendarTokens)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(googleCalendarTokens.adminId, adminId));
+  }
+
+  // Calendar Events methods
+  async listCalendarEventsByAdmin(adminId: string, from?: Date, to?: Date): Promise<CalendarEvent[]> {
+    let query = db.select().from(calendarEvents)
+      .where(eq(calendarEvents.adminId, adminId))
+      .orderBy(desc(calendarEvents.startTime));
+
+    if (from && to) {
+      return await db.select().from(calendarEvents)
+        .where(and(
+          eq(calendarEvents.adminId, adminId),
+          gte(calendarEvents.startTime, from),
+          lte(calendarEvents.startTime, to)
+        ))
+        .orderBy(desc(calendarEvents.startTime));
+    }
+
+    return await query;
+  }
+
+  async getCalendarEventById(id: string): Promise<CalendarEvent | undefined> {
+    const result = await db.select().from(calendarEvents)
+      .where(eq(calendarEvents.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async getCalendarEventByGoogleId(googleEventId: string, adminId: string): Promise<CalendarEvent | undefined> {
+    const result = await db.select().from(calendarEvents)
+      .where(and(
+        eq(calendarEvents.googleEventId, googleEventId),
+        eq(calendarEvents.adminId, adminId)
+      ))
+      .limit(1);
+    return result[0];
+  }
+
+  async createCalendarEvent(data: CalendarEventInsert): Promise<CalendarEvent> {
+    const id = randomUUID();
+    const event: CalendarEvent = {
+      id,
+      adminId: data.adminId,
+      googleEventId: data.googleEventId ?? null,
+      title: data.title,
+      description: data.description ?? null,
+      startTime: data.startTime,
+      endTime: data.endTime,
+      location: data.location ?? null,
+      attendeeEmail: data.attendeeEmail ?? null,
+      attendeeName: data.attendeeName ?? null,
+      attendeePhone: data.attendeePhone ?? null,
+      status: data.status ?? "confirmed",
+      source: data.source ?? "manual",
+      metadata: data.metadata ?? null,
+      syncedAt: data.syncedAt ?? null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    await db.insert(calendarEvents).values(event);
+    return event;
+  }
+
+  async updateCalendarEvent(id: string, data: Partial<CalendarEventInsert>): Promise<CalendarEvent | undefined> {
+    await db.update(calendarEvents)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(calendarEvents.id, id));
+    return await this.getCalendarEventById(id);
+  }
+
+  async deleteCalendarEvent(id: string): Promise<void> {
+    await db.delete(calendarEvents).where(eq(calendarEvents.id, id));
   }
 }
 

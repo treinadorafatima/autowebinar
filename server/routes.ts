@@ -11,6 +11,7 @@ import { webinarConfigInsertSchema, adminInsertSchema, webinarInsertSchema, sess
 import { registerEmailMarketingRoutes } from "./email-marketing";
 import { registerWhatsAppRoutes } from "./whatsapp-routes";
 import { registerAiAgentsRoutes } from "./ai-agents-routes";
+import { registerGoogleCalendarRoutes } from "./google-calendar-routes";
 import { rescheduleSequencesForWebinar, cancelAllSequencesForWebinar } from "./sequence-sync";
 import { renderDomainsService } from "./render-domains";
 import multer from "multer";
@@ -13613,6 +13614,9 @@ Seja conversacional e objetivo.`;
 
   // Register AI Agents routes
   registerAiAgentsRoutes(app);
+
+  // Register Google Calendar routes
+  registerGoogleCalendarRoutes(app);
 
   const httpServer = createServer(app);
   return httpServer;
