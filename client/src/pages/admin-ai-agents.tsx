@@ -15,7 +15,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { 
   Bot, Plus, Edit, Trash2, Check, X, Loader2, 
   TestTube, Send, MessageSquare, Settings, Clock,
-  Key, Cpu, AlertTriangle, CheckCircle, Info
+  Key, Cpu, AlertTriangle, CheckCircle, Info, FileText, Upload, File
 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 
@@ -60,6 +60,17 @@ interface ProviderInfo {
   apiKeyHint: string;
 }
 
+interface AiAgentFile {
+  id: string;
+  agentId: string;
+  fileName: string;
+  fileUrl: string;
+  fileType: string;
+  fileSize: number;
+  extractedText: string | null;
+  createdAt: string;
+}
+
 const DAYS_OF_WEEK = [
   { value: "1", label: "Seg" },
   { value: "2", label: "Ter" },
@@ -78,6 +89,9 @@ export default function AdminAiAgents() {
   const [testMessage, setTestMessage] = useState("");
   const [testResponse, setTestResponse] = useState<string | null>(null);
   const [testingAgentId, setTestingAgentId] = useState<string | null>(null);
+  const [newFileName, setNewFileName] = useState("");
+  const [newFileUrl, setNewFileUrl] = useState("");
+  const [newFileText, setNewFileText] = useState("");
   
   const [formData, setFormData] = useState({
     whatsappAccountId: "",
@@ -112,6 +126,11 @@ export default function AdminAiAgents() {
 
   const { data: whatsappAccounts } = useQuery<WhatsAppAccount[]>({
     queryKey: ["/api/whatsapp/accounts/marketing"],
+  });
+
+  const { data: agentFiles, refetch: refetchFiles } = useQuery<AiAgentFile[]>({
+    queryKey: ["/api/ai-agents", editingAgent?.id, "files"],
+    enabled: !!editingAgent?.id,
   });
 
   const createMutation = useMutation({
@@ -169,6 +188,42 @@ export default function AdminAiAgents() {
     },
     onError: (error: any) => {
       setTestResponse(`Erro: ${error.message}`);
+    },
+  });
+
+  const addFileMutation = useMutation({
+    mutationFn: async ({ agentId, fileName, fileUrl, extractedText }: { agentId: string; fileName: string; fileUrl: string; extractedText?: string }) => {
+      const fileType = fileUrl.includes(".pdf") ? "pdf" : fileUrl.includes(".txt") ? "txt" : "text";
+      const res = await apiRequest("POST", `/api/ai-agents/${agentId}/files`, { 
+        fileName, 
+        fileUrl, 
+        fileType,
+        extractedText: extractedText || null 
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      refetchFiles();
+      setNewFileName("");
+      setNewFileUrl("");
+      setNewFileText("");
+      toast({ title: "Arquivo adicionado com sucesso!" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Erro ao adicionar arquivo", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteFileMutation = useMutation({
+    mutationFn: async ({ agentId, fileId }: { agentId: string; fileId: string }) => {
+      await apiRequest("DELETE", `/api/ai-agents/${agentId}/files/${fileId}`);
+    },
+    onSuccess: () => {
+      refetchFiles();
+      toast({ title: "Arquivo removido!" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Erro ao remover arquivo", description: error.message, variant: "destructive" });
     },
   });
 
@@ -771,6 +826,109 @@ export default function AdminAiAgents() {
                 />
               </div>
             </div>
+
+            {editingAgent && (
+              <div className="space-y-4 p-4 border rounded-lg">
+                <Label className="flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  Arquivos de Contexto (Base de Conhecimento)
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Adicione textos ou URLs de arquivos que o agente pode usar como referência nas respostas
+                </p>
+
+                {agentFiles && agentFiles.length > 0 && (
+                  <div className="space-y-2">
+                    {agentFiles.map((file) => (
+                      <div key={file.id} className="flex items-center justify-between p-2 bg-muted rounded">
+                        <div className="flex items-center gap-2">
+                          <File className="h-4 w-4" />
+                          <span className="text-sm">{file.fileName}</span>
+                          <Badge variant="outline" className="text-xs">{file.fileType}</Badge>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => deleteFileMutation.mutate({ agentId: editingAgent.id, fileId: file.id })}
+                          data-testid={`button-delete-file-${file.id}`}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="space-y-3 pt-2 border-t">
+                  <div className="space-y-2">
+                    <Label>Nome do Arquivo/Contexto</Label>
+                    <Input
+                      placeholder="Ex: FAQ de Vendas, Política de Devolução"
+                      value={newFileName}
+                      onChange={(e) => setNewFileName(e.target.value)}
+                      data-testid="input-new-file-name"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label>URL do Arquivo (opcional)</Label>
+                    <Input
+                      placeholder="https://exemplo.com/arquivo.pdf"
+                      value={newFileUrl}
+                      onChange={(e) => setNewFileUrl(e.target.value)}
+                      data-testid="input-new-file-url"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Link para PDF, TXT ou página web
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Conteúdo de Texto (opcional)</Label>
+                    <Textarea
+                      placeholder="Cole aqui o texto que o agente deve usar como referência..."
+                      value={newFileText}
+                      onChange={(e) => setNewFileText(e.target.value)}
+                      className="min-h-[100px]"
+                      data-testid="input-new-file-text"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Use isso para colar FAQ, instruções, políticas, etc.
+                    </p>
+                  </div>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      if (!newFileName) {
+                        toast({ title: "Informe um nome para o arquivo", variant: "destructive" });
+                        return;
+                      }
+                      if (!newFileUrl && !newFileText) {
+                        toast({ title: "Informe uma URL ou conteúdo de texto", variant: "destructive" });
+                        return;
+                      }
+                      addFileMutation.mutate({
+                        agentId: editingAgent.id,
+                        fileName: newFileName,
+                        fileUrl: newFileUrl || "text://inline",
+                        extractedText: newFileText || undefined,
+                      });
+                    }}
+                    disabled={addFileMutation.isPending}
+                    data-testid="button-add-file"
+                  >
+                    {addFileMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Plus className="h-4 w-4 mr-2" />
+                    )}
+                    Adicionar Arquivo
+                  </Button>
+                </div>
+              </div>
+            )}
 
             <div className="flex items-center justify-between p-4 border rounded-lg">
               <div>

@@ -325,6 +325,89 @@ export function registerAiAgentsRoutes(app: Express) {
     }
   });
 
+  // ==================== AI AGENT FILES ====================
+
+  app.get("/api/ai-agents/:id/files", async (req: Request, res: Response) => {
+    try {
+      const { admin, error, errorCode } = await validateSessionAndGetAdmin(req);
+      if (!admin) {
+        return res.status(errorCode || 401).json({ error: error || "Não autenticado" });
+      }
+
+      const agent = await storage.getAiAgentById(req.params.id);
+      if (!agent) {
+        return res.status(404).json({ error: "Agente não encontrado" });
+      }
+      if (agent.adminId !== admin.id) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+
+      const files = await storage.getAiAgentFiles(agent.id);
+      res.json(files);
+    } catch (error: any) {
+      console.error("[ai-agents] Error listing files:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/ai-agents/:id/files", async (req: Request, res: Response) => {
+    try {
+      const { admin, error, errorCode } = await validateSessionAndGetAdmin(req);
+      if (!admin) {
+        return res.status(errorCode || 401).json({ error: error || "Não autenticado" });
+      }
+
+      const agent = await storage.getAiAgentById(req.params.id);
+      if (!agent) {
+        return res.status(404).json({ error: "Agente não encontrado" });
+      }
+      if (agent.adminId !== admin.id) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+
+      const { fileName, fileUrl, fileType, fileSize, extractedText } = req.body;
+      if (!fileName || !fileUrl || !fileType) {
+        return res.status(400).json({ error: "fileName, fileUrl e fileType são obrigatórios" });
+      }
+
+      const file = await storage.createAiAgentFile({
+        agentId: agent.id,
+        fileName,
+        fileUrl,
+        fileType,
+        fileSize: fileSize || 0,
+        extractedText: extractedText || null,
+      });
+      res.json(file);
+    } catch (error: any) {
+      console.error("[ai-agents] Error creating file:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/ai-agents/:id/files/:fileId", async (req: Request, res: Response) => {
+    try {
+      const { admin, error, errorCode } = await validateSessionAndGetAdmin(req);
+      if (!admin) {
+        return res.status(errorCode || 401).json({ error: error || "Não autenticado" });
+      }
+
+      const agent = await storage.getAiAgentById(req.params.id);
+      if (!agent) {
+        return res.status(404).json({ error: "Agente não encontrado" });
+      }
+      if (agent.adminId !== admin.id) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+
+      await storage.deleteAiAgentFile(req.params.fileId);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[ai-agents] Error deleting file:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.post("/api/ai-agents/cleanup-messages", async (req: Request, res: Response) => {
     try {
       const { admin, error, errorCode } = await validateSessionAndGetAdmin(req);
