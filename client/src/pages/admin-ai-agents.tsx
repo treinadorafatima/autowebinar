@@ -1258,7 +1258,6 @@ export default function AdminAiAgents() {
                         Adicionar à Base de Conhecimento
                       </Button>
                     </div>
-                  </div>
                 </div>
               </div>
             )}

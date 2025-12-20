@@ -430,6 +430,152 @@ export function registerAiAgentsRoutes(app: Express) {
     }
   });
 
+  app.post("/api/ai-agents/generate-prompt", async (req: Request, res: Response) => {
+    try {
+      const { admin, error, errorCode } = await validateSessionAndGetAdmin(req);
+      if (!admin) {
+        return res.status(errorCode || 401).json({ error: error || "Não autenticado" });
+      }
+
+      const { provider, model, apiKey, context, files } = req.body;
+      
+      if (!provider || !apiKey || !context) {
+        return res.status(400).json({ error: "Dados obrigatórios: provider, apiKey, context" });
+      }
+
+      let filesContext = "";
+      if (files && Array.isArray(files) && files.length > 0) {
+        filesContext = "\n\n=== ARQUIVOS ANEXADOS ===\n";
+        for (const file of files) {
+          filesContext += `\n--- ${file.name} ---\n${file.content.substring(0, 15000)}\n`;
+        }
+      }
+
+      const generatorPrompt = `Você é um especialista em criar prompts de sistema para chatbots de WhatsApp.
+
+Com base nas informações abaixo, crie um prompt de sistema completo e profissional para um agente de IA.
+
+=== DESCRIÇÃO DO NEGÓCIO ===
+${context}
+${filesContext}
+
+=== INSTRUÇÕES ===
+Crie um prompt de sistema que inclua:
+1. Identidade clara do agente (quem é, qual empresa representa)
+2. Tom de voz apropriado (formal, amigável, consultivo)
+3. Regras claras do que o agente deve e não deve fazer
+4. Informações sobre produtos/serviços mencionados
+5. Fluxo de atendimento sugerido
+6. Como lidar com situações comuns
+7. Limite de caracteres por resposta (máximo 500 caracteres por mensagem)
+
+IMPORTANTE:
+- Escreva em português brasileiro
+- O prompt deve ser direto e conciso
+- Inclua exemplos de respostas quando relevante
+- Adicione instruções para situações que precisam de humano
+
+Responda APENAS com o prompt de sistema, sem explicações adicionais.`;
+
+      let generatedPrompt = "";
+
+      if (provider === "openai") {
+        const response = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: model || "gpt-4o-mini",
+            messages: [{ role: "user", content: generatorPrompt }],
+            temperature: 0.7,
+            max_tokens: 2000,
+          }),
+        });
+        
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error?.message || "Erro na API OpenAI");
+        }
+        
+        const data = await response.json();
+        generatedPrompt = data.choices[0]?.message?.content || "";
+      } else if (provider === "gemini") {
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model || "gemini-1.5-flash"}:generateContent?key=${apiKey}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: generatorPrompt }] }],
+              generationConfig: { temperature: 0.7, maxOutputTokens: 2000 },
+            }),
+          }
+        );
+        
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error?.message || "Erro na API Gemini");
+        }
+        
+        const data = await response.json();
+        generatedPrompt = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      } else if (provider === "deepseek") {
+        const response = await fetch("https://api.deepseek.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: model || "deepseek-chat",
+            messages: [{ role: "user", content: generatorPrompt }],
+            temperature: 0.7,
+            max_tokens: 2000,
+          }),
+        });
+        
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error?.message || "Erro na API DeepSeek");
+        }
+        
+        const data = await response.json();
+        generatedPrompt = data.choices[0]?.message?.content || "";
+      } else if (provider === "grok") {
+        const response = await fetch("https://api.x.ai/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: model || "grok-2-mini",
+            messages: [{ role: "user", content: generatorPrompt }],
+            temperature: 0.7,
+            max_tokens: 2000,
+          }),
+        });
+        
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error?.message || "Erro na API Grok");
+        }
+        
+        const data = await response.json();
+        generatedPrompt = data.choices[0]?.message?.content || "";
+      } else {
+        return res.status(400).json({ error: "Provedor não suportado" });
+      }
+
+      res.json({ prompt: generatedPrompt.trim() });
+    } catch (error: any) {
+      console.error("[ai-agents] Error generating prompt:", error);
+      res.status(500).json({ error: error.message || "Erro ao gerar prompt" });
+    }
+  });
+
   setInterval(async () => {
     try {
       const result = await storage.cleanupOldAiMessages();
