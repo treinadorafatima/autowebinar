@@ -942,46 +942,47 @@ export default function AdminAiAgents() {
                       </p>
                     </div>
 
-                    {editingAgent && agentFiles && agentFiles.length > 0 && (
-                      <div className="space-y-2">
-                        <Label className="text-sm">Arquivos Salvos:</Label>
-                        {agentFiles.map((file) => (
-                          <div key={file.id} className="flex items-center justify-between p-2 bg-muted rounded">
-                            <div className="flex items-center gap-2">
-                              <File className="h-4 w-4" />
-                              <span className="text-sm">{file.fileName}</span>
-                              <Badge variant="outline" className="text-xs">{file.fileType}</Badge>
+                    {((editingAgent && agentFiles && agentFiles.length > 0) || pendingFiles.length > 0) && (
+                      <div className="space-y-2 p-3 bg-muted/50 rounded-lg border">
+                        <Label className="text-sm font-medium flex items-center gap-2">
+                          <File className="h-4 w-4" />
+                          Arquivos na Base ({(agentFiles?.length || 0) + pendingFiles.length})
+                        </Label>
+                        
+                        {editingAgent && agentFiles && agentFiles.map((file) => (
+                          <div key={file.id} className="flex items-center justify-between p-2 bg-background rounded border">
+                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                              <File className="h-4 w-4 flex-shrink-0" />
+                              <span className="text-sm truncate">{file.fileName}</span>
+                              <Badge variant="secondary" className="text-xs flex-shrink-0">{file.fileType}</Badge>
                             </div>
                             <Button
                               variant="ghost"
                               size="icon"
                               onClick={() => deleteFileMutation.mutate({ agentId: editingAgent.id, fileId: file.id })}
+                              className="flex-shrink-0 text-destructive hover:text-destructive hover:bg-destructive/10"
                               data-testid={`button-delete-file-${file.id}`}
                             >
-                              <Trash2 className="h-4 w-4 text-destructive" />
+                              <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
                         ))}
-                      </div>
-                    )}
-
-                    {pendingFiles.length > 0 && (
-                      <div className="space-y-2">
-                        <Label className="text-sm">Arquivos a Adicionar:</Label>
+                        
                         {pendingFiles.map((file, index) => (
-                          <div key={index} className="flex items-center justify-between p-2 bg-green-500/10 border border-green-500/20 rounded">
-                            <div className="flex items-center gap-2">
-                              <File className="h-4 w-4 text-green-500" />
-                              <span className="text-sm">{file.fileName}</span>
-                              <Badge variant="outline" className="text-xs">Novo</Badge>
+                          <div key={`pending-${index}`} className="flex items-center justify-between p-2 bg-green-500/10 rounded border border-green-500/30">
+                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                              <File className="h-4 w-4 text-green-600 flex-shrink-0" />
+                              <span className="text-sm truncate">{file.fileName}</span>
+                              <Badge className="text-xs flex-shrink-0 bg-green-600">Novo</Badge>
                             </div>
                             <Button
                               variant="ghost"
                               size="icon"
                               onClick={() => removePendingFile(index)}
+                              className="flex-shrink-0"
                               data-testid={`button-remove-pending-${index}`}
                             >
-                              <X className="h-4 w-4" />
+                              <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
                           </div>
                         ))}
