@@ -134,6 +134,7 @@ export default function AdminAiAgents() {
   const [promptFiles, setPromptFiles] = useState<Array<{ name: string; content: string }>>([]);
   const [isGeneratingPrompt, setIsGeneratingPrompt] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [showConnectCalendarDialog, setShowConnectCalendarDialog] = useState(false);
   
   const [formDataState, setFormDataState] = useState({
     whatsappAccountId: "",
@@ -536,9 +537,7 @@ export default function AdminAiAgents() {
                 <p className="text-sm text-blue-800 dark:text-blue-200">Configure agendas para que seus agentes façam agendamentos automáticos</p>
               </div>
               <Button 
-                onClick={() => {
-                  window.location.href = '/admin/ai-agents?openCalendar=true';
-                }}
+                onClick={() => setShowConnectCalendarDialog(true)}
                 data-testid="button-connect-calendars-top"
                 className="gap-2 shrink-0"
               >
@@ -694,9 +693,7 @@ export default function AdminAiAgents() {
                 </Button>
                 <Button 
                   variant="outline"
-                  onClick={() => {
-                    window.location.href = '/admin/ai-agents?openCalendar=true';
-                  }}
+                  onClick={() => setShowConnectCalendarDialog(true)}
                   data-testid="button-connect-calendars"
                   className="gap-2 shrink-0"
                 >
@@ -1766,6 +1763,55 @@ export default function AdminAiAgents() {
                 </Button>
               )}
             </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showConnectCalendarDialog} onOpenChange={setShowConnectCalendarDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Calendar className="h-5 w-5" />
+              Conectar Agendas do Google Calendar
+            </DialogTitle>
+            <DialogDescription>
+              Configure as agendas que seus agentes irão usar para fazer agendamentos automáticos
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+              <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">Como funciona:</h4>
+              <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
+                <li>• Conecte agendas do Google Calendar de seus administradores</li>
+                <li>• Ou permita que clientes conectem suas próprias agendas via OAuth</li>
+                <li>• Cada agente pode ser configurado para usar uma agenda específica</li>
+              </ul>
+            </div>
+
+            <div className="space-y-3">
+              <Button onClick={() => {}} variant="outline" className="w-full justify-start gap-2 h-auto py-3">
+                <Calendar className="h-4 w-4 shrink-0" />
+                <div className="text-left">
+                  <div className="font-semibold text-sm">Calendário do Administrador</div>
+                  <div className="text-xs text-muted-foreground">Conecte múltiplas agendas para gerenciar</div>
+                </div>
+              </Button>
+              
+              <Button onClick={() => {}} variant="outline" className="w-full justify-start gap-2 h-auto py-3">
+                <Link2 className="h-4 w-4 shrink-0" />
+                <div className="text-left">
+                  <div className="font-semibold text-sm">Calendário do Cliente (OAuth)</div>
+                  <div className="text-xs text-muted-foreground">Clientes conectam suas próprias agendas</div>
+                </div>
+              </Button>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setShowConnectCalendarDialog(false)}>
+              Fechar
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
