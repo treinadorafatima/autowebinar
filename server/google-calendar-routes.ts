@@ -10,9 +10,12 @@ const SCOPES = [
 ];
 
 function getRedirectUri(): string {
-  const baseUrl = process.env.REPLIT_DEV_DOMAIN 
-    ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-    : process.env.BASE_URL || "http://localhost:5000";
+  // Priorizar domínio de produção para OAuth (evita redirect_uri_mismatch)
+  const baseUrl = process.env.PUBLIC_BASE_URL 
+    || process.env.VITE_PUBLIC_BASE_URL
+    || (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : null)
+    || process.env.BASE_URL 
+    || "http://localhost:5000";
   return `${baseUrl}/api/google/callback`;
 }
 
