@@ -44,6 +44,7 @@ import AdminAffiliatesPage from "@/pages/admin-affiliates";
 import AdminWhatsAppNotificationsPage from "@/pages/admin-whatsapp-notifications";
 import AdminEmailNotificationsPage from "@/pages/admin-email-notifications";
 import AdminAiAgentsPage from "@/pages/admin-ai-agents";
+import ClientCalendarConnectPage from "@/pages/client-calendar-connect";
 import AfiliadoCadastroPage from "@/pages/afiliado-cadastro";
 import AfiliadoLoginPage from "@/pages/afiliado-login";
 import AfiliadoDashboardPage from "@/pages/afiliado-dashboard";
@@ -161,6 +162,7 @@ function Router() {
       <Route path="/aula-1" component={Aula1Page} />
       <Route path="/carlos" component={CarlosPage} />
       <Route path="/carlos/replay" component={CarlosReplayPage} />
+      <Route path="/calendar/connect" component={ClientCalendarConnectPage} />
       <Route path="/w/:slug" component={WebinarPublicPage} />
       <Route path="/w/:slug/register" component={WebinarRegisterPage} />
       <Route path="/w/:slug/replay" component={WebinarReplayPage} />
