@@ -1880,12 +1880,7 @@ export default function Checkout() {
                 <div className="text-center pt-4 border-t border-white/10">
                   <div className="flex items-center justify-center gap-2 text-slate-400 text-sm">
                     <Lock className="w-4 h-4" />
-                    <span>Processamento seguro via</span>
-                    {isMercadoPago ? (
-                      <SiMercadopago className="w-5 h-5 text-[#00b1ea]" />
-                    ) : (
-                      <SiStripe className="w-5 h-5 text-[#635bff]" />
-                    )}
+                    <span>Processamento seguro</span>
                   </div>
                 </div>
               </CardContent>
