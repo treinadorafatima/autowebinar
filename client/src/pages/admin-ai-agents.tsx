@@ -636,7 +636,7 @@ export default function AdminAiAgents() {
                     <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1">
                         <Clock className="h-3 w-3" />
-                        {agent.responseDelayMs}ms delay
+                        {agent.responseDelayMs / 1000}s delay
                       </span>
                       <span className="flex items-center gap-1">
                         <MessageSquare className="h-3 w-3" />
@@ -1426,17 +1426,18 @@ export default function AdminAiAgents() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Delay de Resposta (ms)</Label>
+                    <Label>Delay de Resposta (segundos)</Label>
                     <Input
                       type="number"
-                      value={formData.responseDelayMs}
-                      onChange={(e) => setFormData({ ...formData, responseDelayMs: parseInt(e.target.value) || 0 })}
+                      value={Math.round(formData.responseDelayMs / 1000)}
+                      onChange={(e) => setFormData({ ...formData, responseDelayMs: (parseFloat(e.target.value) || 0) * 1000 })}
                       min={0}
-                      max={10000}
+                      max={10}
+                      step={0.5}
                       data-testid="input-response-delay"
                     />
                     <p className="text-xs text-muted-foreground">
-                      Simula tempo de digitação para parecer mais humano (2000ms = 2 segundos)
+                      Simula tempo de digitação para parecer mais humano
                     </p>
                   </div>
                 </div>
