@@ -659,7 +659,7 @@ export default function AdminAiAgents() {
                 />
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex gap-2 w-full">
                 <Button 
                   onClick={() => testingAgentId && handleTest(testingAgentId)}
                   disabled={!testingAgentId || !testMessage.trim() || testMutation.isPending}
@@ -676,14 +676,13 @@ export default function AdminAiAgents() {
                 <Button 
                   variant="outline"
                   onClick={() => {
-                    // Navigate to settings or open calendar connection dialog
                     window.location.href = '/admin/ai-agents?openCalendar=true';
                   }}
                   data-testid="button-connect-calendars"
-                  className="gap-2"
+                  className="gap-2 shrink-0"
                 >
                   <Calendar className="h-4 w-4" />
-                  Conectar Agendas
+                  <span>Conectar Agendas</span>
                 </Button>
               </div>
 
