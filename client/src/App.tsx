@@ -51,6 +51,8 @@ import AfiliadoDashboardPage from "@/pages/afiliado-dashboard";
 import AfiliadoForgotPasswordPage from "@/pages/afiliado-forgot-password";
 import AfiliadoResetPasswordPage from "@/pages/afiliado-reset-password";
 import AffiliateRedirectPage from "@/pages/affiliate-redirect";
+import PoliticaPrivacidadePage from "@/pages/politica-privacidade";
+import TermosServicoPage from "@/pages/termos-servico";
 import NotFound from "@/pages/not-found";
 
 function HomePage() {
@@ -179,6 +181,8 @@ function Router() {
       <Route path="/afiliado/forgot-password" component={AfiliadoForgotPasswordPage} />
       <Route path="/afiliado/reset-password" component={AfiliadoResetPasswordPage} />
       <Route path="/r/:code" component={AffiliateRedirectPage} />
+      <Route path="/privacidade" component={PoliticaPrivacidadePage} />
+      <Route path="/termos" component={TermosServicoPage} />
       <Route component={NotFound} />
     </Switch>
   );
