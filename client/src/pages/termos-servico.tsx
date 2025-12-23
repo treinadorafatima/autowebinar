@@ -2,10 +2,15 @@ import { Link } from "wouter";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLocation } from "wouter";
+import { useEffect } from "react";
 import logoAutoWebinar from "@assets/logo-autowebinar_1764493901947.png";
 
 export default function TermosServicoPage() {
   const [, setLocation] = useLocation();
+
+  useEffect(() => {
+    document.title = "Termos de Serviço | AutoWebinar";
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-white flex flex-col">
