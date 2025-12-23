@@ -56,15 +56,52 @@ async function getAuthenticatedClient(adminId: string) {
 }
 
 async function validateSessionAndGetAdmin(req: Request) {
-  const session = req.session as any;
-  if (!session?.adminId) {
+  // Buscar token do header Authorization
+  const authHeader = req.headers.authorization;
+  const token = authHeader?.replace("Bearer ", "") || "";
+  
+  if (!token) {
     return { admin: null, error: "Não autenticado", errorCode: 401 };
   }
-  const admin = await storage.getAdminById(session.adminId);
+
+  // Validar token na tabela de sessões
+  const email = await validateToken(token);
+  if (!email) {
+    return { admin: null, error: "Sessão inválida", errorCode: 401 };
+  }
+
+  const admin = await storage.getAdminByEmail(email);
   if (!admin) {
     return { admin: null, error: "Admin não encontrado", errorCode: 401 };
   }
   return { admin, error: null, errorCode: null };
+}
+
+async function validateToken(token: string): Promise<string | null> {
+  if (!token) return null;
+  try {
+    const { db } = await import("./db");
+    const { sessions } = await import("@shared/schema");
+    const { eq } = await import("drizzle-orm");
+    
+    const result = await db
+      .select()
+      .from(sessions)
+      .where(eq(sessions.token, token))
+      .limit(1);
+    
+    if (result.length === 0) return null;
+    
+    const session = result[0];
+    if (new Date(session.expiresAt).getTime() < Date.now()) {
+      return null;
+    }
+    
+    return session.email;
+  } catch (error) {
+    console.error("[google-calendar] Token validation error:", error);
+    return null;
+  }
 }
 
 export function registerGoogleCalendarRoutes(app: Express) {
