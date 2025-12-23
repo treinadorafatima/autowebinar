@@ -34,7 +34,19 @@ async function buildSystemPromptWithKnowledge(
   knowledgeFiles: AiAgentFile[],
   calendarContext?: CalendarContext
 ): Promise<string> {
-  let systemPrompt = agent.systemPrompt;
+  const humanizationRules = `
+REGRAS DE COMUNICAÇÃO (IMPORTANTE):
+- Seja natural e humano, como uma pessoa real conversando
+- Respostas CURTAS e DIRETAS (máximo 2-3 frases por mensagem)
+- NÃO use listas ou bullet points a menos que seja estritamente necessário
+- NÃO use formatação markdown (negrito, itálico, etc)
+- Use linguagem informal e acolhedora
+- Evite textos longos ou explicações excessivas
+- Faça uma pergunta de cada vez
+- Responda apenas o que foi perguntado
+
+`;
+  let systemPrompt = humanizationRules + agent.systemPrompt;
   
   if (knowledgeFiles && knowledgeFiles.length > 0) {
     const knowledgeSection = knowledgeFiles
