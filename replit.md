@@ -38,9 +38,20 @@ O controle de quantidade de assistentes simula a variação de público, e o arm
 ### System Design Choices
 A arquitetura adota um design multi-inquilino para os webinars, onde cada um é uma entidade autônoma. A separação entre frontend e backend permite escalabilidade e manutenção independente. O uso de um ORM como Drizzle facilita a interação com o banco de dados PostgreSQL. A estratégia de armazenamento híbrida (Supabase Storage com fallback local) garante robustez. A modularidade do sistema de checkout e IA permite a integração de novos provedores e funcionalidades com relativa facilidade.
 
+## Google Calendar Integration (Em Desenvolvimento)
+- **Fluxo de Autenticação**: Cada admin conecta sua própria conta Google
+- **Isolamento de dados**: Cada admin tem acesso apenas às suas agendas Google
+- **Múltiplas agendas por admin**: Um admin pode ter várias agendas (pessoal, comercial, etc)
+- **Vinculação com agentes**: Cada agente de IA pode ser configurado para usar UMA agenda específica
+- **Schema (ainda não migrado)**:
+  - `admin_google_calendars`: Armazena tokens OAuth e agendas conectadas por admin
+  - `ai_agents.calendarEnabled`: Flag se o agente usa agendamentos
+  - `ai_agents.adminCalendarId`: ID da agenda que o agente usará (FK para admin_google_calendars)
+
 ## External Dependencies
 - **PostgreSQL (Neon)**: Banco de dados relacional para armazenamento de dados da aplicação.
 - **Supabase Storage**: Serviço de armazenamento de objetos para vídeos e imagens dos webinars.
+- **Google Calendar API**: Para integração de agendamentos automáticos via agentes de IA (OAuth2).
 - **OpenAI API**: Utilizada pelo Designer IA para sugestões de design e geração de roteiros.
 - **DeepSeek API**: Alternativa de provedor de IA para o Designer IA.
 - **Stripe**: Gateway de pagamento para processamento de pagamentos e assinaturas recorrentes.
