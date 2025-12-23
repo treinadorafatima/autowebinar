@@ -139,26 +139,27 @@ export function registerGoogleCalendarRoutes(app: Express) {
       const { code, state, error: authError } = req.query;
 
       if (authError) {
-        return res.redirect("/admin/configuracoes?calendar=error&message=" + encodeURIComponent(String(authError)));
+        return res.redirect("/admin/ai-agents?calendar=error&message=" + encodeURIComponent(String(authError)));
       }
 
       if (!code || !state) {
-        return res.redirect("/admin/configuracoes?calendar=error&message=Parâmetros inválidos");
+        return res.redirect("/admin/ai-agents?calendar=error&message=Parâmetros inválidos");
       }
 
       const adminId = String(state);
       const admin = await storage.getAdminById(adminId);
       if (!admin) {
-        return res.redirect("/admin/configuracoes?calendar=error&message=Usuário não encontrado");
+        return res.redirect("/admin/ai-agents?calendar=error&message=Usuário não encontrado");
       }
 
       const oauth2Client = createOAuth2Client();
       const { tokens } = await oauth2Client.getToken(String(code));
 
       if (!tokens.access_token || !tokens.refresh_token) {
-        return res.redirect("/admin/configuracoes?calendar=error&message=Tokens inválidos");
+        return res.redirect("/admin/ai-agents?calendar=error&message=Tokens inválidos");
       }
 
+      // Salvar tokens na tabela legada também
       await storage.upsertGoogleCalendarToken(adminId, {
         adminId,
         accessToken: tokens.access_token,
@@ -168,10 +169,37 @@ export function registerGoogleCalendarRoutes(app: Express) {
         isConnected: true,
       });
 
-      res.redirect("/admin/configuracoes?calendar=connected");
+      // Buscar lista de calendários do Google e salvar
+      oauth2Client.setCredentials(tokens);
+      const calendar = google.calendar({ version: "v3", auth: oauth2Client });
+      
+      try {
+        const calendarList = await calendar.calendarList.list();
+        const calendars = calendarList.data.items || [];
+        
+        console.log(`[google-calendar] Found ${calendars.length} calendars for admin ${adminId}`);
+        
+        for (const cal of calendars) {
+          if (cal.id && cal.summary) {
+            await storage.upsertAdminCalendar({
+              adminId,
+              googleCalendarId: cal.id,
+              name: cal.summary,
+              accessToken: tokens.access_token,
+              refreshToken: tokens.refresh_token,
+              expiryDate: tokens.expiry_date || null,
+              isPrimary: cal.primary || false,
+            });
+          }
+        }
+      } catch (calError: any) {
+        console.error("[google-calendar] Error fetching calendar list:", calError);
+      }
+
+      res.redirect("/admin/ai-agents?calendar=connected");
     } catch (error: any) {
       console.error("[google-calendar] Callback error:", error);
-      res.redirect("/admin/configuracoes?calendar=error&message=" + encodeURIComponent(error.message));
+      res.redirect("/admin/ai-agents?calendar=error&message=" + encodeURIComponent(error.message));
     }
   });
 

@@ -6152,6 +6152,62 @@ Apos o pagamento, seu acesso sera renovado automaticamente!
       .orderBy(desc(adminGoogleCalendars.isPrimary), desc(adminGoogleCalendars.createdAt));
   }
 
+  async upsertAdminCalendar(data: {
+    adminId: string;
+    googleCalendarId: string;
+    name: string;
+    accessToken: string;
+    refreshToken: string;
+    expiryDate: number | null;
+    isPrimary: boolean;
+  }): Promise<AdminGoogleCalendar> {
+    const existing = await db.select().from(adminGoogleCalendars)
+      .where(and(
+        eq(adminGoogleCalendars.adminId, data.adminId),
+        eq(adminGoogleCalendars.googleCalendarId, data.googleCalendarId)
+      ))
+      .limit(1);
+
+    if (existing.length > 0) {
+      await db.update(adminGoogleCalendars)
+        .set({
+          name: data.name,
+          accessToken: data.accessToken,
+          refreshToken: data.refreshToken,
+          expiryDate: data.expiryDate,
+          isConnected: true,
+          updatedAt: new Date(),
+        })
+        .where(eq(adminGoogleCalendars.id, existing[0].id));
+      const updated = await db.select().from(adminGoogleCalendars)
+        .where(eq(adminGoogleCalendars.id, existing[0].id))
+        .limit(1);
+      return updated[0];
+    } else {
+      const id = randomUUID();
+      const calendar: AdminGoogleCalendar = {
+        id,
+        adminId: data.adminId,
+        name: data.name,
+        googleCalendarId: data.googleCalendarId,
+        accessToken: data.accessToken,
+        refreshToken: data.refreshToken,
+        expiryDate: data.expiryDate,
+        isConnected: true,
+        isPrimary: data.isPrimary,
+        lastSyncAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      await db.insert(adminGoogleCalendars).values(calendar);
+      return calendar;
+    }
+  }
+
+  async deleteAdminCalendars(adminId: string): Promise<void> {
+    await db.delete(adminGoogleCalendars).where(eq(adminGoogleCalendars.adminId, adminId));
+  }
+
   // Calendar Events methods
   async listCalendarEventsByAdmin(adminId: string, from?: Date, to?: Date): Promise<CalendarEvent[]> {
     let query = db.select().from(calendarEvents)

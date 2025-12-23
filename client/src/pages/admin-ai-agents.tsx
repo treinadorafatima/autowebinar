@@ -221,7 +221,7 @@ export default function AdminAiAgents() {
     enabled: !!editingAgent?.id,
   });
 
-  const { data: connectedCalendars } = useQuery<Array<{ id: string; name: string; isPrimary: boolean }>>({
+  const { data: connectedCalendars, isLoading: loadingCalendars } = useQuery<Array<{ id: string; name: string; isPrimary: boolean }>>({
     queryKey: ["/api/google-calendar/connected"],
   });
 
@@ -477,6 +477,15 @@ export default function AdminAiAgents() {
   };
 
   const handleSubmit = async () => {
+    if (formData.calendarEnabled && !formData.adminCalendarId) {
+      toast({ 
+        title: "Selecione uma agenda", 
+        description: "Para habilitar agendamentos, selecione uma agenda Google conectada",
+        variant: "destructive" 
+      });
+      return;
+    }
+    
     if (editingAgent) {
       updateMutation.mutate({ id: editingAgent.id, data: formData });
     } else {
@@ -1601,7 +1610,12 @@ export default function AdminAiAgents() {
                         <div className="space-y-2">
                           <Label>Agendas Conectadas</Label>
                           
-                          {connectedCalendars && connectedCalendars.length > 0 ? (
+                          {loadingCalendars ? (
+                            <div className="flex items-center gap-2 p-3 border rounded-lg">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <span className="text-sm text-muted-foreground">Carregando agendas...</span>
+                            </div>
+                          ) : connectedCalendars && connectedCalendars.length > 0 ? (
                             <div className="space-y-2">
                               <Select 
                                 value={formData.adminCalendarId || ""} 
@@ -1618,9 +1632,24 @@ export default function AdminAiAgents() {
                                   ))}
                                 </SelectContent>
                               </Select>
-                              <p className="text-xs text-muted-foreground">
-                                {connectedCalendars.length} agenda(s) conectada(s)
-                              </p>
+                              <div className="flex items-center justify-between">
+                                <p className="text-xs text-muted-foreground">
+                                  {connectedCalendars.length} agenda(s) conectada(s)
+                                </p>
+                                <Button 
+                                  size="sm" 
+                                  variant="outline"
+                                  onClick={handleConnectGoogle}
+                                  disabled={isConnectingGoogle}
+                                  data-testid="button-reconnect-google"
+                                >
+                                  {isConnectingGoogle ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Calendar className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              </div>
                             </div>
                           ) : (
                             <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg">
