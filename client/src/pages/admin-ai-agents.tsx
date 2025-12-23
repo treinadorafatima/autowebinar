@@ -1599,78 +1599,50 @@ export default function AdminAiAgents() {
                     {formData.calendarEnabled && (
                       <div className="space-y-3 pt-2">
                         <div className="space-y-2">
-                          <Label>Tipo de Autenticação *</Label>
-                          <Select 
-                            value={formData.calendarAuthType} 
-                            onValueChange={(v) => setFormData({ ...formData, calendarAuthType: v })}
-                          >
-                            <SelectTrigger data-testid="select-calendar-auth-type">
-                              <SelectValue placeholder="Selecione o tipo" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="admin">Calendário do Admin (padrão)</SelectItem>
-                              <SelectItem value="client">Calendário do Cliente (requer conexão)</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <p className="text-xs text-muted-foreground">
-                            {formData.calendarAuthType === "admin" 
-                              ? "Agendamentos serão no calendário do administrador"
-                              : "Cliente conecta sua conta Google pessoalmente"}
-                          </p>
-                        </div>
-
-                        {formData.calendarAuthType === "admin" && (
-                          <div className="space-y-2">
-                            <Label>Selecione a Agenda *</Label>
-                            <Select 
-                              value={formData.adminCalendarId || ""} 
-                              onValueChange={(v) => setFormData({ ...formData, adminCalendarId: v })}
-                            >
-                              <SelectTrigger data-testid="select-admin-calendar">
-                                <SelectValue placeholder="Selecione uma agenda" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="primary">Calendário Principal (Google)</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <p className="text-xs text-muted-foreground">
-                              Qual calendário do Google será usado para agendamentos deste agente
-                            </p>
-                          </div>
-                        )}
-
-                        {formData.calendarAuthType === "client" && editingAgent && (
-                          <div className="space-y-2 p-3 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
-                            <Label className="flex items-center gap-2 text-blue-900 dark:text-blue-100">
-                              <Link2 className="h-4 w-4" />
-                              Link de Conexão para Cliente
-                            </Label>
-                            <div className="flex gap-2">
-                              <input 
-                                type="text" 
-                                readOnly 
-                                value={getCalendarConnectionLink() || ""} 
-                                className="flex-1 px-3 py-2 text-sm bg-white dark:bg-slate-900 border rounded text-slate-600 dark:text-slate-300"
-                                data-testid="input-calendar-link"
-                              />
+                          <Label>Agendas Conectadas</Label>
+                          
+                          {connectedCalendars && connectedCalendars.length > 0 ? (
+                            <div className="space-y-2">
+                              <Select 
+                                value={formData.adminCalendarId || ""} 
+                                onValueChange={(v) => setFormData({ ...formData, adminCalendarId: v })}
+                              >
+                                <SelectTrigger data-testid="select-admin-calendar">
+                                  <SelectValue placeholder="Selecione uma agenda" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {connectedCalendars.map((cal) => (
+                                    <SelectItem key={cal.id} value={cal.id}>
+                                      {cal.name} {cal.isPrimary && "(Principal)"}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <p className="text-xs text-muted-foreground">
+                                {connectedCalendars.length} agenda(s) conectada(s)
+                              </p>
+                            </div>
+                          ) : (
+                            <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg">
+                              <p className="text-sm text-amber-800 dark:text-amber-200 mb-2">
+                                Nenhuma agenda Google conectada
+                              </p>
                               <Button 
                                 size="sm" 
-                                variant="outline"
-                                onClick={copyToClipboard}
-                                data-testid="button-copy-calendar-link"
+                                onClick={handleConnectGoogle}
+                                disabled={isConnectingGoogle}
+                                data-testid="button-connect-google"
                               >
-                                {copiedLink ? (
-                                  <CheckCheck className="h-4 w-4" />
+                                {isConnectingGoogle ? (
+                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                                 ) : (
-                                  <Copy className="h-4 w-4" />
+                                  <Calendar className="h-4 w-4 mr-2" />
                                 )}
+                                Conectar Google Calendar
                               </Button>
                             </div>
-                            <p className="text-xs text-blue-800 dark:text-blue-200">
-                              Compartilhe este link com o cliente para que ele conecte seu próprio calendário Google
-                            </p>
-                          </div>
-                        )}
+                          )}
+                        </div>
 
                         <div className="space-y-2">
                           <Label>Duração padrão (minutos) *</Label>
