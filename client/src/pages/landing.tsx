@@ -1359,8 +1359,8 @@ export default function LandingPage() {
             <div>
               <h4 className="text-white font-semibold mb-4">Legal</h4>
               <ul className="space-y-2 text-slate-400 text-sm">
-                <li><button onClick={() => setLocation("/privacidade")} className="hover:text-white transition-colors" data-testid="link-privacy">Política de Privacidade</button></li>
-                <li><button onClick={() => setLocation("/termos")} className="hover:text-white transition-colors" data-testid="link-terms">Termos de Serviço</button></li>
+                <li><button onClick={() => setLocation("/politica-de-privacidade")} className="hover:text-white transition-colors" data-testid="link-privacy">Política de Privacidade</button></li>
+                <li><button onClick={() => setLocation("/termos-de-servico")} className="hover:text-white transition-colors" data-testid="link-terms">Termos de Serviço</button></li>
               </ul>
             </div>
           </div>

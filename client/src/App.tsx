@@ -181,8 +181,8 @@ function Router() {
       <Route path="/afiliado/forgot-password" component={AfiliadoForgotPasswordPage} />
       <Route path="/afiliado/reset-password" component={AfiliadoResetPasswordPage} />
       <Route path="/r/:code" component={AffiliateRedirectPage} />
-      <Route path="/privacidade" component={PoliticaPrivacidadePage} />
-      <Route path="/termos" component={TermosServicoPage} />
+      <Route path="/politica-de-privacidade" component={PoliticaPrivacidadePage} />
+      <Route path="/termos-de-servico" component={TermosServicoPage} />
       <Route component={NotFound} />
     </Switch>
   );
