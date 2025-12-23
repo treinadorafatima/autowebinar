@@ -169,29 +169,23 @@ export function registerGoogleCalendarRoutes(app: Express) {
         isConnected: true,
       });
 
-      // Buscar lista de calendários do Google e salvar
+      // Buscar lista de calendários do Google e sincronizar
       oauth2Client.setCredentials(tokens);
       const calendar = google.calendar({ version: "v3", auth: oauth2Client });
       
       try {
         const calendarList = await calendar.calendarList.list();
-        const calendars = calendarList.data.items || [];
+        const calendars = (calendarList.data.items || [])
+          .filter(cal => cal.id && cal.summary)
+          .map(cal => ({
+            googleCalendarId: cal.id!,
+            name: cal.summary!,
+            isPrimary: cal.primary || false,
+          }));
         
         console.log(`[google-calendar] Found ${calendars.length} calendars for admin ${adminId}`);
         
-        for (const cal of calendars) {
-          if (cal.id && cal.summary) {
-            await storage.upsertAdminCalendar({
-              adminId,
-              googleCalendarId: cal.id,
-              name: cal.summary,
-              accessToken: tokens.access_token,
-              refreshToken: tokens.refresh_token,
-              expiryDate: tokens.expiry_date || null,
-              isPrimary: cal.primary || false,
-            });
-          }
-        }
+        await storage.syncAdminCalendars(adminId, calendars);
       } catch (calError: any) {
         console.error("[google-calendar] Error fetching calendar list:", calError);
       }
@@ -497,6 +491,11 @@ export function registerGoogleCalendarRoutes(app: Express) {
       const { admin, error, errorCode } = await validateSessionAndGetAdmin(req);
       if (!admin) {
         return res.status(errorCode || 401).json({ error: error || "Não autenticado" });
+      }
+
+      const token = await storage.getGoogleCalendarToken(admin.id);
+      if (!token || !token.isConnected) {
+        return res.json([]);
       }
 
       const calendars = await storage.getConnectedAdminCalendars(admin.id);

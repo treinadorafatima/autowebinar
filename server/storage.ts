@@ -6145,62 +6145,47 @@ Apos o pagamento, seu acesso sera renovado automaticamente!
 
   async getConnectedAdminCalendars(adminId: string): Promise<AdminGoogleCalendar[]> {
     return await db.select().from(adminGoogleCalendars)
-      .where(and(
-        eq(adminGoogleCalendars.adminId, adminId),
-        eq(adminGoogleCalendars.isConnected, true)
-      ))
+      .where(eq(adminGoogleCalendars.adminId, adminId))
       .orderBy(desc(adminGoogleCalendars.isPrimary), desc(adminGoogleCalendars.createdAt));
   }
 
-  async upsertAdminCalendar(data: {
-    adminId: string;
-    googleCalendarId: string;
-    name: string;
-    accessToken: string;
-    refreshToken: string;
-    expiryDate: number | null;
-    isPrimary: boolean;
-  }): Promise<AdminGoogleCalendar> {
-    const existing = await db.select().from(adminGoogleCalendars)
-      .where(and(
-        eq(adminGoogleCalendars.adminId, data.adminId),
-        eq(adminGoogleCalendars.googleCalendarId, data.googleCalendarId)
-      ))
-      .limit(1);
-
-    if (existing.length > 0) {
-      await db.update(adminGoogleCalendars)
-        .set({
-          name: data.name,
-          accessToken: data.accessToken,
-          refreshToken: data.refreshToken,
-          expiryDate: data.expiryDate,
-          isConnected: true,
-          updatedAt: new Date(),
-        })
-        .where(eq(adminGoogleCalendars.id, existing[0].id));
-      const updated = await db.select().from(adminGoogleCalendars)
-        .where(eq(adminGoogleCalendars.id, existing[0].id))
+  async syncAdminCalendars(adminId: string, calendars: { googleCalendarId: string; name: string; isPrimary: boolean }[]): Promise<void> {
+    const existingCalendars = await db.select().from(adminGoogleCalendars)
+      .where(eq(adminGoogleCalendars.adminId, adminId));
+    
+    const existingIds = new Set(existingCalendars.map(c => c.googleCalendarId));
+    const newIds = new Set(calendars.map(c => c.googleCalendarId));
+    
+    const toDelete = existingCalendars.filter(c => !newIds.has(c.googleCalendarId));
+    for (const cal of toDelete) {
+      const agentsUsingCalendar = await db.select().from(aiAgents)
+        .where(eq(aiAgents.adminCalendarId, cal.id))
         .limit(1);
-      return updated[0];
-    } else {
-      const id = randomUUID();
-      const calendar: AdminGoogleCalendar = {
-        id,
-        adminId: data.adminId,
-        name: data.name,
-        googleCalendarId: data.googleCalendarId,
-        accessToken: data.accessToken,
-        refreshToken: data.refreshToken,
-        expiryDate: data.expiryDate,
-        isConnected: true,
-        isPrimary: data.isPrimary,
-        lastSyncAt: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-      await db.insert(adminGoogleCalendars).values(calendar);
-      return calendar;
+      
+      if (agentsUsingCalendar.length === 0) {
+        await db.delete(adminGoogleCalendars).where(eq(adminGoogleCalendars.id, cal.id));
+      }
+    }
+    
+    for (const cal of calendars) {
+      if (existingIds.has(cal.googleCalendarId)) {
+        const existing = existingCalendars.find(c => c.googleCalendarId === cal.googleCalendarId);
+        if (existing) {
+          await db.update(adminGoogleCalendars)
+            .set({ name: cal.name, isPrimary: cal.isPrimary, updatedAt: new Date() })
+            .where(eq(adminGoogleCalendars.id, existing.id));
+        }
+      } else {
+        await db.insert(adminGoogleCalendars).values({
+          id: randomUUID(),
+          adminId,
+          googleCalendarId: cal.googleCalendarId,
+          name: cal.name,
+          isPrimary: cal.isPrimary,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+      }
     }
   }
 

@@ -1134,6 +1134,7 @@ export const aiAgents = pgTable("ai_agents", {
   escalationKeywords: text("escalation_keywords").default(""), // Palavras-chave para escalar (separadas por vírgula)
   escalationMessage: text("escalation_message").default("Vou transferir você para um atendente humano."),
   calendarEnabled: boolean("calendar_enabled").notNull().default(false), // Habilitar agendamentos via calendário
+  adminCalendarId: text("admin_calendar_id"), // FK para admin_google_calendars (qual agenda usar)
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -1207,18 +1208,13 @@ export type AiUsageStats = typeof aiUsageStats.$inferSelect;
 export const aiUsageStatsInsertSchema = createInsertSchema(aiUsageStats).omit({ id: true });
 export type AiUsageStatsInsert = z.infer<typeof aiUsageStatsInsertSchema>;
 
-// Admin Google Calendars - agendas do admin (pode ter múltiplas)
+// Admin Google Calendars - metadados das agendas do admin (sem tokens)
 export const adminGoogleCalendars = pgTable("admin_google_calendars", {
   id: text("id").primaryKey(),
   adminId: text("admin_id").notNull(), // FK para admins
   name: text("name").notNull(), // Nome da agenda (ex: "Calendário Principal")
   googleCalendarId: text("google_calendar_id").notNull(), // ID do calendário no Google
-  accessToken: text("access_token").notNull(), // Token de acesso (criptografado)
-  refreshToken: text("refresh_token").notNull(), // Token de refresh (criptografado)
-  expiryDate: integer("expiry_date"), // Unix timestamp de expiração
-  isConnected: boolean("is_connected").notNull().default(true),
   isPrimary: boolean("is_primary").notNull().default(false), // Agenda padrão do admin
-  lastSyncAt: timestamp("last_sync_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

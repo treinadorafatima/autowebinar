@@ -156,10 +156,22 @@ export function registerAiAgentsRoutes(app: Express) {
         return res.status(errorCode || 401).json({ error: error || "Não autenticado" });
       }
 
-      const { whatsappAccountId, name, provider, apiKey, model, systemPrompt, ...rest } = req.body;
+      const { whatsappAccountId, name, provider, apiKey, model, systemPrompt, calendarEnabled, adminCalendarId, ...rest } = req.body;
 
       if (!whatsappAccountId || !name || !apiKey || !systemPrompt) {
         return res.status(400).json({ error: "Campos obrigatórios: whatsappAccountId, name, apiKey, systemPrompt" });
+      }
+
+      if (calendarEnabled && !adminCalendarId) {
+        return res.status(400).json({ error: "Para habilitar agendamentos, selecione uma agenda Google conectada" });
+      }
+
+      if (adminCalendarId) {
+        const calendars = await storage.getConnectedAdminCalendars(admin.id);
+        const validCalendar = calendars.find(c => c.id === adminCalendarId);
+        if (!validCalendar) {
+          return res.status(400).json({ error: "Agenda selecionada não encontrada ou não pertence a esta conta" });
+        }
       }
 
       const account = await storage.getWhatsappAccountById(whatsappAccountId);
@@ -180,6 +192,8 @@ export function registerAiAgentsRoutes(app: Express) {
         apiKey,
         model: model || "gpt-4o-mini",
         systemPrompt,
+        calendarEnabled: calendarEnabled || false,
+        adminCalendarId: adminCalendarId || null,
         ...rest,
       });
 
@@ -211,6 +225,18 @@ export function registerAiAgentsRoutes(app: Express) {
       const updateData = { ...req.body };
       if (updateData.apiKey && updateData.apiKey.startsWith("sk-****")) {
         delete updateData.apiKey;
+      }
+
+      if (updateData.calendarEnabled && !updateData.adminCalendarId) {
+        return res.status(400).json({ error: "Para habilitar agendamentos, selecione uma agenda Google conectada" });
+      }
+
+      if (updateData.adminCalendarId) {
+        const calendars = await storage.getConnectedAdminCalendars(admin.id);
+        const validCalendar = calendars.find(c => c.id === updateData.adminCalendarId);
+        if (!validCalendar) {
+          return res.status(400).json({ error: "Agenda selecionada não encontrada ou não pertence a esta conta" });
+        }
       }
 
       const updatedAgent = await storage.updateAiAgent(req.params.id, updateData);
