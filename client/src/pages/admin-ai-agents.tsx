@@ -1768,44 +1768,42 @@ export default function AdminAiAgents() {
       </Dialog>
 
       <Dialog open={showConnectCalendarDialog} onOpenChange={setShowConnectCalendarDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Calendar className="h-5 w-5" />
-              Conectar Agendas do Google Calendar
+              Agendas do Google Calendar
             </DialogTitle>
             <DialogDescription>
-              Configure as agendas que seus agentes irão usar para fazer agendamentos automáticos
+              Conecte sua conta Google para usar calendários nos agentes
             </DialogDescription>
           </DialogHeader>
           
-          <div className="space-y-4 py-4">
-            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-              <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">Como funciona:</h4>
-              <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
-                <li>• Conecte agendas do Google Calendar de seus administradores</li>
-                <li>• Ou permita que clientes conectem suas próprias agendas via OAuth</li>
-                <li>• Cada agente pode ser configurado para usar uma agenda específica</li>
-              </ul>
-            </div>
+          <div className="space-y-3 py-4">
+            <Button 
+              onClick={() => {
+                // TODO: Implement Google OAuth connection
+                window.location.href = '/auth/google/callback';
+              }}
+              className="w-full gap-2 h-auto py-3"
+              data-testid="button-connect-google"
+            >
+              <Calendar className="h-4 w-4" />
+              Conectar Conta Google
+            </Button>
 
-            <div className="space-y-3">
-              <Button onClick={() => {}} variant="outline" className="w-full justify-start gap-2 h-auto py-3">
-                <Calendar className="h-4 w-4 shrink-0" />
-                <div className="text-left">
-                  <div className="font-semibold text-sm">Calendário do Administrador</div>
-                  <div className="text-xs text-muted-foreground">Conecte múltiplas agendas para gerenciar</div>
-                </div>
-              </Button>
-              
-              <Button onClick={() => {}} variant="outline" className="w-full justify-start gap-2 h-auto py-3">
-                <Link2 className="h-4 w-4 shrink-0" />
-                <div className="text-left">
-                  <div className="font-semibold text-sm">Calendário do Cliente (OAuth)</div>
-                  <div className="text-xs text-muted-foreground">Clientes conectam suas próprias agendas</div>
-                </div>
-              </Button>
-            </div>
+            <Button 
+              onClick={() => {
+                // TODO: Implement view connected calendars
+                setShowConnectCalendarDialog(false);
+              }}
+              variant="outline"
+              className="w-full gap-2 h-auto py-3"
+              data-testid="button-view-calendars"
+            >
+              <CheckCircle className="h-4 w-4" />
+              Minhas Agendas Conectadas
+            </Button>
           </div>
 
           <DialogFooter>
