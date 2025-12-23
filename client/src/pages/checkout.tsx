@@ -1278,13 +1278,7 @@ export default function Checkout() {
                     </div>
                     {isMercadoPago ? (
                       <SiMercadopago className="w-8 h-8 text-[#00b1ea]" />
-                    ) : isHibrido ? (
-                      <div className="flex items-center gap-1">
-                        <SiStripe className="w-6 h-6 text-[#635bff]" />
-                        <span className="text-xs text-slate-400">+</span>
-                        <SiMercadopago className="w-6 h-6 text-[#00b1ea]" />
-                      </div>
-                    ) : (
+                    ) : !isHibrido && (
                       <SiStripe className="w-8 h-8 text-[#635bff]" />
                     )}
                   </div>
@@ -1538,7 +1532,6 @@ export default function Checkout() {
                           >
                             <CreditCard className={`w-6 h-6 ${hybridPaymentMethod === "card" ? "text-blue-500" : "text-slate-400"}`} />
                             <span className={`text-sm font-medium ${hybridPaymentMethod === "card" ? "text-blue-700" : "text-slate-600"}`}>Cartão</span>
-                            <span className="text-xs text-slate-400">via Stripe</span>
                           </button>
                           <button
                             type="button"
@@ -1552,7 +1545,6 @@ export default function Checkout() {
                           >
                             <QrCode className={`w-6 h-6 ${hybridPaymentMethod === "pix" ? "text-emerald-500" : "text-slate-400"}`} />
                             <span className={`text-sm font-medium ${hybridPaymentMethod === "pix" ? "text-emerald-700" : "text-slate-600"}`}>Pix</span>
-                            <span className="text-xs text-slate-400">via MP</span>
                           </button>
                           <button
                             type="button"
@@ -1566,7 +1558,6 @@ export default function Checkout() {
                           >
                             <Barcode className={`w-6 h-6 ${hybridPaymentMethod === "boleto" ? "text-orange-500" : "text-slate-400"}`} />
                             <span className={`text-sm font-medium ${hybridPaymentMethod === "boleto" ? "text-orange-700" : "text-slate-600"}`}>Boleto</span>
-                            <span className="text-xs text-slate-400">via MP</span>
                           </button>
                         </div>
                       </div>
