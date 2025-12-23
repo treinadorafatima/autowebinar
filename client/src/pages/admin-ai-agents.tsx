@@ -532,8 +532,8 @@ export default function AdminAiAgents() {
           <Card className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
             <CardContent className="pt-6 flex items-center justify-between">
               <div>
-                <h3 className="font-semibold text-blue-900 dark:text-blue-100">Gerenciar Agendas do Google Calendar</h3>
-                <p className="text-sm text-blue-800 dark:text-blue-200">Conecte as agendas dos seus administradores ou clientes aos agentes</p>
+                <h3 className="font-semibold text-blue-900 dark:text-blue-100">Agendas do Google Calendar</h3>
+                <p className="text-sm text-blue-800 dark:text-blue-200">Configure agendas para que seus agentes façam agendamentos automáticos</p>
               </div>
               <Button 
                 onClick={() => {
