@@ -169,10 +169,19 @@ async function handleIncomingMessage(accountId: string, senderPhone: string, tex
     const recentMessages = await storage.listAiMessagesByConversation(conversation.id, agent.memoryLength);
     const knowledgeFiles = await storage.listAiAgentFiles(agent.id);
     
+    let googleCalendarId: string | undefined;
+    if (agent.calendarEnabled && agent.adminCalendarId) {
+      const adminCalendar = await storage.getAdminCalendarById(agent.adminCalendarId);
+      if (adminCalendar) {
+        googleCalendarId = adminCalendar.googleCalendarId;
+      }
+    }
+    
     const calendarContext = agent.calendarEnabled ? {
       adminId: agent.adminId,
       contactPhone: senderPhone,
       contactName: conversation.contactName || undefined,
+      googleCalendarId,
     } : undefined;
     
     const response = await processMessage(agent, textContent, recentMessages, knowledgeFiles, calendarContext);

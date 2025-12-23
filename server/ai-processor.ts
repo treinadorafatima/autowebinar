@@ -109,7 +109,8 @@ async function parseAndExecuteCalendarActions(
   adminId: string,
   contactPhone?: string,
   contactName?: string,
-  durationMinutes: number = 60
+  durationMinutes: number = 60,
+  googleCalendarId?: string
 ): Promise<{ cleanContent: string; actions: CalendarAction[] }> {
   const actions: CalendarAction[] = [];
   let cleanContent = content;
@@ -127,6 +128,7 @@ async function parseAndExecuteCalendarActions(
         endTime,
         attendeeName: contactName,
         attendeePhone: contactPhone,
+        googleCalendarId,
       });
       
       actions.push({ type: "schedule", result });
@@ -148,7 +150,7 @@ async function parseAndExecuteCalendarActions(
     
     if (parsed) {
       const endTime = new Date(parsed.start.getTime() + durationMinutes * 60000);
-      const result = await calendarService.rescheduleAppointment(adminId, eventId, parsed.start, endTime);
+      const result = await calendarService.rescheduleAppointment(adminId, eventId, parsed.start, endTime, googleCalendarId);
       
       actions.push({ type: "reschedule", result });
       
@@ -165,7 +167,7 @@ async function parseAndExecuteCalendarActions(
   const cancelMatch = content.match(/\[CALENDAR_CANCEL:([^|]+)\|([^\]]+)\]/);
   if (cancelMatch) {
     const [fullMatch, eventId, reason] = cancelMatch;
-    const result = await calendarService.cancelAppointment(adminId, eventId, reason);
+    const result = await calendarService.cancelAppointment(adminId, eventId, reason, googleCalendarId);
     
     actions.push({ type: "cancel", result });
     
@@ -187,7 +189,7 @@ async function parseAndExecuteCalendarActions(
       const year = dateMatch[3] ? (dateMatch[3].length === 2 ? 2000 + parseInt(dateMatch[3]) : parseInt(dateMatch[3])) : new Date().getFullYear();
       const date = new Date(year, month, day);
       
-      const slots = await calendarService.getAvailableSlots(adminId, date, durationMinutes);
+      const slots = await calendarService.getAvailableSlots(adminId, date, durationMinutes, "America/Sao_Paulo", googleCalendarId);
       const message = calendarService.formatAvailableSlotsMessage(slots, date);
       
       actions.push({ type: "check_availability", result: { slots, date } });
@@ -350,19 +352,24 @@ export async function processMessage(
     adminId: string;
     contactPhone?: string;
     contactName?: string;
+    googleCalendarId?: string;
   }
 ): Promise<AIResponse> {
   try {
     let calendarCtx: CalendarContext | undefined;
+    let googleCalendarId: string | undefined;
     
     if (agent.calendarEnabled && calendarContext?.adminId) {
+      googleCalendarId = calendarContext.googleCalendarId;
       const connected = await calendarService.checkCalendarConnected(calendarContext.adminId);
       if (connected) {
         const today = new Date();
         const availableSlots = await calendarService.getAvailableSlots(
           calendarContext.adminId, 
           today, 
-          agent.calendarDuration || 60
+          agent.calendarDuration || 60,
+          "America/Sao_Paulo",
+          googleCalendarId
         );
         const upcomingAppointments = calendarContext.contactPhone 
           ? await calendarService.getUpcomingAppointments(calendarContext.adminId, calendarContext.contactPhone)
@@ -423,7 +430,8 @@ export async function processMessage(
         calendarContext.adminId,
         calendarContext.contactPhone,
         calendarContext.contactName,
-        agent.calendarDuration || 60
+        agent.calendarDuration || 60,
+        googleCalendarId
       );
       
       response.content = cleanContent;

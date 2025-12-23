@@ -79,7 +79,8 @@ export async function getAvailableSlots(
   adminId: string,
   date: Date,
   durationMinutes: number = 60,
-  timezone: string = "America/Sao_Paulo"
+  timezone: string = "America/Sao_Paulo",
+  googleCalendarId: string = "primary"
 ): Promise<AvailabilitySlot[]> {
   const oauth2Client = await getAuthenticatedClient(adminId);
   if (!oauth2Client) {
@@ -91,15 +92,17 @@ export async function getAvailableSlots(
   const dayStart = startOfDay(date);
   const dayEnd = endOfDay(date);
 
+  const calId = googleCalendarId || "primary";
+
   const response = await calendar.freebusy.query({
     requestBody: {
       timeMin: dayStart.toISOString(),
       timeMax: dayEnd.toISOString(),
-      items: [{ id: "primary" }],
+      items: [{ id: calId }],
     },
   });
 
-  const busySlots = response.data.calendars?.primary?.busy || [];
+  const busySlots = response.data.calendars?.[calId]?.busy || [];
 
   const workStartHour = 9;
   const workEndHour = 18;
@@ -153,11 +156,13 @@ export async function scheduleAppointment(
     attendeeEmail?: string;
     attendeePhone?: string;
     location?: string;
+    googleCalendarId?: string;
   }
 ): Promise<ScheduleResult> {
   const oauth2Client = await getAuthenticatedClient(adminId);
   
   let googleEventId: string | null = null;
+  const calId = params.googleCalendarId || "primary";
 
   if (oauth2Client) {
     try {
@@ -182,7 +187,7 @@ export async function scheduleAppointment(
       }
 
       const response = await calendar.events.insert({
-        calendarId: "primary",
+        calendarId: calId,
         requestBody: event,
         sendUpdates: params.attendeeEmail ? "all" : "none",
       });
@@ -226,7 +231,8 @@ export async function rescheduleAppointment(
   adminId: string,
   eventId: string,
   newStartTime: Date,
-  newEndTime: Date
+  newEndTime: Date,
+  googleCalendarId?: string
 ): Promise<ScheduleResult> {
   const event = await storage.getCalendarEventById(eventId);
   
@@ -238,6 +244,8 @@ export async function rescheduleAppointment(
     return { success: false, message: "Acesso negado" };
   }
 
+  const calId = googleCalendarId || "primary";
+
   if (event.googleEventId) {
     const oauth2Client = await getAuthenticatedClient(adminId);
     if (oauth2Client) {
@@ -245,7 +253,7 @@ export async function rescheduleAppointment(
         const calendar = google.calendar({ version: "v3", auth: oauth2Client });
 
         await calendar.events.patch({
-          calendarId: "primary",
+          calendarId: calId,
           eventId: event.googleEventId,
           requestBody: {
             start: {
@@ -286,7 +294,8 @@ export async function rescheduleAppointment(
 export async function cancelAppointment(
   adminId: string,
   eventId: string,
-  reason?: string
+  reason?: string,
+  googleCalendarId?: string
 ): Promise<ScheduleResult> {
   const event = await storage.getCalendarEventById(eventId);
   
@@ -298,6 +307,8 @@ export async function cancelAppointment(
     return { success: false, message: "Acesso negado" };
   }
 
+  const calId = googleCalendarId || "primary";
+
   if (event.googleEventId) {
     const oauth2Client = await getAuthenticatedClient(adminId);
     if (oauth2Client) {
@@ -305,7 +316,7 @@ export async function cancelAppointment(
         const calendar = google.calendar({ version: "v3", auth: oauth2Client });
 
         await calendar.events.delete({
-          calendarId: "primary",
+          calendarId: calId,
           eventId: event.googleEventId,
           sendUpdates: "all",
         });

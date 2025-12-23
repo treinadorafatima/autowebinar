@@ -6149,6 +6149,13 @@ Apos o pagamento, seu acesso sera renovado automaticamente!
       .orderBy(desc(adminGoogleCalendars.isPrimary), desc(adminGoogleCalendars.createdAt));
   }
 
+  async getAdminCalendarById(id: string): Promise<AdminGoogleCalendar | null> {
+    const result = await db.select().from(adminGoogleCalendars)
+      .where(eq(adminGoogleCalendars.id, id))
+      .limit(1);
+    return result[0] || null;
+  }
+
   async syncAdminCalendars(adminId: string, calendars: { googleCalendarId: string; name: string; isPrimary: boolean }[]): Promise<void> {
     const existingCalendars = await db.select().from(adminGoogleCalendars)
       .where(eq(adminGoogleCalendars.adminId, adminId));
