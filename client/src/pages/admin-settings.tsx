@@ -18,13 +18,9 @@ import {
   CheckCircle,
   XCircle,
   Sparkles,
-  Zap,
-  Calendar,
-  Link2,
-  Unlink,
-  RefreshCw
+  Zap
 } from "lucide-react";
-import { SiOpenai, SiGooglecalendar } from "react-icons/si";
+import { SiOpenai } from "react-icons/si";
 
 type AIProvider = "openai" | "deepseek";
 
@@ -38,8 +34,6 @@ export default function AdminSettingsPage() {
   const [showDeepseekKey, setShowDeepseekKey] = useState(false);
   const [openaiConfigured, setOpenaiConfigured] = useState(false);
   const [deepseekConfigured, setDeepseekConfigured] = useState(false);
-  const [googleCalendarConnected, setGoogleCalendarConnected] = useState(false);
-  const [googleCalendarLoading, setGoogleCalendarLoading] = useState(false);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const searchString = useSearch();
@@ -52,23 +46,6 @@ export default function AdminSettingsPage() {
       return;
     }
     fetchSettings();
-    fetchGoogleCalendarStatus();
-    
-    const params = new URLSearchParams(searchString);
-    if (params.get("calendar") === "connected") {
-      toast({
-        title: "Google Calendar Conectado",
-        description: "Sua conta Google foi conectada com sucesso!",
-      });
-      window.history.replaceState({}, document.title, "/admin/configuracoes");
-    } else if (params.get("calendar") === "error") {
-      toast({
-        title: "Erro ao conectar",
-        description: params.get("message") || "Não foi possível conectar ao Google Calendar",
-        variant: "destructive",
-      });
-      window.history.replaceState({}, document.title, "/admin/configuracoes");
-    }
   }, []);
 
   async function fetchSettings() {
@@ -249,75 +226,6 @@ export default function AdminSettingsPage() {
       });
     } finally {
       setSaving(false);
-    }
-  }
-
-  async function fetchGoogleCalendarStatus() {
-    try {
-      const res = await fetch("/api/google/status", {
-        credentials: "include",
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setGoogleCalendarConnected(data.connected);
-      }
-    } catch (error) {
-      console.error("Error fetching Google Calendar status:", error);
-    }
-  }
-
-  async function connectGoogleCalendar() {
-    setGoogleCalendarLoading(true);
-    try {
-      const res = await fetch("/api/google/auth-url", {
-        credentials: "include",
-      });
-      if (res.ok) {
-        const data = await res.json();
-        window.location.href = data.authUrl;
-      } else {
-        const error = await res.json();
-        toast({
-          title: "Erro",
-          description: error.error || "Não foi possível iniciar a conexão",
-          variant: "destructive",
-        });
-        setGoogleCalendarLoading(false);
-      }
-    } catch (error) {
-      toast({
-        title: "Erro",
-        description: "Erro ao conectar ao Google Calendar",
-        variant: "destructive",
-      });
-      setGoogleCalendarLoading(false);
-    }
-  }
-
-  async function disconnectGoogleCalendar() {
-    setGoogleCalendarLoading(true);
-    try {
-      const res = await fetch("/api/google/disconnect", {
-        method: "POST",
-        credentials: "include",
-      });
-      if (res.ok) {
-        setGoogleCalendarConnected(false);
-        toast({
-          title: "Sucesso",
-          description: "Google Calendar desconectado",
-        });
-      } else {
-        throw new Error("Erro ao desconectar");
-      }
-    } catch (error) {
-      toast({
-        title: "Erro",
-        description: "Erro ao desconectar o Google Calendar",
-        variant: "destructive",
-      });
-    } finally {
-      setGoogleCalendarLoading(false);
     }
   }
 
@@ -648,83 +556,6 @@ export default function AdminSettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Google Calendar Integration */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-green-500 shadow-md">
-              <SiGooglecalendar className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                Google Calendar
-                {googleCalendarConnected ? (
-                  <CheckCircle className="w-5 h-5 text-green-500" />
-                ) : (
-                  <XCircle className="w-5 h-5 text-muted-foreground" />
-                )}
-              </CardTitle>
-              <CardDescription>
-                Sincronize agendamentos com sua agenda Google
-              </CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
-            <div className="flex gap-3">
-              <Calendar className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
-              <div className="text-sm">
-                <p className="font-medium text-blue-600 dark:text-blue-400">
-                  Integração com Google Calendar
-                </p>
-                <p className="text-muted-foreground mt-1">
-                  Conecte sua conta Google para sincronizar compromissos automaticamente.
-                  Seus agentes de IA poderão agendar, reagendar e cancelar eventos via WhatsApp.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {googleCalendarConnected ? (
-            <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="w-5 h-5 text-green-500" />
-                  <span className="font-medium text-green-600 dark:text-green-400">
-                    Google Calendar conectado
-                  </span>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={disconnectGoogleCalendar}
-                  disabled={googleCalendarLoading}
-                  className="gap-2"
-                  data-testid="button-disconnect-google-calendar"
-                >
-                  <Unlink className="w-4 h-4" />
-                  {googleCalendarLoading ? "Desconectando..." : "Desconectar"}
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <Button
-              onClick={connectGoogleCalendar}
-              disabled={googleCalendarLoading}
-              className="gap-2"
-              data-testid="button-connect-google-calendar"
-            >
-              {googleCalendarLoading ? (
-                <RefreshCw className="w-4 h-4 animate-spin" />
-              ) : (
-                <Link2 className="w-4 h-4" />
-              )}
-              {googleCalendarLoading ? "Conectando..." : "Conectar Google Calendar"}
-            </Button>
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 }

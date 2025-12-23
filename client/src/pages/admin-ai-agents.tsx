@@ -659,18 +659,33 @@ export default function AdminAiAgents() {
                 />
               </div>
 
-              <Button 
-                onClick={() => testingAgentId && handleTest(testingAgentId)}
-                disabled={!testingAgentId || !testMessage.trim() || testMutation.isPending}
-                data-testid="button-send-test"
-              >
-                {testMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Send className="h-4 w-4 mr-2" />
-                )}
-                Enviar Teste
-              </Button>
+              <div className="flex gap-2">
+                <Button 
+                  onClick={() => testingAgentId && handleTest(testingAgentId)}
+                  disabled={!testingAgentId || !testMessage.trim() || testMutation.isPending}
+                  data-testid="button-send-test"
+                  className="flex-1"
+                >
+                  {testMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4 mr-2" />
+                  )}
+                  Enviar Teste
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={() => {
+                    // Navigate to settings or open calendar connection dialog
+                    window.location.href = '/admin/ai-agents?openCalendar=true';
+                  }}
+                  data-testid="button-connect-calendars"
+                  className="gap-2"
+                >
+                  <Calendar className="h-4 w-4" />
+                  Conectar Agendas
+                </Button>
+              </div>
 
               {testResponse && (
                 <div className="p-4 bg-muted rounded-lg mt-4">
