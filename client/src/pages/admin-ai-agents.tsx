@@ -73,6 +73,7 @@ interface AiAgent {
   escalationMessage: string | null;
   calendarEnabled: boolean;
   calendarAuthType: "admin" | "client";
+  adminCalendarId: string | null;
   calendarDuration: number;
   calendarInstructions: string | null;
   createdAt: string;
@@ -157,6 +158,7 @@ export default function AdminAiAgents() {
     escalationMessage: "",
     calendarEnabled: false,
     calendarAuthType: "admin",
+    adminCalendarId: null as string | null,
     calendarDuration: 60,
     calendarInstructions: "",
   });
@@ -1554,6 +1556,26 @@ export default function AdminAiAgents() {
                               : "Cliente conecta sua conta Google pessoalmente"}
                           </p>
                         </div>
+
+                        {formData.calendarAuthType === "admin" && (
+                          <div className="space-y-2">
+                            <Label>Selecione a Agenda *</Label>
+                            <Select 
+                              value={formData.adminCalendarId || ""} 
+                              onValueChange={(v) => setFormData({ ...formData, adminCalendarId: v })}
+                            >
+                              <SelectTrigger data-testid="select-admin-calendar">
+                                <SelectValue placeholder="Selecione uma agenda" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="primary">Calendário Principal (Google)</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <p className="text-xs text-muted-foreground">
+                              Qual calendário do Google será usado para agendamentos deste agente
+                            </p>
+                          </div>
+                        )}
 
                         {formData.calendarAuthType === "client" && editingAgent && (
                           <div className="space-y-2 p-3 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
