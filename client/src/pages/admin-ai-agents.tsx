@@ -71,6 +71,10 @@ interface AiAgent {
   timezone: string;
   escalationKeywords: string | null;
   escalationMessage: string | null;
+  calendarEnabled: boolean;
+  calendarAuthType: "admin" | "client";
+  calendarDuration: number;
+  calendarInstructions: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -129,7 +133,7 @@ export default function AdminAiAgents() {
   const [promptFiles, setPromptFiles] = useState<Array<{ name: string; content: string }>>([]);
   const [isGeneratingPrompt, setIsGeneratingPrompt] = useState(false);
   
-  const [formData, setFormData] = useState({
+  const [formDataState, setFormDataState] = useState({
     whatsappAccountId: "",
     name: "",
     description: "",
@@ -150,7 +154,14 @@ export default function AdminAiAgents() {
     timezone: "America/Sao_Paulo",
     escalationKeywords: "",
     escalationMessage: "",
+    calendarEnabled: false,
+    calendarAuthType: "admin",
+    calendarDuration: 60,
+    calendarInstructions: "",
   });
+
+  const formData = formDataState;
+  const setFormData = setFormDataState;
 
   const { data: providers } = useQuery<Record<string, ProviderInfo>>({
     queryKey: ["/api/ai-agents/providers"],
@@ -1484,6 +1495,73 @@ export default function AdminAiAgents() {
                         data-testid="input-escalation-message"
                       />
                     </div>
+                  </div>
+
+                  <div className="space-y-4 p-4 border rounded-lg">
+                    <Label className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4" />
+                      Google Calendar - Agendamentos
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Habilite agendamentos automáticos via Google Calendar
+                    </p>
+
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={formData.calendarEnabled}
+                        onCheckedChange={(v) => setFormData({ ...formData, calendarEnabled: v })}
+                        data-testid="toggle-calendar-enabled"
+                      />
+                      <Label className="flex-1 cursor-pointer">Habilitar agendamentos</Label>
+                    </div>
+
+                    {formData.calendarEnabled && (
+                      <div className="space-y-3 pt-2">
+                        <div className="space-y-2">
+                          <Label>Tipo de Autenticação *</Label>
+                          <Select 
+                            value={formData.calendarAuthType} 
+                            onValueChange={(v) => setFormData({ ...formData, calendarAuthType: v })}
+                          >
+                            <SelectTrigger data-testid="select-calendar-auth-type">
+                              <SelectValue placeholder="Selecione o tipo" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="admin">Calendário do Admin (padrão)</SelectItem>
+                              <SelectItem value="client">Calendário do Cliente (requer conexão)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-muted-foreground">
+                            {formData.calendarAuthType === "admin" 
+                              ? "Agendamentos serão no calendário do administrador"
+                              : "Cliente conecta sua conta Google pessoalmente"}
+                          </p>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Duração padrão (minutos) *</Label>
+                          <Input
+                            type="number"
+                            min="15"
+                            step="15"
+                            value={formData.calendarDuration}
+                            onChange={(e) => setFormData({ ...formData, calendarDuration: parseInt(e.target.value) })}
+                            data-testid="input-calendar-duration"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Instruções (opcional)</Label>
+                          <Textarea
+                            placeholder="Ex: Agendar apenas segunda a sexta entre 9h e 18h"
+                            value={formData.calendarInstructions}
+                            onChange={(e) => setFormData({ ...formData, calendarInstructions: e.target.value })}
+                            className="min-h-[80px]"
+                            data-testid="input-calendar-instructions"
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg">

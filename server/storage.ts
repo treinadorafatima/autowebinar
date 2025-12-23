@@ -404,11 +404,16 @@ export interface IStorage {
   // AI Usage Stats
   getOrCreateAiUsageStats(agentId: string, date: string): Promise<AiUsageStats>;
   incrementAiUsageStats(agentId: string, date: string, messages?: number, tokens?: number, conversations?: number, errors?: number): Promise<void>;
-  // Google Calendar Tokens
+  // Google Calendar Tokens (Admin)
   getGoogleCalendarToken(adminId: string): Promise<GoogleCalendarToken | undefined>;
   upsertGoogleCalendarToken(adminId: string, data: GoogleCalendarTokenInsert): Promise<GoogleCalendarToken>;
   deleteGoogleCalendarToken(adminId: string): Promise<void>;
   updateGoogleCalendarToken(adminId: string, data: Partial<GoogleCalendarTokenInsert>): Promise<void>;
+  // Google Calendar Tokens (Client)
+  getClientGoogleCalendarToken(adminId: string, clientPhone: string): Promise<ClientGoogleCalendarToken | undefined>;
+  upsertClientGoogleCalendarToken(adminId: string, clientPhone: string, data: ClientGoogleCalendarTokenInsert): Promise<ClientGoogleCalendarToken>;
+  deleteClientGoogleCalendarToken(adminId: string, clientPhone: string): Promise<void>;
+  updateClientGoogleCalendarToken(adminId: string, clientPhone: string, data: Partial<ClientGoogleCalendarTokenInsert>): Promise<void>;
   // Calendar Events
   listCalendarEventsByAdmin(adminId: string, from?: Date, to?: Date): Promise<CalendarEvent[]>;
   listCalendarEventsByAdminAndPhone(adminId: string, phone: string): Promise<CalendarEvent[]>;
@@ -6217,6 +6222,54 @@ Apos o pagamento, seu acesso sera renovado automaticamente!
 
   async deleteCalendarEvent(id: string): Promise<void> {
     await db.delete(calendarEvents).where(eq(calendarEvents.id, id));
+  }
+
+  // Client Google Calendar Token methods
+  async getClientGoogleCalendarToken(adminId: string, clientPhone: string): Promise<ClientGoogleCalendarToken | undefined> {
+    const result = await db.select().from(clientGoogleCalendarTokens)
+      .where(and(eq(clientGoogleCalendarTokens.adminId, adminId), eq(clientGoogleCalendarTokens.clientPhone, clientPhone)))
+      .limit(1);
+    return result[0];
+  }
+
+  async upsertClientGoogleCalendarToken(adminId: string, clientPhone: string, data: ClientGoogleCalendarTokenInsert): Promise<ClientGoogleCalendarToken> {
+    const existing = await this.getClientGoogleCalendarToken(adminId, clientPhone);
+    if (existing) {
+      await db.update(clientGoogleCalendarTokens)
+        .set({ ...data, updatedAt: new Date() })
+        .where(and(eq(clientGoogleCalendarTokens.adminId, adminId), eq(clientGoogleCalendarTokens.clientPhone, clientPhone)));
+      const updated = await this.getClientGoogleCalendarToken(adminId, clientPhone);
+      return updated!;
+    } else {
+      const id = randomUUID();
+      const token: ClientGoogleCalendarToken = {
+        id,
+        adminId,
+        clientPhone,
+        clientEmail: data.clientEmail ?? null,
+        accessToken: data.accessToken,
+        refreshToken: data.refreshToken,
+        expiryDate: data.expiryDate ?? null,
+        calendarId: data.calendarId ?? "primary",
+        isConnected: data.isConnected ?? true,
+        lastSyncAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      await db.insert(clientGoogleCalendarTokens).values(token);
+      return token;
+    }
+  }
+
+  async deleteClientGoogleCalendarToken(adminId: string, clientPhone: string): Promise<void> {
+    await db.delete(clientGoogleCalendarTokens)
+      .where(and(eq(clientGoogleCalendarTokens.adminId, adminId), eq(clientGoogleCalendarTokens.clientPhone, clientPhone)));
+  }
+
+  async updateClientGoogleCalendarToken(adminId: string, clientPhone: string, data: Partial<ClientGoogleCalendarTokenInsert>): Promise<void> {
+    await db.update(clientGoogleCalendarTokens)
+      .set({ ...data, updatedAt: new Date() })
+      .where(and(eq(clientGoogleCalendarTokens.adminId, adminId), eq(clientGoogleCalendarTokens.clientPhone, clientPhone)));
   }
 }
 

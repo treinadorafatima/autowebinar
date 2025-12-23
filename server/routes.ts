@@ -12,6 +12,7 @@ import { registerEmailMarketingRoutes } from "./email-marketing";
 import { registerWhatsAppRoutes } from "./whatsapp-routes";
 import { registerAiAgentsRoutes } from "./ai-agents-routes";
 import { registerGoogleCalendarRoutes } from "./google-calendar-routes";
+import { registerClientCalendarRoutes } from "./client-calendar-routes";
 import { rescheduleSequencesForWebinar, cancelAllSequencesForWebinar } from "./sequence-sync";
 import { renderDomainsService } from "./render-domains";
 import multer from "multer";
@@ -13617,6 +13618,9 @@ Seja conversacional e objetivo.`;
 
   // Register Google Calendar routes
   registerGoogleCalendarRoutes(app);
+
+  // Register Client Calendar routes
+  registerClientCalendarRoutes(app);
 
   const httpServer = createServer(app);
   return httpServer;

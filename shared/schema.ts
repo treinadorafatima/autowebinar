@@ -1134,6 +1134,7 @@ export const aiAgents = pgTable("ai_agents", {
   escalationKeywords: text("escalation_keywords").default(""), // Palavras-chave para escalar (separadas por vírgula)
   escalationMessage: text("escalation_message").default("Vou transferir você para um atendente humano."),
   calendarEnabled: boolean("calendar_enabled").notNull().default(false), // Habilitar agendamentos via calendário
+  calendarAuthType: text("calendar_auth_type").notNull().default("admin"), // 'admin' ou 'client'
   calendarDuration: integer("calendar_duration").notNull().default(60), // Duração padrão do agendamento em minutos
   calendarInstructions: text("calendar_instructions").default(""), // Instruções adicionais para o agente sobre agendamentos
   createdAt: timestamp("created_at").defaultNow(),
@@ -1226,6 +1227,26 @@ export const googleCalendarTokens = pgTable("google_calendar_tokens", {
 export type GoogleCalendarToken = typeof googleCalendarTokens.$inferSelect;
 export const googleCalendarTokenInsertSchema = createInsertSchema(googleCalendarTokens).omit({ id: true, createdAt: true, updatedAt: true });
 export type GoogleCalendarTokenInsert = z.infer<typeof googleCalendarTokenInsertSchema>;
+
+// Client Google Calendar Tokens - tokens OAuth per client for calendar integration
+export const clientGoogleCalendarTokens = pgTable("client_google_calendar_tokens", {
+  id: text("id").primaryKey(),
+  adminId: text("admin_id").notNull(), // FK para admins
+  clientPhone: text("client_phone").notNull(), // Phone do cliente (identificador único)
+  clientEmail: text("client_email"), // Email da conta Google conectada
+  accessToken: text("access_token").notNull(), // Token de acesso (criptografado)
+  refreshToken: text("refresh_token").notNull(), // Token de refresh (criptografado)
+  expiryDate: integer("expiry_date"), // Unix timestamp de expiração
+  calendarId: text("calendar_id").notNull().default("primary"), // ID do calendário
+  isConnected: boolean("is_connected").notNull().default(true),
+  lastSyncAt: timestamp("last_sync_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type ClientGoogleCalendarToken = typeof clientGoogleCalendarTokens.$inferSelect;
+export const clientGoogleCalendarTokenInsertSchema = createInsertSchema(clientGoogleCalendarTokens).omit({ id: true, createdAt: true, updatedAt: true });
+export type ClientGoogleCalendarTokenInsert = z.infer<typeof clientGoogleCalendarTokenInsertSchema>;
 
 // Calendar Events - local cache of calendar events
 export const calendarEvents = pgTable("calendar_events", {

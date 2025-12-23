@@ -24,6 +24,7 @@ interface ChatMessage {
 interface CalendarContext {
   enabled: boolean;
   connected: boolean;
+  requiresClientAuth?: boolean;
   availableSlots?: calendarService.AvailabilitySlot[];
   upcomingAppointments?: any[];
 }
@@ -48,8 +49,9 @@ async function buildSystemPromptWithKnowledge(
 
   if (calendarContext?.enabled) {
     if (!calendarContext.connected) {
+      const connectionType = calendarContext.requiresClientAuth ? "do cliente" : "do administrador";
       systemPrompt += `\n\n=== AVISO SOBRE AGENDAMENTOS ===
-O sistema de agendamentos está habilitado, mas a conta Google Calendar ainda não foi conectada pelo administrador.
+O sistema de agendamentos está habilitado, mas a conta Google Calendar ${connectionType} ainda não foi conectada.
 Se o usuário perguntar sobre agendamentos, informe que o serviço de agendamento online não está disponível no momento e sugira que entre em contato por outro meio.
 NÃO use tags de calendário como [CALENDAR_SCHEDULE:], etc.
 === FIM DO AVISO ===`;
