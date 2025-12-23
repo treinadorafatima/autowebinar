@@ -135,6 +135,27 @@ export default function AdminAiAgents() {
   const [isGeneratingPrompt, setIsGeneratingPrompt] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [showConnectCalendarDialog, setShowConnectCalendarDialog] = useState(false);
+  const [isConnectingGoogle, setIsConnectingGoogle] = useState(false);
+  
+  const handleConnectGoogle = async () => {
+    setIsConnectingGoogle(true);
+    try {
+      const token = localStorage.getItem("adminToken");
+      const response = await fetch('/api/google/auth-url', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await response.json();
+      if (data.authUrl) {
+        window.location.href = data.authUrl;
+      } else {
+        toast({ title: "Erro", description: data.error || "Não foi possível conectar", variant: "destructive" });
+      }
+    } catch (error) {
+      toast({ title: "Erro", description: "Falha ao conectar com Google", variant: "destructive" });
+    } finally {
+      setIsConnectingGoogle(false);
+    }
+  };
   
   const [formDataState, setFormDataState] = useState({
     whatsappAccountId: "",
@@ -545,12 +566,13 @@ export default function AdminAiAgents() {
                   </p>
                 </div>
                 <Button 
-                  onClick={() => setShowConnectCalendarDialog(true)}
+                  onClick={() => connectedCalendars?.length ? setShowConnectCalendarDialog(true) : handleConnectGoogle()}
+                  disabled={isConnectingGoogle}
                   data-testid="button-connect-calendars-top"
                   className="gap-2 shrink-0 ml-4"
                 >
-                  <Calendar className="h-4 w-4" />
-                  Conectar Agendas
+                  {isConnectingGoogle ? <Loader2 className="h-4 w-4 animate-spin" /> : <Calendar className="h-4 w-4" />}
+                  {connectedCalendars?.length ? "Ver Agendas" : "Conectar Google"}
                 </Button>
               </div>
             </CardContent>
@@ -702,12 +724,13 @@ export default function AdminAiAgents() {
                 </Button>
                 <Button 
                   variant="outline"
-                  onClick={() => setShowConnectCalendarDialog(true)}
+                  onClick={() => connectedCalendars?.length ? setShowConnectCalendarDialog(true) : handleConnectGoogle()}
+                  disabled={isConnectingGoogle}
                   data-testid="button-connect-calendars"
                   className="gap-2 shrink-0"
                 >
-                  <Calendar className="h-4 w-4" />
-                  <span>Conectar Agendas</span>
+                  {isConnectingGoogle ? <Loader2 className="h-4 w-4 animate-spin" /> : <Calendar className="h-4 w-4" />}
+                  <span>{connectedCalendars?.length ? "Ver Agendas" : "Conectar Google"}</span>
                 </Button>
               </div>
 
@@ -1777,41 +1800,48 @@ export default function AdminAiAgents() {
       </Dialog>
 
       <Dialog open={showConnectCalendarDialog} onOpenChange={setShowConnectCalendarDialog}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Calendar className="h-5 w-5" />
-              Agendas do Google Calendar
+              Minhas Agendas do Google
             </DialogTitle>
             <DialogDescription>
-              Conecte sua conta Google para usar calendários nos agentes
+              Agendas conectadas para uso nos agentes de IA
             </DialogDescription>
           </DialogHeader>
           
-          <div className="space-y-3 py-4">
+          <div className="py-4 space-y-3">
+            {connectedCalendars && connectedCalendars.length > 0 ? (
+              <div className="space-y-2">
+                {connectedCalendars.map((cal: any) => (
+                  <div key={cal.id} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                      <div>
+                        <p className="font-medium text-sm">{cal.calendarName || cal.email}</p>
+                        <p className="text-xs text-muted-foreground">{cal.email}</p>
+                      </div>
+                    </div>
+                    <Badge variant="outline" className="text-xs">Conectada</Badge>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-6 text-muted-foreground">
+                <Calendar className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                <p>Nenhuma agenda conectada</p>
+              </div>
+            )}
+            
             <Button 
-              onClick={() => {
-                // TODO: Implement Google OAuth connection
-                window.location.href = '/auth/google/callback';
-              }}
-              className="w-full gap-2 h-auto py-3"
-              data-testid="button-connect-google"
+              onClick={handleConnectGoogle}
+              disabled={isConnectingGoogle}
+              className="w-full gap-2"
+              data-testid="button-add-google-account"
             >
-              <Calendar className="h-4 w-4" />
-              Conectar Conta Google
-            </Button>
-
-            <Button 
-              onClick={() => {
-                // TODO: Implement view connected calendars
-                setShowConnectCalendarDialog(false);
-              }}
-              variant="outline"
-              className="w-full gap-2 h-auto py-3"
-              data-testid="button-view-calendars"
-            >
-              <CheckCircle className="h-4 w-4" />
-              Minhas Agendas Conectadas
+              {isConnectingGoogle ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              Adicionar Conta Google
             </Button>
           </div>
 
