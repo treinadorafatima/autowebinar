@@ -717,31 +717,19 @@ export default function AdminAiAgents() {
                 />
               </div>
 
-              <div className="flex gap-2 w-full">
-                <Button 
-                  onClick={() => testingAgentId && handleTest(testingAgentId)}
-                  disabled={!testingAgentId || !testMessage.trim() || testMutation.isPending}
-                  data-testid="button-send-test"
-                  className="flex-1"
-                >
-                  {testMutation.isPending ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Send className="h-4 w-4 mr-2" />
-                  )}
-                  Enviar Teste
-                </Button>
-                <Button 
-                  variant="outline"
-                  onClick={() => connectedCalendars?.length ? setShowConnectCalendarDialog(true) : handleConnectGoogle()}
-                  disabled={isConnectingGoogle}
-                  data-testid="button-connect-calendars"
-                  className="gap-2 shrink-0"
-                >
-                  {isConnectingGoogle ? <Loader2 className="h-4 w-4 animate-spin" /> : <Calendar className="h-4 w-4" />}
-                  <span>{connectedCalendars?.length ? "Ver Agendas" : "Conectar Google"}</span>
-                </Button>
-              </div>
+              <Button 
+                onClick={() => testingAgentId && handleTest(testingAgentId)}
+                disabled={!testingAgentId || !testMessage.trim() || testMutation.isPending}
+                data-testid="button-send-test"
+                className="w-full"
+              >
+                {testMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4 mr-2" />
+                )}
+                {testMutation.isPending ? "Processando..." : "Enviar Teste"}
+              </Button>
 
               {testResponse && (
                 <div className="p-4 bg-muted rounded-lg mt-4">
