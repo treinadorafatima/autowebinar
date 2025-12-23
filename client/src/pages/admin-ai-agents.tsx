@@ -529,6 +529,25 @@ export default function AdminAiAgents() {
         </TabsList>
 
         <TabsContent value="agents" className="space-y-4">
+          <Card className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
+            <CardContent className="pt-6 flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold text-blue-900 dark:text-blue-100">Gerenciar Agendas do Google Calendar</h3>
+                <p className="text-sm text-blue-800 dark:text-blue-200">Conecte as agendas dos seus administradores ou clientes aos agentes</p>
+              </div>
+              <Button 
+                onClick={() => {
+                  window.location.href = '/admin/ai-agents?openCalendar=true';
+                }}
+                data-testid="button-connect-calendars-top"
+                className="gap-2 shrink-0"
+              >
+                <Calendar className="h-4 w-4" />
+                Conectar Agendas
+              </Button>
+            </CardContent>
+          </Card>
+
           {loadingAgents ? (
             <div className="flex items-center justify-center p-8">
               <Loader2 className="h-8 w-8 animate-spin" />
