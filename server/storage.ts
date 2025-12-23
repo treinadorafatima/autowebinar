@@ -6143,6 +6143,15 @@ Apos o pagamento, seu acesso sera renovado automaticamente!
       .where(eq(googleCalendarTokens.adminId, adminId));
   }
 
+  async getConnectedAdminCalendars(adminId: string): Promise<AdminGoogleCalendar[]> {
+    return await db.select().from(adminGoogleCalendars)
+      .where(and(
+        eq(adminGoogleCalendars.adminId, adminId),
+        eq(adminGoogleCalendars.isConnected, true)
+      ))
+      .orderBy(desc(adminGoogleCalendars.isPrimary), desc(adminGoogleCalendars.createdAt));
+  }
+
   // Calendar Events methods
   async listCalendarEventsByAdmin(adminId: string, from?: Date, to?: Date): Promise<CalendarEvent[]> {
     let query = db.select().from(calendarEvents)

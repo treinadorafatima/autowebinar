@@ -424,6 +424,26 @@ export function registerGoogleCalendarRoutes(app: Express) {
     }
   });
 
+  app.get("/api/google-calendar/connected", async (req: Request, res: Response) => {
+    try {
+      const { admin, error, errorCode } = await validateSessionAndGetAdmin(req);
+      if (!admin) {
+        return res.status(errorCode || 401).json({ error: error || "Não autenticado" });
+      }
+
+      const calendars = await storage.getConnectedAdminCalendars(admin.id);
+      const mapped = calendars.map((cal) => ({
+        id: cal.id,
+        name: cal.name,
+        isPrimary: cal.isPrimary,
+      }));
+      res.json(mapped);
+    } catch (error: any) {
+      console.error("[google-calendar] Get connected calendars error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get("/api/calendar/free-busy", async (req: Request, res: Response) => {
     try {
       const { admin, error, errorCode } = await validateSessionAndGetAdmin(req);

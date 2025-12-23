@@ -200,6 +200,10 @@ export default function AdminAiAgents() {
     enabled: !!editingAgent?.id,
   });
 
+  const { data: connectedCalendars } = useQuery<Array<{ id: string; name: string; isPrimary: boolean }>>({
+    queryKey: ["/api/google-calendar/connected"],
+  });
+
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
       const res = await apiRequest("POST", "/api/ai-agents", data);
@@ -531,19 +535,24 @@ export default function AdminAiAgents() {
 
         <TabsContent value="agents" className="space-y-4">
           <Card className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
-            <CardContent className="pt-6 flex items-center justify-between">
-              <div>
-                <h3 className="font-semibold text-blue-900 dark:text-blue-100">Agendas do Google Calendar</h3>
-                <p className="text-sm text-blue-800 dark:text-blue-200">Configure agendas para que seus agentes façam agendamentos automáticos</p>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <h3 className="font-semibold text-blue-900 dark:text-blue-100">Agendas do Google Calendar</h3>
+                  <p className="text-sm text-blue-800 dark:text-blue-200 mt-1">Configure agendas para que seus agentes façam agendamentos automáticos</p>
+                  <p className="text-xs text-blue-700 dark:text-blue-300 mt-2 font-medium">
+                    {connectedCalendars?.length || 0} de ilimitadas agendas conectadas
+                  </p>
+                </div>
+                <Button 
+                  onClick={() => setShowConnectCalendarDialog(true)}
+                  data-testid="button-connect-calendars-top"
+                  className="gap-2 shrink-0 ml-4"
+                >
+                  <Calendar className="h-4 w-4" />
+                  Conectar Agendas
+                </Button>
               </div>
-              <Button 
-                onClick={() => setShowConnectCalendarDialog(true)}
-                data-testid="button-connect-calendars-top"
-                className="gap-2 shrink-0"
-              >
-                <Calendar className="h-4 w-4" />
-                Conectar Agendas
-              </Button>
             </CardContent>
           </Card>
 
