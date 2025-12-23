@@ -16,7 +16,7 @@ import {
   Bot, Plus, Edit, Trash2, Check, X, Loader2, 
   TestTube, Send, MessageSquare, Settings, Clock,
   Key, Cpu, AlertTriangle, CheckCircle, Info, FileText, Upload, File,
-  ChevronRight, ChevronLeft, Sparkles, Brain, Zap, Calendar, Link2
+  ChevronRight, ChevronLeft, Sparkles, Brain, Zap, Calendar, Link2, Copy, CheckCheck
 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { Progress } from "@/components/ui/progress";
@@ -132,6 +132,7 @@ export default function AdminAiAgents() {
   const [promptContext, setPromptContext] = useState("");
   const [promptFiles, setPromptFiles] = useState<Array<{ name: string; content: string }>>([]);
   const [isGeneratingPrompt, setIsGeneratingPrompt] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
   
   const [formDataState, setFormDataState] = useState({
     whatsappAccountId: "",
@@ -162,6 +163,22 @@ export default function AdminAiAgents() {
 
   const formData = formDataState;
   const setFormData = setFormDataState;
+
+  const getCalendarConnectionLink = () => {
+    const agentId = editingAgent?.id;
+    if (!agentId) return null;
+    const baseUrl = window.location.origin;
+    return `${baseUrl}/calendar/connect?agentId=${agentId}`;
+  };
+
+  const copyToClipboard = () => {
+    const link = getCalendarConnectionLink();
+    if (link) {
+      navigator.clipboard.writeText(link);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
+    }
+  };
 
   const { data: providers } = useQuery<Record<string, ProviderInfo>>({
     queryKey: ["/api/ai-agents/providers"],
@@ -1537,6 +1554,39 @@ export default function AdminAiAgents() {
                               : "Cliente conecta sua conta Google pessoalmente"}
                           </p>
                         </div>
+
+                        {formData.calendarAuthType === "client" && editingAgent && (
+                          <div className="space-y-2 p-3 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
+                            <Label className="flex items-center gap-2 text-blue-900 dark:text-blue-100">
+                              <Link2 className="h-4 w-4" />
+                              Link de Conexão para Cliente
+                            </Label>
+                            <div className="flex gap-2">
+                              <input 
+                                type="text" 
+                                readOnly 
+                                value={getCalendarConnectionLink() || ""} 
+                                className="flex-1 px-3 py-2 text-sm bg-white dark:bg-slate-900 border rounded text-slate-600 dark:text-slate-300"
+                                data-testid="input-calendar-link"
+                              />
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                onClick={copyToClipboard}
+                                data-testid="button-copy-calendar-link"
+                              >
+                                {copiedLink ? (
+                                  <CheckCheck className="h-4 w-4" />
+                                ) : (
+                                  <Copy className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </div>
+                            <p className="text-xs text-blue-800 dark:text-blue-200">
+                              Compartilhe este link com o cliente para que ele conecte seu próprio calendário Google
+                            </p>
+                          </div>
+                        )}
 
                         <div className="space-y-2">
                           <Label>Duração padrão (minutos) *</Label>
