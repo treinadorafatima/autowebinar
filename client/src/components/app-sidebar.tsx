@@ -21,7 +21,8 @@ import {
   UserCheck,
   Bell,
   Mail,
-  Bot
+  Bot,
+  Globe
 } from "lucide-react";
 import { SiWhatsapp } from "react-icons/si";
 import logoUrl from "@assets/logo-autowebinar-preto.png";
@@ -127,6 +128,12 @@ const adminMenuItems = [
     title: "Usuários",
     url: "/admin/users",
     icon: Users,
+    superadminOnly: true,
+  },
+  {
+    title: "Config. Plataforma",
+    url: "/admin/platform-settings",
+    icon: Globe,
     superadminOnly: true,
   },
   {

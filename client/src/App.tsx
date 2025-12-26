@@ -44,6 +44,7 @@ import AdminAffiliatesPage from "@/pages/admin-affiliates";
 import AdminWhatsAppNotificationsPage from "@/pages/admin-whatsapp-notifications";
 import AdminEmailNotificationsPage from "@/pages/admin-email-notifications";
 import AdminAiAgentsPage from "@/pages/admin-ai-agents";
+import AdminPlatformSettingsPage from "@/pages/admin-platform-settings";
 import ClientCalendarConnectPage from "@/pages/client-calendar-connect";
 import AfiliadoCadastroPage from "@/pages/afiliado-cadastro";
 import AfiliadoLoginPage from "@/pages/afiliado-login";
@@ -119,6 +120,7 @@ function AdminRoutes() {
       <Switch>
         <Route path="/admin" component={AdminPage} />
         <Route path="/admin/users" component={AdminUsersPage} />
+        <Route path="/admin/platform-settings" component={AdminPlatformSettingsPage} />
         <Route path="/admin/webinars" component={AdminWebinarsPage} />
         <Route path="/admin/webinars/:id" component={AdminWebinarDetailPage} />
         <Route path="/admin/videos" component={AdminVideosPage} />
