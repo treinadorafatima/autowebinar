@@ -17,7 +17,13 @@ function getRedirectUri(): string {
 }
 
 async function getGoogleCredentials() {
-  return await storage.getGoogleOAuthCredentials();
+  const credentials = await storage.getGoogleOAuthCredentials();
+  if (credentials) {
+    console.log("[google-calendar] Using credentials from database/env, clientId:", credentials.clientId?.slice(0, 20) + "...");
+  } else {
+    console.log("[google-calendar] No credentials found in database or environment variables");
+  }
+  return credentials;
 }
 
 async function createOAuth2Client() {
