@@ -2,15 +2,12 @@ import { Express, Request, Response } from "express";
 import { google } from "googleapis";
 import { storage } from "./storage";
 
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
-const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 const SCOPES = [
   "https://www.googleapis.com/auth/calendar",
   "https://www.googleapis.com/auth/calendar.events",
 ];
 
 function getRedirectUri(): string {
-  // Priorizar domínio de produção para OAuth (evita redirect_uri_mismatch)
   const baseUrl = process.env.PUBLIC_BASE_URL 
     || process.env.VITE_PUBLIC_BASE_URL
     || (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : null)
@@ -19,10 +16,18 @@ function getRedirectUri(): string {
   return `${baseUrl}/api/google/callback`;
 }
 
-function createOAuth2Client() {
+async function getGoogleCredentials() {
+  return await storage.getGoogleOAuthCredentials();
+}
+
+async function createOAuth2Client() {
+  const credentials = await getGoogleCredentials();
+  if (!credentials) {
+    throw new Error("Google Calendar não configurado no servidor");
+  }
   return new google.auth.OAuth2(
-    GOOGLE_CLIENT_ID,
-    GOOGLE_CLIENT_SECRET,
+    credentials.clientId,
+    credentials.clientSecret,
     getRedirectUri()
   );
 }
@@ -33,7 +38,7 @@ async function getAuthenticatedClient(adminId: string) {
     throw new Error("Conta não conectada ao Google Calendar");
   }
 
-  const oauth2Client = createOAuth2Client();
+  const oauth2Client = await createOAuth2Client();
   oauth2Client.setCredentials({
     access_token: token.accessToken,
     refresh_token: token.refreshToken,
@@ -115,11 +120,12 @@ export function registerGoogleCalendarRoutes(app: Express) {
         return res.status(errorCode || 401).json({ error: error || "Não autenticado" });
       }
 
-      if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+      const credentials = await getGoogleCredentials();
+      if (!credentials) {
         return res.status(500).json({ error: "Google Calendar não configurado no servidor" });
       }
 
-      const oauth2Client = createOAuth2Client();
+      const oauth2Client = await createOAuth2Client();
       const authUrl = oauth2Client.generateAuthUrl({
         access_type: "offline",
         prompt: "consent",
@@ -152,7 +158,7 @@ export function registerGoogleCalendarRoutes(app: Express) {
         return res.redirect("/admin/ai-agents?calendar=error&message=Usuário não encontrado");
       }
 
-      const oauth2Client = createOAuth2Client();
+      const oauth2Client = await createOAuth2Client();
       const { tokens } = await oauth2Client.getToken(String(code));
 
       if (!tokens.access_token || !tokens.refresh_token) {

@@ -1276,6 +1276,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Platform Settings API - Google OAuth Credentials (superadmin only)
+  app.get("/api/admin/platform-settings/google-oauth", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const currentAdmin = await storage.getAdminByEmail(email);
+      if (!currentAdmin || currentAdmin.role !== "superadmin") {
+        return res.status(403).json({ error: "Access denied. Superadmin only." });
+      }
+
+      const credentials = await storage.getGoogleOAuthCredentials();
+      
+      if (credentials) {
+        res.json({ 
+          configured: true,
+          clientId: credentials.clientId,
+          clientSecretMasked: credentials.clientSecret ? "****" + credentials.clientSecret.slice(-4) : null,
+        });
+      } else {
+        res.json({ configured: false });
+      }
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/admin/platform-settings/google-oauth", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const currentAdmin = await storage.getAdminByEmail(email);
+      if (!currentAdmin || currentAdmin.role !== "superadmin") {
+        return res.status(403).json({ error: "Access denied. Superadmin only." });
+      }
+
+      const { clientId, clientSecret } = req.body;
+
+      if (!clientId || !clientSecret) {
+        return res.status(400).json({ error: "clientId e clientSecret são obrigatórios" });
+      }
+
+      await storage.setPlatformSetting("google_client_id", clientId, false, "Google OAuth Client ID", currentAdmin.id);
+      await storage.setPlatformSetting("google_client_secret", clientSecret, true, "Google OAuth Client Secret", currentAdmin.id);
+
+      res.json({ success: true, message: "Credenciais do Google OAuth salvas com sucesso" });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/admin/platform-settings/google-oauth", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const currentAdmin = await storage.getAdminByEmail(email);
+      if (!currentAdmin || currentAdmin.role !== "superadmin") {
+        return res.status(403).json({ error: "Access denied. Superadmin only." });
+      }
+
+      await storage.deletePlatformSetting("google_client_id");
+      await storage.deletePlatformSetting("google_client_secret");
+
+      res.json({ success: true, message: "Credenciais do Google OAuth removidas" });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
   // Admins API (legacy - mantido para compatibilidade)
   app.get("/api/admins", async (req, res) => {
     const token = req.headers.authorization?.split(" ")[1];

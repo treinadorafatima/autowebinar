@@ -1285,3 +1285,18 @@ export const calendarEvents = pgTable("calendar_events", {
 export type CalendarEvent = typeof calendarEvents.$inferSelect;
 export const calendarEventInsertSchema = createInsertSchema(calendarEvents).omit({ id: true, createdAt: true, updatedAt: true });
 export type CalendarEventInsert = z.infer<typeof calendarEventInsertSchema>;
+
+// Platform Settings - configurações globais da plataforma (gerenciadas pelo super admin)
+export const platformSettings = pgTable("platform_settings", {
+  id: text("id").primaryKey(),
+  key: text("key").notNull().unique(), // Chave da configuração (ex: 'google_client_id')
+  value: text("value").notNull(), // Valor da configuração
+  isEncrypted: boolean("is_encrypted").notNull().default(false), // Se o valor está criptografado
+  description: text("description"), // Descrição da configuração
+  updatedAt: timestamp("updated_at").defaultNow(),
+  updatedBy: text("updated_by"), // ID do admin que atualizou
+});
+
+export type PlatformSetting = typeof platformSettings.$inferSelect;
+export const platformSettingInsertSchema = createInsertSchema(platformSettings).omit({ id: true, updatedAt: true });
+export type PlatformSettingInsert = z.infer<typeof platformSettingInsertSchema>;

@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type WebinarConfig, type WebinarConfigInsert, type Admin, type AdminInsert, type UploadedVideo, type UploadedVideoInsert, type Comment, type CommentInsert, type Webinar, type WebinarInsert, type Setting, type SettingInsert, type ViewerSession, type WebinarScript, type WebinarScriptInsert, type AiConfig, type AiConfigInsert, type AiMemory, type AiMemoryInsert, type CheckoutPlano, type CheckoutPlanoInsert, type CheckoutPagamento, type CheckoutPagamentoInsert, type CheckoutConfig, type CheckoutConfigInsert, type CheckoutAssinatura, type CheckoutAssinaturaInsert, type AiChat, type AiChatInsert, type AiMessageChat, type AiMessageChatInsert, type VideoTranscription, type VideoTranscriptionInsert, type AdminEmailCredential, type AdminEmailCredentialInsert, type EmailSequence, type EmailSequenceInsert, type ScheduledEmail, type ScheduledEmailInsert, type LeadFormConfig, type LeadFormConfigInsert, type WhatsappAccount, type WhatsappAccountInsert, type WhatsappSession, type WhatsappSessionInsert, type WhatsappSequence, type WhatsappSequenceInsert, type ScheduledWhatsappMessage, type ScheduledWhatsappMessageInsert, type MediaFile, type MediaFileInsert, type LeadMessage, type LeadMessageInsert, type Lead, type WhatsappBroadcast, type WhatsappBroadcastInsert, type WhatsappBroadcastRecipient, type WhatsappBroadcastRecipientInsert, type WhatsappContactList, type WhatsappContactListInsert, type WhatsappContact, type WhatsappContactInsert, type Affiliate, type AffiliateInsert, type AffiliateLink, type AffiliateLinkInsert, type AffiliateSale, type AffiliateSaleInsert, type AffiliateConfig, type AffiliateConfigInsert, type AffiliateWithdrawal, type AffiliateWithdrawalInsert, type WhatsappNotificationLog, type WhatsappNotificationLogInsert, type WhatsappNotificationTemplate, type WhatsappNotificationTemplateInsert, type EmailNotificationTemplate, type EmailNotificationTemplateInsert, type AiAgent, type AiAgentInsert, type AiAgentFile, type AiAgentFileInsert, type AiConversation, type AiConversationInsert, type AiMessage, type AiMessageInsert, type AiUsageStats, type GoogleCalendarToken, type GoogleCalendarTokenInsert, type AdminGoogleCalendar, type AdminGoogleCalendarInsert, type ClientGoogleCalendarToken, type ClientGoogleCalendarTokenInsert, type CalendarEvent, type CalendarEventInsert, admins, webinarConfigs, users, uploadedVideos, comments, webinars as webinarsTable, settings, viewerSessions, webinarScripts, aiConfigs, aiMemories, checkoutPlanos, checkoutPagamentos, checkoutConfigs, checkoutAssinaturas, aiChats, aiMessageChats, videoTranscriptions, adminEmailCredentials, emailSequences, scheduledEmails, leadFormConfigs, whatsappAccounts, whatsappSessions, whatsappNotificationsLog, whatsappSequences, scheduledWhatsappMessages, mediaFiles, webinarViewLogs, leads, leadMessages, whatsappBroadcasts, whatsappBroadcastRecipients, whatsappContactLists, whatsappContacts, affiliates, affiliateLinks, affiliateSales, affiliateConfig, affiliateWithdrawals, whatsappNotificationTemplates, emailNotificationTemplates, aiAgents, aiAgentFiles, aiConversations, aiMessages, aiUsageStats, googleCalendarTokens, adminGoogleCalendars, clientGoogleCalendarTokens, calendarEvents } from "@shared/schema";
+import { type User, type InsertUser, type WebinarConfig, type WebinarConfigInsert, type Admin, type AdminInsert, type UploadedVideo, type UploadedVideoInsert, type Comment, type CommentInsert, type Webinar, type WebinarInsert, type Setting, type SettingInsert, type ViewerSession, type WebinarScript, type WebinarScriptInsert, type AiConfig, type AiConfigInsert, type AiMemory, type AiMemoryInsert, type CheckoutPlano, type CheckoutPlanoInsert, type CheckoutPagamento, type CheckoutPagamentoInsert, type CheckoutConfig, type CheckoutConfigInsert, type CheckoutAssinatura, type CheckoutAssinaturaInsert, type AiChat, type AiChatInsert, type AiMessageChat, type AiMessageChatInsert, type VideoTranscription, type VideoTranscriptionInsert, type AdminEmailCredential, type AdminEmailCredentialInsert, type EmailSequence, type EmailSequenceInsert, type ScheduledEmail, type ScheduledEmailInsert, type LeadFormConfig, type LeadFormConfigInsert, type WhatsappAccount, type WhatsappAccountInsert, type WhatsappSession, type WhatsappSessionInsert, type WhatsappSequence, type WhatsappSequenceInsert, type ScheduledWhatsappMessage, type ScheduledWhatsappMessageInsert, type MediaFile, type MediaFileInsert, type LeadMessage, type LeadMessageInsert, type Lead, type WhatsappBroadcast, type WhatsappBroadcastInsert, type WhatsappBroadcastRecipient, type WhatsappBroadcastRecipientInsert, type WhatsappContactList, type WhatsappContactListInsert, type WhatsappContact, type WhatsappContactInsert, type Affiliate, type AffiliateInsert, type AffiliateLink, type AffiliateLinkInsert, type AffiliateSale, type AffiliateSaleInsert, type AffiliateConfig, type AffiliateConfigInsert, type AffiliateWithdrawal, type AffiliateWithdrawalInsert, type WhatsappNotificationLog, type WhatsappNotificationLogInsert, type WhatsappNotificationTemplate, type WhatsappNotificationTemplateInsert, type EmailNotificationTemplate, type EmailNotificationTemplateInsert, type AiAgent, type AiAgentInsert, type AiAgentFile, type AiAgentFileInsert, type AiConversation, type AiConversationInsert, type AiMessage, type AiMessageInsert, type AiUsageStats, type GoogleCalendarToken, type GoogleCalendarTokenInsert, type AdminGoogleCalendar, type AdminGoogleCalendarInsert, type ClientGoogleCalendarToken, type ClientGoogleCalendarTokenInsert, type CalendarEvent, type CalendarEventInsert, type PlatformSetting, type PlatformSettingInsert, admins, webinarConfigs, users, uploadedVideos, comments, webinars as webinarsTable, settings, viewerSessions, webinarScripts, aiConfigs, aiMemories, checkoutPlanos, checkoutPagamentos, checkoutConfigs, checkoutAssinaturas, aiChats, aiMessageChats, videoTranscriptions, adminEmailCredentials, emailSequences, scheduledEmails, leadFormConfigs, whatsappAccounts, whatsappSessions, whatsappNotificationsLog, whatsappSequences, scheduledWhatsappMessages, mediaFiles, webinarViewLogs, leads, leadMessages, whatsappBroadcasts, whatsappBroadcastRecipients, whatsappContactLists, whatsappContacts, affiliates, affiliateLinks, affiliateSales, affiliateConfig, affiliateWithdrawals, whatsappNotificationTemplates, emailNotificationTemplates, aiAgents, aiAgentFiles, aiConversations, aiMessages, aiUsageStats, googleCalendarTokens, adminGoogleCalendars, clientGoogleCalendarTokens, calendarEvents, platformSettings } from "@shared/schema";
 import * as crypto from "crypto";
 import { randomUUID } from "crypto";
 import { db } from "./db";
@@ -422,6 +422,12 @@ export interface IStorage {
   createCalendarEvent(data: CalendarEventInsert): Promise<CalendarEvent>;
   updateCalendarEvent(id: string, data: Partial<CalendarEventInsert>): Promise<CalendarEvent | undefined>;
   deleteCalendarEvent(id: string): Promise<void>;
+  // Platform Settings
+  getPlatformSetting(key: string): Promise<string | undefined>;
+  setPlatformSetting(key: string, value: string, isEncrypted?: boolean, description?: string, updatedBy?: string): Promise<void>;
+  deletePlatformSetting(key: string): Promise<void>;
+  listPlatformSettings(): Promise<PlatformSetting[]>;
+  getGoogleOAuthCredentials(): Promise<{ clientId: string; clientSecret: string } | null>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -6327,6 +6333,65 @@ Apos o pagamento, seu acesso sera renovado automaticamente!
     await db.update(clientGoogleCalendarTokens)
       .set({ ...data, updatedAt: new Date() })
       .where(and(eq(clientGoogleCalendarTokens.adminId, adminId), eq(clientGoogleCalendarTokens.clientPhone, clientPhone)));
+  }
+
+  // Platform Settings methods
+  async getPlatformSetting(key: string): Promise<string | undefined> {
+    const result = await db.select().from(platformSettings).where(eq(platformSettings.key, key)).limit(1);
+    return result[0]?.value;
+  }
+
+  async setPlatformSetting(key: string, value: string, isEncrypted: boolean = false, description?: string, updatedBy?: string): Promise<void> {
+    const existing = await db.select().from(platformSettings).where(eq(platformSettings.key, key)).limit(1);
+    
+    if (existing.length > 0) {
+      await db.update(platformSettings)
+        .set({ 
+          value, 
+          isEncrypted,
+          description: description ?? existing[0].description,
+          updatedBy,
+          updatedAt: new Date() 
+        })
+        .where(eq(platformSettings.key, key));
+    } else {
+      await db.insert(platformSettings).values({
+        id: randomUUID(),
+        key,
+        value,
+        isEncrypted,
+        description,
+        updatedBy,
+        updatedAt: new Date(),
+      });
+    }
+  }
+
+  async deletePlatformSetting(key: string): Promise<void> {
+    await db.delete(platformSettings).where(eq(platformSettings.key, key));
+  }
+
+  async listPlatformSettings(): Promise<PlatformSetting[]> {
+    return await db.select().from(platformSettings);
+  }
+
+  async getGoogleOAuthCredentials(): Promise<{ clientId: string; clientSecret: string } | null> {
+    const clientId = await this.getPlatformSetting("google_client_id");
+    const clientSecret = await this.getPlatformSetting("google_client_secret");
+    
+    if (clientId && clientSecret) {
+      return { clientId, clientSecret };
+    }
+    
+    // Fallback para variáveis de ambiente
+    const envClientId = process.env.GOOGLE_CLIENT_ID;
+    const envClientSecret = process.env.GOOGLE_CLIENT_SECRET;
+    
+    if (envClientId && envClientSecret) {
+      return { clientId: envClientId, clientSecret: envClientSecret };
+    }
+    
+    return null;
   }
 }
 

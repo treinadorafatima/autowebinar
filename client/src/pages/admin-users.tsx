@@ -191,6 +191,14 @@ export default function AdminUsersPage() {
   const [mpDetails, setMPDetails] = useState<MPSubscriptionDetails | null>(null);
   const [loadingMPDetails, setLoadingMPDetails] = useState(false);
   const [mpDetailsUser, setMPDetailsUser] = useState<User | null>(null);
+  
+  const [showGoogleOAuthModal, setShowGoogleOAuthModal] = useState(false);
+  const [googleOAuthConfig, setGoogleOAuthConfig] = useState<{ configured: boolean; clientId?: string; clientSecretMasked?: string } | null>(null);
+  const [googleClientId, setGoogleClientId] = useState("");
+  const [googleClientSecret, setGoogleClientSecret] = useState("");
+  const [savingGoogleOAuth, setSavingGoogleOAuth] = useState(false);
+  const [loadingGoogleOAuth, setLoadingGoogleOAuth] = useState(false);
+  
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   
@@ -226,6 +234,7 @@ export default function AdminUsersPage() {
     }
     fetchUsers();
     fetchPlanos();
+    fetchGoogleOAuthConfig();
   }, []);
 
   // Resetar página quando filtros mudam
@@ -277,6 +286,73 @@ export default function AdminUsersPage() {
       }
     } catch (error) {
       console.error("Erro ao carregar planos:", error);
+    }
+  }
+
+  async function fetchGoogleOAuthConfig() {
+    setLoadingGoogleOAuth(true);
+    try {
+      const res = await fetch("/api/admin/platform-settings/google-oauth", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setGoogleOAuthConfig(data);
+        if (data.clientId) {
+          setGoogleClientId(data.clientId);
+        }
+      }
+    } catch (error) {
+      console.error("Erro ao carregar config Google OAuth:", error);
+    } finally {
+      setLoadingGoogleOAuth(false);
+    }
+  }
+
+  async function saveGoogleOAuthConfig() {
+    if (!googleClientId || !googleClientSecret) {
+      toast({
+        title: "Erro",
+        description: "Preencha o Client ID e Client Secret",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSavingGoogleOAuth(true);
+    try {
+      const res = await fetch("/api/admin/platform-settings/google-oauth", {
+        method: "POST",
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          clientId: googleClientId,
+          clientSecret: googleClientSecret,
+        }),
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Erro ao salvar");
+      }
+
+      toast({
+        title: "Sucesso",
+        description: "Credenciais do Google OAuth salvas com sucesso",
+      });
+      setShowGoogleOAuthModal(false);
+      setGoogleClientSecret("");
+      fetchGoogleOAuthConfig();
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setSavingGoogleOAuth(false);
     }
   }
 
@@ -821,6 +897,41 @@ export default function AdminUsersPage() {
           Novo Usuário
         </Button>
       </div>
+
+      {/* Configurações da Plataforma */}
+      <Card className="border-dashed border-2">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Shield className="w-5 h-5 text-primary" />
+              <CardTitle className="text-lg">Configurações da Plataforma</CardTitle>
+            </div>
+          </div>
+          <CardDescription>Integrações e configurações globais do sistema</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-4">
+            <div className="flex items-center gap-3 p-3 border rounded-lg bg-muted/30">
+              <div className={`w-3 h-3 rounded-full ${googleOAuthConfig?.configured ? 'bg-green-500' : 'bg-red-500'}`} />
+              <div className="flex-1">
+                <p className="font-medium text-sm">Google Calendar OAuth</p>
+                <p className="text-xs text-muted-foreground">
+                  {loadingGoogleOAuth ? "Carregando..." : 
+                   googleOAuthConfig?.configured ? "Configurado" : "Não configurado"}
+                </p>
+              </div>
+              <Button 
+                size="sm" 
+                variant="outline"
+                onClick={() => setShowGoogleOAuthModal(true)}
+                data-testid="button-config-google-oauth"
+              >
+                {googleOAuthConfig?.configured ? "Editar" : "Configurar"}
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
@@ -2163,6 +2274,90 @@ export default function AdminUsersPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowMPDetailsModal(false)}>
               Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Configuração Google OAuth */}
+      <Dialog open={showGoogleOAuthModal} onOpenChange={setShowGoogleOAuthModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-primary" />
+              Configurar Google Calendar OAuth
+            </DialogTitle>
+            <DialogDescription>
+              Configure as credenciais OAuth do Google Cloud para permitir integração com Google Calendar.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {googleOAuthConfig?.configured && (
+              <div className="p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
+                <p className="text-sm text-green-700 dark:text-green-400 flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4" />
+                  Credenciais configuradas
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Client ID: {googleOAuthConfig.clientId?.slice(0, 20)}...
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Client Secret: {googleOAuthConfig.clientSecretMasked}
+                </p>
+              </div>
+            )}
+            
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Client ID</label>
+              <Input
+                placeholder="Seu Google Client ID"
+                value={googleClientId}
+                onChange={(e) => setGoogleClientId(e.target.value)}
+                data-testid="input-google-client-id"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Client Secret</label>
+              <Input
+                type="password"
+                placeholder={googleOAuthConfig?.configured ? "Digite para alterar..." : "Seu Google Client Secret"}
+                value={googleClientSecret}
+                onChange={(e) => setGoogleClientSecret(e.target.value)}
+                data-testid="input-google-client-secret"
+              />
+            </div>
+            
+            <div className="p-3 bg-muted/50 rounded-lg text-xs text-muted-foreground">
+              <p className="font-medium mb-1">Como obter as credenciais:</p>
+              <ol className="list-decimal list-inside space-y-1">
+                <li>Acesse console.cloud.google.com</li>
+                <li>Crie ou selecione um projeto</li>
+                <li>Habilite a Google Calendar API</li>
+                <li>Vá em "Credenciais" e crie OAuth Client ID</li>
+                <li>Configure o URI de redirect: <code className="bg-background px-1 rounded">{window.location.origin}/api/google/callback</code></li>
+              </ol>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowGoogleOAuthModal(false)}>
+              Cancelar
+            </Button>
+            <Button 
+              onClick={saveGoogleOAuthConfig}
+              disabled={savingGoogleOAuth || !googleClientId || !googleClientSecret}
+              data-testid="button-save-google-oauth"
+            >
+              {savingGoogleOAuth ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Salvando...
+                </>
+              ) : (
+                "Salvar Credenciais"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
