@@ -506,11 +506,16 @@ export function registerGoogleCalendarRoutes(app: Express) {
       }
 
       const token = await storage.getGoogleCalendarToken(admin.id);
+      console.log("[google-calendar] Token for admin:", admin.id, "token exists:", !!token, "isConnected:", token?.isConnected);
+      
       if (!token || !token.isConnected) {
+        console.log("[google-calendar] No token or not connected, returning empty array");
         return res.json([]);
       }
 
       const calendars = await storage.getConnectedAdminCalendars(admin.id);
+      console.log("[google-calendar] Found calendars:", calendars.length);
+      
       const mapped = calendars.map((cal) => ({
         id: cal.id,
         name: cal.name,
