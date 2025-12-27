@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { pgTable, text, integer, timestamp, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, bigint, timestamp, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 
 export const webinarInfoSchema = z.object({
@@ -1229,7 +1229,7 @@ export const googleCalendarTokens = pgTable("google_calendar_tokens", {
   adminId: text("admin_id").notNull().unique(), // FK para admins (1 token por usuário)
   accessToken: text("access_token").notNull(), // Token de acesso (criptografado)
   refreshToken: text("refresh_token").notNull(), // Token de refresh (criptografado)
-  expiryDate: integer("expiry_date"), // Unix timestamp de expiração
+  expiryDate: bigint("expiry_date", { mode: "number" }), // Unix timestamp de expiração (bigint para suportar ms)
   calendarId: text("calendar_id").notNull().default("primary"), // ID do calendário
   isConnected: boolean("is_connected").notNull().default(true),
   lastSyncAt: timestamp("last_sync_at"),
@@ -1249,7 +1249,7 @@ export const clientGoogleCalendarTokens = pgTable("client_google_calendar_tokens
   clientEmail: text("client_email"), // Email da conta Google conectada
   accessToken: text("access_token").notNull(), // Token de acesso (criptografado)
   refreshToken: text("refresh_token").notNull(), // Token de refresh (criptografado)
-  expiryDate: integer("expiry_date"), // Unix timestamp de expiração
+  expiryDate: bigint("expiry_date", { mode: "number" }), // Unix timestamp de expiração (bigint para suportar ms)
   calendarId: text("calendar_id").notNull().default("primary"), // ID do calendário
   isConnected: boolean("is_connected").notNull().default(true),
   lastSyncAt: timestamp("last_sync_at"),
