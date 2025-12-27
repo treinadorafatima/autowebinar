@@ -618,17 +618,17 @@ export default function AdminAiAgents() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+        <div className="flex-1">
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <Bot className="h-6 w-6" />
             Agentes de IA
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             Configure chatbots inteligentes para responder mensagens automaticamente via WhatsApp
           </p>
         </div>
-        <Button onClick={() => { resetForm(); setEditingAgent(null); setShowCreateDialog(true); }} data-testid="button-create-agent">
+        <Button onClick={() => { resetForm(); setEditingAgent(null); setShowCreateDialog(true); }} data-testid="button-create-agent" className="w-full sm:w-auto">
           <Plus className="h-4 w-4 mr-2" />
           Novo Agente
         </Button>
@@ -649,7 +649,7 @@ export default function AdminAiAgents() {
         <TabsContent value="agents" className="space-y-4">
           <Card className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
             <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                 <div className="flex-1">
                   <h3 className="font-semibold text-blue-900 dark:text-blue-100">Agendas do Google Calendar</h3>
                   <p className="text-sm text-blue-800 dark:text-blue-200 mt-1">Configure agendas para que seus agentes façam agendamentos automáticos</p>
@@ -661,7 +661,7 @@ export default function AdminAiAgents() {
                   onClick={() => connectedCalendars?.length ? setShowConnectCalendarDialog(true) : handleConnectGoogle()}
                   disabled={isConnectingGoogle}
                   data-testid="button-connect-calendars-top"
-                  className="gap-2 shrink-0 ml-4"
+                  className="gap-2 w-full sm:w-auto"
                 >
                   {isConnectingGoogle ? <Loader2 className="h-4 w-4 animate-spin" /> : <Calendar className="h-4 w-4" />}
                   {connectedCalendars?.length ? "Ver Agendas" : "Conectar Google"}
