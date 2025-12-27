@@ -156,6 +156,29 @@ export default function AdminAiAgents() {
       setIsConnectingGoogle(false);
     }
   };
+
+  const handleDisconnectGoogle = async () => {
+    setIsConnectingGoogle(true);
+    try {
+      const token = localStorage.getItem("adminToken");
+      const response = await fetch('/api/google/disconnect', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await response.json();
+      if (data.success) {
+        toast({ title: "Sucesso", description: "Conta Google desconectada" });
+        queryClient.invalidateQueries({ queryKey: ["/api/google-calendar/connected"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/google/status"] });
+      } else {
+        toast({ title: "Erro", description: data.error || "Não foi possível desconectar", variant: "destructive" });
+      }
+    } catch (error) {
+      toast({ title: "Erro", description: "Falha ao desconectar conta Google", variant: "destructive" });
+    } finally {
+      setIsConnectingGoogle(false);
+    }
+  };
   
   const [formDataState, setFormDataState] = useState({
     whatsappAccountId: "",
@@ -1802,20 +1825,37 @@ export default function AdminAiAgents() {
           </DialogHeader>
           
           <div className="py-4 space-y-3">
-            {connectedCalendars && connectedCalendars.length > 0 ? (
+            {loadingCalendars ? (
+              <div className="flex items-center justify-center py-6">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : connectedCalendars && connectedCalendars.length > 0 ? (
               <div className="space-y-2">
                 {connectedCalendars.map((cal: any) => (
                   <div key={cal.id} className="flex items-center justify-between p-3 border rounded-lg">
                     <div className="flex items-center gap-3">
                       <CheckCircle className="h-4 w-4 text-green-500" />
                       <div>
-                        <p className="font-medium text-sm">{cal.calendarName || cal.email}</p>
-                        <p className="text-xs text-muted-foreground">{cal.email}</p>
+                        <p className="font-medium text-sm">{cal.name}</p>
+                        {cal.isPrimary && (
+                          <p className="text-xs text-muted-foreground">Agenda principal</p>
+                        )}
                       </div>
                     </div>
                     <Badge variant="outline" className="text-xs">Conectada</Badge>
                   </div>
                 ))}
+                
+                <Button 
+                  variant="outline"
+                  onClick={handleDisconnectGoogle}
+                  disabled={isConnectingGoogle}
+                  className="w-full gap-2 text-destructive hover:text-destructive"
+                  data-testid="button-disconnect-google"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Desconectar Conta Google
+                </Button>
               </div>
             ) : (
               <div className="text-center py-6 text-muted-foreground">
