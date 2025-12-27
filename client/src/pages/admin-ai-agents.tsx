@@ -1674,72 +1674,117 @@ export default function AdminAiAgents() {
                     </div>
 
                     {formData.calendarEnabled && (
-                      <div className="space-y-3 pt-2">
-                        <div className="space-y-2">
-                          <Label>Agendas Conectadas</Label>
-                          
-                          {loadingCalendars ? (
-                            <div className="flex items-center gap-2 p-3 border rounded-lg">
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                              <span className="text-sm text-muted-foreground">Carregando agendas...</span>
-                            </div>
-                          ) : connectedCalendars && connectedCalendars.length > 0 ? (
+                      <div className="space-y-4 pt-2">
+                        {loadingCalendars ? (
+                          <div className="flex items-center gap-2 p-3 border rounded-lg">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <span className="text-sm text-muted-foreground">Carregando...</span>
+                          </div>
+                        ) : connectedCalendars && connectedCalendars.length > 0 ? (
+                          <>
                             <div className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <Label className="text-xs text-muted-foreground">Conta Google</Label>
+                                <Button 
+                                  size="sm" 
+                                  variant="ghost"
+                                  className="h-6 text-xs"
+                                  onClick={() => setShowConnectCalendarDialog(true)}
+                                  data-testid="button-manage-google"
+                                >
+                                  Gerenciar
+                                </Button>
+                              </div>
+                              <div className="flex items-center gap-2 p-2 border rounded-lg bg-muted/30">
+                                <CheckCircle className="h-4 w-4 text-green-500" />
+                                <span className="text-sm">Conectada</span>
+                              </div>
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label>Calendário</Label>
                               <Select 
                                 value={formData.adminCalendarId || ""} 
                                 onValueChange={(v) => setFormData({ ...formData, adminCalendarId: v })}
                               >
                                 <SelectTrigger data-testid="select-admin-calendar">
-                                  <SelectValue placeholder="Selecione uma agenda" />
+                                  <SelectValue placeholder="Selecione um calendário" />
                                 </SelectTrigger>
                                 <SelectContent>
                                   {connectedCalendars.map((cal) => (
                                     <SelectItem key={cal.id} value={cal.id}>
-                                      {cal.name} {cal.isPrimary && "(Principal)"}
+                                      {cal.isPrimary ? "Calendário Principal" : cal.name}
                                     </SelectItem>
                                   ))}
                                 </SelectContent>
                               </Select>
                               <div className="flex items-center justify-between">
                                 <p className="text-xs text-muted-foreground">
-                                  {connectedCalendars.length} agenda(s) conectada(s)
+                                  {connectedCalendars.length} calendário(s) disponível(is)
                                 </p>
                                 <Button 
                                   size="sm" 
-                                  variant="outline"
-                                  onClick={handleConnectGoogle}
-                                  disabled={isConnectingGoogle}
-                                  data-testid="button-reconnect-google"
+                                  variant="ghost"
+                                  className="h-6 text-xs gap-1"
+                                  onClick={() => setShowCreateCalendarInput(true)}
+                                  data-testid="button-new-calendar-inline"
                                 >
-                                  {isConnectingGoogle ? (
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                  ) : (
-                                    <Calendar className="h-4 w-4" />
-                                  )}
+                                  <Plus className="h-3 w-3" />
+                                  Novo
                                 </Button>
                               </div>
                             </div>
-                          ) : (
-                            <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg">
-                              <p className="text-sm text-amber-800 dark:text-amber-200 mb-2">
-                                Nenhuma agenda Google conectada
-                              </p>
-                              <Button 
-                                size="sm" 
-                                onClick={handleConnectGoogle}
-                                disabled={isConnectingGoogle}
-                                data-testid="button-connect-google"
-                              >
-                                {isConnectingGoogle ? (
-                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                ) : (
-                                  <Calendar className="h-4 w-4 mr-2" />
-                                )}
-                                Conectar Google Calendar
-                              </Button>
-                            </div>
-                          )}
-                        </div>
+
+                            {showCreateCalendarInput && (
+                              <div className="space-y-2 p-3 border rounded-lg bg-muted/50">
+                                <Label className="text-xs">Nome do novo calendário</Label>
+                                <div className="flex gap-2">
+                                  <Input
+                                    value={newCalendarName}
+                                    onChange={(e) => setNewCalendarName(e.target.value)}
+                                    placeholder="Ex: Agendamentos Comerciais"
+                                    className="h-8 text-sm"
+                                    data-testid="input-new-calendar-name-inline"
+                                  />
+                                  <Button 
+                                    size="sm"
+                                    onClick={handleCreateCalendar}
+                                    disabled={!newCalendarName.trim() || isCreatingCalendar}
+                                    data-testid="button-create-calendar-inline"
+                                  >
+                                    {isCreatingCalendar ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                                  </Button>
+                                  <Button 
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => { setShowCreateCalendarInput(false); setNewCalendarName(""); }}
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg">
+                            <p className="text-sm text-amber-800 dark:text-amber-200 mb-2">
+                              Nenhuma conta Google conectada
+                            </p>
+                            <Button 
+                              size="sm" 
+                              onClick={handleConnectGoogle}
+                              disabled={isConnectingGoogle}
+                              data-testid="button-connect-google"
+                            >
+                              {isConnectingGoogle ? (
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              ) : (
+                                <Calendar className="h-4 w-4 mr-2" />
+                              )}
+                              Conectar Google Calendar
+                            </Button>
+                          </div>
+                        )}
 
                         <div className="space-y-2">
                           <Label>Duração padrão (minutos) *</Label>
