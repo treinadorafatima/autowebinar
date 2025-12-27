@@ -16,7 +16,7 @@ import {
   Bot, Plus, Edit, Trash2, Check, X, Loader2, 
   TestTube, Send, MessageSquare, Settings, Clock,
   Key, Cpu, AlertTriangle, CheckCircle, Info, FileText, Upload, File,
-  ChevronRight, ChevronLeft, Sparkles, Brain, Zap, Calendar, Link2, Copy, CheckCheck
+  ChevronRight, ChevronLeft, Sparkles, Brain, Zap, Calendar, Link2, Copy, CheckCheck, RefreshCw
 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { Progress } from "@/components/ui/progress";
@@ -177,6 +177,62 @@ export default function AdminAiAgents() {
       toast({ title: "Erro", description: "Falha ao desconectar conta Google", variant: "destructive" });
     } finally {
       setIsConnectingGoogle(false);
+    }
+  };
+
+  const [isSyncingCalendars, setIsSyncingCalendars] = useState(false);
+  const [showCreateCalendarInput, setShowCreateCalendarInput] = useState(false);
+  const [newCalendarName, setNewCalendarName] = useState("");
+  const [isCreatingCalendar, setIsCreatingCalendar] = useState(false);
+
+  const handleSyncCalendars = async () => {
+    setIsSyncingCalendars(true);
+    try {
+      const token = localStorage.getItem("adminToken");
+      const response = await fetch('/api/google-calendar/sync', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await response.json();
+      if (data.success) {
+        toast({ title: "Sucesso", description: `${data.calendars?.length || 0} agenda(s) sincronizada(s)` });
+        queryClient.invalidateQueries({ queryKey: ["/api/google-calendar/connected"] });
+      } else {
+        toast({ title: "Erro", description: data.error || "Falha na sincronização", variant: "destructive" });
+      }
+    } catch (error) {
+      toast({ title: "Erro", description: "Falha ao sincronizar agendas", variant: "destructive" });
+    } finally {
+      setIsSyncingCalendars(false);
+    }
+  };
+
+  const handleCreateCalendar = async () => {
+    if (!newCalendarName.trim()) return;
+    setIsCreatingCalendar(true);
+    try {
+      const token = localStorage.getItem("adminToken");
+      const response = await fetch('/api/google-calendar/create', {
+        method: 'POST',
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ name: newCalendarName.trim() })
+      });
+      const data = await response.json();
+      if (data.success) {
+        toast({ title: "Sucesso", description: `Agenda "${newCalendarName}" criada com sucesso` });
+        setNewCalendarName("");
+        setShowCreateCalendarInput(false);
+        queryClient.invalidateQueries({ queryKey: ["/api/google-calendar/connected"] });
+      } else {
+        toast({ title: "Erro", description: data.error || "Falha ao criar agenda", variant: "destructive" });
+      }
+    } catch (error) {
+      toast({ title: "Erro", description: "Falha ao criar agenda no Google", variant: "destructive" });
+    } finally {
+      setIsCreatingCalendar(false);
     }
   };
   
@@ -1830,21 +1886,74 @@ export default function AdminAiAgents() {
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
             ) : connectedCalendars && connectedCalendars.length > 0 ? (
-              <div className="space-y-2">
-                {connectedCalendars.map((cal: any) => (
-                  <div key={cal.id} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                      <div>
-                        <p className="font-medium text-sm">{cal.name}</p>
-                        {cal.isPrimary && (
-                          <p className="text-xs text-muted-foreground">Agenda principal</p>
-                        )}
+              <div className="space-y-3">
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {connectedCalendars.map((cal: any) => (
+                    <div key={cal.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                        <div>
+                          <p className="font-medium text-sm">{cal.name}</p>
+                          {cal.isPrimary && (
+                            <p className="text-xs text-muted-foreground">Agenda principal</p>
+                          )}
+                        </div>
                       </div>
+                      <Badge variant="outline" className="text-xs">Conectada</Badge>
                     </div>
-                    <Badge variant="outline" className="text-xs">Conectada</Badge>
+                  ))}
+                </div>
+                
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline"
+                    onClick={handleSyncCalendars}
+                    disabled={isSyncingCalendars}
+                    className="flex-1 gap-2"
+                    data-testid="button-sync-calendars"
+                  >
+                    {isSyncingCalendars ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                    Atualizar
+                  </Button>
+                  <Button 
+                    variant="outline"
+                    onClick={() => setShowCreateCalendarInput(true)}
+                    className="flex-1 gap-2"
+                    data-testid="button-show-create-calendar"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Nova Agenda
+                  </Button>
+                </div>
+
+                {showCreateCalendarInput && (
+                  <div className="space-y-2 p-3 border rounded-lg bg-muted/50">
+                    <Label htmlFor="new-calendar-name">Nome da nova agenda</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="new-calendar-name"
+                        value={newCalendarName}
+                        onChange={(e) => setNewCalendarName(e.target.value)}
+                        placeholder="Ex: Agendamentos Comerciais"
+                        data-testid="input-new-calendar-name"
+                      />
+                      <Button 
+                        onClick={handleCreateCalendar}
+                        disabled={!newCalendarName.trim() || isCreatingCalendar}
+                        data-testid="button-create-calendar"
+                      >
+                        {isCreatingCalendar ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                      </Button>
+                      <Button 
+                        variant="ghost"
+                        onClick={() => { setShowCreateCalendarInput(false); setNewCalendarName(""); }}
+                        data-testid="button-cancel-create-calendar"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
-                ))}
+                )}
                 
                 <Button 
                   variant="outline"

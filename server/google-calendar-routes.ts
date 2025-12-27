@@ -528,6 +528,91 @@ export function registerGoogleCalendarRoutes(app: Express) {
     }
   });
 
+  // Sincronizar calendários do Google
+  app.post("/api/google-calendar/sync", async (req: Request, res: Response) => {
+    try {
+      const { admin, error, errorCode } = await validateSessionAndGetAdmin(req);
+      if (!admin) {
+        return res.status(errorCode || 401).json({ error: error || "Não autenticado" });
+      }
+
+      const oauth2Client = await getAuthenticatedClient(admin.id);
+      const calendar = google.calendar({ version: "v3", auth: oauth2Client });
+
+      const calendarList = await calendar.calendarList.list();
+      const calendars = (calendarList.data.items || [])
+        .filter(cal => cal.id && cal.summary)
+        .map(cal => ({
+          googleCalendarId: cal.id!,
+          name: cal.summary!,
+          isPrimary: cal.primary || false,
+        }));
+
+      console.log(`[google-calendar] Sync: Found ${calendars.length} calendars for admin ${admin.id}`);
+      
+      await storage.syncAdminCalendars(admin.id, calendars);
+      
+      const updatedCalendars = await storage.getConnectedAdminCalendars(admin.id);
+      res.json({ 
+        success: true, 
+        calendars: updatedCalendars.map(c => ({ id: c.id, name: c.name, isPrimary: c.isPrimary }))
+      });
+    } catch (error: any) {
+      console.error("[google-calendar] Sync error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Criar nova agenda no Google Calendar
+  app.post("/api/google-calendar/create", async (req: Request, res: Response) => {
+    try {
+      const { admin, error, errorCode } = await validateSessionAndGetAdmin(req);
+      if (!admin) {
+        return res.status(errorCode || 401).json({ error: error || "Não autenticado" });
+      }
+
+      const { name } = req.body;
+      if (!name || typeof name !== "string") {
+        return res.status(400).json({ error: "Nome da agenda é obrigatório" });
+      }
+
+      const oauth2Client = await getAuthenticatedClient(admin.id);
+      const calendar = google.calendar({ version: "v3", auth: oauth2Client });
+
+      // Criar nova agenda no Google
+      const newCalendar = await calendar.calendars.insert({
+        requestBody: {
+          summary: name,
+          timeZone: "America/Sao_Paulo",
+        },
+      });
+
+      console.log(`[google-calendar] Created new calendar: ${newCalendar.data.id} - ${name}`);
+
+      // Sincronizar para salvar a nova agenda localmente
+      const calendarList = await calendar.calendarList.list();
+      const calendars = (calendarList.data.items || [])
+        .filter(cal => cal.id && cal.summary)
+        .map(cal => ({
+          googleCalendarId: cal.id!,
+          name: cal.summary!,
+          isPrimary: cal.primary || false,
+        }));
+
+      await storage.syncAdminCalendars(admin.id, calendars);
+
+      const updatedCalendars = await storage.getConnectedAdminCalendars(admin.id);
+      res.json({ 
+        success: true, 
+        newCalendarId: newCalendar.data.id,
+        calendars: updatedCalendars.map(c => ({ id: c.id, name: c.name, isPrimary: c.isPrimary }))
+      });
+    } catch (error: any) {
+      console.error("[google-calendar] Create calendar error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get("/api/calendar/free-busy", async (req: Request, res: Response) => {
     try {
       const { admin, error, errorCode } = await validateSessionAndGetAdmin(req);
