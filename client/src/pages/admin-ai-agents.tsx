@@ -1873,115 +1873,130 @@ export default function AdminAiAgents() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Calendar className="h-5 w-5" />
-              Minhas Agendas do Google
+              Google Calendar
             </DialogTitle>
             <DialogDescription>
-              Agendas conectadas para uso nos agentes de IA
+              Gerencie sua conta Google e calendários para agendamentos
             </DialogDescription>
           </DialogHeader>
           
-          <div className="py-4 space-y-3">
+          <div className="py-4 space-y-4">
             {loadingCalendars ? (
               <div className="flex items-center justify-center py-6">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
             ) : connectedCalendars && connectedCalendars.length > 0 ? (
-              <div className="space-y-3">
-                <div className="space-y-2 max-h-48 overflow-y-auto">
-                  {connectedCalendars.map((cal: any) => (
-                    <div key={cal.id} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <CheckCircle className="h-4 w-4 text-green-500" />
-                        <div>
-                          <p className="font-medium text-sm">{cal.name}</p>
-                          {cal.isPrimary && (
-                            <p className="text-xs text-muted-foreground">Agenda principal</p>
-                          )}
-                        </div>
-                      </div>
-                      <Badge variant="outline" className="text-xs">Conectada</Badge>
-                    </div>
-                  ))}
-                </div>
-                
-                <div className="flex gap-2">
-                  <Button 
-                    variant="outline"
-                    onClick={handleSyncCalendars}
-                    disabled={isSyncingCalendars}
-                    className="flex-1 gap-2"
-                    data-testid="button-sync-calendars"
-                  >
-                    {isSyncingCalendars ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                    Atualizar
-                  </Button>
-                  <Button 
-                    variant="outline"
-                    onClick={() => setShowCreateCalendarInput(true)}
-                    className="flex-1 gap-2"
-                    data-testid="button-show-create-calendar"
-                  >
-                    <Plus className="h-4 w-4" />
-                    Nova Agenda
-                  </Button>
+              <>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-medium">Conta Google</h4>
+                    <Button 
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleDisconnectGoogle}
+                      disabled={isConnectingGoogle}
+                      className="h-8 text-xs text-destructive hover:text-destructive"
+                      data-testid="button-disconnect-google"
+                    >
+                      <Trash2 className="h-3 w-3 mr-1" />
+                      Desconectar
+                    </Button>
+                  </div>
+                  <div className="flex items-center gap-3 p-3 border rounded-lg bg-muted/30">
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                    <span className="text-sm">Conta conectada</span>
+                  </div>
                 </div>
 
-                {showCreateCalendarInput && (
-                  <div className="space-y-2 p-3 border rounded-lg bg-muted/50">
-                    <Label htmlFor="new-calendar-name">Nome da nova agenda</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        id="new-calendar-name"
-                        value={newCalendarName}
-                        onChange={(e) => setNewCalendarName(e.target.value)}
-                        placeholder="Ex: Agendamentos Comerciais"
-                        data-testid="input-new-calendar-name"
-                      />
+                <div className="border-t pt-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-medium">Calendários ({connectedCalendars.length})</h4>
+                    <div className="flex gap-1">
                       <Button 
-                        onClick={handleCreateCalendar}
-                        disabled={!newCalendarName.trim() || isCreatingCalendar}
-                        data-testid="button-create-calendar"
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleSyncCalendars}
+                        disabled={isSyncingCalendars}
+                        className="h-8 text-xs"
+                        data-testid="button-sync-calendars"
                       >
-                        {isCreatingCalendar ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                        {isSyncingCalendars ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
                       </Button>
                       <Button 
                         variant="ghost"
-                        onClick={() => { setShowCreateCalendarInput(false); setNewCalendarName(""); }}
-                        data-testid="button-cancel-create-calendar"
+                        size="sm"
+                        onClick={() => setShowCreateCalendarInput(true)}
+                        className="h-8 text-xs"
+                        data-testid="button-show-create-calendar"
                       >
-                        <X className="h-4 w-4" />
+                        <Plus className="h-3 w-3 mr-1" />
+                        Novo
                       </Button>
                     </div>
                   </div>
-                )}
-                
-                <Button 
-                  variant="outline"
-                  onClick={handleDisconnectGoogle}
-                  disabled={isConnectingGoogle}
-                  className="w-full gap-2 text-destructive hover:text-destructive"
-                  data-testid="button-disconnect-google"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  Desconectar Conta Google
-                </Button>
-              </div>
+                  
+                  <div className="space-y-2 max-h-40 overflow-y-auto">
+                    {connectedCalendars.map((cal: any) => (
+                      <div key={cal.id} className="flex items-center justify-between p-2 border rounded-lg text-sm">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4 text-muted-foreground" />
+                          <span>{cal.name}</span>
+                        </div>
+                        {cal.isPrimary && (
+                          <Badge variant="secondary" className="text-xs">Principal</Badge>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {showCreateCalendarInput && (
+                    <div className="space-y-2 p-3 border rounded-lg bg-muted/50">
+                      <Label htmlFor="new-calendar-name" className="text-xs">Nome do novo calendário</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          id="new-calendar-name"
+                          value={newCalendarName}
+                          onChange={(e) => setNewCalendarName(e.target.value)}
+                          placeholder="Ex: Agendamentos Comerciais"
+                          className="h-8 text-sm"
+                          data-testid="input-new-calendar-name"
+                        />
+                        <Button 
+                          size="sm"
+                          onClick={handleCreateCalendar}
+                          disabled={!newCalendarName.trim() || isCreatingCalendar}
+                          data-testid="button-create-calendar"
+                        >
+                          {isCreatingCalendar ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                        </Button>
+                        <Button 
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => { setShowCreateCalendarInput(false); setNewCalendarName(""); }}
+                          data-testid="button-cancel-create-calendar"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
             ) : (
               <div className="text-center py-6 text-muted-foreground">
                 <Calendar className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                <p>Nenhuma agenda conectada</p>
+                <p className="mb-4">Nenhuma conta Google conectada</p>
+                <Button 
+                  onClick={handleConnectGoogle}
+                  disabled={isConnectingGoogle}
+                  className="gap-2"
+                  data-testid="button-add-google-account"
+                >
+                  {isConnectingGoogle ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                  Conectar Conta Google
+                </Button>
               </div>
             )}
-            
-            <Button 
-              onClick={handleConnectGoogle}
-              disabled={isConnectingGoogle}
-              className="w-full gap-2"
-              data-testid="button-add-google-account"
-            >
-              {isConnectingGoogle ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-              Adicionar Conta Google
-            </Button>
           </div>
 
           <DialogFooter>
