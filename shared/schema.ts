@@ -1227,6 +1227,7 @@ export type AdminGoogleCalendarInsert = z.infer<typeof adminGoogleCalendarInsert
 export const googleCalendarTokens = pgTable("google_calendar_tokens", {
   id: text("id").primaryKey(),
   adminId: text("admin_id").notNull().unique(), // FK para admins (1 token por usuário)
+  email: text("email"), // Email da conta Google conectada
   accessToken: text("access_token").notNull(), // Token de acesso (criptografado)
   refreshToken: text("refresh_token").notNull(), // Token de refresh (criptografado)
   expiryDate: bigint("expiry_date", { mode: "number" }), // Unix timestamp de expiração (bigint para suportar ms)

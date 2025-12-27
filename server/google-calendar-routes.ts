@@ -171,9 +171,23 @@ export function registerGoogleCalendarRoutes(app: Express) {
         return res.redirect("/admin/ai-agents?calendar=error&message=Tokens inválidos");
       }
 
+      oauth2Client.setCredentials(tokens);
+      
+      // Buscar email da conta Google conectada
+      let googleEmail: string | undefined;
+      try {
+        const oauth2 = google.oauth2({ version: "v2", auth: oauth2Client });
+        const userInfo = await oauth2.userinfo.get();
+        googleEmail = userInfo.data.email || undefined;
+        console.log(`[google-calendar] Connected account email: ${googleEmail}`);
+      } catch (emailError: any) {
+        console.error("[google-calendar] Error fetching user info:", emailError);
+      }
+
       // Salvar tokens na tabela legada também
       await storage.upsertGoogleCalendarToken(adminId, {
         adminId,
+        email: googleEmail,
         accessToken: tokens.access_token,
         refreshToken: tokens.refresh_token,
         expiryDate: tokens.expiry_date || null,
@@ -182,7 +196,6 @@ export function registerGoogleCalendarRoutes(app: Express) {
       });
 
       // Buscar lista de calendários do Google e sincronizar
-      oauth2Client.setCredentials(tokens);
       const calendar = google.calendar({ version: "v3", auth: oauth2Client });
       
       try {
@@ -219,6 +232,7 @@ export function registerGoogleCalendarRoutes(app: Express) {
       const token = await storage.getGoogleCalendarToken(admin.id);
       res.json({
         connected: !!token?.isConnected,
+        email: token?.email || null,
         calendarId: token?.calendarId || null,
         lastSyncAt: token?.lastSyncAt || null,
       });

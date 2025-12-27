@@ -304,6 +304,10 @@ export default function AdminAiAgents() {
     queryKey: ["/api/google-calendar/connected"],
   });
 
+  const { data: googleStatus } = useQuery<{ connected: boolean; email: string | null }>({
+    queryKey: ["/api/google/status"],
+  });
+
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
       const res = await apiRequest("POST", "/api/ai-agents", data);
@@ -1697,7 +1701,7 @@ export default function AdminAiAgents() {
                               </div>
                               <div className="flex items-center gap-2 p-2 border rounded-lg bg-muted/30">
                                 <CheckCircle className="h-4 w-4 text-green-500" />
-                                <span className="text-sm">Conectada</span>
+                                <span className="text-sm truncate">{googleStatus?.email || "Conectada"}</span>
                               </div>
                             </div>
 
@@ -1949,7 +1953,7 @@ export default function AdminAiAgents() {
                   </div>
                   <div className="flex items-center gap-3 p-3 border rounded-lg bg-muted/30">
                     <CheckCircle className="h-4 w-4 text-green-500" />
-                    <span className="text-sm">Conta conectada</span>
+                    <span className="text-sm truncate">{googleStatus?.email || "Conta conectada"}</span>
                   </div>
                 </div>
 
