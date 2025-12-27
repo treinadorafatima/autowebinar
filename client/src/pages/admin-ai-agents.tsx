@@ -1939,21 +1939,34 @@ export default function AdminAiAgents() {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <h4 className="text-sm font-medium">Conta Google</h4>
-                    <Button 
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleDisconnectGoogle}
-                      disabled={isConnectingGoogle}
-                      className="h-8 text-xs text-destructive hover:text-destructive"
-                      data-testid="button-disconnect-google"
-                    >
-                      <Trash2 className="h-3 w-3 mr-1" />
-                      Desconectar
-                    </Button>
+                    <div className="flex gap-1">
+                      <Button 
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleConnectGoogle}
+                        disabled={isConnectingGoogle}
+                        className="h-8 text-xs"
+                        data-testid="button-reconnect-google"
+                      >
+                        <RefreshCw className="h-3 w-3 mr-1" />
+                        {googleStatus?.email ? "Trocar" : "Atualizar"}
+                      </Button>
+                      <Button 
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleDisconnectGoogle}
+                        disabled={isConnectingGoogle}
+                        className="h-8 text-xs text-destructive hover:text-destructive"
+                        data-testid="button-disconnect-google"
+                      >
+                        <Trash2 className="h-3 w-3 mr-1" />
+                        Desconectar
+                      </Button>
+                    </div>
                   </div>
                   <div className="flex items-center gap-3 p-3 border rounded-lg bg-muted/30">
                     <CheckCircle className="h-4 w-4 text-green-500" />
-                    <span className="text-sm truncate">{googleStatus?.email || "Conta conectada"}</span>
+                    <span className="text-sm truncate">{googleStatus?.email || "Conta conectada (reconecte para ver o email)"}</span>
                   </div>
                 </div>
 
@@ -1989,7 +2002,7 @@ export default function AdminAiAgents() {
                       <div key={cal.id} className="flex items-center justify-between p-2 border rounded-lg text-sm">
                         <div className="flex items-center gap-2">
                           <Calendar className="h-4 w-4 text-muted-foreground" />
-                          <span>{cal.name}</span>
+                          <span>{cal.isPrimary ? "Calendário Principal" : cal.name}</span>
                         </div>
                         {cal.isPrimary && (
                           <Badge variant="secondary" className="text-xs">Principal</Badge>
