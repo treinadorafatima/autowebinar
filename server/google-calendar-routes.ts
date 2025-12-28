@@ -306,30 +306,47 @@ export function registerGoogleCalendarRoutes(app: Express) {
       }
 
       // Buscar contas da nova tabela
-      const accounts = await storage.listAdminGoogleAccounts(admin.id);
+      let accounts = await storage.listAdminGoogleAccounts(admin.id);
       
-      // Fallback para tabela legada se não houver contas novas
+      // Se não houver contas na nova tabela, verificar tabela legada e migrar
       if (accounts.length === 0) {
-        const token = await storage.getGoogleCalendarToken(admin.id);
-        res.json({
-          connected: !!token?.isConnected,
-          email: token?.email || null,
-          calendarId: token?.calendarId || null,
-          lastSyncAt: token?.lastSyncAt || null,
-          accounts: [],
-        });
-      } else {
-        res.json({
-          connected: accounts.length > 0,
-          email: accounts[0]?.email || null,
-          accounts: accounts.map(acc => ({
-            id: acc.id,
-            email: acc.email,
-            isConnected: acc.isConnected,
-            lastSyncAt: acc.lastSyncAt,
-          })),
-        });
+        const legacyToken = await storage.getGoogleCalendarToken(admin.id);
+        if (legacyToken?.isConnected && legacyToken.accessToken) {
+          // Migrar token legado para nova tabela
+          const email = legacyToken.email || "conta-legada@google.com";
+          console.log(`[google-calendar] Migrating legacy token for admin ${admin.id} to new accounts table`);
+          
+          const migratedAccount = await storage.createOrUpdateAdminGoogleAccount({
+            adminId: admin.id,
+            email,
+            accessToken: legacyToken.accessToken,
+            refreshToken: legacyToken.refreshToken || null,
+            expiresAt: legacyToken.expiresAt || null,
+            isConnected: true,
+          });
+          
+          // Atualizar calendários existentes para vincular à nova conta
+          const existingCalendars = await storage.getConnectedAdminCalendars(admin.id);
+          for (const cal of existingCalendars) {
+            if (!cal.googleAccountId) {
+              await storage.updateAdminCalendar(cal.id, { googleAccountId: migratedAccount.id });
+            }
+          }
+          
+          accounts = [migratedAccount];
+        }
       }
+      
+      res.json({
+        connected: accounts.length > 0 && accounts.some(a => a.isConnected),
+        email: accounts[0]?.email || null,
+        accounts: accounts.map(acc => ({
+          id: acc.id,
+          email: acc.email,
+          isConnected: acc.isConnected,
+          lastSyncAt: acc.lastSyncAt,
+        })),
+      });
     } catch (error: any) {
       console.error("[google-calendar] Status error:", error);
       res.status(500).json({ error: error.message });

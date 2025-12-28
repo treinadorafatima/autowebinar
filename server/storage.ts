@@ -6271,6 +6271,12 @@ Apos o pagamento, seu acesso sera renovado automaticamente!
     await db.delete(adminGoogleCalendars).where(eq(adminGoogleCalendars.adminId, adminId));
   }
 
+  async updateAdminCalendar(calendarId: string, data: { googleAccountId?: string; name?: string; isPrimary?: boolean }): Promise<void> {
+    await db.update(adminGoogleCalendars)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(adminGoogleCalendars.id, calendarId));
+  }
+
   async syncAdminCalendarsForAccount(adminId: string, googleAccountId: string, calendars: { googleCalendarId: string; name: string; isPrimary: boolean; googleAccountId: string }[]): Promise<void> {
     // Buscar calendários existentes apenas desta conta
     const existingCalendars = await db.select().from(adminGoogleCalendars)
