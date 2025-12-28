@@ -316,24 +316,39 @@ export function registerGoogleCalendarRoutes(app: Express) {
           const email = legacyToken.email || "conta-legada@google.com";
           console.log(`[google-calendar] Migrating legacy token for admin ${admin.id} to new accounts table`);
           
-          const migratedAccount = await storage.createOrUpdateAdminGoogleAccount({
-            adminId: admin.id,
-            email,
-            accessToken: legacyToken.accessToken,
-            refreshToken: legacyToken.refreshToken || null,
-            expiresAt: legacyToken.expiresAt || null,
-            isConnected: true,
-          });
+          // Verificar se já existe conta com esse email
+          let migratedAccount = await storage.getAdminGoogleAccountByEmail(admin.id, email);
           
-          // Atualizar calendários existentes para vincular à nova conta
-          const existingCalendars = await storage.getConnectedAdminCalendars(admin.id);
-          for (const cal of existingCalendars) {
-            if (!cal.googleAccountId) {
-              await storage.updateAdminCalendar(cal.id, { googleAccountId: migratedAccount.id });
-            }
+          if (!migratedAccount) {
+            migratedAccount = await storage.createAdminGoogleAccount({
+              adminId: admin.id,
+              email,
+              accessToken: legacyToken.accessToken,
+              refreshToken: legacyToken.refreshToken || null,
+              expiresAt: legacyToken.expiresAt || null,
+              isConnected: true,
+            });
+          } else {
+            await storage.updateAdminGoogleAccount(migratedAccount.id, {
+              accessToken: legacyToken.accessToken,
+              refreshToken: legacyToken.refreshToken || null,
+              expiresAt: legacyToken.expiresAt || null,
+              isConnected: true,
+            });
+            migratedAccount = await storage.getAdminGoogleAccountById(migratedAccount.id);
           }
           
-          accounts = [migratedAccount];
+          // Atualizar calendários existentes para vincular à nova conta
+          if (migratedAccount) {
+            const existingCalendars = await storage.getConnectedAdminCalendars(admin.id);
+            for (const cal of existingCalendars) {
+              if (!cal.googleAccountId) {
+                await storage.updateAdminCalendar(cal.id, { googleAccountId: migratedAccount.id });
+              }
+            }
+            
+            accounts = [migratedAccount];
+          }
         }
       }
       
