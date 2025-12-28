@@ -2064,17 +2064,30 @@ export default function AdminAiAgents() {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <h4 className="text-sm font-medium">Conta Google</h4>
-                    <Button 
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleConnectGoogle}
-                      disabled={isConnectingGoogle}
-                      className="h-8 text-xs"
-                      data-testid="button-reconnect-google"
-                    >
-                      <RefreshCw className="h-3 w-3 mr-1" />
-                      Reconectar
-                    </Button>
+                    <div className="flex gap-1">
+                      <Button 
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleConnectGoogle}
+                        disabled={isConnectingGoogle}
+                        className="h-8 text-xs"
+                        data-testid="button-add-google-account"
+                      >
+                        {isConnectingGoogle ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Plus className="h-3 w-3 mr-1" />}
+                        Nova conta
+                      </Button>
+                      <Button 
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleConnectGoogle}
+                        disabled={isConnectingGoogle}
+                        className="h-8 text-xs"
+                        data-testid="button-reconnect-google"
+                      >
+                        <RefreshCw className="h-3 w-3 mr-1" />
+                        Reconectar
+                      </Button>
+                    </div>
                   </div>
                   <div className="flex items-center gap-3 p-3 border rounded-lg bg-muted/30">
                     <CheckCircle className="h-4 w-4 text-green-500" />
