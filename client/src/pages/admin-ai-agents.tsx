@@ -304,7 +304,7 @@ export default function AdminAiAgents() {
     queryKey: ["/api/google-calendar/connected"],
   });
 
-  const { data: googleStatus } = useQuery<{ 
+  const { data: googleStatus, isLoading: loadingGoogleStatus } = useQuery<{ 
     connected: boolean; 
     email: string | null; 
     accounts: Array<{ id: string; email: string; isConnected: boolean; lastSyncAt: string | null }> 
@@ -1934,7 +1934,7 @@ export default function AdminAiAgents() {
           </DialogHeader>
           
           <div className="py-4 space-y-4">
-            {loadingCalendars ? (
+            {(loadingCalendars || loadingGoogleStatus) ? (
               <div className="flex items-center justify-center py-6">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
