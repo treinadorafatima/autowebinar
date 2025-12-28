@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,8 @@ import {
   Bot, Plus, Edit, Trash2, Check, X, Loader2, 
   TestTube, Send, MessageSquare, Settings, Clock,
   Key, Cpu, AlertTriangle, CheckCircle, Info, FileText, Upload, File,
-  ChevronRight, ChevronLeft, Sparkles, Brain, Zap, Calendar, Link2, Copy, CheckCheck, RefreshCw
+  ChevronRight, ChevronLeft, Sparkles, Brain, Zap, Calendar, Link2, Copy, CheckCheck, RefreshCw,
+  Image, User
 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { Progress } from "@/components/ui/progress";
@@ -123,6 +124,9 @@ export default function AdminAiAgents() {
   const [testMessage, setTestMessage] = useState("");
   const [testResponse, setTestResponse] = useState<string | null>(null);
   const [testingAgentId, setTestingAgentId] = useState<string | null>(null);
+  const [chatHistory, setChatHistory] = useState<Array<{ role: 'user' | 'assistant'; content: string; mediaUrl?: string; timestamp: Date }>>([]);
+  const [testMediaUrl, setTestMediaUrl] = useState<string>("");
+  const chatEndRef = useRef<HTMLDivElement>(null);
   const [newFileName, setNewFileName] = useState("");
   const [newFileUrl, setNewFileUrl] = useState("");
   const [newFileText, setNewFileText] = useState("");
@@ -371,15 +375,20 @@ export default function AdminAiAgents() {
   });
 
   const testMutation = useMutation({
-    mutationFn: async ({ id, message }: { id: string; message: string }) => {
-      const res = await apiRequest("POST", `/api/ai-agents/${id}/test`, { message });
+    mutationFn: async ({ id, message, mediaUrl }: { id: string; message: string; mediaUrl?: string }) => {
+      const res = await apiRequest("POST", `/api/ai-agents/${id}/test`, { message, mediaUrl });
       return res.json();
     },
     onSuccess: (data: { content?: string }) => {
-      setTestResponse(data.content || "Resposta vazia");
+      const assistantMessage = data.content || "Resposta vazia";
+      setTestResponse(assistantMessage);
+      setChatHistory(prev => [...prev, { role: 'assistant', content: assistantMessage, timestamp: new Date() }]);
+      setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
     },
     onError: (error: any) => {
-      setTestResponse(`Erro: ${error.message}`);
+      const errorMessage = `Erro: ${error.message}`;
+      setTestResponse(errorMessage);
+      setChatHistory(prev => [...prev, { role: 'assistant', content: errorMessage, timestamp: new Date() }]);
     },
   });
 
@@ -602,10 +611,27 @@ export default function AdminAiAgents() {
   };
 
   const handleTest = (agentId: string) => {
-    if (!testMessage.trim()) return;
+    if (!testMessage.trim() && !testMediaUrl) return;
     setTestingAgentId(agentId);
     setTestResponse(null);
-    testMutation.mutate({ id: agentId, message: testMessage });
+    
+    // Adiciona mensagem do usuário ao histórico
+    const userMessage = { 
+      role: 'user' as const, 
+      content: testMessage, 
+      mediaUrl: testMediaUrl || undefined,
+      timestamp: new Date() 
+    };
+    setChatHistory(prev => [...prev, userMessage]);
+    
+    testMutation.mutate({ id: agentId, message: testMessage, mediaUrl: testMediaUrl || undefined });
+    setTestMessage("");
+    setTestMediaUrl("");
+  };
+
+  const clearChatHistory = () => {
+    setChatHistory([]);
+    setTestResponse(null);
   };
 
   const currentModels = providers?.[formData.provider]?.models || [];
@@ -769,61 +795,175 @@ export default function AdminAiAgents() {
         </TabsContent>
 
         <TabsContent value="test" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Testar Agente</CardTitle>
-              <CardDescription>
-                Envie uma mensagem de teste para verificar como o agente responde
-              </CardDescription>
+          <Card className="flex flex-col h-[600px]">
+            <CardHeader className="flex-shrink-0 pb-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <MessageSquare className="h-5 w-5" />
+                    Testar Agente
+                  </CardTitle>
+                  <CardDescription>
+                    Simule uma conversa para verificar as respostas do agente
+                  </CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Select value={testingAgentId || ""} onValueChange={(id) => { setTestingAgentId(id); clearChatHistory(); }}>
+                    <SelectTrigger className="w-[180px]" data-testid="select-test-agent">
+                      <SelectValue placeholder="Selecione um agente" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {agents?.map((agent) => (
+                        <SelectItem key={agent.id} value={agent.id}>
+                          {agent.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {chatHistory.length > 0 && (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={clearChatHistory}
+                      data-testid="button-clear-chat"
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Limpar
+                    </Button>
+                  )}
+                </div>
+              </div>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>Selecionar Agente</Label>
-                <Select value={testingAgentId || ""} onValueChange={setTestingAgentId}>
-                  <SelectTrigger data-testid="select-test-agent">
-                    <SelectValue placeholder="Selecione um agente" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {agents?.map((agent) => (
-                      <SelectItem key={agent.id} value={agent.id}>
-                        {agent.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div className="space-y-2">
-                <Label>Mensagem de Teste</Label>
-                <Textarea
-                  placeholder="Digite uma mensagem para testar o agente..."
-                  value={testMessage}
-                  onChange={(e) => setTestMessage(e.target.value)}
-                  className="min-h-[100px]"
-                  data-testid="input-test-message"
-                />
-              </div>
-
-              <Button 
-                onClick={() => testingAgentId && handleTest(testingAgentId)}
-                disabled={!testingAgentId || !testMessage.trim() || testMutation.isPending}
-                data-testid="button-send-test"
-                className="w-full"
-              >
-                {testMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            
+            <CardContent className="flex-1 overflow-hidden flex flex-col p-0">
+              {/* Área de mensagens */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-muted/30">
+                {chatHistory.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                    <Bot className="h-16 w-16 mb-4 opacity-30" />
+                    <p className="text-center">
+                      {testingAgentId 
+                        ? "Envie uma mensagem para iniciar a conversa" 
+                        : "Selecione um agente para começar"}
+                    </p>
+                  </div>
                 ) : (
-                  <Send className="h-4 w-4 mr-2" />
+                  chatHistory.map((msg, index) => (
+                    <div 
+                      key={index} 
+                      className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div className={`flex items-start gap-2 max-w-[80%] ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                          msg.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted-foreground/20'
+                        }`}>
+                          {msg.role === 'user' ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
+                        </div>
+                        <div className={`rounded-2xl px-4 py-2 ${
+                          msg.role === 'user' 
+                            ? 'bg-primary text-primary-foreground rounded-tr-sm' 
+                            : 'bg-card border rounded-tl-sm'
+                        }`}>
+                          {msg.mediaUrl && (
+                            <div className="mb-2">
+                              <img 
+                                src={msg.mediaUrl} 
+                                alt="Mídia enviada" 
+                                className="max-w-[200px] rounded-lg"
+                              />
+                            </div>
+                          )}
+                          <p className="whitespace-pre-wrap text-sm">{msg.content}</p>
+                          <span className={`text-xs mt-1 block ${
+                            msg.role === 'user' ? 'text-primary-foreground/70' : 'text-muted-foreground'
+                          }`}>
+                            {msg.timestamp.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))
                 )}
-                {testMutation.isPending ? "Processando..." : "Enviar Teste"}
-              </Button>
+                {testMutation.isPending && (
+                  <div className="flex justify-start">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-muted-foreground/20 flex items-center justify-center">
+                        <Bot className="h-4 w-4" />
+                      </div>
+                      <div className="bg-card border rounded-2xl rounded-tl-sm px-4 py-3">
+                        <div className="flex items-center gap-1">
+                          <span className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                          <span className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                          <span className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <div ref={chatEndRef} />
+              </div>
 
-              {testResponse && (
-                <div className="p-4 bg-muted rounded-lg mt-4">
-                  <Label className="text-sm text-muted-foreground mb-2 block">Resposta do Agente:</Label>
-                  <p className="whitespace-pre-wrap" data-testid="text-test-response">{testResponse}</p>
+              {/* Input de mídia (se houver) */}
+              {testMediaUrl && (
+                <div className="px-4 py-2 border-t bg-muted/50">
+                  <div className="flex items-center gap-2">
+                    <img src={testMediaUrl} alt="Prévia" className="h-12 w-12 object-cover rounded" />
+                    <span className="text-sm text-muted-foreground flex-1 truncate">{testMediaUrl}</span>
+                    <Button variant="ghost" size="sm" onClick={() => setTestMediaUrl("")}>
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               )}
+
+              {/* Área de input */}
+              <div className="flex-shrink-0 p-4 border-t bg-background">
+                <div className="flex items-end gap-2">
+                  <div className="flex-1 relative">
+                    <Textarea
+                      placeholder={testingAgentId ? "Digite sua mensagem..." : "Selecione um agente primeiro..."}
+                      value={testMessage}
+                      onChange={(e) => setTestMessage(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey && testingAgentId && testMessage.trim()) {
+                          e.preventDefault();
+                          handleTest(testingAgentId);
+                        }
+                      }}
+                      className="min-h-[44px] max-h-[120px] resize-none pr-24"
+                      disabled={!testingAgentId}
+                      data-testid="input-test-message"
+                    />
+                    <div className="absolute right-2 bottom-2 flex items-center gap-1">
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        className="h-8 w-8 p-0"
+                        onClick={() => {
+                          const url = prompt("Cole a URL da imagem:");
+                          if (url) setTestMediaUrl(url);
+                        }}
+                        disabled={!testingAgentId}
+                        data-testid="button-attach-media"
+                      >
+                        <Image className="h-4 w-4 text-muted-foreground" />
+                      </Button>
+                    </div>
+                  </div>
+                  <Button 
+                    onClick={() => testingAgentId && handleTest(testingAgentId)}
+                    disabled={!testingAgentId || (!testMessage.trim() && !testMediaUrl) || testMutation.isPending}
+                    data-testid="button-send-test"
+                    className="h-11"
+                  >
+                    {testMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
