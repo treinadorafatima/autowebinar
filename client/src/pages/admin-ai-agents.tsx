@@ -795,21 +795,19 @@ export default function AdminAiAgents() {
         </TabsContent>
 
         <TabsContent value="test" className="space-y-4">
-          <Card className="flex flex-col h-[600px]">
-            <CardHeader className="flex-shrink-0 pb-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <MessageSquare className="h-5 w-5" />
-                    Testar Agente
-                  </CardTitle>
-                  <CardDescription>
-                    Simule uma conversa para verificar as respostas do agente
-                  </CardDescription>
+          <div className="flex flex-col h-[650px] rounded-xl overflow-hidden border shadow-lg">
+            {/* Header estilo WhatsApp */}
+            <div className="bg-[#075e54] dark:bg-[#1f2c34] text-white px-4 py-3 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-[#25d366] flex items-center justify-center">
+                  <Bot className="h-5 w-5 text-white" />
                 </div>
-                <div className="flex items-center gap-2">
+                <div>
                   <Select value={testingAgentId || ""} onValueChange={(id) => { setTestingAgentId(id); clearChatHistory(); }}>
-                    <SelectTrigger className="w-[180px]" data-testid="select-test-agent">
+                    <SelectTrigger 
+                      className="border-0 bg-transparent text-white h-auto p-0 font-semibold text-base hover:bg-transparent focus:ring-0 [&>svg]:text-white/70" 
+                      data-testid="select-test-agent"
+                    >
                       <SelectValue placeholder="Selecione um agente" />
                     </SelectTrigger>
                     <SelectContent>
@@ -820,152 +818,171 @@ export default function AdminAiAgents() {
                       ))}
                     </SelectContent>
                   </Select>
-                  {chatHistory.length > 0 && (
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={clearChatHistory}
-                      data-testid="button-clear-chat"
-                    >
-                      <Trash2 className="h-4 w-4 mr-1" />
-                      Limpar
-                    </Button>
-                  )}
+                  <p className="text-xs text-white/70">
+                    {testingAgentId ? (testMutation.isPending ? "digitando..." : "online") : "Selecione um agente"}
+                  </p>
                 </div>
               </div>
-            </CardHeader>
+              {chatHistory.length > 0 && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={clearChatHistory}
+                  className="text-white/80 hover:text-white hover:bg-white/10"
+                  data-testid="button-clear-chat"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
             
-            <CardContent className="flex-1 overflow-hidden flex flex-col p-0">
-              {/* Área de mensagens */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-muted/30">
-                {chatHistory.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                    <Bot className="h-16 w-16 mb-4 opacity-30" />
-                    <p className="text-center">
+            {/* Área de mensagens com fundo estilo WhatsApp */}
+            <div 
+              className="flex-1 overflow-y-auto p-3 space-y-2"
+              style={{
+                backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23075e54' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+                backgroundColor: '#ece5dd'
+              }}
+            >
+              {chatHistory.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full">
+                  <div className="bg-[#fcf4cb] dark:bg-[#1d282f] rounded-lg px-4 py-3 shadow-sm max-w-sm text-center">
+                    <p className="text-sm text-[#54656f] dark:text-[#8696a0]">
                       {testingAgentId 
-                        ? "Envie uma mensagem para iniciar a conversa" 
-                        : "Selecione um agente para começar"}
+                        ? "Envie uma mensagem para iniciar a conversa com o agente" 
+                        : "Selecione um agente no topo para começar o teste"}
                     </p>
                   </div>
-                ) : (
-                  chatHistory.map((msg, index) => (
+                </div>
+              ) : (
+                chatHistory.map((msg, index) => (
+                  <div 
+                    key={index} 
+                    className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                  >
                     <div 
-                      key={index} 
-                      className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                      className={`relative max-w-[75%] rounded-lg px-3 py-2 shadow-sm ${
+                        msg.role === 'user' 
+                          ? 'bg-[#d9fdd3] dark:bg-[#005c4b]' 
+                          : 'bg-white dark:bg-[#1f2c34]'
+                      }`}
+                      style={{
+                        borderTopRightRadius: msg.role === 'user' ? '0' : undefined,
+                        borderTopLeftRadius: msg.role === 'assistant' ? '0' : undefined,
+                      }}
                     >
-                      <div className={`flex items-start gap-2 max-w-[80%] ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                          msg.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted-foreground/20'
-                        }`}>
-                          {msg.role === 'user' ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
-                        </div>
-                        <div className={`rounded-2xl px-4 py-2 ${
+                      {/* Seta do balão */}
+                      <div 
+                        className={`absolute top-0 w-0 h-0 ${
                           msg.role === 'user' 
-                            ? 'bg-primary text-primary-foreground rounded-tr-sm' 
-                            : 'bg-card border rounded-tl-sm'
-                        }`}>
-                          {msg.mediaUrl && (
-                            <div className="mb-2">
-                              <img 
-                                src={msg.mediaUrl} 
-                                alt="Mídia enviada" 
-                                className="max-w-[200px] rounded-lg"
-                              />
-                            </div>
-                          )}
-                          <p className="whitespace-pre-wrap text-sm">{msg.content}</p>
-                          <span className={`text-xs mt-1 block ${
-                            msg.role === 'user' ? 'text-primary-foreground/70' : 'text-muted-foreground'
-                          }`}>
-                            {msg.timestamp.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                          </span>
+                            ? 'right-[-8px] border-l-[8px] border-l-[#d9fdd3] dark:border-l-[#005c4b] border-t-[8px] border-t-transparent border-b-[8px] border-b-transparent'
+                            : 'left-[-8px] border-r-[8px] border-r-white dark:border-r-[#1f2c34] border-t-[8px] border-t-transparent border-b-[8px] border-b-transparent'
+                        }`}
+                        style={{ top: 0 }}
+                      />
+                      {msg.mediaUrl && (
+                        <div className="mb-2">
+                          <img 
+                            src={msg.mediaUrl} 
+                            alt="Mídia enviada" 
+                            className="max-w-[200px] rounded-lg"
+                          />
                         </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-                {testMutation.isPending && (
-                  <div className="flex justify-start">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-muted-foreground/20 flex items-center justify-center">
-                        <Bot className="h-4 w-4" />
-                      </div>
-                      <div className="bg-card border rounded-2xl rounded-tl-sm px-4 py-3">
-                        <div className="flex items-center gap-1">
-                          <span className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                          <span className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                          <span className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                        </div>
+                      )}
+                      <p className="whitespace-pre-wrap text-sm text-[#111b21] dark:text-[#e9edef] leading-relaxed">{msg.content}</p>
+                      <div className={`flex items-center justify-end gap-1 mt-1 ${
+                        msg.role === 'user' ? '' : ''
+                      }`}>
+                        <span className="text-[10px] text-[#667781] dark:text-[#8696a0]">
+                          {msg.timestamp.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                        {msg.role === 'user' && (
+                          <CheckCheck className="h-3.5 w-3.5 text-[#53bdeb]" />
+                        )}
                       </div>
                     </div>
                   </div>
-                )}
-                <div ref={chatEndRef} />
-              </div>
-
-              {/* Input de mídia (se houver) */}
-              {testMediaUrl && (
-                <div className="px-4 py-2 border-t bg-muted/50">
-                  <div className="flex items-center gap-2">
-                    <img src={testMediaUrl} alt="Prévia" className="h-12 w-12 object-cover rounded" />
-                    <span className="text-sm text-muted-foreground flex-1 truncate">{testMediaUrl}</span>
-                    <Button variant="ghost" size="sm" onClick={() => setTestMediaUrl("")}>
-                      <X className="h-4 w-4" />
-                    </Button>
+                ))
+              )}
+              {testMutation.isPending && (
+                <div className="flex justify-start">
+                  <div 
+                    className="relative bg-white dark:bg-[#1f2c34] rounded-lg px-3 py-2 shadow-sm"
+                    style={{ borderTopLeftRadius: 0 }}
+                  >
+                    <div 
+                      className="absolute top-0 left-[-8px] w-0 h-0 border-r-[8px] border-r-white dark:border-r-[#1f2c34] border-t-[8px] border-t-transparent border-b-[8px] border-b-transparent"
+                    />
+                    <div className="flex items-center gap-1 py-1">
+                      <span className="w-2 h-2 bg-[#667781] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <span className="w-2 h-2 bg-[#667781] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <span className="w-2 h-2 bg-[#667781] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </div>
                   </div>
                 </div>
               )}
+              <div ref={chatEndRef} />
+            </div>
 
-              {/* Área de input */}
-              <div className="flex-shrink-0 p-4 border-t bg-background">
-                <div className="flex items-end gap-2">
-                  <div className="flex-1 relative">
-                    <Textarea
-                      placeholder={testingAgentId ? "Digite sua mensagem..." : "Selecione um agente primeiro..."}
-                      value={testMessage}
-                      onChange={(e) => setTestMessage(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey && testingAgentId && testMessage.trim()) {
-                          e.preventDefault();
-                          handleTest(testingAgentId);
-                        }
-                      }}
-                      className="min-h-[44px] max-h-[120px] resize-none pr-24"
-                      disabled={!testingAgentId}
-                      data-testid="input-test-message"
-                    />
-                    <div className="absolute right-2 bottom-2 flex items-center gap-1">
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        className="h-8 w-8 p-0"
-                        onClick={() => {
-                          const url = prompt("Cole a URL da imagem:");
-                          if (url) setTestMediaUrl(url);
-                        }}
-                        disabled={!testingAgentId}
-                        data-testid="button-attach-media"
-                      >
-                        <Image className="h-4 w-4 text-muted-foreground" />
-                      </Button>
-                    </div>
-                  </div>
-                  <Button 
-                    onClick={() => testingAgentId && handleTest(testingAgentId)}
-                    disabled={!testingAgentId || (!testMessage.trim() && !testMediaUrl) || testMutation.isPending}
-                    data-testid="button-send-test"
-                    className="h-11"
-                  >
-                    {testMutation.isPending ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Send className="h-4 w-4" />
-                    )}
+            {/* Input de mídia (se houver) */}
+            {testMediaUrl && (
+              <div className="px-3 py-2 bg-[#f0f2f5] dark:bg-[#1f2c34] border-t border-[#e9edef] dark:border-[#3b4a54]">
+                <div className="flex items-center gap-2 bg-white dark:bg-[#2a3942] rounded-lg p-2">
+                  <img src={testMediaUrl} alt="Prévia" className="h-12 w-12 object-cover rounded" />
+                  <span className="text-sm text-[#667781] flex-1 truncate">{testMediaUrl}</span>
+                  <Button variant="ghost" size="sm" onClick={() => setTestMediaUrl("")} className="h-8 w-8 p-0">
+                    <X className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            )}
+
+            {/* Área de input estilo WhatsApp */}
+            <div className="bg-[#f0f2f5] dark:bg-[#1f2c34] px-3 py-2 flex items-end gap-2">
+              <Button 
+                variant="ghost" 
+                size="icon"
+                className="h-10 w-10 rounded-full text-[#54656f] dark:text-[#8696a0] hover:bg-[#e9edef] dark:hover:bg-[#3b4a54] flex-shrink-0"
+                onClick={() => {
+                  const url = prompt("Cole a URL da imagem:");
+                  if (url) setTestMediaUrl(url);
+                }}
+                disabled={!testingAgentId}
+                data-testid="button-attach-media"
+              >
+                <Image className="h-5 w-5" />
+              </Button>
+              <div className="flex-1 relative">
+                <Textarea
+                  placeholder={testingAgentId ? "Mensagem" : "Selecione um agente..."}
+                  value={testMessage}
+                  onChange={(e) => setTestMessage(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey && testingAgentId && testMessage.trim()) {
+                      e.preventDefault();
+                      handleTest(testingAgentId);
+                    }
+                  }}
+                  className="min-h-[42px] max-h-[100px] resize-none rounded-3xl bg-white dark:bg-[#2a3942] border-0 px-4 py-2.5 text-sm focus-visible:ring-0 placeholder:text-[#667781]"
+                  disabled={!testingAgentId}
+                  data-testid="input-test-message"
+                />
+              </div>
+              <Button 
+                onClick={() => testingAgentId && handleTest(testingAgentId)}
+                disabled={!testingAgentId || (!testMessage.trim() && !testMediaUrl) || testMutation.isPending}
+                data-testid="button-send-test"
+                className="h-10 w-10 rounded-full bg-[#00a884] hover:bg-[#008f72] flex-shrink-0"
+                size="icon"
+              >
+                {testMutation.isPending ? (
+                  <Loader2 className="h-5 w-5 animate-spin text-white" />
+                ) : (
+                  <Send className="h-5 w-5 text-white" />
+                )}
+              </Button>
+            </div>
+          </div>
         </TabsContent>
       </Tabs>
 
