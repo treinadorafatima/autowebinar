@@ -1208,10 +1208,29 @@ export type AiUsageStats = typeof aiUsageStats.$inferSelect;
 export const aiUsageStatsInsertSchema = createInsertSchema(aiUsageStats).omit({ id: true });
 export type AiUsageStatsInsert = z.infer<typeof aiUsageStatsInsertSchema>;
 
+// Admin Google Accounts - múltiplas contas Google por admin
+export const adminGoogleAccounts = pgTable("admin_google_accounts", {
+  id: text("id").primaryKey(),
+  adminId: text("admin_id").notNull(), // FK para admins
+  email: text("email").notNull(), // Email da conta Google
+  accessToken: text("access_token").notNull(), // Token de acesso
+  refreshToken: text("refresh_token").notNull(), // Token de refresh
+  expiryDate: bigint("expiry_date", { mode: "number" }), // Unix timestamp de expiração
+  isConnected: boolean("is_connected").notNull().default(true),
+  lastSyncAt: timestamp("last_sync_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type AdminGoogleAccount = typeof adminGoogleAccounts.$inferSelect;
+export const adminGoogleAccountInsertSchema = createInsertSchema(adminGoogleAccounts).omit({ id: true, createdAt: true, updatedAt: true });
+export type AdminGoogleAccountInsert = z.infer<typeof adminGoogleAccountInsertSchema>;
+
 // Admin Google Calendars - metadados das agendas do admin (sem tokens)
 export const adminGoogleCalendars = pgTable("admin_google_calendars", {
   id: text("id").primaryKey(),
   adminId: text("admin_id").notNull(), // FK para admins
+  googleAccountId: text("google_account_id"), // FK para admin_google_accounts (qual conta Google)
   name: text("name").notNull(), // Nome da agenda (ex: "Calendário Principal")
   googleCalendarId: text("google_calendar_id").notNull(), // ID do calendário no Google
   isPrimary: boolean("is_primary").notNull().default(false), // Agenda padrão do admin
