@@ -338,13 +338,61 @@ export function registerAiAgentsRoutes(app: Express) {
         return res.status(403).json({ error: "Acesso negado" });
       }
 
-      const { message } = req.body;
-      if (!message) {
+      const { message, mediaUrl } = req.body;
+      if (!message && !mediaUrl) {
         return res.status(400).json({ error: "Mensagem é obrigatória" });
       }
 
+      // Log de diagnóstico
+      console.log("[ai-agents] Testing agent:", {
+        agentId: agent.id,
+        agentName: agent.name,
+        provider: agent.provider,
+        model: agent.model,
+        hasApiKey: !!agent.apiKey,
+        apiKeyLength: agent.apiKey?.length || 0,
+        systemPromptLength: agent.systemPrompt?.length || 0,
+        temperature: agent.temperature,
+        maxTokens: agent.maxTokens,
+        calendarEnabled: agent.calendarEnabled,
+      });
+
       const knowledgeFiles = await storage.listAiAgentFiles(agent.id);
-      const response = await processMessage(agent, message, [], knowledgeFiles);
+      console.log("[ai-agents] Knowledge files:", knowledgeFiles.map(f => ({
+        fileName: f.fileName,
+        hasExtractedText: !!f.extractedText,
+        extractedTextLength: f.extractedText?.length || 0,
+      })));
+
+      // Preparar contexto de calendário se habilitado
+      let calendarContext: { adminId: string; contactPhone?: string; contactName?: string; googleCalendarId?: string } | undefined;
+      if (agent.calendarEnabled && agent.adminCalendarId) {
+        const calendar = await storage.getAdminGoogleCalendarById(agent.adminCalendarId);
+        calendarContext = {
+          adminId: admin.id,
+          contactPhone: "teste",
+          contactName: "Usuário Teste",
+          googleCalendarId: calendar?.googleCalendarId,
+        };
+      }
+
+      // Adicionar mídia à mensagem se houver
+      let fullMessage = message || "";
+      if (mediaUrl) {
+        fullMessage = `[Mídia recebida: ${mediaUrl}]\n${fullMessage}`;
+      }
+
+      const response = await processMessage(agent, fullMessage, [], knowledgeFiles, calendarContext);
+      
+      console.log("[ai-agents] Test response:", {
+        hasContent: !!response.content,
+        contentLength: response.content?.length || 0,
+        tokensUsed: response.tokensUsed,
+        processingTimeMs: response.processingTimeMs,
+        hasError: !!response.error,
+        error: response.error,
+      });
+
       res.json(response);
     } catch (error: any) {
       console.error("[ai-agents] Error testing agent:", error);
