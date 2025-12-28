@@ -304,7 +304,11 @@ export default function AdminAiAgents() {
     queryKey: ["/api/google-calendar/connected"],
   });
 
-  const { data: googleStatus } = useQuery<{ connected: boolean; email: string | null }>({
+  const { data: googleStatus } = useQuery<{ 
+    connected: boolean; 
+    email: string | null; 
+    accounts: Array<{ id: string; email: string; isConnected: boolean; lastSyncAt: string | null }> 
+  }>({
     queryKey: ["/api/google/status"],
   });
 
@@ -1925,7 +1929,7 @@ export default function AdminAiAgents() {
               Google Calendar
             </DialogTitle>
             <DialogDescription>
-              Gerencie sua conta Google e calendários para agendamentos
+              Gerencie suas contas Google e calendários para agendamentos
             </DialogDescription>
           </DialogHeader>
           
@@ -1934,35 +1938,143 @@ export default function AdminAiAgents() {
               <div className="flex items-center justify-center py-6">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
+            ) : googleStatus?.accounts && googleStatus.accounts.length > 0 ? (
+              <>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-medium">Contas Google ({googleStatus.accounts.length})</h4>
+                    <Button 
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleConnectGoogle}
+                      disabled={isConnectingGoogle}
+                      className="h-8 text-xs"
+                      data-testid="button-add-google-account"
+                    >
+                      {isConnectingGoogle ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Plus className="h-3 w-3 mr-1" />}
+                      Adicionar
+                    </Button>
+                  </div>
+                  <div className="space-y-2 max-h-32 overflow-y-auto">
+                    {googleStatus.accounts.map((account) => (
+                      <div key={account.id} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
+                          <span className="text-sm truncate">{account.email}</span>
+                        </div>
+                        <Button 
+                          variant="ghost"
+                          size="sm"
+                          onClick={async () => {
+                            try {
+                              await apiRequest("DELETE", `/api/google/accounts/${account.id}`);
+                              queryClient.invalidateQueries({ queryKey: ["/api/google/status"] });
+                              queryClient.invalidateQueries({ queryKey: ["/api/google-calendar/connected"] });
+                              toast({ title: "Conta removida com sucesso!" });
+                            } catch (err: any) {
+                              toast({ title: "Erro ao remover conta", description: err.message, variant: "destructive" });
+                            }
+                          }}
+                          className="h-7 w-7 p-0 text-destructive hover:text-destructive flex-shrink-0"
+                          data-testid={`button-remove-account-${account.id}`}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="border-t pt-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-medium">Calendários ({connectedCalendars?.length || 0})</h4>
+                    <div className="flex gap-1">
+                      <Button 
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleSyncCalendars}
+                        disabled={isSyncingCalendars}
+                        className="h-8 text-xs"
+                        data-testid="button-sync-calendars"
+                      >
+                        {isSyncingCalendars ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                      </Button>
+                      <Button 
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowCreateCalendarInput(true)}
+                        className="h-8 text-xs"
+                        data-testid="button-show-create-calendar"
+                      >
+                        <Plus className="h-3 w-3 mr-1" />
+                        Novo
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2 max-h-40 overflow-y-auto">
+                    {connectedCalendars?.map((cal: any) => (
+                      <div key={cal.id} className="flex items-center justify-between p-2 border rounded-lg text-sm">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4 text-muted-foreground" />
+                          <span>{cal.isPrimary ? "Calendário Principal" : cal.name}</span>
+                        </div>
+                        {cal.isPrimary && (
+                          <Badge variant="secondary" className="text-xs">Principal</Badge>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {showCreateCalendarInput && (
+                    <div className="space-y-2 p-3 border rounded-lg bg-muted/50">
+                      <Label htmlFor="new-calendar-name" className="text-xs">Nome do novo calendário</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          id="new-calendar-name"
+                          value={newCalendarName}
+                          onChange={(e) => setNewCalendarName(e.target.value)}
+                          placeholder="Ex: Agendamentos Comerciais"
+                          className="h-8 text-sm"
+                          data-testid="input-new-calendar-name"
+                        />
+                        <Button 
+                          size="sm"
+                          onClick={handleCreateCalendar}
+                          disabled={!newCalendarName.trim() || isCreatingCalendar}
+                          data-testid="button-create-calendar"
+                        >
+                          {isCreatingCalendar ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                        </Button>
+                        <Button 
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => { setShowCreateCalendarInput(false); setNewCalendarName(""); }}
+                          data-testid="button-cancel-create-calendar"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
             ) : connectedCalendars && connectedCalendars.length > 0 ? (
               <>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <h4 className="text-sm font-medium">Conta Google</h4>
-                    <div className="flex gap-1">
-                      <Button 
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleConnectGoogle}
-                        disabled={isConnectingGoogle}
-                        className="h-8 text-xs"
-                        data-testid="button-reconnect-google"
-                      >
-                        <RefreshCw className="h-3 w-3 mr-1" />
-                        {googleStatus?.email ? "Trocar" : "Atualizar"}
-                      </Button>
-                      <Button 
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleDisconnectGoogle}
-                        disabled={isConnectingGoogle}
-                        className="h-8 text-xs text-destructive hover:text-destructive"
-                        data-testid="button-disconnect-google"
-                      >
-                        <Trash2 className="h-3 w-3 mr-1" />
-                        Desconectar
-                      </Button>
-                    </div>
+                    <Button 
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleConnectGoogle}
+                      disabled={isConnectingGoogle}
+                      className="h-8 text-xs"
+                      data-testid="button-reconnect-google"
+                    >
+                      <RefreshCw className="h-3 w-3 mr-1" />
+                      Reconectar
+                    </Button>
                   </div>
                   <div className="flex items-center gap-3 p-3 border rounded-lg bg-muted/30">
                     <CheckCircle className="h-4 w-4 text-green-500" />
@@ -2010,38 +2122,6 @@ export default function AdminAiAgents() {
                       </div>
                     ))}
                   </div>
-
-                  {showCreateCalendarInput && (
-                    <div className="space-y-2 p-3 border rounded-lg bg-muted/50">
-                      <Label htmlFor="new-calendar-name" className="text-xs">Nome do novo calendário</Label>
-                      <div className="flex gap-2">
-                        <Input
-                          id="new-calendar-name"
-                          value={newCalendarName}
-                          onChange={(e) => setNewCalendarName(e.target.value)}
-                          placeholder="Ex: Agendamentos Comerciais"
-                          className="h-8 text-sm"
-                          data-testid="input-new-calendar-name"
-                        />
-                        <Button 
-                          size="sm"
-                          onClick={handleCreateCalendar}
-                          disabled={!newCalendarName.trim() || isCreatingCalendar}
-                          data-testid="button-create-calendar"
-                        >
-                          {isCreatingCalendar ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-                        </Button>
-                        <Button 
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => { setShowCreateCalendarInput(false); setNewCalendarName(""); }}
-                          data-testid="button-cancel-create-calendar"
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  )}
                 </div>
               </>
             ) : (

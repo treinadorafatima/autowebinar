@@ -39,7 +39,48 @@ async function createOAuth2Client() {
   );
 }
 
-async function getAuthenticatedClient(adminId: string) {
+async function getAuthenticatedClient(adminId: string, googleAccountId?: string) {
+  // Tentar buscar da nova tabela de múltiplas contas primeiro
+  let account = googleAccountId 
+    ? await storage.getAdminGoogleAccountById(googleAccountId)
+    : null;
+  
+  // Se não especificou conta, buscar a primeira disponível
+  if (!account) {
+    const accounts = await storage.listAdminGoogleAccounts(adminId);
+    if (accounts.length > 0) {
+      account = accounts[0];
+    }
+  }
+
+  // Se encontrou conta na nova tabela
+  if (account && account.adminId === adminId) {
+    const oauth2Client = await createOAuth2Client();
+    oauth2Client.setCredentials({
+      access_token: account.accessToken,
+      refresh_token: account.refreshToken,
+      expiry_date: account.expiryDate || undefined,
+    });
+
+    oauth2Client.on("tokens", async (tokens) => {
+      if (tokens.refresh_token) {
+        await storage.updateAdminGoogleAccount(account.id, {
+          accessToken: tokens.access_token || account.accessToken,
+          refreshToken: tokens.refresh_token,
+          expiryDate: tokens.expiry_date || null,
+        });
+      } else if (tokens.access_token) {
+        await storage.updateAdminGoogleAccount(account.id, {
+          accessToken: tokens.access_token,
+          expiryDate: tokens.expiry_date || null,
+        });
+      }
+    });
+
+    return { oauth2Client, googleAccountId: account.id };
+  }
+
+  // Fallback para tabela legada
   const token = await storage.getGoogleCalendarToken(adminId);
   if (!token) {
     throw new Error("Conta não conectada ao Google Calendar");
@@ -67,7 +108,7 @@ async function getAuthenticatedClient(adminId: string) {
     }
   });
 
-  return oauth2Client;
+  return { oauth2Client, googleAccountId: null };
 }
 
 async function validateSessionAndGetAdmin(req: Request) {
@@ -365,7 +406,7 @@ export function registerGoogleCalendarRoutes(app: Express) {
 
       if (syncWithGoogle === "true") {
         try {
-          const oauth2Client = await getAuthenticatedClient(admin.id);
+          const { oauth2Client } = await getAuthenticatedClient(admin.id);
           const calendar = google.calendar({ version: "v3", auth: oauth2Client });
 
           const response = await calendar.events.list({
@@ -443,7 +484,7 @@ export function registerGoogleCalendarRoutes(app: Express) {
 
       if (syncToGoogle !== false) {
         try {
-          const oauth2Client = await getAuthenticatedClient(admin.id);
+          const { oauth2Client } = await getAuthenticatedClient(admin.id);
           const calendar = google.calendar({ version: "v3", auth: oauth2Client });
 
           const event: any = {
@@ -518,7 +559,7 @@ export function registerGoogleCalendarRoutes(app: Express) {
 
       if (syncToGoogle !== false && event.googleEventId) {
         try {
-          const oauth2Client = await getAuthenticatedClient(admin.id);
+          const { oauth2Client } = await getAuthenticatedClient(admin.id);
           const calendar = google.calendar({ version: "v3", auth: oauth2Client });
 
           const updateEvent: any = {};
@@ -588,7 +629,7 @@ export function registerGoogleCalendarRoutes(app: Express) {
 
       if (deleteFromGoogle !== "false" && event.googleEventId) {
         try {
-          const oauth2Client = await getAuthenticatedClient(admin.id);
+          const { oauth2Client } = await getAuthenticatedClient(admin.id);
           const calendar = google.calendar({ version: "v3", auth: oauth2Client });
 
           await calendar.events.delete({
@@ -616,12 +657,19 @@ export function registerGoogleCalendarRoutes(app: Express) {
         return res.status(errorCode || 401).json({ error: error || "Não autenticado" });
       }
 
-      const token = await storage.getGoogleCalendarToken(admin.id);
-      console.log("[google-calendar] Token for admin:", admin.id, "token exists:", !!token, "isConnected:", token?.isConnected);
+      // Verificar nova tabela de contas primeiro
+      const accounts = await storage.listAdminGoogleAccounts(admin.id);
+      const hasConnectedAccounts = accounts.length > 0 && accounts.some(a => a.isConnected);
       
-      if (!token || !token.isConnected) {
-        console.log("[google-calendar] No token or not connected, returning empty array");
-        return res.json([]);
+      if (!hasConnectedAccounts) {
+        // Fallback para tabela legada
+        const token = await storage.getGoogleCalendarToken(admin.id);
+        console.log("[google-calendar] Token for admin:", admin.id, "token exists:", !!token, "isConnected:", token?.isConnected);
+        
+        if (!token || !token.isConnected) {
+          console.log("[google-calendar] No token or not connected, returning empty array");
+          return res.json([]);
+        }
       }
 
       const calendars = await storage.getConnectedAdminCalendars(admin.id);
@@ -631,6 +679,7 @@ export function registerGoogleCalendarRoutes(app: Express) {
         id: cal.id,
         name: cal.name,
         isPrimary: cal.isPrimary,
+        googleAccountId: cal.googleAccountId || null,
       }));
       res.json(mapped);
     } catch (error: any) {
@@ -647,7 +696,8 @@ export function registerGoogleCalendarRoutes(app: Express) {
         return res.status(errorCode || 401).json({ error: error || "Não autenticado" });
       }
 
-      const oauth2Client = await getAuthenticatedClient(admin.id);
+      const { googleAccountId } = req.body;
+      const { oauth2Client, googleAccountId: resolvedAccountId } = await getAuthenticatedClient(admin.id, googleAccountId);
       const calendar = google.calendar({ version: "v3", auth: oauth2Client });
 
       const calendarList = await calendar.calendarList.list();
@@ -657,15 +707,22 @@ export function registerGoogleCalendarRoutes(app: Express) {
           googleCalendarId: cal.id!,
           name: cal.summary!,
           isPrimary: cal.primary || false,
+          googleAccountId: resolvedAccountId!,
         }));
 
-      console.log(`[google-calendar] Sync: Found ${calendars.length} calendars for admin ${admin.id}`);
+      console.log(`[google-calendar] Sync: Found ${calendars.length} calendars for admin ${admin.id}, account ${resolvedAccountId}`);
       
-      await storage.syncAdminCalendars(admin.id, calendars);
+      if (resolvedAccountId) {
+        await storage.syncAdminCalendarsForAccount(admin.id, resolvedAccountId, calendars);
+        await storage.updateAdminGoogleAccount(resolvedAccountId, { lastSyncAt: new Date() });
+      } else {
+        await storage.syncAdminCalendars(admin.id, calendars);
+      }
       
       const updatedCalendars = await storage.getConnectedAdminCalendars(admin.id);
       res.json({ 
         success: true, 
+        googleAccountId: resolvedAccountId,
         calendars: updatedCalendars.map(c => ({ id: c.id, name: c.name, isPrimary: c.isPrimary }))
       });
     } catch (error: any) {
@@ -682,12 +739,12 @@ export function registerGoogleCalendarRoutes(app: Express) {
         return res.status(errorCode || 401).json({ error: error || "Não autenticado" });
       }
 
-      const { name } = req.body;
+      const { name, googleAccountId } = req.body;
       if (!name || typeof name !== "string") {
         return res.status(400).json({ error: "Nome da agenda é obrigatório" });
       }
 
-      const oauth2Client = await getAuthenticatedClient(admin.id);
+      const { oauth2Client, googleAccountId: resolvedAccountId } = await getAuthenticatedClient(admin.id, googleAccountId);
       const calendar = google.calendar({ version: "v3", auth: oauth2Client });
 
       // Criar nova agenda no Google
@@ -708,9 +765,14 @@ export function registerGoogleCalendarRoutes(app: Express) {
           googleCalendarId: cal.id!,
           name: cal.summary!,
           isPrimary: cal.primary || false,
+          googleAccountId: resolvedAccountId!,
         }));
 
-      await storage.syncAdminCalendars(admin.id, calendars);
+      if (resolvedAccountId) {
+        await storage.syncAdminCalendarsForAccount(admin.id, resolvedAccountId, calendars);
+      } else {
+        await storage.syncAdminCalendars(admin.id, calendars);
+      }
 
       const updatedCalendars = await storage.getConnectedAdminCalendars(admin.id);
       res.json({ 
@@ -736,7 +798,7 @@ export function registerGoogleCalendarRoutes(app: Express) {
         return res.status(400).json({ error: "Parâmetros from e to são obrigatórios" });
       }
 
-      const oauth2Client = await getAuthenticatedClient(admin.id);
+      const { oauth2Client } = await getAuthenticatedClient(admin.id);
       const calendar = google.calendar({ version: "v3", auth: oauth2Client });
 
       const response = await calendar.freebusy.query({
