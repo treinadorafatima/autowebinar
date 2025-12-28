@@ -135,7 +135,7 @@ export function registerGoogleCalendarRoutes(app: Express) {
       const oauth2Client = await createOAuth2Client();
       const authUrl = oauth2Client.generateAuthUrl({
         access_type: "offline",
-        prompt: "consent",
+        prompt: "consent select_account",
         scope: SCOPES,
         state: admin.id,
       });
