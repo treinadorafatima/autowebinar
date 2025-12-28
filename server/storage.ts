@@ -6271,6 +6271,53 @@ Apos o pagamento, seu acesso sera renovado automaticamente!
     await db.delete(adminGoogleCalendars).where(eq(adminGoogleCalendars.adminId, adminId));
   }
 
+  async syncAdminCalendarsForAccount(adminId: string, googleAccountId: string, calendars: { googleCalendarId: string; name: string; isPrimary: boolean; googleAccountId: string }[]): Promise<void> {
+    // Buscar calendários existentes apenas desta conta
+    const existingCalendars = await db.select().from(adminGoogleCalendars)
+      .where(and(
+        eq(adminGoogleCalendars.adminId, adminId),
+        eq(adminGoogleCalendars.googleAccountId, googleAccountId)
+      ));
+    
+    const existingIds = new Set(existingCalendars.map(c => c.googleCalendarId));
+    const newIds = new Set(calendars.map(c => c.googleCalendarId));
+    
+    // Deletar calendários que não existem mais (se não estiverem em uso)
+    const toDelete = existingCalendars.filter(c => !newIds.has(c.googleCalendarId));
+    for (const cal of toDelete) {
+      const agentsUsingCalendar = await db.select().from(aiAgents)
+        .where(eq(aiAgents.adminCalendarId, cal.id))
+        .limit(1);
+      
+      if (agentsUsingCalendar.length === 0) {
+        await db.delete(adminGoogleCalendars).where(eq(adminGoogleCalendars.id, cal.id));
+      }
+    }
+    
+    // Adicionar ou atualizar calendários
+    for (const cal of calendars) {
+      if (existingIds.has(cal.googleCalendarId)) {
+        const existing = existingCalendars.find(c => c.googleCalendarId === cal.googleCalendarId);
+        if (existing) {
+          await db.update(adminGoogleCalendars)
+            .set({ name: cal.name, isPrimary: cal.isPrimary, googleAccountId, updatedAt: new Date() })
+            .where(eq(adminGoogleCalendars.id, existing.id));
+        }
+      } else {
+        await db.insert(adminGoogleCalendars).values({
+          id: randomUUID(),
+          adminId,
+          googleAccountId,
+          googleCalendarId: cal.googleCalendarId,
+          name: cal.name,
+          isPrimary: cal.isPrimary,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+      }
+    }
+  }
+
   // Calendar Events methods
   async listCalendarEventsByAdmin(adminId: string, from?: Date, to?: Date): Promise<CalendarEvent[]> {
     let query = db.select().from(calendarEvents)

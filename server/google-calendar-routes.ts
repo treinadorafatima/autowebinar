@@ -183,9 +183,42 @@ export function registerGoogleCalendarRoutes(app: Express) {
         console.log(`[google-calendar] Connected account email: ${googleEmail}`);
       } catch (emailError: any) {
         console.error("[google-calendar] Error fetching user info:", emailError);
+        return res.redirect("/admin/ai-agents?calendar=error&message=Não foi possível obter o email da conta");
       }
 
-      // Salvar tokens na tabela legada também
+      if (!googleEmail) {
+        return res.redirect("/admin/ai-agents?calendar=error&message=Email da conta não disponível");
+      }
+
+      // Verificar se já existe uma conta com esse email para este admin
+      const existingAccount = await storage.getAdminGoogleAccountByEmail(adminId, googleEmail);
+      
+      let googleAccountId: string;
+      if (existingAccount) {
+        // Atualizar tokens da conta existente
+        await storage.updateAdminGoogleAccount(existingAccount.id, {
+          accessToken: tokens.access_token,
+          refreshToken: tokens.refresh_token,
+          expiryDate: tokens.expiry_date || null,
+          isConnected: true,
+        });
+        googleAccountId = existingAccount.id;
+        console.log(`[google-calendar] Updated existing account: ${googleEmail}`);
+      } else {
+        // Criar nova conta Google
+        const newAccount = await storage.createAdminGoogleAccount({
+          adminId,
+          email: googleEmail,
+          accessToken: tokens.access_token,
+          refreshToken: tokens.refresh_token,
+          expiryDate: tokens.expiry_date || null,
+          isConnected: true,
+        });
+        googleAccountId = newAccount.id;
+        console.log(`[google-calendar] Created new account: ${googleEmail}`);
+      }
+
+      // Salvar tokens na tabela legada também (para compatibilidade)
       await storage.upsertGoogleCalendarToken(adminId, {
         adminId,
         email: googleEmail,
@@ -207,11 +240,12 @@ export function registerGoogleCalendarRoutes(app: Express) {
             googleCalendarId: cal.id!,
             name: cal.summary!,
             isPrimary: cal.primary || false,
+            googleAccountId,
           }));
         
-        console.log(`[google-calendar] Found ${calendars.length} calendars for admin ${adminId}`);
+        console.log(`[google-calendar] Found ${calendars.length} calendars for admin ${adminId}, account ${googleEmail}`);
         
-        await storage.syncAdminCalendars(adminId, calendars);
+        await storage.syncAdminCalendarsForAccount(adminId, googleAccountId, calendars);
       } catch (calError: any) {
         console.error("[google-calendar] Error fetching calendar list:", calError);
       }
@@ -230,15 +264,77 @@ export function registerGoogleCalendarRoutes(app: Express) {
         return res.status(errorCode || 401).json({ error: error || "Não autenticado" });
       }
 
-      const token = await storage.getGoogleCalendarToken(admin.id);
-      res.json({
-        connected: !!token?.isConnected,
-        email: token?.email || null,
-        calendarId: token?.calendarId || null,
-        lastSyncAt: token?.lastSyncAt || null,
-      });
+      // Buscar contas da nova tabela
+      const accounts = await storage.listAdminGoogleAccounts(admin.id);
+      
+      // Fallback para tabela legada se não houver contas novas
+      if (accounts.length === 0) {
+        const token = await storage.getGoogleCalendarToken(admin.id);
+        res.json({
+          connected: !!token?.isConnected,
+          email: token?.email || null,
+          calendarId: token?.calendarId || null,
+          lastSyncAt: token?.lastSyncAt || null,
+          accounts: [],
+        });
+      } else {
+        res.json({
+          connected: accounts.length > 0,
+          email: accounts[0]?.email || null,
+          accounts: accounts.map(acc => ({
+            id: acc.id,
+            email: acc.email,
+            isConnected: acc.isConnected,
+            lastSyncAt: acc.lastSyncAt,
+          })),
+        });
+      }
     } catch (error: any) {
       console.error("[google-calendar] Status error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Listar contas Google do admin
+  app.get("/api/google/accounts", async (req: Request, res: Response) => {
+    try {
+      const { admin, error, errorCode } = await validateSessionAndGetAdmin(req);
+      if (!admin) {
+        return res.status(errorCode || 401).json({ error: error || "Não autenticado" });
+      }
+
+      const accounts = await storage.listAdminGoogleAccounts(admin.id);
+      res.json(accounts.map(acc => ({
+        id: acc.id,
+        email: acc.email,
+        isConnected: acc.isConnected,
+        lastSyncAt: acc.lastSyncAt,
+      })));
+    } catch (error: any) {
+      console.error("[google-calendar] List accounts error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Remover uma conta Google específica
+  app.delete("/api/google/accounts/:accountId", async (req: Request, res: Response) => {
+    try {
+      const { admin, error, errorCode } = await validateSessionAndGetAdmin(req);
+      if (!admin) {
+        return res.status(errorCode || 401).json({ error: error || "Não autenticado" });
+      }
+
+      const { accountId } = req.params;
+      const account = await storage.getAdminGoogleAccountById(accountId);
+      
+      if (!account || account.adminId !== admin.id) {
+        return res.status(404).json({ error: "Conta não encontrada" });
+      }
+
+      await storage.deleteAdminGoogleAccount(accountId);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[google-calendar] Delete account error:", error);
       res.status(500).json({ error: error.message });
     }
   });
