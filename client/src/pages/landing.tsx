@@ -1351,11 +1351,15 @@ export default function LandingPage() {
         
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-center">
           <div className="w-full max-w-2xl p-8 sm:p-12 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-sm text-center">
+            <Badge className="mb-4 bg-teal-500/20 text-teal-300 border-teal-500/30">
+              <Bot className="w-3 h-3 mr-1" />
+              Agora com Agente IA no WhatsApp
+            </Badge>
             <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
               Pronto para transformar suas vendas?
             </h2>
             <p className="text-lg text-slate-300 mb-8 max-w-2xl mx-auto">
-              Junte-se a centenas de empresas que já estão vendendo mais com webinários automáticos.
+              Junte-se a centenas de empresas que já estão vendendo mais com webinários automáticos e IA.
             </p>
             <Button
               size="lg"
