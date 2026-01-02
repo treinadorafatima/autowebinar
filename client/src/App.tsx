@@ -160,6 +160,7 @@ function Router() {
       <Route path="/" component={LandingPage} />
       <Route path="/login" component={LoginPage} />
       <Route path="/admin-login" component={LoginPage} />
+      <Route path="/register" component={FreeTrialPage} />
       <Route path="/teste-gratis" component={FreeTrialPage} />
       <Route path="/forgot-password" component={ForgotPasswordPage} />
       <Route path="/reset-password" component={ResetPasswordPage} />
