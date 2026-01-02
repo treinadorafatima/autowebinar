@@ -518,6 +518,25 @@ export default function LandingPage() {
               </CardContent>
             </Card>
 
+            {/* Feature - AI WhatsApp Agent - NEW EXCLUSIVE */}
+            <Card className="bg-slate-800/40 border-slate-700/50 hover:border-green-500/50 hover:bg-slate-800/60 transition-all duration-300 group backdrop-blur-sm relative overflow-hidden ring-1 ring-green-500/30" data-testid="card-feature-whatsapp-ai-agent">
+              <div className="absolute top-2 right-2">
+                <Badge className="bg-gradient-to-r from-green-500 to-teal-500 text-white text-xs border-0" data-testid="badge-exclusive-whatsapp-ai">
+                  <Bot className="w-3 h-3 mr-1" />
+                  IA + Exclusivo
+                </Badge>
+              </div>
+              <CardHeader>
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-green-500/30 to-teal-600/20 flex items-center justify-center mb-4 group-hover:scale-110 group-hover:shadow-lg group-hover:shadow-green-500/20 transition-all">
+                  <Bot className="w-7 h-7 text-green-400" />
+                </div>
+                <CardTitle className="text-white text-lg" data-testid="text-feature-whatsapp-ai-agent">Agente IA WhatsApp</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-slate-300 text-sm leading-relaxed">IA que responde seus leads no WhatsApp 24/7. Atendimento inteligente, independente dos webinars.</p>
+              </CardContent>
+            </Card>
+
             {/* Feature 12 - Reminder Sequences - NEW */}
             <Card className="bg-slate-800/40 border-slate-700/50 hover:border-orange-500/50 hover:bg-slate-800/60 transition-all duration-300 group backdrop-blur-sm relative overflow-hidden" data-testid="card-feature-reminders">
               <div className="absolute top-2 right-2">
@@ -540,13 +559,13 @@ export default function LandingPage() {
 
           {/* AI Differentiator Highlight */}
           <div className="mt-12 text-center" data-testid="section-ai-differentiator">
-            <div className="inline-flex flex-col sm:flex-row items-center gap-3 px-6 py-4 rounded-2xl bg-gradient-to-r from-violet-500/10 via-purple-500/10 to-emerald-500/10 border border-violet-500/20 backdrop-blur-sm">
+            <div className="inline-flex flex-col sm:flex-row items-center gap-3 px-6 py-4 rounded-2xl bg-gradient-to-r from-violet-500/10 via-green-500/10 to-teal-500/10 border border-violet-500/20 backdrop-blur-sm">
               <div className="flex items-center gap-2">
                 <Bot className="w-6 h-6 text-violet-400" />
                 <span className="text-violet-300 font-semibold" data-testid="text-ai-exclusive">Exclusivo AutoWebinar:</span>
               </div>
-              <span className="text-slate-200 text-sm">
-                Geradores de Copy com IA que <strong className="text-white">nenhum concorrente oferece</strong>
+              <span className="text-slate-200 text-sm text-center sm:text-left">
+                Geradores de Copy IA + <strong className="text-green-300">Agente IA WhatsApp 24/7</strong> em todos os planos
               </span>
             </div>
           </div>
@@ -852,6 +871,19 @@ export default function LandingPage() {
                       <td className="p-2 sm:p-4 text-center"><Check className="w-4 h-4 text-green-400 mx-auto" /></td>
                       <td className="p-2 sm:p-4 text-center"><X className="w-4 h-4 text-red-400 mx-auto" /></td>
                     </tr>
+                    <tr className="bg-teal-500/10 hover:bg-teal-500/15 transition-colors">
+                      <td className="p-2 sm:p-4">
+                        <div className="flex flex-col gap-0.5 sm:flex-row sm:items-center sm:gap-2">
+                          <div className="flex items-center gap-1 sm:gap-2">
+                            <Bot className="w-3 h-3 sm:w-5 sm:h-5 text-teal-400 flex-shrink-0" />
+                            <span className="text-white font-medium text-xs sm:text-base">Agente IA WhatsApp</span>
+                          </div>
+                          <Badge className="bg-teal-500/20 text-teal-300 border-teal-500/30 text-[10px] sm:text-xs w-fit px-1 py-0 sm:px-2 sm:py-0.5">Novo</Badge>
+                        </div>
+                      </td>
+                      <td className="p-2 sm:p-4 text-center"><Check className="w-4 h-4 text-green-400 mx-auto" /></td>
+                      <td className="p-2 sm:p-4 text-center"><X className="w-4 h-4 text-red-400 mx-auto" /></td>
+                    </tr>
                     <tr className="hover:bg-white/5 transition-colors">
                       <td className="p-2 sm:p-4 text-slate-200 text-xs sm:text-base">Domínio Próprio</td>
                       <td className="p-2 sm:p-4 text-center"><Check className="w-4 h-4 text-green-400 mx-auto" /></td>
@@ -864,19 +896,19 @@ export default function LandingPage() {
 
             {/* AI & Automation Summary */}
             <div className="mt-8 text-center px-4">
-              <div className="inline-flex flex-col sm:flex-row items-center gap-3 sm:gap-4 px-4 sm:px-8 py-4 sm:py-5 rounded-2xl bg-gradient-to-r from-violet-500/10 via-green-500/10 to-blue-500/10 border border-violet-500/20 backdrop-blur-sm max-w-full">
+              <div className="inline-flex flex-col sm:flex-row items-center gap-3 sm:gap-4 px-4 sm:px-8 py-4 sm:py-5 rounded-2xl bg-gradient-to-r from-violet-500/10 via-teal-500/10 to-green-500/10 border border-teal-500/20 backdrop-blur-sm max-w-full">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-violet-500 to-green-600 flex items-center justify-center shadow-lg shadow-violet-500/30 flex-shrink-0">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-teal-500 to-green-600 flex items-center justify-center shadow-lg shadow-teal-500/30 flex-shrink-0">
                     <Bot className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                   </div>
                   <div className="text-left">
-                    <div className="text-white font-semibold text-sm sm:text-base">IA + Automação Completa</div>
-                    <div className="text-slate-400 text-xs sm:text-sm">Email, WhatsApp e lembretes</div>
+                    <div className="text-white font-semibold text-sm sm:text-base">Agente IA WhatsApp</div>
+                    <div className="text-slate-400 text-xs sm:text-sm">Atendimento 24/7 automático</div>
                   </div>
                 </div>
                 <div className="hidden sm:block w-px h-10 bg-white/10" />
                 <div className="text-slate-300 text-xs sm:text-sm max-w-xs text-center sm:text-left">
-                  <strong className="text-white">Venda no piloto automático</strong> com comunicação multicanal
+                  <strong className="text-teal-300">IA responde seus leads</strong> independente dos webinars, em todos os planos
                 </div>
               </div>
             </div>
@@ -1060,6 +1092,11 @@ export default function LandingPage() {
                           <div className="flex items-center gap-2 text-slate-200 mt-2">
                             <Check className="w-5 h-5 text-green-400 flex-shrink-0" />
                             <span>Designer IA</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-slate-200 mt-2">
+                            <Bot className="w-5 h-5 text-teal-400 flex-shrink-0" />
+                            <span>Agente IA WhatsApp</span>
+                            <Badge className="bg-teal-500/20 text-teal-300 border-teal-500/30 text-[10px]">Novo</Badge>
                           </div>
                         </div>
                         
