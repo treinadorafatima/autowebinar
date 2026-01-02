@@ -29,6 +29,7 @@ import {
   ArrowLeft
 } from "lucide-react";
 import logoImage from "@assets/autowebinar-logo.png";
+import logoLightBg from "@assets/image_1767375365474.png";
 
 const COUNTRY_CODES = [
   { code: "+55", country: "Brasil", abbr: "BR" },
@@ -191,14 +192,12 @@ export default function FreeTrialPage() {
       <div className="w-full lg:w-1/2 flex items-center justify-center bg-white p-8">
         <div className="w-full max-w-md">
           <div className="lg:hidden flex justify-center mb-8">
-            <div className="bg-[#0a1628] p-4 rounded-xl">
-              <img 
-                src={logoImage} 
-                alt="AutoWebinar" 
-                className="h-12 w-auto object-contain"
-                data-testid="img-logo-mobile"
-              />
-            </div>
+            <img 
+              src={logoLightBg} 
+              alt="AutoWebinar" 
+              className="h-12 w-auto object-contain"
+              data-testid="img-logo-mobile"
+            />
           </div>
 
           <div className="text-center mb-8">
