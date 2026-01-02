@@ -1349,8 +1349,8 @@ export default function LandingPage() {
         <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-blue-950/20 to-slate-900" />
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[300px] bg-gradient-to-r from-blue-500/10 via-cyan-500/10 to-blue-500/10 rounded-full blur-[100px]" />
         
-        <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="p-8 sm:p-12 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-sm">
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-center">
+          <div className="w-full max-w-2xl p-8 sm:p-12 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-sm text-center">
             <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
               Pronto para transformar suas vendas?
             </h2>
