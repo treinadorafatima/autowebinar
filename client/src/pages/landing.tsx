@@ -728,134 +728,134 @@ export default function LandingPage() {
 
           <div className="max-w-4xl mx-auto">
             <Card className="bg-white/5 border-white/10 backdrop-blur-sm overflow-hidden" data-testid="card-comparison-table">
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[400px]" data-testid="table-comparison">
+              <div>
+                <table className="w-full" data-testid="table-comparison">
                   <thead>
                     <tr className="border-b border-white/10">
-                      <th className="text-left p-3 sm:p-4 text-slate-300 font-medium text-sm sm:text-base">Recurso</th>
-                      <th className="p-3 sm:p-4 text-center min-w-[80px] sm:min-w-[100px]">
-                        <div className="flex flex-col items-center gap-1">
-                          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
-                            <Zap className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+                      <th className="text-left p-2 sm:p-4 text-slate-300 font-medium text-xs sm:text-base">Recurso</th>
+                      <th className="p-2 sm:p-4 text-center w-16 sm:w-24">
+                        <div className="flex flex-col items-center gap-0.5 sm:gap-1">
+                          <div className="w-6 h-6 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
+                            <Zap className="w-3 h-3 sm:w-5 sm:h-5 text-white" />
                           </div>
-                          <span className="text-white font-bold text-xs sm:text-sm">AutoWebinar</span>
+                          <span className="text-white font-bold text-[10px] sm:text-sm">Nós</span>
                         </div>
                       </th>
-                      <th className="p-3 sm:p-4 text-center min-w-[70px] sm:min-w-[100px]">
-                        <span className="text-slate-400 text-xs sm:text-sm">Outros</span>
+                      <th className="p-2 sm:p-4 text-center w-14 sm:w-24">
+                        <span className="text-slate-400 text-[10px] sm:text-sm">Outros</span>
                       </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5">
                     <tr className="hover:bg-white/5 transition-colors">
-                      <td className="p-3 sm:p-4 text-slate-200 text-sm sm:text-base">Webinários Automatizados</td>
-                      <td className="p-3 sm:p-4 text-center"><Check className="w-4 h-4 sm:w-5 sm:h-5 text-green-400 mx-auto" /></td>
-                      <td className="p-3 sm:p-4 text-center"><Check className="w-4 h-4 sm:w-5 sm:h-5 text-slate-500 mx-auto" /></td>
+                      <td className="p-2 sm:p-4 text-slate-200 text-xs sm:text-base">Webinários Automatizados</td>
+                      <td className="p-2 sm:p-4 text-center"><Check className="w-4 h-4 text-green-400 mx-auto" /></td>
+                      <td className="p-2 sm:p-4 text-center"><Check className="w-4 h-4 text-slate-500 mx-auto" /></td>
                     </tr>
                     <tr className="hover:bg-white/5 transition-colors">
-                      <td className="p-3 sm:p-4 text-slate-200 text-sm sm:text-base">Chat Simulado Inteligente</td>
-                      <td className="p-3 sm:p-4 text-center"><Check className="w-4 h-4 sm:w-5 sm:h-5 text-green-400 mx-auto" /></td>
-                      <td className="p-3 sm:p-4 text-center"><Check className="w-4 h-4 sm:w-5 sm:h-5 text-slate-500 mx-auto" /></td>
+                      <td className="p-2 sm:p-4 text-slate-200 text-xs sm:text-base">Chat Simulado Inteligente</td>
+                      <td className="p-2 sm:p-4 text-center"><Check className="w-4 h-4 text-green-400 mx-auto" /></td>
+                      <td className="p-2 sm:p-4 text-center"><Check className="w-4 h-4 text-slate-500 mx-auto" /></td>
                     </tr>
                     <tr className="hover:bg-white/5 transition-colors">
-                      <td className="p-3 sm:p-4 text-slate-200 text-sm sm:text-base">Streaming HLS Adaptativo</td>
-                      <td className="p-3 sm:p-4 text-center"><Check className="w-4 h-4 sm:w-5 sm:h-5 text-green-400 mx-auto" /></td>
-                      <td className="p-3 sm:p-4 text-center"><Check className="w-4 h-4 sm:w-5 sm:h-5 text-slate-500 mx-auto" /></td>
+                      <td className="p-2 sm:p-4 text-slate-200 text-xs sm:text-base">Streaming HLS Adaptativo</td>
+                      <td className="p-2 sm:p-4 text-center"><Check className="w-4 h-4 text-green-400 mx-auto" /></td>
+                      <td className="p-2 sm:p-4 text-center"><Check className="w-4 h-4 text-slate-500 mx-auto" /></td>
                     </tr>
                     <tr className="hover:bg-white/5 transition-colors">
-                      <td className="p-3 sm:p-4 text-slate-200 text-sm sm:text-base">Captura de Leads</td>
-                      <td className="p-3 sm:p-4 text-center"><Check className="w-4 h-4 sm:w-5 sm:h-5 text-green-400 mx-auto" /></td>
-                      <td className="p-3 sm:p-4 text-center"><Check className="w-4 h-4 sm:w-5 sm:h-5 text-slate-500 mx-auto" /></td>
+                      <td className="p-2 sm:p-4 text-slate-200 text-xs sm:text-base">Captura de Leads</td>
+                      <td className="p-2 sm:p-4 text-center"><Check className="w-4 h-4 text-green-400 mx-auto" /></td>
+                      <td className="p-2 sm:p-4 text-center"><Check className="w-4 h-4 text-slate-500 mx-auto" /></td>
                     </tr>
                     <tr className="bg-violet-500/10 hover:bg-violet-500/15 transition-colors">
-                      <td className="p-3 sm:p-4">
-                        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-                          <div className="flex items-center gap-2">
-                            <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-violet-400 flex-shrink-0" />
-                            <span className="text-white font-medium text-sm sm:text-base">Gerador de Roteiro IA</span>
+                      <td className="p-2 sm:p-4">
+                        <div className="flex flex-col gap-0.5 sm:flex-row sm:items-center sm:gap-2">
+                          <div className="flex items-center gap-1 sm:gap-2">
+                            <FileText className="w-3 h-3 sm:w-5 sm:h-5 text-violet-400 flex-shrink-0" />
+                            <span className="text-white font-medium text-xs sm:text-base">Roteiro IA</span>
                           </div>
-                          <Badge className="bg-violet-500/20 text-violet-300 border-violet-500/30 text-xs w-fit">Exclusivo</Badge>
+                          <Badge className="bg-violet-500/20 text-violet-300 border-violet-500/30 text-[10px] sm:text-xs w-fit px-1 py-0 sm:px-2 sm:py-0.5">Exclusivo</Badge>
                         </div>
                       </td>
-                      <td className="p-3 sm:p-4 text-center"><Check className="w-4 h-4 sm:w-5 sm:h-5 text-green-400 mx-auto" /></td>
-                      <td className="p-3 sm:p-4 text-center"><X className="w-4 h-4 sm:w-5 sm:h-5 text-red-400 mx-auto" /></td>
+                      <td className="p-2 sm:p-4 text-center"><Check className="w-4 h-4 text-green-400 mx-auto" /></td>
+                      <td className="p-2 sm:p-4 text-center"><X className="w-4 h-4 text-red-400 mx-auto" /></td>
                     </tr>
                     <tr className="bg-emerald-500/10 hover:bg-emerald-500/15 transition-colors">
-                      <td className="p-3 sm:p-4">
-                        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-                          <div className="flex items-center gap-2">
-                            <Mail className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400 flex-shrink-0" />
-                            <span className="text-white font-medium text-sm sm:text-base">Gerador de Mensagens IA</span>
+                      <td className="p-2 sm:p-4">
+                        <div className="flex flex-col gap-0.5 sm:flex-row sm:items-center sm:gap-2">
+                          <div className="flex items-center gap-1 sm:gap-2">
+                            <Mail className="w-3 h-3 sm:w-5 sm:h-5 text-emerald-400 flex-shrink-0" />
+                            <span className="text-white font-medium text-xs sm:text-base">Mensagens IA</span>
                           </div>
-                          <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/30 text-xs w-fit">Exclusivo</Badge>
+                          <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/30 text-[10px] sm:text-xs w-fit px-1 py-0 sm:px-2 sm:py-0.5">Exclusivo</Badge>
                         </div>
                       </td>
-                      <td className="p-3 sm:p-4 text-center"><Check className="w-4 h-4 sm:w-5 sm:h-5 text-green-400 mx-auto" /></td>
-                      <td className="p-3 sm:p-4 text-center"><X className="w-4 h-4 sm:w-5 sm:h-5 text-red-400 mx-auto" /></td>
+                      <td className="p-2 sm:p-4 text-center"><Check className="w-4 h-4 text-green-400 mx-auto" /></td>
+                      <td className="p-2 sm:p-4 text-center"><X className="w-4 h-4 text-red-400 mx-auto" /></td>
                     </tr>
                     <tr className="bg-rose-500/10 hover:bg-rose-500/15 transition-colors">
-                      <td className="p-3 sm:p-4">
-                        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-                          <div className="flex items-center gap-2">
-                            <Mic className="w-4 h-4 sm:w-5 sm:h-5 text-rose-400 flex-shrink-0" />
-                            <span className="text-white font-medium text-sm sm:text-base">Transcrição Automática IA</span>
+                      <td className="p-2 sm:p-4">
+                        <div className="flex flex-col gap-0.5 sm:flex-row sm:items-center sm:gap-2">
+                          <div className="flex items-center gap-1 sm:gap-2">
+                            <Mic className="w-3 h-3 sm:w-5 sm:h-5 text-rose-400 flex-shrink-0" />
+                            <span className="text-white font-medium text-xs sm:text-base">Transcrição IA</span>
                           </div>
-                          <Badge className="bg-rose-500/20 text-rose-300 border-rose-500/30 text-xs w-fit">Exclusivo</Badge>
+                          <Badge className="bg-rose-500/20 text-rose-300 border-rose-500/30 text-[10px] sm:text-xs w-fit px-1 py-0 sm:px-2 sm:py-0.5">Exclusivo</Badge>
                         </div>
                       </td>
-                      <td className="p-3 sm:p-4 text-center"><Check className="w-4 h-4 sm:w-5 sm:h-5 text-green-400 mx-auto" /></td>
-                      <td className="p-3 sm:p-4 text-center"><X className="w-4 h-4 sm:w-5 sm:h-5 text-red-400 mx-auto" /></td>
+                      <td className="p-2 sm:p-4 text-center"><Check className="w-4 h-4 text-green-400 mx-auto" /></td>
+                      <td className="p-2 sm:p-4 text-center"><X className="w-4 h-4 text-red-400 mx-auto" /></td>
                     </tr>
                     <tr className="hover:bg-white/5 transition-colors">
-                      <td className="p-3 sm:p-4 text-slate-200 text-sm sm:text-base">Designer IA (cores e textos)</td>
-                      <td className="p-3 sm:p-4 text-center"><Check className="w-4 h-4 sm:w-5 sm:h-5 text-green-400 mx-auto" /></td>
-                      <td className="p-3 sm:p-4 text-center"><X className="w-4 h-4 sm:w-5 sm:h-5 text-red-400 mx-auto" /></td>
+                      <td className="p-2 sm:p-4 text-slate-200 text-xs sm:text-base">Designer IA</td>
+                      <td className="p-2 sm:p-4 text-center"><Check className="w-4 h-4 text-green-400 mx-auto" /></td>
+                      <td className="p-2 sm:p-4 text-center"><X className="w-4 h-4 text-red-400 mx-auto" /></td>
                     </tr>
                     <tr className="hover:bg-white/5 transition-colors">
-                      <td className="p-3 sm:p-4 text-slate-200 text-sm sm:text-base">Pagamento em Real (Stripe + MP)</td>
-                      <td className="p-3 sm:p-4 text-center"><Check className="w-4 h-4 sm:w-5 sm:h-5 text-green-400 mx-auto" /></td>
-                      <td className="p-3 sm:p-4 text-center"><X className="w-4 h-4 sm:w-5 sm:h-5 text-red-400 mx-auto" /></td>
+                      <td className="p-2 sm:p-4 text-slate-200 text-xs sm:text-base">Pagamento em Real</td>
+                      <td className="p-2 sm:p-4 text-center"><Check className="w-4 h-4 text-green-400 mx-auto" /></td>
+                      <td className="p-2 sm:p-4 text-center"><X className="w-4 h-4 text-red-400 mx-auto" /></td>
                     </tr>
                     <tr className="hover:bg-white/5 transition-colors">
-                      <td className="p-3 sm:p-4 text-slate-200 text-sm sm:text-base">Suporte 100% em Português</td>
-                      <td className="p-3 sm:p-4 text-center"><Check className="w-4 h-4 sm:w-5 sm:h-5 text-green-400 mx-auto" /></td>
-                      <td className="p-3 sm:p-4 text-center"><X className="w-4 h-4 sm:w-5 sm:h-5 text-red-400 mx-auto" /></td>
+                      <td className="p-2 sm:p-4 text-slate-200 text-xs sm:text-base">Suporte em Português</td>
+                      <td className="p-2 sm:p-4 text-center"><Check className="w-4 h-4 text-green-400 mx-auto" /></td>
+                      <td className="p-2 sm:p-4 text-center"><X className="w-4 h-4 text-red-400 mx-auto" /></td>
                     </tr>
                     <tr className="hover:bg-white/5 transition-colors">
-                      <td className="p-3 sm:p-4 text-slate-200 text-sm sm:text-base">Automação de Email Marketing</td>
-                      <td className="p-3 sm:p-4 text-center"><Check className="w-4 h-4 sm:w-5 sm:h-5 text-green-400 mx-auto" /></td>
-                      <td className="p-3 sm:p-4 text-center"><Check className="w-4 h-4 sm:w-5 sm:h-5 text-slate-500 mx-auto" /></td>
+                      <td className="p-2 sm:p-4 text-slate-200 text-xs sm:text-base">Email Marketing</td>
+                      <td className="p-2 sm:p-4 text-center"><Check className="w-4 h-4 text-green-400 mx-auto" /></td>
+                      <td className="p-2 sm:p-4 text-center"><Check className="w-4 h-4 text-slate-500 mx-auto" /></td>
                     </tr>
                     <tr className="bg-green-500/10 hover:bg-green-500/15 transition-colors">
-                      <td className="p-3 sm:p-4">
-                        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-                          <div className="flex items-center gap-2">
-                            <SiWhatsapp className="w-4 h-4 sm:w-5 sm:h-5 text-green-400 flex-shrink-0" />
-                            <span className="text-white font-medium text-sm sm:text-base">WhatsApp Marketing</span>
+                      <td className="p-2 sm:p-4">
+                        <div className="flex flex-col gap-0.5 sm:flex-row sm:items-center sm:gap-2">
+                          <div className="flex items-center gap-1 sm:gap-2">
+                            <SiWhatsapp className="w-3 h-3 sm:w-5 sm:h-5 text-green-400 flex-shrink-0" />
+                            <span className="text-white font-medium text-xs sm:text-base">WhatsApp</span>
                           </div>
-                          <Badge className="bg-green-500/20 text-green-300 border-green-500/30 text-xs w-fit">Exclusivo</Badge>
+                          <Badge className="bg-green-500/20 text-green-300 border-green-500/30 text-[10px] sm:text-xs w-fit px-1 py-0 sm:px-2 sm:py-0.5">Exclusivo</Badge>
                         </div>
                       </td>
-                      <td className="p-3 sm:p-4 text-center"><Check className="w-4 h-4 sm:w-5 sm:h-5 text-green-400 mx-auto" /></td>
-                      <td className="p-3 sm:p-4 text-center"><X className="w-4 h-4 sm:w-5 sm:h-5 text-red-400 mx-auto" /></td>
+                      <td className="p-2 sm:p-4 text-center"><Check className="w-4 h-4 text-green-400 mx-auto" /></td>
+                      <td className="p-2 sm:p-4 text-center"><X className="w-4 h-4 text-red-400 mx-auto" /></td>
                     </tr>
                     <tr className="bg-orange-500/10 hover:bg-orange-500/15 transition-colors">
-                      <td className="p-3 sm:p-4">
-                        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-                          <div className="flex items-center gap-2">
-                            <Bell className="w-4 h-4 sm:w-5 sm:h-5 text-orange-400 flex-shrink-0" />
-                            <span className="text-white font-medium text-sm sm:text-base">Lembretes Multicanal</span>
+                      <td className="p-2 sm:p-4">
+                        <div className="flex flex-col gap-0.5 sm:flex-row sm:items-center sm:gap-2">
+                          <div className="flex items-center gap-1 sm:gap-2">
+                            <Bell className="w-3 h-3 sm:w-5 sm:h-5 text-orange-400 flex-shrink-0" />
+                            <span className="text-white font-medium text-xs sm:text-base">Lembretes</span>
                           </div>
-                          <Badge className="bg-orange-500/20 text-orange-300 border-orange-500/30 text-xs w-fit">Exclusivo</Badge>
+                          <Badge className="bg-orange-500/20 text-orange-300 border-orange-500/30 text-[10px] sm:text-xs w-fit px-1 py-0 sm:px-2 sm:py-0.5">Exclusivo</Badge>
                         </div>
                       </td>
-                      <td className="p-3 sm:p-4 text-center"><Check className="w-4 h-4 sm:w-5 sm:h-5 text-green-400 mx-auto" /></td>
-                      <td className="p-3 sm:p-4 text-center"><X className="w-4 h-4 sm:w-5 sm:h-5 text-red-400 mx-auto" /></td>
+                      <td className="p-2 sm:p-4 text-center"><Check className="w-4 h-4 text-green-400 mx-auto" /></td>
+                      <td className="p-2 sm:p-4 text-center"><X className="w-4 h-4 text-red-400 mx-auto" /></td>
                     </tr>
                     <tr className="hover:bg-white/5 transition-colors">
-                      <td className="p-3 sm:p-4 text-slate-200 text-sm sm:text-base">Conecte Seu Próprio Domínio</td>
-                      <td className="p-3 sm:p-4 text-center"><Check className="w-4 h-4 sm:w-5 sm:h-5 text-green-400 mx-auto" /></td>
-                      <td className="p-3 sm:p-4 text-center"><Check className="w-4 h-4 sm:w-5 sm:h-5 text-slate-500 mx-auto" /></td>
+                      <td className="p-2 sm:p-4 text-slate-200 text-xs sm:text-base">Domínio Próprio</td>
+                      <td className="p-2 sm:p-4 text-center"><Check className="w-4 h-4 text-green-400 mx-auto" /></td>
+                      <td className="p-2 sm:p-4 text-center"><Check className="w-4 h-4 text-slate-500 mx-auto" /></td>
                     </tr>
                   </tbody>
                 </table>
