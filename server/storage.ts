@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type WebinarConfig, type WebinarConfigInsert, type Admin, type AdminInsert, type UploadedVideo, type UploadedVideoInsert, type Comment, type CommentInsert, type Webinar, type WebinarInsert, type Setting, type SettingInsert, type ViewerSession, type WebinarScript, type WebinarScriptInsert, type AiConfig, type AiConfigInsert, type AiMemory, type AiMemoryInsert, type CheckoutPlano, type CheckoutPlanoInsert, type CheckoutPagamento, type CheckoutPagamentoInsert, type CheckoutConfig, type CheckoutConfigInsert, type CheckoutAssinatura, type CheckoutAssinaturaInsert, type AiChat, type AiChatInsert, type AiMessageChat, type AiMessageChatInsert, type VideoTranscription, type VideoTranscriptionInsert, type AdminEmailCredential, type AdminEmailCredentialInsert, type EmailSequence, type EmailSequenceInsert, type ScheduledEmail, type ScheduledEmailInsert, type LeadFormConfig, type LeadFormConfigInsert, type WhatsappAccount, type WhatsappAccountInsert, type WhatsappSession, type WhatsappSessionInsert, type WhatsappSequence, type WhatsappSequenceInsert, type ScheduledWhatsappMessage, type ScheduledWhatsappMessageInsert, type MediaFile, type MediaFileInsert, type LeadMessage, type LeadMessageInsert, type Lead, type WhatsappBroadcast, type WhatsappBroadcastInsert, type WhatsappBroadcastRecipient, type WhatsappBroadcastRecipientInsert, type WhatsappContactList, type WhatsappContactListInsert, type WhatsappContact, type WhatsappContactInsert, type Affiliate, type AffiliateInsert, type AffiliateLink, type AffiliateLinkInsert, type AffiliateSale, type AffiliateSaleInsert, type AffiliateConfig, type AffiliateConfigInsert, type AffiliateWithdrawal, type AffiliateWithdrawalInsert, type WhatsappNotificationLog, type WhatsappNotificationLogInsert, type WhatsappNotificationTemplate, type WhatsappNotificationTemplateInsert, type EmailNotificationTemplate, type EmailNotificationTemplateInsert, type AiAgent, type AiAgentInsert, type AiAgentFile, type AiAgentFileInsert, type AiConversation, type AiConversationInsert, type AiMessage, type AiMessageInsert, type AiUsageStats, type GoogleCalendarToken, type GoogleCalendarTokenInsert, type AdminGoogleCalendar, type AdminGoogleCalendarInsert, type AdminGoogleAccount, type AdminGoogleAccountInsert, type ClientGoogleCalendarToken, type ClientGoogleCalendarTokenInsert, type CalendarEvent, type CalendarEventInsert, type PlatformSetting, type PlatformSettingInsert, admins, webinarConfigs, users, uploadedVideos, comments, webinars as webinarsTable, settings, viewerSessions, webinarScripts, aiConfigs, aiMemories, checkoutPlanos, checkoutPagamentos, checkoutConfigs, checkoutAssinaturas, aiChats, aiMessageChats, videoTranscriptions, adminEmailCredentials, emailSequences, scheduledEmails, leadFormConfigs, whatsappAccounts, whatsappSessions, whatsappNotificationsLog, whatsappSequences, scheduledWhatsappMessages, mediaFiles, webinarViewLogs, leads, leadMessages, whatsappBroadcasts, whatsappBroadcastRecipients, whatsappContactLists, whatsappContacts, affiliates, affiliateLinks, affiliateSales, affiliateConfig, affiliateWithdrawals, whatsappNotificationTemplates, emailNotificationTemplates, aiAgents, aiAgentFiles, aiConversations, aiMessages, aiUsageStats, googleCalendarTokens, adminGoogleCalendars, adminGoogleAccounts, clientGoogleCalendarTokens, calendarEvents, platformSettings } from "@shared/schema";
+import { type User, type InsertUser, type WebinarConfig, type WebinarConfigInsert, type Admin, type AdminInsert, type UploadedVideo, type UploadedVideoInsert, type Comment, type CommentInsert, type Webinar, type WebinarInsert, type Setting, type SettingInsert, type ViewerSession, type WebinarScript, type WebinarScriptInsert, type AiConfig, type AiConfigInsert, type AiMemory, type AiMemoryInsert, type CheckoutPlano, type CheckoutPlanoInsert, type CheckoutPagamento, type CheckoutPagamentoInsert, type CheckoutConfig, type CheckoutConfigInsert, type CheckoutAssinatura, type CheckoutAssinaturaInsert, type AiChat, type AiChatInsert, type AiMessageChat, type AiMessageChatInsert, type VideoTranscription, type VideoTranscriptionInsert, type AdminEmailCredential, type AdminEmailCredentialInsert, type EmailSequence, type EmailSequenceInsert, type ScheduledEmail, type ScheduledEmailInsert, type LeadFormConfig, type LeadFormConfigInsert, type WhatsappAccount, type WhatsappAccountInsert, type WhatsappSession, type WhatsappSessionInsert, type WhatsappSequence, type WhatsappSequenceInsert, type ScheduledWhatsappMessage, type ScheduledWhatsappMessageInsert, type MediaFile, type MediaFileInsert, type LeadMessage, type LeadMessageInsert, type Lead, type WhatsappBroadcast, type WhatsappBroadcastInsert, type WhatsappBroadcastRecipient, type WhatsappBroadcastRecipientInsert, type WhatsappContactList, type WhatsappContactListInsert, type WhatsappContact, type WhatsappContactInsert, type Affiliate, type AffiliateInsert, type AffiliateLink, type AffiliateLinkInsert, type AffiliateSale, type AffiliateSaleInsert, type AffiliateConfig, type AffiliateConfigInsert, type AffiliateWithdrawal, type AffiliateWithdrawalInsert, type WhatsappNotificationLog, type WhatsappNotificationLogInsert, type WhatsappNotificationTemplate, type WhatsappNotificationTemplateInsert, type EmailNotificationLog, type EmailNotificationLogInsert, type EmailNotificationTemplate, type EmailNotificationTemplateInsert, type AiAgent, type AiAgentInsert, type AiAgentFile, type AiAgentFileInsert, type AiConversation, type AiConversationInsert, type AiMessage, type AiMessageInsert, type AiUsageStats, type GoogleCalendarToken, type GoogleCalendarTokenInsert, type AdminGoogleCalendar, type AdminGoogleCalendarInsert, type AdminGoogleAccount, type AdminGoogleAccountInsert, type ClientGoogleCalendarToken, type ClientGoogleCalendarTokenInsert, type CalendarEvent, type CalendarEventInsert, type PlatformSetting, type PlatformSettingInsert, admins, webinarConfigs, users, uploadedVideos, comments, webinars as webinarsTable, settings, viewerSessions, webinarScripts, aiConfigs, aiMemories, checkoutPlanos, checkoutPagamentos, checkoutConfigs, checkoutAssinaturas, aiChats, aiMessageChats, videoTranscriptions, adminEmailCredentials, emailSequences, scheduledEmails, leadFormConfigs, whatsappAccounts, whatsappSessions, whatsappNotificationsLog, emailNotificationsLog, whatsappSequences, scheduledWhatsappMessages, mediaFiles, webinarViewLogs, leads, leadMessages, whatsappBroadcasts, whatsappBroadcastRecipients, whatsappContactLists, whatsappContacts, affiliates, affiliateLinks, affiliateSales, affiliateConfig, affiliateWithdrawals, whatsappNotificationTemplates, emailNotificationTemplates, aiAgents, aiAgentFiles, aiConversations, aiMessages, aiUsageStats, googleCalendarTokens, adminGoogleCalendars, adminGoogleAccounts, clientGoogleCalendarTokens, calendarEvents, platformSettings } from "@shared/schema";
 import * as crypto from "crypto";
 import { randomUUID } from "crypto";
 import { db } from "./db";
@@ -371,6 +371,10 @@ export interface IStorage {
   createAffiliateWithdrawal(data: AffiliateWithdrawalInsert): Promise<AffiliateWithdrawal>;
   updateAffiliateWithdrawal(id: string, data: Partial<AffiliateWithdrawalInsert>): Promise<AffiliateWithdrawal | undefined>;
   listPendingWithdrawals(): Promise<AffiliateWithdrawal[]>;
+  // Email Notification Logs
+  createEmailNotificationLog(log: EmailNotificationLogInsert): Promise<EmailNotificationLog>;
+  listEmailNotificationLogs(limit?: number): Promise<EmailNotificationLog[]>;
+  updateEmailNotificationLog(id: string, data: Partial<EmailNotificationLogInsert>): Promise<void>;
   // WhatsApp Notification Logs
   createWhatsappNotificationLog(log: WhatsappNotificationLogInsert): Promise<WhatsappNotificationLog>;
   listWhatsappNotificationLogs(limit?: number): Promise<WhatsappNotificationLog[]>;
@@ -4647,6 +4651,38 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
     return db.select().from(affiliateWithdrawals)
       .where(eq(affiliateWithdrawals.status, 'pending'))
       .orderBy(affiliateWithdrawals.requestedAt);
+  }
+
+  // Email Notification Logs
+
+  async createEmailNotificationLog(log: EmailNotificationLogInsert): Promise<EmailNotificationLog> {
+    const id = randomUUID();
+    const newLog: EmailNotificationLog = {
+      id,
+      adminId: log.adminId ?? null,
+      emailType: log.emailType,
+      recipientEmail: log.recipientEmail ?? null,
+      recipientName: log.recipientName ?? null,
+      status: log.status ?? "pending",
+      sentAt: log.sentAt ?? null,
+      createdAt: new Date(),
+      success: log.success ?? true,
+      error: log.error ?? null,
+    };
+    await db.insert(emailNotificationsLog).values(newLog);
+    return newLog;
+  }
+
+  async listEmailNotificationLogs(limit: number = 100): Promise<EmailNotificationLog[]> {
+    return db.select().from(emailNotificationsLog)
+      .orderBy(desc(emailNotificationsLog.createdAt))
+      .limit(limit);
+  }
+
+  async updateEmailNotificationLog(id: string, data: Partial<EmailNotificationLogInsert>): Promise<void> {
+    await db.update(emailNotificationsLog)
+      .set(data)
+      .where(eq(emailNotificationsLog.id, id));
   }
 
   // WhatsApp Notification Logs

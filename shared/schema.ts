@@ -578,9 +578,13 @@ export type PasswordResetTokenInsert = z.infer<typeof passwordResetTokenInsertSc
 
 export const emailNotificationsLog = pgTable("email_notifications_log", {
   id: text("id").primaryKey(),
-  adminId: text("admin_id").notNull(),
-  emailType: text("email_type").notNull(), // 'welcome', 'password_reset', 'plan_expired', 'payment_failed'
-  sentAt: timestamp("sent_at").defaultNow(),
+  adminId: text("admin_id"), // Optional - null for system notifications
+  emailType: text("email_type").notNull(), // 'welcome', 'password_reset', 'plan_expired', 'payment_failed', 'credentials', 'payment_confirmed'
+  recipientEmail: text("recipient_email"), // Email address
+  recipientName: text("recipient_name"), // Recipient name
+  status: text("status").notNull().default("pending"), // 'pending', 'sent', 'failed'
+  sentAt: timestamp("sent_at"),
+  createdAt: timestamp("created_at").defaultNow(),
   success: boolean("success").notNull().default(true),
   error: text("error"),
 });

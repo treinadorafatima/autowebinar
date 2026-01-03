@@ -176,28 +176,85 @@ export async function setWhatsAppNotificationsEnabled(enabled: boolean): Promise
 }
 
 /**
+ * Logs notification attempt to database for visibility in admin panel
+ */
+async function logNotificationToDatabase(
+  notificationType: string,
+  phone: string,
+  recipientName: string | null,
+  message: string,
+  status: 'pending' | 'sent' | 'failed',
+  error?: string
+): Promise<string | null> {
+  try {
+    const log = await storage.createWhatsappNotificationLog({
+      notificationType,
+      recipientPhone: phone,
+      recipientName: recipientName || undefined,
+      message,
+      status,
+      sentAt: status === 'sent' ? new Date() : undefined,
+      error: error || undefined,
+    });
+    return log.id;
+  } catch (err) {
+    console.error("[whatsapp-notifications] Erro ao registrar log no banco:", err);
+    return null;
+  }
+}
+
+/**
+ * Updates notification log status after send attempt
+ */
+async function updateNotificationLog(logId: string, status: 'sent' | 'failed', error?: string): Promise<void> {
+  try {
+    await storage.updateWhatsappNotificationLog(logId, {
+      status,
+      sentAt: status === 'sent' ? new Date() : undefined,
+      error: error || undefined,
+    });
+  } catch (err) {
+    console.error("[whatsapp-notifications] Erro ao atualizar log:", err);
+  }
+}
+
+/**
  * Envia mensagem WhatsApp usando rotação automática entre contas conectadas
  * Retorna true se enviou com sucesso, false caso contrário
+ * SEMPRE registra no banco de dados para visibilidade no painel admin
  * Nunca lança erros (safe)
  */
-async function sendNotificationMessage(phone: string, message: string): Promise<boolean> {
+async function sendNotificationMessage(
+  phone: string, 
+  message: string,
+  notificationType: string = 'generic',
+  recipientName?: string
+): Promise<boolean> {
+  let logId: string | null = null;
+  
   try {
     // Verificar se as notificações estão habilitadas
     const enabled = await isWhatsAppNotificationsEnabled();
     if (!enabled) {
-      console.log("[whatsapp-notifications] Notificações desabilitadas, ignorando envio");
+      console.log("[whatsapp-notifications] Notificações desabilitadas, registrando no log");
+      await logNotificationToDatabase(notificationType, phone || 'N/A', recipientName || null, message, 'failed', 'Notificações WhatsApp desabilitadas nas configurações');
       return false;
     }
     
     if (!phone) {
-      console.log("[whatsapp-notifications] Telefone não fornecido, ignorando envio");
+      console.log("[whatsapp-notifications] Telefone não fornecido, registrando no log");
+      await logNotificationToDatabase(notificationType, 'N/A', recipientName || null, message, 'failed', 'Telefone não fornecido');
       return false;
     }
+    
+    // Registrar tentativa como pendente ANTES de tentar enviar
+    logId = await logNotificationToDatabase(notificationType, phone, recipientName || null, message, 'pending');
     
     // Selecionar conta usando rotação automática
     const selectedAccount = await selectAccountForSending();
     if (!selectedAccount) {
       console.log("[whatsapp-notifications] Nenhuma conta disponível para envio");
+      if (logId) await updateNotificationLog(logId, 'failed', 'Nenhuma conta WhatsApp conectada ou disponível para envio');
       return false;
     }
     
@@ -206,6 +263,7 @@ async function sendNotificationMessage(phone: string, message: string): Promise<
     const status = await getWhatsAppStatus(accountId);
     if (status.status !== "connected") {
       console.log(`[whatsapp-notifications] Conta ${label} não está conectada (status: ${status.status})`);
+      if (logId) await updateNotificationLog(logId, 'failed', `Conta ${label} não está conectada (status: ${status.status})`);
       return false;
     }
     
@@ -214,13 +272,21 @@ async function sendNotificationMessage(phone: string, message: string): Promise<
       // Incrementar contador de mensagens da conta usada
       await storage.incrementWhatsappAccountMessageCount(accountId);
       console.log(`[whatsapp-notifications] Mensagem enviada para ${phone} via ${label}`);
+      if (logId) await updateNotificationLog(logId, 'sent');
       return true;
     } else {
       console.error(`[whatsapp-notifications] Falha ao enviar para ${phone}: ${result.error}`);
+      if (logId) await updateNotificationLog(logId, 'failed', result.error || 'Erro desconhecido ao enviar mensagem');
       return false;
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error("[whatsapp-notifications] Erro ao enviar mensagem:", error);
+    if (logId) {
+      await updateNotificationLog(logId, 'failed', error.message || 'Erro interno');
+    } else {
+      // Se não conseguimos criar o log inicial, tenta criar agora com o erro
+      await logNotificationToDatabase(notificationType, phone || 'N/A', recipientName || null, message, 'failed', error.message || 'Erro interno');
+    }
     return false;
   }
 }
@@ -276,7 +342,7 @@ Duvidas? Estamos aqui para ajudar!`;
     };
 
     const message = await getTemplateMessage("credentials", templateData, defaultMessage);
-    return await sendNotificationMessage(formattedPhone, message);
+    return await sendNotificationMessage(formattedPhone, message, 'credentials', name);
   } catch (error) {
     console.error("[whatsapp-notifications] Erro em sendWhatsAppCredentialsSafe:", error);
     return false;
@@ -319,7 +385,7 @@ Obrigado por escolher o ${APP_NAME}!`;
     };
 
     const message = await getTemplateMessage("payment_confirmed", templateData, defaultMessage);
-    return await sendNotificationMessage(formattedPhone, message);
+    return await sendNotificationMessage(formattedPhone, message, 'payment_confirmed', name);
   } catch (error) {
     console.error("[whatsapp-notifications] Erro em sendWhatsAppPaymentConfirmedSafe:", error);
     return false;
@@ -357,7 +423,7 @@ Se voce nao solicitou isso, ignore esta mensagem.`;
     };
 
     const message = await getTemplateMessage("password_reset", templateData, defaultMessage);
-    return await sendNotificationMessage(formattedPhone, message);
+    return await sendNotificationMessage(formattedPhone, message, 'password_reset', name);
   } catch (error) {
     console.error("[whatsapp-notifications] Erro em sendWhatsAppPasswordResetSafe:", error);
     return false;
@@ -414,7 +480,7 @@ Precisa de ajuda? Estamos aqui!`;
     };
 
     const message = await getTemplateMessage("plan_expired", templateData, defaultMessage);
-    return await sendNotificationMessage(formattedPhone, message);
+    return await sendNotificationMessage(formattedPhone, message, 'plan_expired', name);
   } catch (error) {
     console.error("[whatsapp-notifications] Erro em sendWhatsAppPlanExpiredSafe:", error);
     return false;
@@ -461,7 +527,7 @@ Duvidas? Estamos aqui para ajudar!`;
     };
 
     const message = await getTemplateMessage("payment_failed", templateData, defaultMessage);
-    return await sendNotificationMessage(formattedPhone, message);
+    return await sendNotificationMessage(formattedPhone, message, 'payment_failed', name);
   } catch (error) {
     console.error("[whatsapp-notifications] Erro em sendWhatsAppPaymentFailedSafe:", error);
     return false;
@@ -502,7 +568,7 @@ Duvidas? Estamos aqui para ajudar!`;
     };
 
     const message = await getTemplateMessage("welcome", templateData, defaultMessage);
-    return await sendNotificationMessage(formattedPhone, message);
+    return await sendNotificationMessage(formattedPhone, message, 'welcome', name);
   } catch (error) {
     console.error("[whatsapp-notifications] Erro em sendWhatsAppWelcomeSafe:", error);
     return false;
@@ -569,7 +635,7 @@ Duvidas? Responda esta mensagem!`;
     };
 
     const message = await getTemplateMessage("payment_recovery", templateData, defaultMessage);
-    return await sendNotificationMessage(formattedPhone, message);
+    return await sendNotificationMessage(formattedPhone, message, 'payment_recovery', name);
   } catch (error) {
     console.error("[whatsapp-notifications] Erro em sendWhatsAppPaymentRecoverySafe:", error);
     return false;
@@ -642,7 +708,7 @@ Duvidas? Estamos aqui para ajudar!`;
     };
 
     const message = await getTemplateMessage("expiration_reminder", templateData, defaultMessage);
-    return await sendNotificationMessage(formattedPhone, message);
+    return await sendNotificationMessage(formattedPhone, message, 'expiration_reminder', name);
   } catch (error) {
     console.error("[whatsapp-notifications] Erro em sendWhatsAppExpirationReminderSafe:", error);
     return false;
@@ -786,7 +852,7 @@ Duvidas? Responda esta mensagem!`;
     };
 
     const message = await getTemplateMessage("recurring_payment_failed_reminder", templateData, defaultMessage);
-    return await sendNotificationMessage(formattedPhone, message);
+    return await sendNotificationMessage(formattedPhone, message, 'recurring_payment_failed_reminder', name);
   } catch (error) {
     console.error("[whatsapp-notifications] Erro em sendWhatsAppRecurringPaymentFailedReminderSafe:", error);
     return false;
@@ -849,7 +915,7 @@ Duvidas? Responda esta mensagem!`;
     };
 
     const message = await getTemplateMessage("pix_generated", templateData, defaultMessage);
-    return await sendNotificationMessage(formattedPhone, message);
+    return await sendNotificationMessage(formattedPhone, message, 'pix_generated', name);
   } catch (error) {
     console.error("[whatsapp-notifications] Erro em sendWhatsAppPixGeneratedSafe:", error);
     return false;
@@ -911,7 +977,7 @@ Duvidas? Responda esta mensagem!`;
     };
 
     const message = await getTemplateMessage("boleto_generated", templateData, defaultMessage);
-    return await sendNotificationMessage(formattedPhone, message);
+    return await sendNotificationMessage(formattedPhone, message, 'boleto_generated', name);
   } catch (error) {
     console.error("[whatsapp-notifications] Erro em sendWhatsAppBoletoGeneratedSafe:", error);
     return false;
@@ -972,7 +1038,7 @@ Duvidas? Responda esta mensagem!`;
     };
 
     const message = await getTemplateMessage("payment_pending", templateData, defaultMessage);
-    return await sendNotificationMessage(formattedPhone, message);
+    return await sendNotificationMessage(formattedPhone, message, 'payment_pending', name);
   } catch (error) {
     console.error("[whatsapp-notifications] Erro em sendWhatsAppPaymentPendingSafe:", error);
     return false;

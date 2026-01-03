@@ -149,6 +149,78 @@ async function getResendClient(): Promise<{ client: Resend; fromEmail: string }>
 }
 
 /**
+ * Log email notification to database for visibility in admin panel
+ * Guaranteed to never throw - always attempts to persist the log
+ */
+async function logEmailToDatabase(
+  emailType: string,
+  recipientEmail: string,
+  recipientName: string | null,
+  status: 'pending' | 'sent' | 'failed',
+  error?: string
+): Promise<string | null> {
+  try {
+    const log = await storage.createEmailNotificationLog({
+      emailType,
+      recipientEmail,
+      recipientName: recipientName || undefined,
+      status,
+      success: status === 'sent',
+      sentAt: status === 'sent' ? new Date() : undefined,
+      error: error || undefined,
+    });
+    return log.id;
+  } catch (err) {
+    console.error("[email] Erro ao registrar log no banco:", err);
+    return null;
+  }
+}
+
+/**
+ * Update email notification log status after send attempt
+ * Falls back to creating a new log if update fails
+ * Guaranteed to attempt persistence even if initial methods fail
+ */
+async function updateEmailLog(
+  logId: string | null, 
+  status: 'sent' | 'failed', 
+  emailType: string,
+  recipientEmail: string,
+  recipientName: string | null,
+  error?: string
+): Promise<void> {
+  const logData = {
+    emailType,
+    recipientEmail,
+    recipientName: recipientName || undefined,
+    status,
+    success: status === 'sent',
+    sentAt: status === 'sent' ? new Date() : undefined,
+    error: error || undefined,
+  };
+
+  if (logId) {
+    try {
+      await storage.updateEmailNotificationLog(logId, {
+        status: logData.status,
+        success: logData.success,
+        sentAt: logData.sentAt,
+        error: logData.error,
+      });
+      return;
+    } catch (err) {
+      console.error("[email] Erro ao atualizar log, tentando criar novo:", err);
+    }
+  }
+
+  try {
+    await storage.createEmailNotificationLog(logData);
+  } catch (fallbackErr) {
+    console.error("[email] Fallback log creation failed:", fallbackErr);
+  }
+}
+
+/**
  * Queue an email for retry if initial send fails
  */
 function queueEmailForRetry(type: string, to: string, data: any, error: string): void {
@@ -3170,128 +3242,153 @@ ${APP_NAME}
  */
 
 export function sendAccessCredentialsEmailSafe(to: string, name: string, tempPassword: string, planName: string): void {
-  try {
-    if (!isEmailServiceAvailable()) {
-      console.warn(`[email-safe] Email service not available, queuing credentials email for ${to}`);
-      queueEmailForRetry('credentials', to, { name, tempPassword, planName }, 'RESEND_API_KEY not configured');
-      return;
+  (async () => {
+    let logId: string | null = null;
+    const emailType = 'credentials';
+    try {
+      if (!isEmailServiceAvailable()) {
+        console.warn(`[email-safe] Email service not available, logging failure for ${to}`);
+        await updateEmailLog(null, 'failed', emailType, to, name, 'RESEND_API_KEY não configurada');
+        queueEmailForRetry(emailType, to, { name, tempPassword, planName }, 'RESEND_API_KEY not configured');
+        return;
+      }
+      
+      logId = await logEmailToDatabase(emailType, to, name, 'pending');
+      
+      const success = await sendAccessCredentialsEmail(to, name, tempPassword, planName);
+      if (success) {
+        await updateEmailLog(logId, 'sent', emailType, to, name);
+      } else {
+        console.error(`[email-safe] Credentials email returned false for ${to}`);
+        await updateEmailLog(logId, 'failed', emailType, to, name, 'Email send returned false');
+        queueEmailForRetry(emailType, to, { name, tempPassword, planName }, 'Email send returned false');
+      }
+    } catch (err: any) {
+      console.error(`[email-safe] Error sending credentials email to ${to}:`, err.message);
+      await updateEmailLog(logId, 'failed', emailType, to, name, err.message);
+      queueEmailForRetry(emailType, to, { name, tempPassword, planName }, err.message);
     }
-    
-    sendAccessCredentialsEmail(to, name, tempPassword, planName)
-      .then((success) => {
-        if (!success) {
-          console.error(`[email-safe] Credentials email returned false for ${to}, queuing for retry`);
-          queueEmailForRetry('credentials', to, { name, tempPassword, planName }, 'Email send returned false');
-        }
-      })
-      .catch((err) => {
-        console.error(`[email-safe] Failed to send credentials email to ${to}, queuing for retry:`, err.message);
-        queueEmailForRetry('credentials', to, { name, tempPassword, planName }, err.message);
-      });
-  } catch (err: any) {
-    console.error(`[email-safe] Sync error sending credentials email to ${to}, queuing for retry:`, err.message);
-    queueEmailForRetry('credentials', to, { name, tempPassword, planName }, err.message);
-  }
+  })();
 }
 
 export function sendPaymentConfirmedEmailSafe(to: string, name: string, planName: string, expirationDate: Date): void {
-  try {
-    if (!isEmailServiceAvailable()) {
-      console.warn(`[email-safe] Email service not available, queuing payment confirmed email for ${to}`);
-      queueEmailForRetry('payment_confirmed', to, { name, planName, expirationDate }, 'RESEND_API_KEY not configured');
-      return;
+  (async () => {
+    let logId: string | null = null;
+    const emailType = 'payment_confirmed';
+    try {
+      if (!isEmailServiceAvailable()) {
+        console.warn(`[email-safe] Email service not available, logging failure for ${to}`);
+        await updateEmailLog(null, 'failed', emailType, to, name, 'RESEND_API_KEY não configurada');
+        queueEmailForRetry(emailType, to, { name, planName, expirationDate }, 'RESEND_API_KEY not configured');
+        return;
+      }
+      
+      logId = await logEmailToDatabase(emailType, to, name, 'pending');
+      
+      const success = await sendPaymentConfirmedEmail(to, name, planName, expirationDate);
+      if (success) {
+        await updateEmailLog(logId, 'sent', emailType, to, name);
+      } else {
+        console.error(`[email-safe] Payment confirmed email returned false for ${to}`);
+        await updateEmailLog(logId, 'failed', emailType, to, name, 'Email send returned false');
+        queueEmailForRetry(emailType, to, { name, planName, expirationDate }, 'Email send returned false');
+      }
+    } catch (err: any) {
+      console.error(`[email-safe] Error sending payment confirmed email to ${to}:`, err.message);
+      await updateEmailLog(logId, 'failed', emailType, to, name, err.message);
+      queueEmailForRetry(emailType, to, { name, planName, expirationDate }, err.message);
     }
-    
-    sendPaymentConfirmedEmail(to, name, planName, expirationDate)
-      .then((success) => {
-        if (!success) {
-          console.error(`[email-safe] Payment confirmed email returned false for ${to}, queuing for retry`);
-          queueEmailForRetry('payment_confirmed', to, { name, planName, expirationDate }, 'Email send returned false');
-        }
-      })
-      .catch((err) => {
-        console.error(`[email-safe] Failed to send payment confirmed email to ${to}, queuing for retry:`, err.message);
-        queueEmailForRetry('payment_confirmed', to, { name, planName, expirationDate }, err.message);
-      });
-  } catch (err: any) {
-    console.error(`[email-safe] Sync error sending payment confirmed email to ${to}, queuing for retry:`, err.message);
-    queueEmailForRetry('payment_confirmed', to, { name, planName, expirationDate }, err.message);
-  }
+  })();
 }
 
 export function sendPaymentFailedEmailSafe(to: string, name: string, planName: string, reason: string, planoId?: string): void {
-  try {
-    if (!isEmailServiceAvailable()) {
-      console.warn(`[email-safe] Email service not available, queuing payment failed email for ${to}`);
-      queueEmailForRetry('payment_failed', to, { name, planName, reason, planoId }, 'RESEND_API_KEY not configured');
-      return;
+  (async () => {
+    let logId: string | null = null;
+    const emailType = 'payment_failed';
+    try {
+      if (!isEmailServiceAvailable()) {
+        console.warn(`[email-safe] Email service not available, logging failure for ${to}`);
+        await updateEmailLog(null, 'failed', emailType, to, name, 'RESEND_API_KEY não configurada');
+        queueEmailForRetry(emailType, to, { name, planName, reason, planoId }, 'RESEND_API_KEY not configured');
+        return;
+      }
+      
+      logId = await logEmailToDatabase(emailType, to, name, 'pending');
+      
+      const success = await sendPaymentFailedEmail(to, name, planName, reason, planoId);
+      if (success) {
+        await updateEmailLog(logId, 'sent', emailType, to, name);
+      } else {
+        console.error(`[email-safe] Payment failed email returned false for ${to}`);
+        await updateEmailLog(logId, 'failed', emailType, to, name, 'Email send returned false');
+        queueEmailForRetry(emailType, to, { name, planName, reason, planoId }, 'Email send returned false');
+      }
+    } catch (err: any) {
+      console.error(`[email-safe] Error sending payment failed email to ${to}:`, err.message);
+      await updateEmailLog(logId, 'failed', emailType, to, name, err.message);
+      queueEmailForRetry(emailType, to, { name, planName, reason, planoId }, err.message);
     }
-    
-    sendPaymentFailedEmail(to, name, planName, reason, planoId)
-      .then((success) => {
-        if (!success) {
-          console.error(`[email-safe] Payment failed email returned false for ${to}, queuing for retry`);
-          queueEmailForRetry('payment_failed', to, { name, planName, reason, planoId }, 'Email send returned false');
-        }
-      })
-      .catch((err) => {
-        console.error(`[email-safe] Failed to send payment failed email to ${to}, queuing for retry:`, err.message);
-        queueEmailForRetry('payment_failed', to, { name, planName, reason, planoId }, err.message);
-      });
-  } catch (err: any) {
-    console.error(`[email-safe] Sync error sending payment failed email to ${to}, queuing for retry:`, err.message);
-    queueEmailForRetry('payment_failed', to, { name, planName, reason, planoId }, err.message);
-  }
+  })();
 }
 
 export function sendPlanExpiredEmailSafe(to: string, name: string, planName: string): void {
-  try {
-    if (!isEmailServiceAvailable()) {
-      console.warn(`[email-safe] Email service not available, queuing plan expired email for ${to}`);
-      queueEmailForRetry('plan_expired', to, { name, planName }, 'RESEND_API_KEY not configured');
-      return;
+  (async () => {
+    let logId: string | null = null;
+    const emailType = 'plan_expired';
+    try {
+      if (!isEmailServiceAvailable()) {
+        console.warn(`[email-safe] Email service not available, logging failure for ${to}`);
+        await updateEmailLog(null, 'failed', emailType, to, name, 'RESEND_API_KEY não configurada');
+        queueEmailForRetry(emailType, to, { name, planName }, 'RESEND_API_KEY not configured');
+        return;
+      }
+      
+      logId = await logEmailToDatabase(emailType, to, name, 'pending');
+      
+      const success = await sendPlanExpiredEmail(to, name, planName);
+      if (success) {
+        await updateEmailLog(logId, 'sent', emailType, to, name);
+      } else {
+        console.error(`[email-safe] Plan expired email returned false for ${to}`);
+        await updateEmailLog(logId, 'failed', emailType, to, name, 'Email send returned false');
+        queueEmailForRetry(emailType, to, { name, planName }, 'Email send returned false');
+      }
+    } catch (err: any) {
+      console.error(`[email-safe] Error sending plan expired email to ${to}:`, err.message);
+      await updateEmailLog(logId, 'failed', emailType, to, name, err.message);
+      queueEmailForRetry(emailType, to, { name, planName }, err.message);
     }
-    
-    sendPlanExpiredEmail(to, name, planName)
-      .then((success) => {
-        if (!success) {
-          console.error(`[email-safe] Plan expired email returned false for ${to}, queuing for retry`);
-          queueEmailForRetry('plan_expired', to, { name, planName }, 'Email send returned false');
-        }
-      })
-      .catch((err) => {
-        console.error(`[email-safe] Failed to send plan expired email to ${to}, queuing for retry:`, err.message);
-        queueEmailForRetry('plan_expired', to, { name, planName }, err.message);
-      });
-  } catch (err: any) {
-    console.error(`[email-safe] Sync error sending plan expired email to ${to}, queuing for retry:`, err.message);
-    queueEmailForRetry('plan_expired', to, { name, planName }, err.message);
-  }
+  })();
 }
 
 export function sendWelcomeEmailSafe(to: string, name: string): void {
-  try {
-    if (!isEmailServiceAvailable()) {
-      console.warn(`[email-safe] Email service not available, queuing welcome email for ${to}`);
-      queueEmailForRetry('welcome', to, { name }, 'RESEND_API_KEY not configured');
-      return;
+  (async () => {
+    let logId: string | null = null;
+    const emailType = 'welcome';
+    try {
+      if (!isEmailServiceAvailable()) {
+        console.warn(`[email-safe] Email service not available, logging failure for ${to}`);
+        await updateEmailLog(null, 'failed', emailType, to, name, 'RESEND_API_KEY não configurada');
+        queueEmailForRetry(emailType, to, { name }, 'RESEND_API_KEY not configured');
+        return;
+      }
+      
+      logId = await logEmailToDatabase(emailType, to, name, 'pending');
+      
+      const success = await sendWelcomeEmail(to, name);
+      if (success) {
+        await updateEmailLog(logId, 'sent', emailType, to, name);
+      } else {
+        console.error(`[email-safe] Welcome email returned false for ${to}`);
+        await updateEmailLog(logId, 'failed', emailType, to, name, 'Email send returned false');
+        queueEmailForRetry(emailType, to, { name }, 'Email send returned false');
+      }
+    } catch (err: any) {
+      console.error(`[email-safe] Error sending welcome email to ${to}:`, err.message);
+      await updateEmailLog(logId, 'failed', emailType, to, name, err.message);
+      queueEmailForRetry(emailType, to, { name }, err.message);
     }
-    
-    sendWelcomeEmail(to, name)
-      .then((success) => {
-        if (!success) {
-          console.error(`[email-safe] Welcome email returned false for ${to}, queuing for retry`);
-          queueEmailForRetry('welcome', to, { name }, 'Email send returned false');
-        }
-      })
-      .catch((err) => {
-        console.error(`[email-safe] Failed to send welcome email to ${to}, queuing for retry:`, err.message);
-        queueEmailForRetry('welcome', to, { name }, err.message);
-      });
-  } catch (err: any) {
-    console.error(`[email-safe] Sync error sending welcome email to ${to}, queuing for retry:`, err.message);
-    queueEmailForRetry('welcome', to, { name }, err.message);
-  }
+  })();
 }
 
 export function sendAffiliateSaleEmailSafe(to: string, name: string, saleAmount: number, commissionAmount: number): void {

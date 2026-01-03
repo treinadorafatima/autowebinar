@@ -7279,6 +7279,127 @@ Seja conversacional e objetivo.`;
     }
   });
 
+  // Email Notifications - Status and Configuration (superadmin only)
+  app.get("/api/notifications/email/status", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.replace("Bearer ", "");
+      if (!token) return res.status(401).json({ error: "Token não fornecido" });
+      
+      const email = await validateSession(token);
+      if (!email) return res.status(401).json({ error: "Sessão inválida" });
+      
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin || admin.role !== "superadmin") {
+        return res.status(403).json({ error: "Acesso negado - apenas superadmin" });
+      }
+
+      const { isEmailServiceAvailable, getPendingEmailCount } = await import("./email");
+      const hasResendKey = !!(process.env.RESEND_API_KEY || process.env.REPLIT_CONNECTORS_HOSTNAME);
+      
+      res.json({
+        enabled: hasResendKey,
+        configured: isEmailServiceAvailable(),
+        pendingRetries: getPendingEmailCount(),
+        configIssues: !hasResendKey ? ["RESEND_API_KEY não configurada"] : [],
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Email Notifications - Get sent messages history (superadmin only)
+  app.get("/api/notifications/email/logs", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.replace("Bearer ", "");
+      if (!token) return res.status(401).json({ error: "Token não fornecido" });
+      
+      const email = await validateSession(token);
+      if (!email) return res.status(401).json({ error: "Sessão inválida" });
+      
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin || admin.role !== "superadmin") {
+        return res.status(403).json({ error: "Acesso negado - apenas superadmin" });
+      }
+
+      const limit = parseInt(req.query.limit as string) || 100;
+      const logs = await storage.listEmailNotificationLogs(limit);
+      
+      res.json(logs);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Combined Notifications Diagnostics - Overview of all notification systems (superadmin only)
+  app.get("/api/notifications/diagnostics", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.replace("Bearer ", "");
+      if (!token) return res.status(401).json({ error: "Token não fornecido" });
+      
+      const email = await validateSession(token);
+      if (!email) return res.status(401).json({ error: "Sessão inválida" });
+      
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin || admin.role !== "superadmin") {
+        return res.status(403).json({ error: "Acesso negado - apenas superadmin" });
+      }
+
+      const { getNotificationStatus } = await import("./whatsapp-notifications");
+      const { isEmailServiceAvailable, getPendingEmailCount } = await import("./email");
+      
+      const whatsappStatus = await getNotificationStatus();
+      const hasResendKey = !!(process.env.RESEND_API_KEY || process.env.REPLIT_CONNECTORS_HOSTNAME);
+      
+      const configIssues: string[] = [];
+      
+      if (!hasResendKey) {
+        configIssues.push("Email: RESEND_API_KEY não configurada");
+      }
+      
+      if (!whatsappStatus.enabled) {
+        configIssues.push("WhatsApp: Notificações desabilitadas");
+      } else if (whatsappStatus.accounts === 0) {
+        configIssues.push("WhatsApp: Nenhuma conta conectada");
+      } else if (whatsappStatus.connectedAccounts === 0) {
+        configIssues.push("WhatsApp: Nenhuma conta online");
+      }
+      
+      const recentEmailLogs = await storage.listEmailNotificationLogs(20);
+      const recentWhatsappLogs = await storage.listWhatsappNotificationLogs(20);
+      
+      const emailStats = {
+        sent: recentEmailLogs.filter((l: any) => l.status === 'sent').length,
+        failed: recentEmailLogs.filter((l: any) => l.status === 'failed').length,
+        pending: recentEmailLogs.filter((l: any) => l.status === 'pending').length,
+      };
+      
+      const whatsappStats = {
+        sent: recentWhatsappLogs.filter((l: any) => l.status === 'sent').length,
+        failed: recentWhatsappLogs.filter((l: any) => l.status === 'failed').length,
+        pending: recentWhatsappLogs.filter((l: any) => l.status === 'pending').length,
+      };
+      
+      res.json({
+        email: {
+          configured: isEmailServiceAvailable(),
+          pendingRetries: getPendingEmailCount(),
+          recentStats: emailStats,
+        },
+        whatsapp: {
+          enabled: whatsappStatus.enabled,
+          accounts: whatsappStatus.accounts,
+          connectedAccounts: whatsappStatus.connectedAccounts,
+          pendingMessages: whatsappStatus.pendingMessages,
+          recentStats: whatsappStats,
+        },
+        configIssues,
+        overallHealth: configIssues.length === 0 ? "healthy" : "degraded",
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Get public key for frontend (public route)
   app.get("/api/checkout/public-key/:gateway", async (req, res) => {
     try {
