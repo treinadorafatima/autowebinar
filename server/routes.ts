@@ -9400,9 +9400,26 @@ Seja conversacional e objetivo.`;
       if (paymentConfirmed) {
         const plano = await storage.getCheckoutPlanoById(pagamento.planoId);
         
-        // Calculate expiration date
+        // Calculate expiration date based on plan type
         const expirationDate = new Date();
-        expirationDate.setDate(expirationDate.getDate() + (plano?.prazoDias || 30));
+        if (plano?.tipoCobranca === 'recorrente') {
+          // For recurring: use frequencia + frequenciaTipo
+          const freq = plano.frequencia || 1;
+          const freqTipo = plano.frequenciaTipo || 'months';
+          
+          if (freqTipo === 'days') {
+            expirationDate.setDate(expirationDate.getDate() + freq);
+          } else if (freqTipo === 'weeks') {
+            expirationDate.setDate(expirationDate.getDate() + (freq * 7));
+          } else if (freqTipo === 'months') {
+            expirationDate.setMonth(expirationDate.getMonth() + freq);
+          } else if (freqTipo === 'years') {
+            expirationDate.setFullYear(expirationDate.getFullYear() + freq);
+          }
+        } else {
+          // For one-time payments: use prazoDias
+          expirationDate.setDate(expirationDate.getDate() + (plano?.prazoDias || 30));
+        }
 
         // Check if admin exists
         let admin = await storage.getAdminByEmail(pagamento.email);
