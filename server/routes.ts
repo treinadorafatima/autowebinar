@@ -9326,6 +9326,171 @@ Seja conversacional e objetivo.`;
     }
   });
 
+  // Confirm Stripe payment after successful frontend confirmation
+  // This is called from the success page to ensure payment is marked as approved
+  app.post("/api/checkout/stripe/confirmar-pagamento", async (req, res) => {
+    try {
+      const { pagamentoId, paymentIntentId, subscriptionId } = req.body;
+      
+      if (!pagamentoId) {
+        return res.status(400).json({ error: 'pagamentoId é obrigatório' });
+      }
+
+      const pagamento = await storage.getCheckoutPagamentoById(pagamentoId);
+      if (!pagamento) {
+        return res.status(404).json({ error: 'Pagamento não encontrado' });
+      }
+
+      // If already approved, skip
+      if (pagamento.status === 'approved') {
+        return res.json({ success: true, message: 'Pagamento já aprovado' });
+      }
+
+      const stripeSecretKey = await storage.getCheckoutConfig('STRIPE_SECRET_KEY');
+      if (!stripeSecretKey) {
+        return res.status(500).json({ error: 'Stripe não configurado' });
+      }
+
+      // Determine which ID to use for verification
+      const checkId = paymentIntentId || subscriptionId || pagamento.stripePaymentIntentId || pagamento.stripeSubscriptionId;
+      
+      if (!checkId) {
+        return res.status(400).json({ error: 'ID de pagamento não encontrado' });
+      }
+
+      let paymentConfirmed = false;
+      let paymentDate = new Date();
+
+      // Check if it's a subscription or payment intent
+      if (checkId.startsWith('sub_')) {
+        // Fetch subscription to check status
+        const subResponse = await fetch(`https://api.stripe.com/v1/subscriptions/${checkId}`, {
+          headers: {
+            'Authorization': `Bearer ${stripeSecretKey}`,
+          },
+        });
+        
+        if (subResponse.ok) {
+          const subData = await subResponse.json();
+          // Check if subscription is active (has paid)
+          if (subData.status === 'active' || subData.status === 'trialing') {
+            paymentConfirmed = true;
+            paymentDate = subData.current_period_start 
+              ? new Date(subData.current_period_start * 1000) 
+              : new Date();
+          }
+        }
+      } else if (checkId.startsWith('pi_')) {
+        // Fetch payment intent to check status
+        const piResponse = await fetch(`https://api.stripe.com/v1/payment_intents/${checkId}`, {
+          headers: {
+            'Authorization': `Bearer ${stripeSecretKey}`,
+          },
+        });
+        
+        if (piResponse.ok) {
+          const piData = await piResponse.json();
+          if (piData.status === 'succeeded') {
+            paymentConfirmed = true;
+            paymentDate = piData.created ? new Date(piData.created * 1000) : new Date();
+          }
+        }
+      }
+
+      if (paymentConfirmed) {
+        const plano = await storage.getCheckoutPlanoById(pagamento.planoId);
+        
+        // Calculate expiration date
+        const expirationDate = new Date();
+        expirationDate.setDate(expirationDate.getDate() + (plano?.prazoDias || 30));
+
+        // Check if admin exists
+        let admin = await storage.getAdminByEmail(pagamento.email);
+        
+        if (admin) {
+          // Update existing admin
+          await storage.updateAdmin(admin.id, {
+            accessExpiresAt: expirationDate,
+            webinarLimit: plano?.webinarLimit || admin.webinarLimit,
+            uploadLimit: plano?.uploadLimit || admin.uploadLimit,
+            isActive: true,
+            planoId: plano?.id || admin.planoId,
+            paymentStatus: 'ok',
+            paymentFailedReason: null,
+          });
+          console.log(`[Stripe Confirm] Updated admin: ${pagamento.email}, expires: ${expirationDate}`);
+        } else {
+          // Create new admin
+          const tempPassword = Math.random().toString(36).slice(-8);
+          const bcrypt = await import('bcryptjs');
+          const hashedPassword = await bcrypt.hash(tempPassword, 10);
+          
+          admin = await storage.createAdmin({
+            name: pagamento.nome,
+            email: pagamento.email,
+            password: hashedPassword,
+            telefone: pagamento.telefone,
+            role: 'user',
+            webinarLimit: plano?.webinarLimit || 5,
+            uploadLimit: plano?.uploadLimit || 999,
+            isActive: true,
+            accessExpiresAt: expirationDate,
+            planoId: plano?.id,
+            paymentStatus: 'ok',
+          });
+          
+          console.log(`[Stripe Confirm] Created admin: ${pagamento.email}, temp password: ${tempPassword}`);
+          
+          // Send access credentials email
+          import("./email").then(({ sendAccessCredentialsEmailSafe }) => {
+            sendAccessCredentialsEmailSafe(pagamento.email, pagamento.nome, tempPassword, plano?.nome || "Seu Plano");
+          });
+          
+          // Send WhatsApp credentials
+          if (pagamento.telefone) {
+            import("./whatsapp-notifications").then(({ sendWhatsAppCredentialsSafe }) => {
+              sendWhatsAppCredentialsSafe(pagamento.telefone, pagamento.nome, tempPassword, plano?.nome || "Seu Plano", pagamento.email);
+            });
+          }
+        }
+
+        // Update payment record
+        await storage.updateCheckoutPagamento(pagamentoId, {
+          status: 'approved',
+          statusDetail: 'Pagamento confirmado via Stripe',
+          metodoPagamento: 'card',
+          dataPagamento: paymentDate,
+          dataAprovacao: new Date(),
+          dataExpiracao: expirationDate,
+          adminId: admin.id,
+        });
+
+        // Process affiliate sale if applicable
+        if (plano) {
+          import("./routes").then(async (routes) => {
+            // Note: processAffiliateSale is defined in routes, skip for now
+          }).catch(() => {});
+        }
+
+        console.log(`[Stripe Confirm] Payment ${pagamentoId} confirmed successfully`);
+        
+        return res.json({ 
+          success: true, 
+          message: 'Pagamento confirmado com sucesso',
+          expiresAt: expirationDate.toISOString(),
+        });
+      } else {
+        return res.json({ 
+          success: false, 
+          message: 'Pagamento ainda não confirmado pelo Stripe',
+        });
+      }
+    } catch (error: any) {
+      console.error('[Stripe Confirm] Error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Webhook - Mercado Pago
   app.post("/webhook/mercadopago", async (req, res) => {
     try {

@@ -1582,6 +1582,7 @@ export default function Checkout() {
                           <StripeCheckoutForm 
                             onSuccess={() => {
                               const successParams = new URLSearchParams({ gateway: 'hibrido' });
+                              if (pagamentoId) successParams.set('id', pagamentoId);
                               if (affiliateCode) successParams.set('ref', affiliateCode);
                               if (selectedPlano) {
                                 successParams.set('planoId', String(selectedPlano.id));
@@ -1595,6 +1596,8 @@ export default function Checkout() {
                             setIsProcessing={setIsProcessingPayment}
                             returnUrlParams={(() => {
                               const params = new URLSearchParams();
+                              params.set('gateway', 'hibrido');
+                              if (pagamentoId) params.set('id', pagamentoId);
                               if (affiliateCode) params.set('ref', affiliateCode);
                               if (selectedPlano) {
                                 params.set('planoId', String(selectedPlano.id));

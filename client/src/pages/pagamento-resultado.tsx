@@ -1,9 +1,10 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useSearch } from "wouter";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, Clock, XCircle, ArrowRight } from "lucide-react";
+import { CheckCircle, Clock, XCircle, ArrowRight, Loader2 } from "lucide-react";
 import { usePixel } from "@/hooks/use-pixel";
+import { apiRequest } from "@/lib/queryClient";
 
 type ResultType = "sucesso" | "pendente" | "erro";
 
@@ -43,12 +44,44 @@ export default function PagamentoResultado({ tipo }: Props) {
   const valor = params.get("valor");
   const plano = params.get("plano");
   const planoId = params.get("planoId");
+  const gateway = params.get("gateway");
+  const paymentIntentId = params.get("payment_intent");
   const affiliateCode = params.get("ref") || null;
   const { trackPurchase } = usePixel({ affiliateCode });
   const purchaseTracked = useRef(false);
+  const confirmationAttempted = useRef(false);
+  const [isConfirming, setIsConfirming] = useState(false);
 
   const config = resultConfig[tipo];
   const Icon = config.icon;
+
+  // Confirm Stripe payment when success page loads
+  useEffect(() => {
+    const confirmStripePayment = async () => {
+      if (confirmationAttempted.current) return;
+      if (tipo !== "sucesso") return;
+      if (!pagamentoId) return;
+      // Only confirm for Stripe/hybrid payments
+      if (gateway !== "stripe" && gateway !== "hibrido") return;
+      
+      confirmationAttempted.current = true;
+      setIsConfirming(true);
+      
+      try {
+        await apiRequest("POST", "/api/checkout/stripe/confirmar-pagamento", {
+          pagamentoId,
+          paymentIntentId,
+        });
+        console.log("[PagamentoResultado] Stripe payment confirmed");
+      } catch (error) {
+        console.error("[PagamentoResultado] Error confirming payment:", error);
+      } finally {
+        setIsConfirming(false);
+      }
+    };
+    
+    confirmStripePayment();
+  }, [tipo, pagamentoId, gateway, paymentIntentId]);
 
   useEffect(() => {
     if (tipo === "sucesso") {
