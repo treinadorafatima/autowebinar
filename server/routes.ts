@@ -7546,9 +7546,29 @@ Seja conversacional e objetivo.`;
               const subscriptionData = await subscriptionResponse.json();
               clientSecret = subscriptionData.latest_invoice?.payment_intent?.client_secret;
               subscriptionId = subscriptionData.id;
+              
+              // Get the PaymentIntent ID from the latest invoice and update its metadata
+              const paymentIntentId = subscriptionData.latest_invoice?.payment_intent?.id;
+              if (paymentIntentId) {
+                // Update PaymentIntent with pagamentoId metadata so webhook can find it
+                const piUpdateParams = new URLSearchParams({
+                  'metadata[pagamentoId]': pagamento.id,
+                  'metadata[planoId]': plano.id,
+                });
+                
+                await fetch(`https://api.stripe.com/v1/payment_intents/${paymentIntentId}`, {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Bearer ${stripeSecretKey}`,
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                  },
+                  body: piUpdateParams.toString(),
+                });
+                console.log('[Checkout] Updated PaymentIntent metadata:', paymentIntentId);
+              }
 
               await storage.updateCheckoutPagamento(pagamento.id, {
-                stripePaymentIntentId: subscriptionData.id,
+                stripePaymentIntentId: paymentIntentId || subscriptionData.id,
                 stripeSubscriptionId: subscriptionData.id,
                 stripeCustomerId: customerId,
               });
@@ -8884,10 +8904,31 @@ Seja conversacional e objetivo.`;
 
         const subscriptionData = await subscriptionResponse.json();
         const clientSecret = subscriptionData.latest_invoice?.payment_intent?.client_secret;
+        
+        // Get the PaymentIntent ID from the latest invoice and update its metadata
+        const paymentIntentId = subscriptionData.latest_invoice?.payment_intent?.id;
+        if (paymentIntentId) {
+          // Update PaymentIntent with pagamentoId metadata so webhook can find it
+          const piUpdateParams = new URLSearchParams({
+            'metadata[pagamentoId]': pagamentoId,
+            'metadata[planoId]': plano.id,
+          });
+          
+          await fetch(`https://api.stripe.com/v1/payment_intents/${paymentIntentId}`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${stripeSecretKey}`,
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: piUpdateParams.toString(),
+          });
+          console.log('[Stripe] Updated PaymentIntent metadata:', paymentIntentId);
+        }
 
         // Update payment with Stripe subscription ID
         await storage.updateCheckoutPagamento(pagamentoId, {
-          stripePaymentIntentId: subscriptionData.id,
+          stripePaymentIntentId: paymentIntentId || subscriptionData.id,
+          stripeSubscriptionId: subscriptionData.id,
         });
 
         console.log('[Stripe] Created subscription:', subscriptionData.id);
