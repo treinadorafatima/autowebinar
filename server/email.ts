@@ -2909,7 +2909,8 @@ export async function sendAutoRenewalPaymentEmail(
   pixExpiresAt: Date | null,
   boletoUrl: string | null,
   boletoCodigo: string | null,
-  boletoExpiresAt: Date | null
+  boletoExpiresAt: Date | null,
+  checkoutUrl?: string | null
 ): Promise<boolean> {
   try {
     const { client, fromEmail } = await getResendClient();
@@ -2918,16 +2919,22 @@ export async function sendAutoRenewalPaymentEmail(
     const formattedPixExpiration = pixExpiresAt?.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }) || '';
     const formattedBoletoExpiration = boletoExpiresAt?.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }) || '';
 
+    const hasPaymentMethods = pixCopiaCola || boletoUrl;
+
     const text = `
 Ola ${name},
 
 Seu plano ${planName} vence em breve (${formattedExpiration}).
 
-Para renovar seu acesso, geramos automaticamente as opcoes de pagamento abaixo:
+${hasPaymentMethods ? 'Para renovar seu acesso, geramos automaticamente as opcoes de pagamento abaixo:' : 'Para renovar seu acesso, clique no link abaixo:'}
 
 Valor: ${formattedAmount}
 
-${pixCopiaCola ? `=== OPCAO 1: PIX (Aprovacao Instantanea) ===
+${checkoutUrl && !hasPaymentMethods ? `=== RENOVAR AGORA ===
+Clique no link abaixo para escolher sua forma de pagamento:
+${checkoutUrl}
+
+` : ''}${pixCopiaCola ? `=== OPCAO 1: PIX (Aprovacao Instantanea) ===
 Valido ate: ${formattedPixExpiration}
 
 Codigo PIX (Copia e Cola):
@@ -3037,7 +3044,7 @@ ${APP_NAME}
                 Seu plano <strong>${planName}</strong> vence em <strong>${formattedExpiration}</strong>.
               </p>
               <p style="margin: 0 0 18px; color: #374151; font-size: 16px; line-height: 1.6;">
-                Para garantir que voce nao perca acesso, geramos automaticamente as opcoes de pagamento abaixo:
+                ${hasPaymentMethods ? 'Para garantir que voce nao perca acesso, geramos automaticamente as opcoes de pagamento abaixo:' : 'Para garantir que voce nao perca acesso, clique no botao abaixo para renovar:'}
               </p>
 
               <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 20px 0; background-color: #f8fafc; border-radius: 6px;">
@@ -3051,6 +3058,20 @@ ${APP_NAME}
                 </tr>
               </table>
 
+              ${!hasPaymentMethods && checkoutUrl ? `
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                <tr>
+                  <td style="text-align: center; padding: 20px 0;">
+                    <a href="${checkoutUrl}" style="display: inline-block; background-color: #10b981; color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 6px; font-weight: 600; font-size: 18px;">
+                      Renovar Meu Plano Agora
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin: 20px 0; color: #6b7280; font-size: 14px; text-align: center;">
+                Voce podera escolher PIX, Cartao de Credito ou Boleto
+              </p>
+              ` : ''}
               ${pixSection}
               ${boletoSection}
 

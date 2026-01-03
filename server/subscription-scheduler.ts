@@ -13,6 +13,7 @@ import {
   sendWhatsAppRecurringPaymentFailedReminderSafe
 } from "./whatsapp-notifications";
 import { storage } from "./storage";
+import { getAppUrl } from "./utils/getAppUrl";
 
 const SCHEDULER_INTERVAL_MS = 3600000; // Check every hour
 let schedulerInterval: NodeJS.Timeout | null = null;
@@ -408,25 +409,36 @@ async function generateRenewalPixBoleto(admin: AdminWithPlan): Promise<boolean> 
       boletoExpiresAt: paymentData.boletoExpiresAt,
     });
 
-    if (paymentData.pixCopiaCola || paymentData.boletoUrl) {
-      await sendAutoRenewalPaymentEmail(
-        admin.email,
-        admin.name || 'Cliente',
-        plan.nome,
-        plan.preco,
-        admin.accessExpiresAt!,
-        paymentData.pixCopiaCola,
-        paymentData.pixQrCode,
-        paymentData.pixExpiresAt,
-        paymentData.boletoUrl,
-        paymentData.boletoCodigo,
-        paymentData.boletoExpiresAt
-      );
-      console.log(`[subscription-scheduler] Sent auto-renewal payment email to ${admin.email}`);
-      return true;
-    }
+    // Generate checkout URL for users to complete payment manually
+    const checkoutParams = new URLSearchParams({
+      email: admin.email,
+      nome: admin.name || 'Cliente',
+      renovacao: 'true'
+    });
+    const checkoutUrl = `${getAppUrl()}/checkout/${plan.id}?${checkoutParams.toString()}`;
 
-    return false;
+    // Always send email - with PIX/Boleto if available, or checkout link as fallback
+    await sendAutoRenewalPaymentEmail(
+      admin.email,
+      admin.name || 'Cliente',
+      plan.nome,
+      plan.preco,
+      admin.accessExpiresAt!,
+      paymentData.pixCopiaCola,
+      paymentData.pixQrCode,
+      paymentData.pixExpiresAt,
+      paymentData.boletoUrl,
+      paymentData.boletoCodigo,
+      paymentData.boletoExpiresAt,
+      checkoutUrl  // New parameter: checkout link for manual payment
+    );
+    
+    if (paymentData.pixCopiaCola || paymentData.boletoUrl) {
+      console.log(`[subscription-scheduler] Sent auto-renewal email with PIX/Boleto to ${admin.email}`);
+    } else {
+      console.log(`[subscription-scheduler] Sent auto-renewal email with checkout link to ${admin.email}`);
+    }
+    return true;
   } catch (error) {
     console.error(`[subscription-scheduler] Error generating renewal payment for ${admin.email}:`, error);
     return false;
