@@ -277,7 +277,7 @@ export async function processPendingEmails(): Promise<void> {
           success = await sendPasswordResetEmail(email.to, email.data.name, email.data.resetToken);
           break;
         case 'plan_expired':
-          success = await sendPlanExpiredEmail(email.to, email.data.name, email.data.planName);
+          success = await sendPlanExpiredEmail(email.to, email.data.name, email.data.planName, email.data.planoId);
           break;
         case 'payment_failed':
           success = await sendPaymentFailedEmail(email.to, email.data.name, email.data.planName, email.data.reason, email.data.planoId);
@@ -801,10 +801,17 @@ Este e um email automatico, por favor nao responda.
   }
 }
 
-export async function sendPlanExpiredEmail(to: string, name: string, planName: string): Promise<boolean> {
+export async function sendPlanExpiredEmail(to: string, name: string, planName: string, planoId?: string | null): Promise<boolean> {
   try {
     const { client, fromEmail } = await getResendClient();
-    const renewUrl = `${getAppUrl()}/checkout`;
+    // Build checkout URL with user data pre-filled
+    const checkoutParams = new URLSearchParams();
+    checkoutParams.set('email', to);
+    if (name) checkoutParams.set('nome', name);
+    const queryString = checkoutParams.toString();
+    const renewUrl = planoId && planoId !== 'trial'
+      ? `${getAppUrl()}/checkout/${planoId}?${queryString}`
+      : `${getAppUrl()}/checkout?${queryString}`;
     
     const placeholderValues: Record<string, string> = {
       name: name || 'Usuário',
@@ -3352,7 +3359,7 @@ export function sendPaymentFailedEmailSafe(to: string, name: string, planName: s
   })();
 }
 
-export function sendPlanExpiredEmailSafe(to: string, name: string, planName: string): void {
+export function sendPlanExpiredEmailSafe(to: string, name: string, planName: string, planoId?: string | null): void {
   (async () => {
     let logId: string | null = null;
     const emailType = 'plan_expired';
@@ -3360,13 +3367,13 @@ export function sendPlanExpiredEmailSafe(to: string, name: string, planName: str
       if (!isEmailServiceAvailable()) {
         console.warn(`[email-safe] Email service not available, logging failure for ${to}`);
         await updateEmailLog(null, 'failed', emailType, to, name, 'RESEND_API_KEY não configurada');
-        queueEmailForRetry(emailType, to, { name, planName }, 'RESEND_API_KEY not configured');
+        queueEmailForRetry(emailType, to, { name, planName, planoId }, 'RESEND_API_KEY not configured');
         return;
       }
       
       logId = await logEmailToDatabase(emailType, to, name, 'pending');
       
-      const success = await sendPlanExpiredEmail(to, name, planName);
+      const success = await sendPlanExpiredEmail(to, name, planName, planoId);
       if (success) {
         await updateEmailLog(logId, 'sent', emailType, to, name);
       } else {

@@ -9867,11 +9867,11 @@ Seja conversacional e objetivo.`;
                 
                 // Send plan expired/paused email (safe - never throws)
                 const plano = await storage.getCheckoutPlanoById(pagamento.planoId);
-                sendPlanExpiredEmailSafe(pagamento.email, pagamento.nome, plano?.nome || "Seu Plano");
+                sendPlanExpiredEmailSafe(pagamento.email, pagamento.nome, plano?.nome || "Seu Plano", pagamento.planoId);
                 // Send WhatsApp notification if phone available (prefer admin phone)
                 const telefoneNotif2 = admin?.telefone || pagamento.telefone;
                 if (telefoneNotif2) {
-                  sendWhatsAppPlanExpiredSafe(telefoneNotif2, pagamento.nome, plano?.nome || "Seu Plano");
+                  sendWhatsAppPlanExpiredSafe(telefoneNotif2, pagamento.nome, plano?.nome || "Seu Plano", pagamento.email, pagamento.planoId);
                 }
               }
             }
@@ -10602,11 +10602,11 @@ Seja conversacional e objetivo.`;
               
               // Send plan expired email (safe - never throws)
               const plano = await storage.getCheckoutPlanoById(pagamento.planoId);
-              sendPlanExpiredEmailSafe(pagamento.email, pagamento.nome, plano?.nome || "Seu Plano");
+              sendPlanExpiredEmailSafe(pagamento.email, pagamento.nome, plano?.nome || "Seu Plano", pagamento.planoId);
               // Send WhatsApp notification if phone available (prefer admin phone)
               const telefoneNotif9 = admin?.telefone || pagamento.telefone;
               if (telefoneNotif9) {
-                sendWhatsAppPlanExpiredSafe(telefoneNotif9, pagamento.nome, plano?.nome || "Seu Plano");
+                sendWhatsAppPlanExpiredSafe(telefoneNotif9, pagamento.nome, plano?.nome || "Seu Plano", pagamento.email, pagamento.planoId);
               }
             }
           }

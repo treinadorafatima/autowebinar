@@ -437,7 +437,9 @@ Se voce nao solicitou isso, ignore esta mensagem.`;
 export async function sendWhatsAppPlanExpiredSafe(
   phone: string | null | undefined,
   name: string,
-  planName: string
+  planName: string,
+  email?: string,
+  planoId?: string | null
 ): Promise<boolean> {
   try {
     if (!phone) {
@@ -457,6 +459,16 @@ export async function sendWhatsAppPlanExpiredSafe(
       return false;
     }
     
+    // Build checkout URL with user data pre-filled
+    const checkoutParams = new URLSearchParams();
+    if (email) checkoutParams.set('email', email);
+    if (name) checkoutParams.set('nome', name);
+    if (phone) checkoutParams.set('telefone', phone);
+    const queryString = checkoutParams.toString();
+    const renewUrl = planoId && planoId !== 'trial'
+      ? `${getAppUrl()}/checkout/${planoId}?${queryString}`
+      : `${getAppUrl()}/checkout?${queryString}`;
+    
     const defaultMessage = `Ola ${name}!
 
 Seu plano *${planName}* expirou.
@@ -468,14 +480,14 @@ O que acontece agora:
 
 *Seus dados estao seguros!*
 
-Renove agora: ${getRenewUrl()}
+Renove agora: ${renewUrl}
 
 Precisa de ajuda? Estamos aqui!`;
 
     const templateData = {
       name,
       planName,
-      renewUrl: getRenewUrl(),
+      renewUrl: renewUrl,
       appName: APP_NAME,
     };
 

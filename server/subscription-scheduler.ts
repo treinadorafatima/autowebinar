@@ -542,7 +542,9 @@ async function processExpirationReminders(): Promise<void> {
       const whatsappSuccess = await sendWhatsAppPlanExpiredSafe(
         admin.telefone,
         admin.name || "Cliente",
-        planName
+        planName,
+        admin.email,
+        admin.planoId
       );
       
       if (emailSuccess || whatsappSuccess) {
@@ -652,7 +654,9 @@ async function processExpirationReminders(): Promise<void> {
         const whatsappSuccess = await sendWhatsAppPlanExpiredSafe(
           admin.telefone,
           admin.name || "Cliente",
-          planName
+          planName,
+          admin.email,
+          admin.planoId
         );
         
         if (emailSuccess || whatsappSuccess) {
