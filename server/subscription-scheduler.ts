@@ -28,6 +28,7 @@ interface AdminWithPlan {
   lastExpirationEmailSent: Date | null;
   planName?: string;
   telefone?: string | null;
+  cpf?: string | null;
 }
 
 interface PlanFrequency {
@@ -96,6 +97,7 @@ async function getAdminsExpiringInDays(days: number): Promise<AdminWithPlan[]> {
       planoId: admins.planoId,
       lastExpirationEmailSent: admins.lastExpirationEmailSent,
       telefone: admins.telefone,
+      cpf: admins.cpf,
     })
     .from(admins)
     .where(
@@ -124,6 +126,7 @@ async function getAdminsExpiringInHours(hours: number): Promise<AdminWithPlan[]>
       planoId: admins.planoId,
       lastExpirationEmailSent: admins.lastExpirationEmailSent,
       telefone: admins.telefone,
+      cpf: admins.cpf,
     })
     .from(admins)
     .where(
@@ -152,6 +155,7 @@ async function getAdminsExpiredInLastHours(hours: number): Promise<AdminWithPlan
       planoId: admins.planoId,
       lastExpirationEmailSent: admins.lastExpirationEmailSent,
       telefone: admins.telefone,
+      cpf: admins.cpf,
     })
     .from(admins)
     .where(
@@ -181,6 +185,8 @@ async function getAdminsExpiredYesterday(): Promise<AdminWithPlan[]> {
       accessExpiresAt: admins.accessExpiresAt,
       planoId: admins.planoId,
       lastExpirationEmailSent: admins.lastExpirationEmailSent,
+      telefone: admins.telefone,
+      cpf: admins.cpf,
     })
     .from(admins)
     .where(
@@ -410,11 +416,19 @@ async function generateRenewalPixBoleto(admin: AdminWithPlan): Promise<boolean> 
     });
 
     // Generate checkout URL for users to complete payment manually
+    // Includes all available user data to pre-fill the checkout form
     const checkoutParams = new URLSearchParams({
       email: admin.email,
       nome: admin.name || 'Cliente',
       renovacao: 'true'
     });
+    // Add CPF and telefone if available
+    if (admin.cpf) {
+      checkoutParams.set('cpf', admin.cpf);
+    }
+    if (admin.telefone) {
+      checkoutParams.set('telefone', admin.telefone);
+    }
     const checkoutUrl = `${getAppUrl()}/checkout/${plan.id}?${checkoutParams.toString()}`;
 
     // Always send email - with PIX/Boleto if available, or checkout link as fallback
