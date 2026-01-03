@@ -12,6 +12,7 @@ interface ExpiredPixPayment {
   email: string;
   nome: string;
   telefone: string | null;
+  cpf: string | null;
   planoId: string;
   valor: number;
   pixExpiresAt: Date;
@@ -27,6 +28,7 @@ async function getExpiredPixPayments(): Promise<ExpiredPixPayment[]> {
       email: checkoutPagamentos.email,
       nome: checkoutPagamentos.nome,
       telefone: checkoutPagamentos.telefone,
+      cpf: checkoutPagamentos.cpf,
       planoId: checkoutPagamentos.planoId,
       valor: checkoutPagamentos.valor,
       pixExpiresAt: checkoutPagamentos.pixExpiresAt,
@@ -114,7 +116,9 @@ async function processExpiredPixPayments(): Promise<void> {
           payment.nome,
           planName,
           payment.planoId,
-          payment.valor
+          payment.valor,
+          payment.email,
+          payment.cpf
         );
 
         if (emailSent || whatsappSent) {

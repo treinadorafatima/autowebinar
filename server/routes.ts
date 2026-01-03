@@ -8385,7 +8385,7 @@ Seja conversacional e objetivo.`;
         
         // Send WhatsApp notification
         import("./whatsapp-notifications").then(({ sendWhatsAppPaymentPendingSafe }) => {
-          sendWhatsAppPaymentPendingSafe(pagamento.telefone, pagamento.nome, plano.nome, 'Cartão de Crédito', pagamento.planoId).catch(err => {
+          sendWhatsAppPaymentPendingSafe(pagamento.telefone, pagamento.nome, plano.nome, 'Cartão de Crédito', pagamento.planoId, pagamento.email, pagamento.cpf).catch(err => {
             console.error(`[MP Subscription] Error sending pending payment WhatsApp:`, err);
           });
         });
@@ -8536,7 +8536,7 @@ Seja conversacional e objetivo.`;
         
         // Send WhatsApp notification
         import("./whatsapp-notifications").then(({ sendWhatsAppPaymentPendingSafe }) => {
-          sendWhatsAppPaymentPendingSafe(pagamento.telefone, pagamento.nome, plano.nome, 'Cartão de Crédito', pagamento.planoId).catch(err => {
+          sendWhatsAppPaymentPendingSafe(pagamento.telefone, pagamento.nome, plano.nome, 'Cartão de Crédito', pagamento.planoId, pagamento.email, pagamento.cpf).catch(err => {
             console.error(`[MP Subscription] Error sending pending payment WhatsApp:`, err);
           });
         });
@@ -8705,7 +8705,9 @@ Seja conversacional e objetivo.`;
           payerName || pagamento.nome, 
           plano.nome, 
           methodName, 
-          pagamento.planoId
+          pagamento.planoId,
+          pagamento.email,
+          pagamento.cpf
         ).catch(err => {
           console.error(`[MP Subscription ${method.toUpperCase()}] Error sending pending WhatsApp:`, err);
         });
@@ -11527,7 +11529,9 @@ Seja conversacional e objetivo.`;
           pagamento.nome,
           plano.nome,
           plano.id,
-          pagamento.valor
+          pagamento.valor,
+          pagamento.email,
+          pagamento.cpf
         );
       }
 

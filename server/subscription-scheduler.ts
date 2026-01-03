@@ -28,7 +28,6 @@ interface AdminWithPlan {
   lastExpirationEmailSent: Date | null;
   planName?: string;
   telefone?: string | null;
-  cpf?: string | null;
 }
 
 interface PlanFrequency {
@@ -97,7 +96,6 @@ async function getAdminsExpiringInDays(days: number): Promise<AdminWithPlan[]> {
       planoId: admins.planoId,
       lastExpirationEmailSent: admins.lastExpirationEmailSent,
       telefone: admins.telefone,
-      cpf: admins.cpf,
     })
     .from(admins)
     .where(
@@ -126,7 +124,6 @@ async function getAdminsExpiringInHours(hours: number): Promise<AdminWithPlan[]>
       planoId: admins.planoId,
       lastExpirationEmailSent: admins.lastExpirationEmailSent,
       telefone: admins.telefone,
-      cpf: admins.cpf,
     })
     .from(admins)
     .where(
@@ -155,7 +152,6 @@ async function getAdminsExpiredInLastHours(hours: number): Promise<AdminWithPlan
       planoId: admins.planoId,
       lastExpirationEmailSent: admins.lastExpirationEmailSent,
       telefone: admins.telefone,
-      cpf: admins.cpf,
     })
     .from(admins)
     .where(
@@ -186,7 +182,6 @@ async function getAdminsExpiredYesterday(): Promise<AdminWithPlan[]> {
       planoId: admins.planoId,
       lastExpirationEmailSent: admins.lastExpirationEmailSent,
       telefone: admins.telefone,
-      cpf: admins.cpf,
     })
     .from(admins)
     .where(
@@ -422,10 +417,7 @@ async function generateRenewalPixBoleto(admin: AdminWithPlan): Promise<boolean> 
       nome: admin.name || 'Cliente',
       renovacao: 'true'
     });
-    // Add CPF and telefone if available
-    if (admin.cpf) {
-      checkoutParams.set('cpf', admin.cpf);
-    }
+    // Add telefone if available (CPF is not stored in admins table)
     if (admin.telefone) {
       checkoutParams.set('telefone', admin.telefone);
     }
@@ -698,6 +690,7 @@ async function processFailedRecurringPaymentReminders(): Promise<void> {
         email: checkoutPagamentos.email,
         nome: checkoutPagamentos.nome,
         telefone: checkoutPagamentos.telefone,
+        cpf: checkoutPagamentos.cpf,
         planoId: checkoutPagamentos.planoId,
         lastFailureAt: checkoutPagamentos.lastFailureAt,
         failedPaymentRemindersSent: checkoutPagamentos.failedPaymentRemindersSent,
@@ -767,7 +760,9 @@ async function processFailedRecurringPaymentReminders(): Promise<void> {
         payment.nome,
         planName,
         reminderNumber,
-        payment.planoId
+        payment.planoId,
+        payment.email,
+        payment.cpf
       );
       
       if (emailSuccess || whatsappSuccess) {

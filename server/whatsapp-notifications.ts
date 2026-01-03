@@ -583,7 +583,9 @@ export async function sendWhatsAppPaymentRecoverySafe(
   name: string,
   planName: string,
   planoId: string,
-  amount: number
+  amount: number,
+  email?: string,
+  cpf?: string | null
 ): Promise<boolean> {
   try {
     if (!phone) {
@@ -607,6 +609,11 @@ export async function sendWhatsAppPaymentRecoverySafe(
     const checkoutParams = new URLSearchParams({
       recuperacao: "true"
     });
+    // Add user data if available
+    if (email) checkoutParams.set('email', email);
+    if (name) checkoutParams.set('nome', name);
+    if (cpf) checkoutParams.set('cpf', cpf);
+    if (phone) checkoutParams.set('telefone', phone);
     const checkoutUrl = `${getAppUrl()}/checkout/${planoId}?${checkoutParams.toString()}`;
 
     const defaultMessage = `Ola ${name}!
@@ -791,7 +798,9 @@ export async function sendWhatsAppRecurringPaymentFailedReminderSafe(
   name: string,
   planName: string,
   reminderNumber: number,
-  planoId?: string
+  planoId?: string,
+  email?: string,
+  cpf?: string | null
 ): Promise<boolean> {
   try {
     if (!phone) {
@@ -814,6 +823,11 @@ export async function sendWhatsAppRecurringPaymentFailedReminderSafe(
     const checkoutParams = new URLSearchParams({
       recuperacao: "true"
     });
+    // Add user data if available
+    if (email) checkoutParams.set('email', email);
+    if (name) checkoutParams.set('nome', name);
+    if (cpf) checkoutParams.set('cpf', cpf);
+    if (phone) checkoutParams.set('telefone', phone);
     const checkoutUrl = planoId 
       ? `${getAppUrl()}/checkout/${planoId}?${checkoutParams.toString()}`
       : `${getAppUrl()}/checkout?${checkoutParams.toString()}`;
@@ -993,7 +1007,9 @@ export async function sendWhatsAppPaymentPendingSafe(
   name: string,
   planName: string,
   paymentMethod: string,
-  planoId?: string
+  planoId?: string,
+  email?: string,
+  cpf?: string | null
 ): Promise<boolean> {
   try {
     if (!phone) {
@@ -1013,9 +1029,16 @@ export async function sendWhatsAppPaymentPendingSafe(
       return false;
     }
 
+    // Build checkout URL with user data
+    const checkoutParams = new URLSearchParams();
+    if (email) checkoutParams.set('email', email);
+    if (name) checkoutParams.set('nome', name);
+    if (cpf) checkoutParams.set('cpf', cpf);
+    if (phone) checkoutParams.set('telefone', phone);
+    const queryString = checkoutParams.toString();
     const checkoutUrl = planoId 
-      ? `${getAppUrl()}/checkout/${planoId}`
-      : `${getAppUrl()}/checkout`;
+      ? `${getAppUrl()}/checkout/${planoId}${queryString ? '?' + queryString : ''}`
+      : `${getAppUrl()}/checkout${queryString ? '?' + queryString : ''}`;
 
     const defaultMessage = `Ola ${name}!
 
