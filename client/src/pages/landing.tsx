@@ -36,6 +36,8 @@ import {
   Bell,
   Upload,
   Settings,
+  Share2,
+  Activity,
 } from "lucide-react";
 import { SiWhatsapp } from "react-icons/si";
 
@@ -561,6 +563,44 @@ export default function LandingPage() {
               </CardHeader>
               <CardContent>
                 <p className="text-slate-300 text-sm leading-relaxed">Sequências antes, durante e depois do webinar. Email + WhatsApp sincronizados automaticamente.</p>
+              </CardContent>
+            </Card>
+
+            {/* Feature 13 - Affiliate Program - NEW */}
+            <Card className="bg-slate-800/40 border-slate-700/50 hover:border-pink-500/50 hover:bg-slate-800/60 transition-all duration-300 group backdrop-blur-sm relative overflow-hidden" data-testid="card-feature-affiliates">
+              <div className="absolute top-2 right-2">
+                <Badge className="bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs border-0" data-testid="badge-affiliates">
+                  <Share2 className="w-3 h-3 mr-1" />
+                  Afiliados
+                </Badge>
+              </div>
+              <CardHeader>
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-pink-500/20 to-rose-600/10 flex items-center justify-center mb-4 group-hover:scale-110 group-hover:shadow-lg group-hover:shadow-pink-500/20 transition-all">
+                  <Share2 className="w-7 h-7 text-pink-400" />
+                </div>
+                <CardTitle className="text-white text-lg" data-testid="text-feature-affiliates">Programa de Afiliados</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-slate-300 text-sm leading-relaxed">Recrute parceiros, rastreie vendas e pague comissões automaticamente. Sistema completo de afiliados.</p>
+              </CardContent>
+            </Card>
+
+            {/* Feature 14 - Facebook Pixel & Conversions API - NEW */}
+            <Card className="bg-slate-800/40 border-slate-700/50 hover:border-sky-500/50 hover:bg-slate-800/60 transition-all duration-300 group backdrop-blur-sm relative overflow-hidden" data-testid="card-feature-pixel">
+              <div className="absolute top-2 right-2">
+                <Badge className="bg-gradient-to-r from-sky-500 to-blue-500 text-white text-xs border-0" data-testid="badge-pixel">
+                  <Activity className="w-3 h-3 mr-1" />
+                  Tracking
+                </Badge>
+              </div>
+              <CardHeader>
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-sky-500/20 to-blue-600/10 flex items-center justify-center mb-4 group-hover:scale-110 group-hover:shadow-lg group-hover:shadow-sky-500/20 transition-all">
+                  <Activity className="w-7 h-7 text-sky-400" />
+                </div>
+                <CardTitle className="text-white text-lg" data-testid="text-feature-pixel">Facebook Pixel + API</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-slate-300 text-sm leading-relaxed">Rastreie eventos com Pixel e Conversions API. Otimize suas campanhas de anúncios com dados precisos.</p>
               </CardContent>
             </Card>
           </div>
