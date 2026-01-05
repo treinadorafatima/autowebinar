@@ -167,8 +167,14 @@ export const webinars = pgTable("webinars", {
   chatCollectEmail: boolean("chat_collect_email").notNull().default(false), // Coletar email
   chatCollectWhatsapp: boolean("chat_collect_whatsapp").notNull().default(false), // Coletar WhatsApp
   // Configurações de rastreamento/tracking por webinar
-  facebookPixelId: text("facebook_pixel_id").default(""), // Facebook Pixel ID específico do webinar
-  googleTagId: text("google_tag_id").default(""), // Google Tag/Analytics ID específico do webinar
+  // Meta/Facebook
+  facebookPixelId: text("facebook_pixel_id").default(""), // Facebook Pixel ID (ex: 123456789012345)
+  facebookAccessToken: text("facebook_access_token").default(""), // Token de acesso para API de Conversões
+  facebookTestEventCode: text("facebook_test_event_code").default(""), // Código de teste para eventos (opcional)
+  // Google Analytics (GA4)
+  googleAnalyticsId: text("google_analytics_id").default(""), // ID do GA4 (ex: G-XXXXXXXXXX)
+  // Google Ads - cada conversão tem seu próprio ID e label
+  googleAdsConversions: text("google_ads_conversions").default("[]"), // JSON: [{event: "lead", conversionId: "AW-xxx", conversionLabel: "abc123"}, ...]
 });
 
 export const webinarInsertSchema = createInsertSchema(webinars).omit({ id: true, createdAt: true });
