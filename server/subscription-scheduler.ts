@@ -273,9 +273,11 @@ async function generateRenewalPixBoleto(admin: AdminWithPlan): Promise<boolean> 
     if (!plano[0]) return false;
     
     const plan = plano[0];
-    const stripeSecretKey = await storage.getCheckoutConfig('STRIPE_SECRET_KEY');
-    if (!stripeSecretKey) {
-      console.log('[subscription-scheduler] Stripe not configured, skipping auto-renewal');
+    
+    // Use Mercado Pago for PIX/Boleto renewals (checkout híbrido)
+    const mpAccessToken = await storage.getCheckoutConfig('MERCADOPAGO_ACCESS_TOKEN');
+    if (!mpAccessToken) {
+      console.log('[subscription-scheduler] Mercado Pago not configured, skipping auto-renewal PIX/Boleto');
       return false;
     }
 
@@ -315,133 +317,126 @@ async function generateRenewalPixBoleto(admin: AdminWithPlan): Promise<boolean> 
       boletoExpiresAt: null,
     };
 
-    const amountInCentavos = Math.round(Number(plan.preco) * 100);
+    // Amount in reais for Mercado Pago (not centavos)
+    const amountInReais = Number(plan.preco) / 100;
+    
+    // Clean document number
+    const docNumber = (userCpf || '').replace(/\D/g, '');
+    const docType = docNumber.length === 14 ? 'CNPJ' : 'CPF';
+    
+    // Get webhook URL
+    const baseUrl = getAppUrl();
 
+    // Generate PIX via Mercado Pago
     try {
-      const pixParams = new URLSearchParams({
-        'amount': amountInCentavos.toString(),
-        'currency': 'brl',
-        'payment_method_types[0]': 'pix',
-        'metadata[pagamentoId]': pagamento.id,
-        'metadata[adminId]': admin.id,
-        'metadata[autoRenewal]': 'true',
-        'receipt_email': admin.email,
-        'description': `Renovação ${plan.nome}`,
-      });
+      const pixExpiresAt = new Date();
+      pixExpiresAt.setMinutes(pixExpiresAt.getMinutes() + 30); // 30 minutes for PIX
+      
+      const pixPaymentRequest = {
+        transaction_amount: amountInReais,
+        description: `Renovação ${plan.nome}`,
+        payment_method_id: 'pix',
+        date_of_expiration: pixExpiresAt.toISOString(),
+        external_reference: pagamento.id,
+        notification_url: `${baseUrl}/webhook/mercadopago`,
+        payer: {
+          email: admin.email,
+          first_name: (admin.name || 'Cliente').split(' ')[0],
+          last_name: (admin.name || 'Cliente').split(' ').slice(1).join(' ') || '',
+          identification: docNumber ? {
+            type: docType,
+            number: docNumber,
+          } : undefined,
+        },
+      };
 
-      const pixResponse = await fetch('https://api.stripe.com/v1/payment_intents', {
+      console.log(`[subscription-scheduler] Creating PIX renewal for ${admin.email}:`, JSON.stringify(pixPaymentRequest, null, 2));
+
+      const pixResponse = await fetch('https://api.mercadopago.com/v1/payments', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${stripeSecretKey}`,
-          'Content-Type': 'application/x-www-form-urlencoded',
+          'Authorization': `Bearer ${mpAccessToken}`,
+          'Content-Type': 'application/json',
+          'X-Idempotency-Key': `${pagamento.id}-renewal-pix-${Date.now()}`,
         },
-        body: pixParams.toString(),
+        body: JSON.stringify(pixPaymentRequest),
       });
 
+      const pixData = await pixResponse.json();
+      
       if (pixResponse.ok) {
-        const pixIntent = await pixResponse.json();
+        const pixQrCode = pixData.point_of_interaction?.transaction_data?.qr_code;
+        const pixQrCodeBase64 = pixData.point_of_interaction?.transaction_data?.qr_code_base64;
         
-        const confirmParams = new URLSearchParams({
-          'payment_method_data[type]': 'pix',
-        });
-
-        const confirmResponse = await fetch(`https://api.stripe.com/v1/payment_intents/${pixIntent.id}/confirm`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${stripeSecretKey}`,
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-          body: confirmParams.toString(),
-        });
-
-        if (confirmResponse.ok) {
-          const confirmedPix = await confirmResponse.json();
-          const pixAction = confirmedPix.next_action?.pix_display_qr_code;
-          if (pixAction) {
-            paymentData.pixCopiaCola = pixAction.data || null;
-            paymentData.pixQrCode = pixAction.image_url_png || null;
-            paymentData.pixExpiresAt = pixAction.expires_at ? new Date(pixAction.expires_at * 1000) : new Date(Date.now() + 24 * 60 * 60 * 1000);
-          }
-        } else {
-          const errorData = await confirmResponse.json().catch(() => ({}));
-          console.error('[subscription-scheduler] PIX confirm failed:', confirmResponse.status, errorData);
+        if (pixQrCode) {
+          paymentData.pixCopiaCola = pixQrCode;
+          paymentData.pixQrCode = pixQrCodeBase64 ? `data:image/png;base64,${pixQrCodeBase64}` : null;
+          paymentData.pixExpiresAt = pixExpiresAt;
+          console.log(`[subscription-scheduler] PIX renewal created for ${admin.email}, payment ID: ${pixData.id}`);
         }
       } else {
-        const errorData = await pixResponse.json().catch(() => ({}));
-        console.error('[subscription-scheduler] PIX create failed:', pixResponse.status, errorData);
+        console.error('[subscription-scheduler] MP PIX renewal failed:', pixData);
       }
     } catch (pixErr) {
-      console.error('[subscription-scheduler] Error generating PIX:', pixErr);
+      console.error('[subscription-scheduler] Error generating PIX renewal:', pixErr);
     }
 
+    // Generate Boleto via Mercado Pago (only if CPF available)
     try {
-      // Only generate boleto if user has a valid CPF on record
-      if (!userCpf || userCpf.length < 11) {
+      if (!docNumber || docNumber.length < 11) {
         console.log(`[subscription-scheduler] Skipping boleto for ${admin.email} - no CPF on record`);
       } else {
         const boletoExpiresAt = new Date();
-        boletoExpiresAt.setDate(boletoExpiresAt.getDate() + 3);
+        boletoExpiresAt.setDate(boletoExpiresAt.getDate() + 3); // 3 days for boleto
 
-        const boletoParams = new URLSearchParams({
-          'amount': amountInCentavos.toString(),
-          'currency': 'brl',
-          'payment_method_types[0]': 'boleto',
-          'metadata[pagamentoId]': pagamento.id,
-          'metadata[adminId]': admin.id,
-          'metadata[autoRenewal]': 'true',
-          'receipt_email': admin.email,
-          'description': `Renovação ${plan.nome}`,
-        });
+        const boletoPaymentRequest = {
+          transaction_amount: amountInReais,
+          description: `Renovação ${plan.nome}`,
+          payment_method_id: 'bolbradesco',
+          date_of_expiration: boletoExpiresAt.toISOString(),
+          external_reference: pagamento.id,
+          notification_url: `${baseUrl}/webhook/mercadopago`,
+          payer: {
+            email: admin.email,
+            first_name: (admin.name || 'Cliente').split(' ')[0],
+            last_name: (admin.name || 'Cliente').split(' ').slice(1).join(' ') || '',
+            identification: {
+              type: docType,
+              number: docNumber,
+            },
+          },
+        };
 
-        const boletoResponse = await fetch('https://api.stripe.com/v1/payment_intents', {
+        console.log(`[subscription-scheduler] Creating Boleto renewal for ${admin.email}`);
+
+        const boletoResponse = await fetch('https://api.mercadopago.com/v1/payments', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${stripeSecretKey}`,
-            'Content-Type': 'application/x-www-form-urlencoded',
+            'Authorization': `Bearer ${mpAccessToken}`,
+            'Content-Type': 'application/json',
+            'X-Idempotency-Key': `${pagamento.id}-renewal-boleto-${Date.now()}`,
           },
-          body: boletoParams.toString(),
+          body: JSON.stringify(boletoPaymentRequest),
         });
+
+        const boletoData = await boletoResponse.json();
 
         if (boletoResponse.ok) {
-          const boletoIntent = await boletoResponse.json();
+          const boletoUrl = boletoData.transaction_details?.external_resource_url;
+          const barcode = boletoData.barcode?.content;
           
-          // Clean CPF - remove non-digits
-          const cpfDigits = userCpf.replace(/\D/g, '');
-          const confirmParams = new URLSearchParams({
-            'payment_method_data[type]': 'boleto',
-            'payment_method_data[billing_details][email]': admin.email,
-            'payment_method_data[billing_details][name]': admin.name || 'Cliente',
-            'payment_method_data[boleto][tax_id]': cpfDigits,
-          });
-
-        const confirmResponse = await fetch(`https://api.stripe.com/v1/payment_intents/${boletoIntent.id}/confirm`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${stripeSecretKey}`,
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-          body: confirmParams.toString(),
-        });
-
-        if (confirmResponse.ok) {
-          const confirmedBoleto = await confirmResponse.json();
-          const boletoAction = confirmedBoleto.next_action?.boleto_display_details;
-          if (boletoAction) {
-            paymentData.boletoUrl = boletoAction.hosted_voucher_url || null;
-            paymentData.boletoCodigo = boletoAction.number || null;
-            paymentData.boletoExpiresAt = boletoAction.expires_at ? new Date(boletoAction.expires_at * 1000) : boletoExpiresAt;
+          if (boletoUrl) {
+            paymentData.boletoUrl = boletoUrl;
+            paymentData.boletoCodigo = barcode || null;
+            paymentData.boletoExpiresAt = boletoExpiresAt;
+            console.log(`[subscription-scheduler] Boleto renewal created for ${admin.email}, payment ID: ${boletoData.id}`);
           }
         } else {
-          const errorData = await confirmResponse.json().catch(() => ({}));
-          console.error('[subscription-scheduler] Boleto confirm failed:', confirmResponse.status, errorData);
-        }
-        } else {
-          const errorData = await boletoResponse.json().catch(() => ({}));
-          console.error('[subscription-scheduler] Boleto create failed:', boletoResponse.status, errorData);
+          console.error('[subscription-scheduler] MP Boleto renewal failed:', boletoData);
         }
       }
     } catch (boletoErr) {
-      console.error('[subscription-scheduler] Error generating Boleto:', boletoErr);
+      console.error('[subscription-scheduler] Error generating Boleto renewal:', boletoErr);
     }
 
     await storage.updateCheckoutPagamento(pagamento.id, {
@@ -454,13 +449,11 @@ async function generateRenewalPixBoleto(admin: AdminWithPlan): Promise<boolean> 
     });
 
     // Generate checkout URL for users to complete payment manually
-    // Includes all available user data to pre-fill the checkout form
     const checkoutParams = new URLSearchParams({
       email: admin.email,
       nome: admin.name || 'Cliente',
       renovacao: 'true'
     });
-    // Add telefone if available (CPF is not stored in admins table)
     if (admin.telefone) {
       checkoutParams.set('telefone', admin.telefone);
     }
@@ -479,11 +472,11 @@ async function generateRenewalPixBoleto(admin: AdminWithPlan): Promise<boolean> 
       paymentData.boletoUrl,
       paymentData.boletoCodigo,
       paymentData.boletoExpiresAt,
-      checkoutUrl  // New parameter: checkout link for manual payment
+      checkoutUrl
     );
     
     if (paymentData.pixCopiaCola || paymentData.boletoUrl) {
-      console.log(`[subscription-scheduler] Sent auto-renewal email with PIX/Boleto to ${admin.email}`);
+      console.log(`[subscription-scheduler] Sent auto-renewal email with MP PIX/Boleto to ${admin.email}`);
     } else {
       console.log(`[subscription-scheduler] Sent auto-renewal email with checkout link to ${admin.email}`);
     }
