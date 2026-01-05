@@ -10473,10 +10473,49 @@ Seja conversacional e objetivo.`;
         }
       }
 
-      // Handle payment_intent.succeeded (for Stripe Elements transparent checkout)
+      // Handle payment_intent.succeeded (for Stripe Elements transparent checkout AND subscription renewals)
       if (event.type === 'payment_intent.succeeded') {
         const paymentIntent = event.data.object;
         const pagamentoId = paymentIntent.metadata?.pagamentoId;
+        const invoiceId = paymentIntent.invoice; // Present in subscription renewals
+        
+        // For subscription renewals, we need to find the original payment by subscription ID
+        let subscriptionId: string | null = null;
+        let originalPagamento: any = null;
+        
+        if (!pagamentoId && invoiceId) {
+          // This is likely a subscription renewal - fetch the invoice to get subscription ID
+          try {
+            const stripeSecretKey = await storage.getCheckoutConfig('STRIPE_SECRET_KEY');
+            if (stripeSecretKey) {
+              const invoiceResponse = await fetch(
+                `https://api.stripe.com/v1/invoices/${invoiceId}`,
+                {
+                  headers: { 'Authorization': `Bearer ${stripeSecretKey}` },
+                }
+              );
+              if (invoiceResponse.ok) {
+                const invoiceData = await invoiceResponse.json();
+                subscriptionId = invoiceData.subscription;
+                
+                if (subscriptionId) {
+                  // Find original payment by stripeSubscriptionId
+                  const allPagamentos = await db.select().from(checkoutPagamentos)
+                    .where(eq(checkoutPagamentos.stripeSubscriptionId, subscriptionId))
+                    .orderBy(sql`${checkoutPagamentos.criadoEm} DESC`)
+                    .limit(1);
+                  
+                  if (allPagamentos.length > 0) {
+                    originalPagamento = allPagamentos[0];
+                    console.log(`[Stripe Webhook] Found original payment for subscription ${subscriptionId}: ${originalPagamento.email}`);
+                  }
+                }
+              }
+            }
+          } catch (subErr) {
+            console.error('[Stripe Webhook] Error fetching subscription for renewal:', subErr);
+          }
+        }
         
         if (pagamentoId) {
           const pagamento = await storage.getCheckoutPagamentoById(pagamentoId);
@@ -10583,6 +10622,65 @@ Seja conversacional e objetivo.`;
             await storage.updateCheckoutPagamento(pagamentoId, updateData);
             console.log(`[Stripe Webhook] Updated payment ${pagamentoId} to approved via Payment Intent`);
           }
+        } else if (originalPagamento && subscriptionId) {
+          // This is a subscription RENEWAL - no pagamentoId but we found the original payment
+          console.log(`[Stripe Webhook] Processing subscription renewal for ${originalPagamento.email}`);
+          
+          const plano = await storage.getCheckoutPlanoById(originalPagamento.planoId);
+          if (plano) {
+            const paymentDate = paymentIntent.created ? new Date(paymentIntent.created * 1000) : new Date();
+            
+            // Calculate new expiration based on current access (extend, don't replace)
+            const admin = await storage.getAdminById(originalPagamento.adminId);
+            if (admin) {
+              const currentAccess = admin.accessExpiresAt ? new Date(admin.accessExpiresAt) : paymentDate;
+              const extensionBase = currentAccess > paymentDate ? currentAccess : paymentDate;
+              
+              // Calculate new expiration
+              const newExpiration = new Date(extensionBase);
+              if (plano.tipoCobranca === 'recorrente') {
+                const freq = plano.frequencia || 1;
+                const freqTipo = plano.frequenciaTipo || 'months';
+                
+                if (freqTipo === 'days') {
+                  newExpiration.setDate(newExpiration.getDate() + freq);
+                } else if (freqTipo === 'weeks') {
+                  newExpiration.setDate(newExpiration.getDate() + (freq * 7));
+                } else if (freqTipo === 'months') {
+                  newExpiration.setMonth(newExpiration.getMonth() + freq);
+                } else if (freqTipo === 'years') {
+                  newExpiration.setFullYear(newExpiration.getFullYear() + freq);
+                }
+              } else {
+                newExpiration.setDate(newExpiration.getDate() + (plano.prazoDias || 30));
+              }
+              
+              // Update admin access
+              await storage.updateAdmin(admin.id, {
+                accessExpiresAt: newExpiration,
+                isActive: true,
+                paymentStatus: 'ok',
+                paymentFailedReason: null,
+              });
+              
+              // Update the original payment record with renewal info
+              await storage.updateCheckoutPagamento(originalPagamento.id, {
+                dataAprovacao: paymentDate,
+                dataPagamento: paymentDate,
+                dataExpiracao: newExpiration,
+                statusDetail: `Renovação automática Stripe - ${paymentDate.toISOString().split('T')[0]}`,
+              });
+              
+              console.log(`[Stripe Webhook] RENEWAL SUCCESS for ${admin.email}: extended from ${extensionBase.toISOString()} to ${newExpiration.toISOString()}`);
+              
+              // Send confirmation notifications
+              sendPaymentConfirmedEmailSafe(originalPagamento.email, originalPagamento.nome, plano.nome, newExpiration);
+              const telefoneRenewal = admin.telefone || originalPagamento.telefone;
+              if (telefoneRenewal) {
+                sendWhatsAppPaymentConfirmedSafe(telefoneRenewal, originalPagamento.nome, plano.nome, newExpiration);
+              }
+            }
+          }
         }
       }
 
@@ -10595,8 +10693,24 @@ Seja conversacional e objetivo.`;
         
         console.log(`[Stripe Webhook] Invoice paid for subscription: ${subscriptionId}`);
         
-        if (pagamentoId) {
-          const pagamento = await storage.getCheckoutPagamentoById(pagamentoId);
+        // If no pagamentoId in metadata, try to find by subscriptionId (for renewals)
+        let foundPagamento: any = null;
+        if (!pagamentoId && subscriptionId) {
+          const pagamentosBySubscription = await db.select().from(checkoutPagamentos)
+            .where(eq(checkoutPagamentos.stripeSubscriptionId, subscriptionId as string))
+            .orderBy(sql`${checkoutPagamentos.criadoEm} DESC`)
+            .limit(1);
+          
+          if (pagamentosBySubscription.length > 0) {
+            foundPagamento = pagamentosBySubscription[0];
+            console.log(`[Stripe Webhook] Found payment by subscription ID: ${foundPagamento.email}`);
+          }
+        }
+        
+        if (pagamentoId || foundPagamento) {
+          const pagamento = pagamentoId 
+            ? await storage.getCheckoutPagamentoById(pagamentoId)
+            : foundPagamento;
           if (pagamento) {
             const plano = await storage.getCheckoutPlanoById(pagamento.planoId);
             
@@ -10674,14 +10788,19 @@ Seja conversacional e objetivo.`;
                 ? new Date(invoice.status_transitions.paid_at * 1000) 
                 : (invoice.created ? new Date(invoice.created * 1000) : new Date());
               
-              await storage.updateCheckoutPagamento(pagamentoId, {
+              // Use pagamento.id since pagamentoId might be null for renewals found by subscriptionId
+              await storage.updateCheckoutPagamento(pagamento.id, {
                 status: 'approved',
-                statusDetail: 'Assinatura ativa',
+                statusDetail: foundPagamento ? `Renovação automática - ${invoicePaymentDate.toISOString().split('T')[0]}` : 'Assinatura ativa',
                 dataPagamento: invoicePaymentDate,
                 dataAprovacao: invoicePaymentDate,
                 dataExpiracao: expirationDate,
                 adminId: admin.id,
               });
+              
+              if (foundPagamento) {
+                console.log(`[Stripe Webhook] RENEWAL via invoice.paid for ${pagamento.email}, expires: ${expirationDate.toISOString()}`);
+              }
             }
           }
         }
