@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useParams, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, CheckCircle2, Calendar, Clock, Users, Video, MapPin } from "lucide-react";
 import type { Webinar, LeadFormConfig } from "@shared/schema";
+import { useWebinarTracking } from "@/hooks/use-webinar-tracking";
 
 function getNextSessionDate(webinar: Webinar): { date: string; time: string; dayOfWeek: string; rawDate: string } | null {
   if (!webinar) return null;
@@ -71,6 +72,14 @@ export default function WebinarRegister() {
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
   const [consent, setConsent] = useState(false);
+
+  // Tracking
+  const { trackRegistration, isConfigured: trackingConfigured } = useWebinarTracking({
+    facebookPixelId: (webinar as any)?.facebookPixelId,
+    googleTagId: (webinar as any)?.googleTagId,
+    webinarName: webinar?.name,
+    webinarSlug: webinar?.slug,
+  });
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -162,6 +171,10 @@ export default function WebinarRegister() {
       if (res.ok) {
         const data = await res.json();
         setSuccess(true);
+        
+        if (trackingConfigured) {
+          trackRegistration({ name, email, phone: whatsapp });
+        }
         
         localStorage.setItem(`webinar-${params.slug}-registered`, "true");
         localStorage.setItem(`webinar-${params.slug}-userName`, name);

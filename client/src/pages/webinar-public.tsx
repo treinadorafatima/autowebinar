@@ -8,6 +8,7 @@ import DOMPurify from "dompurify";
 import Hls from "hls.js";
 import { calculateWebinarStatusWithTimezone } from "@/lib/timezone";
 import { toZonedTime, fromZonedTime } from 'date-fns-tz';
+import { useWebinarTracking } from "@/hooks/use-webinar-tracking";
 import {
   Dialog,
   DialogContent,
@@ -129,6 +130,9 @@ interface Webinar {
   seoDescription?: string;
   seoFaviconUrl?: string;
   seoShareImageUrl?: string;
+  // Tracking
+  facebookPixelId?: string;
+  googleTagId?: string;
 }
 
 interface Comment {
@@ -237,6 +241,20 @@ export default function WebinarPublicPage() {
   const commentsEndRef = useRef<HTMLDivElement>(null);
   const videoInitializedRef = useRef(false);
   const { toast } = useToast();
+  const videoStartTracked = useRef(false);
+
+  // Tracking hook initialization
+  const {
+    trackVideoStart,
+    trackOfferClick,
+    trackRegistration,
+    isConfigured: trackingConfigured,
+  } = useWebinarTracking({
+    facebookPixelId: webinar?.facebookPixelId,
+    googleTagId: webinar?.googleTagId,
+    webinarName: webinar?.name,
+    webinarSlug: webinar?.slug,
+  });
 
   useEffect(() => {
     const hasSeenModal = localStorage.getItem(`webinar-${params.slug}-modal-seen`);
@@ -1366,6 +1384,10 @@ export default function WebinarPublicPage() {
     localStorage.setItem(`webinar-${params.slug}-userCity`, userCity);
     localStorage.setItem(`webinar-${params.slug}-userState`, userState);
     
+    if (trackingConfigured) {
+      trackRegistration({ name: userName, email: userEmail, phone: userWhatsapp });
+    }
+    
     setIsRegistered(true);
     setShowParticipationModal(false);
   }
@@ -1748,6 +1770,10 @@ export default function WebinarPublicPage() {
                           console.log("Video playing");
                           setIsVideoPlaying(true);
                           setNeedsUserInteraction(false);
+                          if (!videoStartTracked.current && trackingConfigured) {
+                            trackVideoStart();
+                            videoStartTracked.current = true;
+                          }
                         }}
                         onSeeked={isUsingHls ? undefined : handleVideoSeeked}
                         data-testid="video-player"
@@ -2071,6 +2097,11 @@ export default function WebinarPublicPage() {
                     padding: getButtonPadding(webinar.offerButtonSize || "lg"),
                     fontSize: getButtonFontSize(webinar.offerButtonSize || "lg"),
                     textShadow: "1px 1px 2px rgba(0,0,0,0.3)"
+                  }}
+                  onClick={() => {
+                    if (trackingConfigured) {
+                      trackOfferClick(webinar.offerButtonUrl);
+                    }
                   }}
                   data-testid="button-offer-cta"
                   dangerouslySetInnerHTML={{ __html: sanitizeHtml(webinar.offerButtonText) }}

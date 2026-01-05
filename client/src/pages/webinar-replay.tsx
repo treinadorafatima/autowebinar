@@ -4,6 +4,7 @@ import { Check, Play, Pause, Volume2, VolumeX, Maximize, Loader2 } from "lucide-
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import Hls from "hls.js";
+import { useWebinarTracking } from "@/hooks/use-webinar-tracking";
 
 interface Webinar {
   id: string;
@@ -28,6 +29,8 @@ interface Webinar {
   replayButtonText: string;
   replayButtonUrl: string;
   replayButtonColor: string;
+  facebookPixelId?: string;
+  googleTagId?: string;
 }
 
 interface VideoInfo {
@@ -125,6 +128,16 @@ export default function WebinarReplayPage() {
   const [hasStarted, setHasStarted] = useState(false);
   const [isVideoReady, setIsVideoReady] = useState(false);
   const [isBuffering, setIsBuffering] = useState(false);
+  
+  const videoStartTracked = useRef(false);
+
+  // Tracking hook
+  const { trackVideoStart, trackOfferClick, isConfigured: trackingConfigured } = useWebinarTracking({
+    facebookPixelId: webinar?.facebookPixelId,
+    googleTagId: webinar?.googleTagId,
+    webinarName: webinar?.name,
+    webinarSlug: webinar?.slug,
+  });
 
   useEffect(() => {
     if (!isEmbed) return;
@@ -316,6 +329,10 @@ export default function WebinarReplayPage() {
     const handlePlay = () => {
       setIsPlaying(true);
       setHasStarted(true);
+      if (!videoStartTracked.current && trackingConfigured) {
+        trackVideoStart();
+        videoStartTracked.current = true;
+      }
     };
     const handlePause = () => setIsPlaying(false);
 
@@ -721,6 +738,11 @@ export default function WebinarReplayPage() {
                   target="_blank"
                   rel="noopener noreferrer"
                   className="block w-full"
+                  onClick={() => {
+                    if (trackingConfigured) {
+                      trackOfferClick(webinar.replayButtonUrl);
+                    }
+                  }}
                 >
                   <Button
                     size="lg"
