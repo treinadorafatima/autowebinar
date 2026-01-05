@@ -657,6 +657,9 @@ export default function AdminWebinarDetailPage() {
     seoDescription: "",
     seoFaviconUrl: "",
     seoShareImageUrl: "",
+    // Tracking/Rastreamento
+    facebookPixelId: "",
+    googleTagId: "",
   });
 
   const [benefitsList, setBenefitsList] = useState<string[]>([]);
@@ -889,6 +892,8 @@ export default function AdminWebinarDetailPage() {
         seoDescription: data.seoDescription || "",
         seoFaviconUrl: data.seoFaviconUrl || "",
         seoShareImageUrl: data.seoShareImageUrl || "",
+        facebookPixelId: data.facebookPixelId || "",
+        googleTagId: data.googleTagId || "",
       });
       setCommentTheme(data.commentTheme || "dark");
       setLeadsEnabled(data.leadsEnabled || false);
@@ -1909,6 +1914,10 @@ export default function AdminWebinarDetailPage() {
               <TabsTrigger value="seo" className="w-full justify-start gap-2 px-3 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 <Globe className="h-4 w-4" />
                 <span>SEO</span>
+              </TabsTrigger>
+              <TabsTrigger value="tracking" className="w-full justify-start gap-2 px-3 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <BarChart3 className="h-4 w-4" />
+                <span>Pixel/Analytics</span>
               </TabsTrigger>
               <TabsTrigger value="embed" className="w-full justify-start gap-2 px-3 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 <Code className="h-4 w-4" />
@@ -5601,6 +5610,77 @@ export default function AdminWebinarDetailPage() {
                   </div>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Tracking/Rastreamento */}
+        <TabsContent value="tracking">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5" />
+                Pixel e Analytics
+              </CardTitle>
+              <CardDescription>Configure rastreamento específico para este webinário. Eventos serão disparados em visualização, registro, início de vídeo e clique na oferta.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="facebook-pixel-id">Facebook Pixel ID</Label>
+                  <Input
+                    id="facebook-pixel-id"
+                    value={formData.facebookPixelId}
+                    onChange={(e) => setFormData({ ...formData, facebookPixelId: e.target.value })}
+                    placeholder="Ex: 123456789012345"
+                    data-testid="input-facebook-pixel-id"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Eventos: PageView, ViewContent, CompleteRegistration, Lead, InitiateCheckout
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="google-tag-id">Google Analytics / Tag ID</Label>
+                  <Input
+                    id="google-tag-id"
+                    value={formData.googleTagId}
+                    onChange={(e) => setFormData({ ...formData, googleTagId: e.target.value })}
+                    placeholder="Ex: G-XXXXXXXXXX ou AW-XXXXXXXXXX"
+                    data-testid="input-google-tag-id"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Aceita GA4 (G-) ou Google Ads (AW-)
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-lg bg-muted/50 p-4 space-y-2">
+                <h4 className="font-medium text-sm">Eventos Rastreados Automaticamente</h4>
+                <ul className="text-sm text-muted-foreground space-y-1">
+                  <li className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-blue-500" />
+                    <strong>PageView</strong> - Quando alguém acessa a página do webinário
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-green-500" />
+                    <strong>CompleteRegistration</strong> - Quando alguém se registra no chat/leads
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-yellow-500" />
+                    <strong>Lead</strong> - Quando o vídeo começa a reproduzir
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-purple-500" />
+                    <strong>InitiateCheckout</strong> - Quando clicam no botão da oferta
+                  </li>
+                </ul>
+              </div>
+
+              {(!formData.facebookPixelId && !formData.googleTagId) && (
+                <div className="rounded-lg border border-dashed p-4 text-center text-muted-foreground">
+                  <p className="text-sm">Nenhum tracking configurado. Adicione um Pixel ou Tag acima para começar a rastrear eventos.</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
