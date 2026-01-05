@@ -166,6 +166,9 @@ export const webinars = pgTable("webinars", {
   chatCollectState: boolean("chat_collect_state").notNull().default(true), // Coletar estado
   chatCollectEmail: boolean("chat_collect_email").notNull().default(false), // Coletar email
   chatCollectWhatsapp: boolean("chat_collect_whatsapp").notNull().default(false), // Coletar WhatsApp
+  // Configurações de rastreamento/tracking por webinar
+  facebookPixelId: text("facebook_pixel_id").default(""), // Facebook Pixel ID específico do webinar
+  googleTagId: text("google_tag_id").default(""), // Google Tag/Analytics ID específico do webinar
 });
 
 export const webinarInsertSchema = createInsertSchema(webinars).omit({ id: true, createdAt: true });
