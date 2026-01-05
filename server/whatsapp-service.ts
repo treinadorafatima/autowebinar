@@ -1418,28 +1418,56 @@ export async function restoreWhatsAppSessions(): Promise<void> {
       // Skip if credentials are not valid (not registered)
       if (!isSessionValid(accountId)) {
         console.log(`[whatsapp] Skipping account ${accountId} - no valid credentials on disk`);
+        
+        // Try to find matching session in database to update its status
+        // First check sessionMap (connected sessions)
+        let session = sessionMap.get(accountId);
+        
+        // If not in sessionMap, try to fetch directly from database
+        if (!session) {
+          try {
+            session = await storage.getWhatsappSessionByAccountId(accountId);
+          } catch (e) {
+            console.log(`[whatsapp] Error fetching session ${accountId} from database:`, e);
+          }
+        }
+        
+        // Update database status to disconnected so UI reflects reality
+        if (session) {
+          try {
+            await storage.upsertWhatsappSessionByAccountId(accountId, session.adminId, {
+              status: "disconnected",
+              qrCode: null,
+            });
+            console.log(`[whatsapp] Updated account ${accountId} status to disconnected in database`);
+          } catch (e) {
+            console.error(`[whatsapp] Error updating status for ${accountId}:`, e);
+          }
+        } else {
+          console.log(`[whatsapp] No database record found for account ${accountId}`);
+        }
         continue;
       }
       
-      // Find matching session in database
-      const session = sessionMap.get(accountId);
-      if (!session) {
+      // Find matching session in database (for valid sessions)
+      const validSession = sessionMap.get(accountId);
+      if (!validSession) {
         console.log(`[whatsapp] Found orphaned session folder ${accountId} - no matching DB record`);
         continue;
       }
       
-      console.log(`[whatsapp] Restoring session for account ${accountId} (admin: ${session.adminId}) from disk credentials`);
+      console.log(`[whatsapp] Restoring session for account ${accountId} (admin: ${validSession.adminId}) from disk credentials`);
       
       // Small delay between connections to avoid rate limiting
       await new Promise(resolve => setTimeout(resolve, 1500));
       
       try {
-        await initWhatsAppConnection(accountId, session.adminId);
+        await initWhatsAppConnection(accountId, validSession.adminId);
         restoredCount++;
       } catch (error) {
         console.error(`[whatsapp] Failed to restore session for account ${accountId}:`, error);
         
-        await storage.upsertWhatsappSessionByAccountId(accountId, session.adminId, {
+        await storage.upsertWhatsappSessionByAccountId(accountId, validSession.adminId, {
           status: "disconnected",
           qrCode: null,
         });
