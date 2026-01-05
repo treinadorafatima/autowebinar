@@ -103,3 +103,46 @@ O sistema de tracking é dividido em três plataformas independentes por webiná
 - API pública retorna apenas flag `metaCapiEnabled: boolean`
 - Endpoint de tracking busca credenciais internamente
 - **NOTA**: Para produção, considerar criptografia adicional ou uso de secrets manager
+
+## Subscription Renewal System (Renovação de Assinaturas)
+
+### Arquitetura
+O sistema de renovação de assinaturas usa múltiplas camadas de redundância para garantir que pagamentos aprovados sempre resultem em acesso estendido:
+
+1. **Webhooks Primários**:
+   - Stripe: `payment_intent.succeeded`, `checkout.session.completed`, `invoice.paid`
+   - Mercado Pago: `payment`, `subscription_preapproval`, `subscription_authorized_payment`
+
+2. **Sync Periódico (Fallback)**:
+   - **Stripe Sync**: Verifica pagamentos pendentes na API do Stripe a cada 30 minutos
+   - **Mercado Pago Sync**: Verifica status de assinaturas na API do MP a cada 30 minutos
+   - Recupera automaticamente pagamentos cujos webhooks falharam
+
+3. **Helper de Expiração Consistente**:
+   - Função `calculateExpirationDate(plano)` centraliza cálculo de expiração
+   - Para planos recorrentes: usa `frequencia` + `frequenciaTipo` (days/weeks/months/years)
+   - Para pagamentos únicos: usa `prazoDias`
+   - Garante consistência entre webhooks e sync
+
+### Fluxo de Renovação
+1. Scheduler detecta admin com `accessExpiresAt` próximo de expirar
+2. Gera PIX/Boleto de renovação via Stripe
+3. Envia email e WhatsApp com dados de pagamento
+4. Quando pago:
+   - Webhook Stripe recebe `payment_intent.succeeded`
+   - Atualiza `checkoutPagamentos.status` para 'approved'
+   - Estende `admins.accessExpiresAt` usando `calculateExpirationDate()`
+5. Se webhook falhar:
+   - Sync periódico (30 min) verifica status na API
+   - Recupera pagamento e estende acesso automaticamente
+
+### Intervalos de Sync
+- **Expiration Reminders**: A cada 1 hora
+- **Payment Sync (Stripe + MP)**: A cada 30 minutos
+- Primeiro sync: 2 minutos após iniciar servidor
+
+### Logs de Diagnóstico
+- `[subscription-scheduler] Auto-approved payment for X` - Sync recuperou pagamento
+- `[subscription-scheduler] Auto-reactivated X` - Acesso estendido via sync
+- `[subscription-scheduler] Stripe auto-sync: Extended access for X` - Stripe sync recuperou
+- `[MP Webhook] PAYMENT CONFIRMED` - Webhook processou renovação

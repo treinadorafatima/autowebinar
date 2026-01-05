@@ -68,6 +68,47 @@ function isDailyPlan(planFreq: PlanFrequency | null): boolean {
          planFreq.frequencia <= 3; // Planos com ciclo de até 3 dias são considerados "diários"
 }
 
+/**
+ * Calcula a data de expiração baseada no tipo do plano
+ * Esta função é usada tanto nos webhooks quanto no sync scheduler
+ * para garantir consistência no cálculo de expiração
+ */
+function calculateExpirationDate(plano: {
+  tipoCobranca?: string;
+  frequencia?: number;
+  frequenciaTipo?: string;
+  prazoDias?: number;
+}): Date {
+  const expirationDate = new Date();
+  
+  if (plano.tipoCobranca === 'recorrente') {
+    // Para planos recorrentes: usar frequencia + frequenciaTipo
+    const freq = plano.frequencia || 1;
+    const freqTipo = plano.frequenciaTipo || 'months';
+    
+    if (freqTipo === 'days') {
+      expirationDate.setDate(expirationDate.getDate() + freq);
+    } else if (freqTipo === 'weeks') {
+      expirationDate.setDate(expirationDate.getDate() + (freq * 7));
+    } else if (freqTipo === 'months') {
+      expirationDate.setMonth(expirationDate.getMonth() + freq);
+    } else if (freqTipo === 'years') {
+      expirationDate.setFullYear(expirationDate.getFullYear() + freq);
+    } else {
+      // Fallback para dias se tipo desconhecido
+      expirationDate.setDate(expirationDate.getDate() + freq);
+    }
+  } else {
+    // Para pagamentos únicos: usar prazoDias
+    expirationDate.setDate(expirationDate.getDate() + (plano.prazoDias || 30));
+  }
+  
+  return expirationDate;
+}
+
+// Exportar para uso nos webhooks
+export { calculateExpirationDate };
+
 interface RenewalPaymentData {
   pixCopiaCola: string | null;
   pixQrCode: string | null;
@@ -884,8 +925,8 @@ async function syncMercadoPagoSubscriptions(): Promise<void> {
                   ? new Date(latestApprovedPayment.date_approved) 
                   : realPaymentDate;
 
-                const expirationDate = new Date();
-                expirationDate.setDate(expirationDate.getDate() + (plano.prazoDias || 30));
+                // Usar helper consistente para calcular expiração
+                const expirationDate = calculateExpirationDate(plano);
 
                 await storage.updateCheckoutPagamento(pagamento.id, {
                   status: 'approved',
@@ -894,13 +935,19 @@ async function syncMercadoPagoSubscriptions(): Promise<void> {
                   dataAprovacao: realApprovalDate,
                   dataExpiracao: expirationDate,
                 });
-                console.log(`[subscription-scheduler] Auto-approved payment for ${pagamento.email}`);
+                console.log(`[subscription-scheduler] Auto-approved payment for ${pagamento.email}, expires: ${expirationDate.toISOString()}`);
               }
 
-              // Reactivate admin if needed
-              if (admin && (!admin.isActive || admin.paymentStatus !== 'ok')) {
-                const expirationDate = new Date();
-                expirationDate.setDate(expirationDate.getDate() + (plano.prazoDias || 30));
+              // Reactivate admin if needed - also extends access for already active users with pending renewal
+              const needsAccessExtension = admin && (
+                !admin.isActive || 
+                admin.paymentStatus !== 'ok' ||
+                (admin.accessExpiresAt && new Date(admin.accessExpiresAt) <= new Date())
+              );
+              
+              if (needsAccessExtension) {
+                // Usar helper consistente para calcular expiração
+                const expirationDate = calculateExpirationDate(plano);
 
                 await storage.updateAdmin(admin.id, {
                   isActive: true,
@@ -910,7 +957,7 @@ async function syncMercadoPagoSubscriptions(): Promise<void> {
                   planoId: plano.id,
                 });
                 reactivated++;
-                console.log(`[subscription-scheduler] Auto-reactivated ${pagamento.email}`);
+                console.log(`[subscription-scheduler] Auto-reactivated ${pagamento.email}, new expiration: ${expirationDate.toISOString()}`);
               }
             }
           }
@@ -930,6 +977,125 @@ async function syncMercadoPagoSubscriptions(): Promise<void> {
   }
 }
 
+// Sync Stripe payment statuses with local database
+// This recovers payments that may have been missed by webhooks
+async function syncStripePayments(): Promise<void> {
+  console.log("[subscription-scheduler] Starting Stripe payment sync");
+  
+  try {
+    const stripeSecretKey = await storage.getCheckoutConfig('STRIPE_SECRET_KEY');
+    if (!stripeSecretKey) {
+      console.log("[subscription-scheduler] Stripe not configured, skipping sync");
+      return;
+    }
+
+    // Get pending Stripe payments that might have been paid but webhook missed
+    // Look for recent payments (created in the last 48 hours) that are still pending
+    const twoDaysAgo = new Date();
+    twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+    
+    const pendingPayments = await db.select().from(checkoutPagamentos)
+      .where(
+        and(
+          sql`(${checkoutPagamentos.stripePaymentIntentId} IS NOT NULL OR ${checkoutPagamentos.stripeSubscriptionId} IS NOT NULL)`,
+          sql`${checkoutPagamentos.status} IN ('pending', 'checkout_iniciado', 'in_process', 'processing')`,
+          sql`${checkoutPagamentos.criadoEm} > ${twoDaysAgo.toISOString()}`
+        )
+      )
+      .orderBy(sql`${checkoutPagamentos.criadoEm} DESC`)
+      .limit(50); // Limit to avoid rate limiting
+
+    let synced = 0;
+    let updated = 0;
+
+    for (const pagamento of pendingPayments) {
+      try {
+        // Check PaymentIntent status if available
+        if (pagamento.stripePaymentIntentId) {
+          const piResponse = await fetch(
+            `https://api.stripe.com/v1/payment_intents/${pagamento.stripePaymentIntentId}`,
+            {
+              headers: { 'Authorization': `Bearer ${stripeSecretKey}` },
+            }
+          );
+          
+          if (piResponse.ok) {
+            const paymentIntent = await piResponse.json();
+            
+            if (paymentIntent.status === 'succeeded' && pagamento.status !== 'approved') {
+              // Payment was successful but webhook missed it!
+              const plano = await storage.getCheckoutPlanoById(pagamento.planoId);
+              if (plano) {
+                const expirationDate = calculateExpirationDate(plano);
+                const paymentDate = paymentIntent.created 
+                  ? new Date(paymentIntent.created * 1000) 
+                  : new Date();
+                
+                await storage.updateCheckoutPagamento(pagamento.id, {
+                  status: 'approved',
+                  statusDetail: 'Pagamento confirmado (auto-sync)',
+                  dataPagamento: paymentDate,
+                  dataAprovacao: paymentDate,
+                  dataExpiracao: expirationDate,
+                });
+                
+                // Update admin access
+                const admin = await storage.getAdminByEmail(pagamento.email);
+                if (admin) {
+                  await storage.updateAdmin(admin.id, {
+                    accessExpiresAt: expirationDate,
+                    webinarLimit: plano.webinarLimit,
+                    uploadLimit: plano.uploadLimit || plano.webinarLimit,
+                    isActive: true,
+                    planoId: plano.id,
+                    paymentStatus: 'ok',
+                    paymentFailedReason: null,
+                  });
+                  updated++;
+                  console.log(`[subscription-scheduler] Stripe auto-sync: Extended access for ${pagamento.email}, expires: ${expirationDate.toISOString()}`);
+                }
+              }
+            } else if (paymentIntent.status === 'canceled' || paymentIntent.status === 'failed') {
+              // Mark as failed/cancelled
+              if (pagamento.status !== 'cancelled' && pagamento.status !== 'rejected') {
+                await storage.updateCheckoutPagamento(pagamento.id, {
+                  status: paymentIntent.status === 'canceled' ? 'cancelled' : 'rejected',
+                  statusDetail: `Pagamento ${paymentIntent.status} (auto-sync)`,
+                });
+              }
+            }
+          }
+        }
+        
+        synced++;
+        
+        // Small delay to avoid rate limiting
+        if (synced % 10 === 0) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      } catch (err) {
+        // Silent fail for individual payments, continue processing others
+        console.error(`[subscription-scheduler] Error syncing Stripe payment ${pagamento.id}:`, err);
+      }
+    }
+
+    if (synced > 0 || updated > 0) {
+      console.log(`[subscription-scheduler] Stripe sync complete: ${synced} checked, ${updated} updated`);
+    }
+  } catch (error) {
+    console.error("[subscription-scheduler] Error syncing Stripe payments:", error);
+  }
+}
+
+// Combined sync function that runs both payment syncs
+async function runPaymentSync(): Promise<void> {
+  await syncStripePayments();
+  await syncMercadoPagoSubscriptions();
+}
+
+// Intervalo de sync de pagamentos (30 minutos para recuperar webhooks perdidos rapidamente)
+const PAYMENT_SYNC_INTERVAL_MS = 30 * 60 * 1000; // 30 minutos
+
 export function startSubscriptionScheduler(): void {
   if (schedulerInterval) {
     console.log("[subscription-scheduler] Scheduler already running");
@@ -938,20 +1104,24 @@ export function startSubscriptionScheduler(): void {
 
   console.log("[subscription-scheduler] Starting subscription scheduler");
   
+  // Run expiration reminders after 5 seconds, then every hour
   setTimeout(() => {
     processExpirationReminders();
   }, 5000);
+  schedulerInterval = setInterval(processExpirationReminders, SCHEDULER_INTERVAL_MS);
   
-  // Run MP sync every 6 hours
+  // Run payment sync (Stripe + MP) after 2 minutes, then every 30 minutes
+  // More frequent sync ensures webhooks failures are recovered quickly
+  // especially important for daily plans
   setTimeout(() => {
-    syncMercadoPagoSubscriptions();
-  }, 60000); // First run after 1 minute
+    runPaymentSync();
+  }, 120000); // First run after 2 minutes
   
   setInterval(() => {
-    syncMercadoPagoSubscriptions();
-  }, 6 * 60 * 60 * 1000); // Then every 6 hours
+    runPaymentSync();
+  }, PAYMENT_SYNC_INTERVAL_MS); // Then every 30 minutes
   
-  schedulerInterval = setInterval(processExpirationReminders, SCHEDULER_INTERVAL_MS);
+  console.log("[subscription-scheduler] Payment sync scheduled every 30 minutes");
 }
 
 export function stopSubscriptionScheduler(): void {
