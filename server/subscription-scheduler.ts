@@ -1114,9 +1114,141 @@ async function syncStripePayments(): Promise<void> {
   }
 }
 
+// Sync active Stripe subscriptions - catches renewal payments when webhooks miss
+// This is critical for recurring card payments that auto-renew
+async function syncStripeActiveSubscriptions(): Promise<void> {
+  console.log("[subscription-scheduler] Syncing active Stripe subscriptions");
+  
+  try {
+    const stripeSecretKey = await storage.getCheckoutConfig('STRIPE_SECRET_KEY');
+    if (!stripeSecretKey) {
+      console.log("[subscription-scheduler] Stripe not configured, skipping subscription sync");
+      return;
+    }
+
+    // Find all approved payments with stripeSubscriptionId (active recurring subscriptions)
+    const activeSubscriptions = await db.select().from(checkoutPagamentos)
+      .where(
+        and(
+          sql`${checkoutPagamentos.stripeSubscriptionId} IS NOT NULL`,
+          sql`${checkoutPagamentos.status} = 'approved'`,
+          sql`${checkoutPagamentos.adminId} IS NOT NULL`
+        )
+      )
+      .orderBy(sql`${checkoutPagamentos.criadoEm} DESC`)
+      .limit(100);
+
+    let checked = 0;
+    let renewed = 0;
+
+    for (const pagamento of activeSubscriptions) {
+      try {
+        // Get subscription details from Stripe
+        const subResponse = await fetch(
+          `https://api.stripe.com/v1/subscriptions/${pagamento.stripeSubscriptionId}`,
+          {
+            headers: { 'Authorization': `Bearer ${stripeSecretKey}` },
+          }
+        );
+
+        if (!subResponse.ok) continue;
+
+        const subscription = await subResponse.json();
+        
+        // Skip cancelled/inactive subscriptions
+        if (subscription.status !== 'active' && subscription.status !== 'trialing') {
+          continue;
+        }
+
+        // Get latest paid invoice for this subscription
+        const invoicesResponse = await fetch(
+          `https://api.stripe.com/v1/invoices?subscription=${pagamento.stripeSubscriptionId}&status=paid&limit=5`,
+          {
+            headers: { 'Authorization': `Bearer ${stripeSecretKey}` },
+          }
+        );
+
+        if (!invoicesResponse.ok) continue;
+
+        const invoicesData = await invoicesResponse.json();
+        const paidInvoices = invoicesData.data || [];
+
+        if (paidInvoices.length === 0) continue;
+
+        // Get the most recent paid invoice
+        const latestInvoice = paidInvoices[0];
+        const invoicePaidAt = new Date(latestInvoice.status_transitions?.paid_at * 1000 || latestInvoice.created * 1000);
+
+        // Get the admin to check their current access
+        const admin = await storage.getAdminById(pagamento.adminId!);
+        if (!admin) continue;
+
+        const currentAccess = admin.accessExpiresAt ? new Date(admin.accessExpiresAt) : null;
+
+        // If the latest invoice was paid AFTER the admin's access was last set,
+        // we might have missed a webhook - extend their access
+        if (currentAccess && invoicePaidAt > new Date(pagamento.dataAprovacao || 0)) {
+          // Check if we already processed this invoice
+          const invoiceDate = invoicePaidAt.toISOString().split('T')[0];
+          const lastApprovalDate = pagamento.dataAprovacao ? new Date(pagamento.dataAprovacao).toISOString().split('T')[0] : null;
+          
+          // If invoice is from a different day than the original approval, it's likely a renewal
+          if (invoiceDate !== lastApprovalDate) {
+            const plano = await storage.getCheckoutPlanoById(pagamento.planoId);
+            if (!plano) continue;
+
+            // Calculate new expiration from the invoice paid date
+            const extensionBase = currentAccess && currentAccess > invoicePaidAt 
+              ? currentAccess 
+              : invoicePaidAt;
+            const newExpiration = calculateExpirationDate(plano, extensionBase);
+
+            // Only update if this extends their access
+            if (!currentAccess || newExpiration > currentAccess) {
+              await storage.updateAdmin(admin.id, {
+                accessExpiresAt: newExpiration,
+                isActive: true,
+                paymentStatus: 'ok',
+                paymentFailedReason: null,
+              });
+
+              // Update the payment record with latest payment date
+              await storage.updateCheckoutPagamento(pagamento.id, {
+                dataAprovacao: invoicePaidAt,
+                dataPagamento: invoicePaidAt,
+                dataExpiracao: newExpiration,
+                statusDetail: `Renovação automática Stripe (sync ${invoiceDate})`,
+              });
+
+              renewed++;
+              console.log(`[subscription-scheduler] Stripe subscription renewal synced for ${admin.email}: invoice ${latestInvoice.id}, new expiration: ${newExpiration.toISOString()}`);
+            }
+          }
+        }
+
+        checked++;
+
+        // Rate limiting
+        if (checked % 5 === 0) {
+          await new Promise(resolve => setTimeout(resolve, 300));
+        }
+      } catch (err) {
+        console.error(`[subscription-scheduler] Error syncing subscription ${pagamento.stripeSubscriptionId}:`, err);
+      }
+    }
+
+    if (checked > 0 || renewed > 0) {
+      console.log(`[subscription-scheduler] Stripe subscription sync: ${checked} checked, ${renewed} renewals processed`);
+    }
+  } catch (error) {
+    console.error("[subscription-scheduler] Error syncing Stripe subscriptions:", error);
+  }
+}
+
 // Combined sync function that runs both payment syncs
 async function runPaymentSync(): Promise<void> {
   await syncStripePayments();
+  await syncStripeActiveSubscriptions(); // Check active subscriptions for missed renewals
   await syncMercadoPagoSubscriptions();
 }
 
