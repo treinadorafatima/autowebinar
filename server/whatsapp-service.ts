@@ -33,7 +33,7 @@ const connections: Map<string, WhatsAppConnection> = new Map();
 const AUTH_DIR = path.join(process.cwd(), "whatsapp-sessions");
 
 const QR_CODE_TTL_MS = 120 * 1000; // 2 minutes for user to scan QR
-const MAX_RECONNECT_ATTEMPTS = 2;
+const MAX_RECONNECT_ATTEMPTS = 5;
 const MIN_MESSAGE_INTERVAL_MS = 3000;
 const MAX_MESSAGE_INTERVAL_MS = 8000;
 const MAX_MESSAGES_PER_MINUTE = 10;
@@ -575,6 +575,25 @@ export async function initWhatsAppConnection(accountId: string, adminId: string,
             qrCode: null,
             phoneNumber: null,
           });
+        } else if (shouldReconnect && attempts < MAX_RECONNECT_ATTEMPTS) {
+          // Auto-reconnect with exponential backoff
+          const newAttempts = attempts + 1;
+          const delay = RECONNECT_BASE_DELAY_MS * Math.pow(2, attempts); // Exponential backoff: 3s, 6s, 12s, 24s, 48s
+          
+          console.log(`[whatsapp] Auto-reconnecting account ${accountId} in ${delay}ms (attempt ${newAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
+          
+          // Update connection state with new attempt count
+          connections.set(accountId, {
+            ...currentConn!,
+            socket: null,
+            status: "connecting",
+            reconnectAttempts: newAttempts,
+          });
+          
+          // Reconnect after delay
+          setTimeout(() => {
+            initWhatsAppConnection(accountId, adminId, true);
+          }, delay);
         }
       }
 
