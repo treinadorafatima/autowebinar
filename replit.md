@@ -64,3 +64,42 @@ A arquitetura adota um design multi-inquilino para os webinars, onde cada um é 
 - **Facebook Pixel**: Para rastreamento de eventos no frontend.
 - **Facebook Conversions API**: Para rastreamento de eventos server-side.
 - **Deepgram API**: Transcrição de áudio/vídeo para o gerador de mensagens ($0.0043/min).
+
+## Tracking System (Rastreamento de Eventos)
+
+### Arquitetura
+O sistema de tracking é dividido em três plataformas independentes por webinário:
+
+1. **Meta (Facebook Pixel + Conversions API)**
+   - Pixel ID: Identificador do pixel para tracking no navegador
+   - Access Token: Token de acesso para API de Conversões (server-side)
+   - Test Event Code: Código opcional para testes no Events Manager
+   - Eventos: PageView, Lead, ChatMessage (custom), InitiateCheckout
+
+2. **Google Analytics (GA4)**
+   - Measurement ID: ID do GA4 (formato G-XXXXXXXX)
+   - Eventos: page_view, generate_lead, webinar_chat, begin_checkout
+
+3. **Google Ads**
+   - Conversões configuráveis por evento (lead, initiate_checkout)
+   - Cada conversão tem conversionId (AW-XXXXXXXX) e conversionLabel
+
+### Fluxo de Eventos
+- **PageView**: Dispara ao abrir a página de inscrição
+- **Lead**: Dispara ao se cadastrar no formulário de inscrição
+- **ChatMessage**: Dispara ao enviar comentário no chat (evento personalizado)
+- **InitiateCheckout**: Dispara ao clicar no botão de oferta
+
+### Implementação Server-Side (Meta CAPI)
+- Endpoint: POST /api/webinars/:id/track-event
+- Validação com Zod schema
+- Hashing SHA256 de dados do usuário (email, telefone, nome)
+- Event ID para deduplicação
+- Dados adicionais: IP do cliente, User-Agent, fbp/fbc cookies
+
+### Segurança
+- Access tokens são armazenados no banco de dados (por webinário)
+- Nunca são expostos para clientes públicos
+- API pública retorna apenas flag `metaCapiEnabled: boolean`
+- Endpoint de tracking busca credenciais internamente
+- **NOTA**: Para produção, considerar criptografia adicional ou uso de secrets manager

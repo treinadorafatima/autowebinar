@@ -657,9 +657,14 @@ export default function AdminWebinarDetailPage() {
     seoDescription: "",
     seoFaviconUrl: "",
     seoShareImageUrl: "",
-    // Tracking/Rastreamento
+    // Tracking/Rastreamento - Meta/Facebook
     facebookPixelId: "",
-    googleTagId: "",
+    facebookAccessToken: "",
+    facebookTestEventCode: "",
+    // Tracking - Google Analytics (GA4)
+    googleAnalyticsId: "",
+    // Tracking - Google Ads
+    googleAdsConversions: "[]",
   });
 
   const [benefitsList, setBenefitsList] = useState<string[]>([]);
@@ -893,7 +898,10 @@ export default function AdminWebinarDetailPage() {
         seoFaviconUrl: data.seoFaviconUrl || "",
         seoShareImageUrl: data.seoShareImageUrl || "",
         facebookPixelId: data.facebookPixelId || "",
-        googleTagId: data.googleTagId || "",
+        facebookAccessToken: data.facebookAccessToken || "",
+        facebookTestEventCode: data.facebookTestEventCode || "",
+        googleAnalyticsId: data.googleAnalyticsId || "",
+        googleAdsConversions: data.googleAdsConversions || "[]",
       });
       setCommentTheme(data.commentTheme || "dark");
       setLeadsEnabled(data.leadsEnabled || false);
@@ -5616,73 +5624,232 @@ export default function AdminWebinarDetailPage() {
 
         {/* Tracking/Rastreamento */}
         <TabsContent value="tracking">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="h-5 w-5" />
-                Pixel e Analytics
-              </CardTitle>
-              <CardDescription>Configure rastreamento específico para este webinário. Eventos serão disparados em visualização, registro, início de vídeo e clique na oferta.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="facebook-pixel-id">Facebook Pixel ID</Label>
-                  <Input
-                    id="facebook-pixel-id"
-                    value={formData.facebookPixelId}
-                    onChange={(e) => setFormData({ ...formData, facebookPixelId: e.target.value })}
-                    placeholder="Ex: 123456789012345"
-                    data-testid="input-facebook-pixel-id"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Eventos: PageView, ViewContent, CompleteRegistration, Lead, InitiateCheckout
-                  </p>
+          <div className="space-y-6">
+            {/* Seção 1: Meta/Facebook */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+                  Meta / Facebook
+                </CardTitle>
+                <CardDescription>Configure o Pixel do Facebook e a API de Conversões para rastreamento otimizado.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="facebook-pixel-id">Facebook Pixel ID</Label>
+                    <Input
+                      id="facebook-pixel-id"
+                      value={formData.facebookPixelId}
+                      onChange={(e) => setFormData({ ...formData, facebookPixelId: e.target.value })}
+                      placeholder="Ex: 123456789012345"
+                      data-testid="input-facebook-pixel-id"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Encontre em: Gerenciador de Eventos &gt; Fontes de Dados &gt; Pixel
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="facebook-access-token">Token de Acesso (API de Conversões)</Label>
+                    <Input
+                      id="facebook-access-token"
+                      type="password"
+                      value={formData.facebookAccessToken}
+                      onChange={(e) => setFormData({ ...formData, facebookAccessToken: e.target.value })}
+                      placeholder="Token para API de Conversões"
+                      data-testid="input-facebook-access-token"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Opcional. Melhora correspondência de dados. Gerenciador de Eventos &gt; Configurações &gt; API de Conversões
+                    </p>
+                  </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="google-tag-id">Google Analytics / Tag ID</Label>
+                  <Label htmlFor="facebook-test-code">Código de Evento de Teste (opcional)</Label>
                   <Input
-                    id="google-tag-id"
-                    value={formData.googleTagId}
-                    onChange={(e) => setFormData({ ...formData, googleTagId: e.target.value })}
-                    placeholder="Ex: G-XXXXXXXXXX ou AW-XXXXXXXXXX"
-                    data-testid="input-google-tag-id"
+                    id="facebook-test-code"
+                    value={formData.facebookTestEventCode}
+                    onChange={(e) => setFormData({ ...formData, facebookTestEventCode: e.target.value })}
+                    placeholder="Ex: TEST12345"
+                    data-testid="input-facebook-test-code"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Aceita GA4 (G-) ou Google Ads (AW-)
+                    Use para testar eventos no Gerenciador de Eventos &gt; Testar Eventos
                   </p>
                 </div>
-              </div>
 
-              <div className="rounded-lg bg-muted/50 p-4 space-y-2">
-                <h4 className="font-medium text-sm">Eventos Rastreados Automaticamente</h4>
-                <ul className="text-sm text-muted-foreground space-y-1">
-                  <li className="flex items-center gap-2">
+                <div className="rounded-lg bg-blue-500/10 border border-blue-500/20 p-4 space-y-3">
+                  <h4 className="font-medium text-sm flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-blue-500" />
-                    <strong>PageView</strong> - Quando alguém acessa a página do webinário
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-green-500" />
-                    <strong>CompleteRegistration</strong> - Quando alguém se registra no chat/leads
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-yellow-500" />
-                    <strong>Lead</strong> - Quando o vídeo começa a reproduzir
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-purple-500" />
-                    <strong>InitiateCheckout</strong> - Quando clicam no botão da oferta
-                  </li>
-                </ul>
-              </div>
-
-              {(!formData.facebookPixelId && !formData.googleTagId) && (
-                <div className="rounded-lg border border-dashed p-4 text-center text-muted-foreground">
-                  <p className="text-sm">Nenhum tracking configurado. Adicione um Pixel ou Tag acima para começar a rastrear eventos.</p>
+                    Eventos Disparados pelo Meta Pixel
+                  </h4>
+                  <ul className="text-sm text-muted-foreground space-y-2">
+                    <li className="flex items-start gap-2">
+                      <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded mt-0.5">PageView</span>
+                      <span>Ao abrir o formulário de inscrição (se habilitado)</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded mt-0.5">Lead</span>
+                      <span>Quando o usuário se cadastra no formulário de inscrição</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded mt-0.5">ChatMessage</span>
+                      <span>Evento personalizado quando envia mensagem no chat</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded mt-0.5">InitiateCheckout</span>
+                      <span>Quando clica no botão da oferta</span>
+                    </li>
+                  </ul>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+
+            {/* Seção 2: Google Analytics (GA4) */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M22.84 2.998v17.958c0 1.664-1.37 3.012-3.06 3.012-1.69 0-3.06-1.348-3.06-3.012V2.998c0-1.664 1.37-3.012 3.06-3.012 1.69 0 3.06 1.348 3.06 3.012zm-8.1 8.991v8.967c0 1.664-1.37 3.012-3.06 3.012-1.69 0-3.06-1.348-3.06-3.012v-8.967c0-1.664 1.37-3.012 3.06-3.012 1.69 0 3.06 1.348 3.06 3.012zM7.26 18.962c0 1.668-1.37 3.02-3.06 3.02-1.69 0-3.06-1.352-3.06-3.02s1.37-3.02 3.06-3.02c1.69 0 3.06 1.352 3.06 3.02z"/></svg>
+                  Google Analytics (GA4)
+                </CardTitle>
+                <CardDescription>Configure o Google Analytics 4 para análise de comportamento.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="google-analytics-id">ID de Medição (GA4)</Label>
+                  <Input
+                    id="google-analytics-id"
+                    value={formData.googleAnalyticsId}
+                    onChange={(e) => setFormData({ ...formData, googleAnalyticsId: e.target.value })}
+                    placeholder="Ex: G-XXXXXXXXXX"
+                    data-testid="input-google-analytics-id"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Encontre em: Google Analytics &gt; Administrador &gt; Fluxos de dados &gt; Detalhes do fluxo
+                  </p>
+                </div>
+
+                <div className="rounded-lg bg-orange-500/10 border border-orange-500/20 p-4 space-y-3">
+                  <h4 className="font-medium text-sm flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-orange-500" />
+                    Eventos Enviados ao GA4
+                  </h4>
+                  <ul className="text-sm text-muted-foreground space-y-2">
+                    <li className="flex items-start gap-2">
+                      <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded mt-0.5">page_view</span>
+                      <span>Ao abrir o formulário de inscrição</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded mt-0.5">generate_lead</span>
+                      <span>Quando o usuário se cadastra</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded mt-0.5">webinar_chat</span>
+                      <span>Quando envia mensagem no chat</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded mt-0.5">begin_checkout</span>
+                      <span>Quando clica na oferta</span>
+                    </li>
+                  </ul>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Seção 3: Google Ads */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M12.24 10.285V14.4h6.806c-.275 1.765-2.056 5.174-6.806 5.174-4.095 0-7.439-3.389-7.439-7.574s3.345-7.574 7.439-7.574c2.33 0 3.891.989 4.785 1.849l3.254-3.138C18.189 1.186 15.479 0 12.24 0c-6.635 0-12 5.365-12 12s5.365 12 12 12c6.926 0 11.52-4.869 11.52-11.726 0-.788-.085-1.39-.189-1.989H12.24z"/></svg>
+                  Google Ads
+                </CardTitle>
+                <CardDescription>
+                  Configure conversões do Google Ads. Cada evento precisa de um código de snippet diferente criado no painel do Google Ads.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="rounded-lg bg-yellow-500/10 border border-yellow-500/20 p-4">
+                  <h4 className="font-medium text-sm mb-2">Como configurar conversões no Google Ads:</h4>
+                  <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
+                    <li>Acesse Google Ads &gt; Metas &gt; Conversões &gt; Nova ação de conversão</li>
+                    <li>Selecione "Website" e configure a conversão</li>
+                    <li>Copie o ID de Conversão (AW-XXXXXXXXX) e o Rótulo do snippet</li>
+                    <li>Cole abaixo para cada tipo de evento que deseja rastrear</li>
+                  </ol>
+                </div>
+
+                {(() => {
+                  let conversions: Array<{event: string, conversionId: string, conversionLabel: string}> = [];
+                  try {
+                    conversions = JSON.parse(formData.googleAdsConversions || "[]");
+                  } catch { conversions = []; }
+                  
+                  const eventTypes = [
+                    { key: "lead", label: "Lead (Cadastro)", description: "Dispara quando usuário se cadastra" },
+                    { key: "initiate_checkout", label: "Iniciar Checkout (Oferta)", description: "Dispara quando clica na oferta" },
+                  ];
+
+                  const updateConversion = (eventKey: string, field: string, value: string) => {
+                    const newConversions = [...conversions];
+                    const idx = newConversions.findIndex(c => c.event === eventKey);
+                    if (idx >= 0) {
+                      (newConversions[idx] as any)[field] = value;
+                    } else {
+                      newConversions.push({ event: eventKey, conversionId: field === "conversionId" ? value : "", conversionLabel: field === "conversionLabel" ? value : "" });
+                    }
+                    setFormData({ ...formData, googleAdsConversions: JSON.stringify(newConversions) });
+                  };
+
+                  const getConversionValue = (eventKey: string, field: string) => {
+                    const conv = conversions.find(c => c.event === eventKey);
+                    return conv ? (conv as any)[field] || "" : "";
+                  };
+
+                  return (
+                    <div className="space-y-4">
+                      {eventTypes.map((evt) => (
+                        <div key={evt.key} className="rounded-lg border p-4 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h5 className="font-medium text-sm">{evt.label}</h5>
+                              <p className="text-xs text-muted-foreground">{evt.description}</p>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <Label className="text-xs">ID de Conversão</Label>
+                              <Input
+                                placeholder="Ex: AW-123456789"
+                                value={getConversionValue(evt.key, "conversionId")}
+                                onChange={(e) => updateConversion(evt.key, "conversionId", e.target.value)}
+                                data-testid={`input-gads-${evt.key}-id`}
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">Rótulo de Conversão</Label>
+                              <Input
+                                placeholder="Ex: abc123DEF"
+                                value={getConversionValue(evt.key, "conversionLabel")}
+                                onChange={(e) => updateConversion(evt.key, "conversionLabel", e.target.value)}
+                                data-testid={`input-gads-${evt.key}-label`}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </CardContent>
+            </Card>
+
+            {/* Resumo de Status */}
+            {(!formData.facebookPixelId && !formData.googleAnalyticsId && formData.googleAdsConversions === "[]") && (
+              <div className="rounded-lg border border-dashed p-4 text-center text-muted-foreground">
+                <p className="text-sm">Nenhum tracking configurado. Configure pelo menos uma opção acima para começar a rastrear eventos.</p>
+              </div>
+            )}
+          </div>
         </TabsContent>
 
         {/* Embed */}

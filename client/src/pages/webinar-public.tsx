@@ -245,13 +245,17 @@ export default function WebinarPublicPage() {
 
   // Tracking hook initialization
   const {
-    trackVideoStart,
-    trackOfferClick,
-    trackRegistration,
+    trackPageView,
+    trackLead,
+    trackChatMessage,
+    trackInitiateCheckout,
     isConfigured: trackingConfigured,
   } = useWebinarTracking({
+    webinarId: webinar?.id,
     facebookPixelId: webinar?.facebookPixelId,
-    googleTagId: webinar?.googleTagId,
+    metaCapiEnabled: !!(webinar as any)?.metaCapiEnabled,
+    googleAnalyticsId: webinar?.googleAnalyticsId,
+    googleAdsConversions: webinar?.googleAdsConversions,
     webinarName: webinar?.name,
     webinarSlug: webinar?.slug,
   });
@@ -1385,7 +1389,7 @@ export default function WebinarPublicPage() {
     localStorage.setItem(`webinar-${params.slug}-userState`, userState);
     
     if (trackingConfigured) {
-      trackRegistration({ name: userName, email: userEmail, phone: userWhatsapp });
+      trackChatMessage();
     }
     
     setIsRegistered(true);
@@ -1770,10 +1774,6 @@ export default function WebinarPublicPage() {
                           console.log("Video playing");
                           setIsVideoPlaying(true);
                           setNeedsUserInteraction(false);
-                          if (!videoStartTracked.current && trackingConfigured) {
-                            trackVideoStart();
-                            videoStartTracked.current = true;
-                          }
                         }}
                         onSeeked={isUsingHls ? undefined : handleVideoSeeked}
                         data-testid="video-player"
@@ -2100,7 +2100,7 @@ export default function WebinarPublicPage() {
                   }}
                   onClick={() => {
                     if (trackingConfigured) {
-                      trackOfferClick(webinar.offerButtonUrl);
+                      trackInitiateCheckout(webinar.offerButtonUrl);
                     }
                   }}
                   data-testid="button-offer-cta"

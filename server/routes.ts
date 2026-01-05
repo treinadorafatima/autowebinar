@@ -40,6 +40,7 @@ import {
   sendWhatsAppPlanExpiredSafe
 } from "./whatsapp-notifications";
 import { getAppUrl } from "./utils/getAppUrl";
+import { sendLeadEvent, sendPageViewEvent, sendInitiateCheckoutEvent, sendCustomEvent } from "./meta-conversions-api";
 
 // Helper function to generate a simple, easy-to-type temporary password
 function generateTempPassword(): string {
@@ -154,6 +155,15 @@ function setCachedVideo(videoId: string, buffer: Buffer): void {
 
 interface MulterRequest extends Request {
   file?: Express.Multer.File;
+}
+
+// Helper to sanitize webinar data for public responses (removes sensitive data, adds computed flags)
+function sanitizeWebinarForPublic(webinar: any): any {
+  const { facebookAccessToken, ...publicData } = webinar;
+  return {
+    ...publicData,
+    metaCapiEnabled: !!(webinar.facebookPixelId && facebookAccessToken),
+  };
 }
 
 const JWT_SECRET = process.env.JWT_SECRET || "autowebinar-jwt-secret-2024";
@@ -2419,7 +2429,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      res.json(webinar);
+      // Sanitize webinar data for public response
+      res.json(sanitizeWebinarForPublic(webinar));
     } catch (error: any) {
       res.status(400).json({ error: error.message });
     }
@@ -2450,7 +2461,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      res.json(webinar);
+      if (!isAdminRequest) {
+        // Sanitize webinar data for public clients
+        res.json(sanitizeWebinarForPublic(webinar));
+      } else {
+        // Admin requests get full data including metaCapiEnabled flag
+        const webinarData = webinar as any;
+        res.json({ 
+          ...webinarData, 
+          metaCapiEnabled: !!(webinarData.facebookPixelId && webinarData.facebookAccessToken) 
+        });
+      }
     } catch (error: any) {
       res.status(400).json({ error: error.message });
     }
@@ -4250,6 +4271,96 @@ IMPORTANTE: Se o usuário pedir algo específico, sugira imediatamente. Se for v
       res.json({ success: true });
     } catch (error: any) {
       res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Track event for Meta Conversions API (server-side tracking)
+  const trackEventSchema = z.object({
+    eventName: z.enum(["PageView", "Lead", "InitiateCheckout", "ChatMessage"]),
+    eventId: z.string().uuid().optional(),
+    eventTime: z.number().optional(),
+    sourceUrl: z.string().url().optional(),
+    userData: z.object({
+      email: z.string().email().optional(),
+      phone: z.string().optional(),
+      firstName: z.string().optional(),
+      lastName: z.string().optional(),
+      city: z.string().optional(),
+      state: z.string().optional(),
+      fbp: z.string().optional(),
+      fbc: z.string().optional(),
+    }).optional(),
+    customData: z.record(z.any()).optional(),
+  });
+
+  app.post("/api/webinars/:id/track-event", async (req, res) => {
+    try {
+      const webinar = await storage.getWebinarById(req.params.id);
+      if (!webinar) {
+        return res.status(404).json({ success: false, error: "Webinar not found" });
+      }
+      
+      const parseResult = trackEventSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ 
+          success: false, 
+          error: "Invalid request body", 
+          details: parseResult.error.flatten() 
+        });
+      }
+      
+      const { eventName, eventId, eventTime, sourceUrl, userData, customData } = parseResult.data;
+      
+      const pixelId = (webinar as any).facebookPixelId;
+      const accessToken = (webinar as any).facebookAccessToken;
+      const testEventCode = (webinar as any).facebookTestEventCode;
+      
+      if (!pixelId || !accessToken) {
+        return res.json({ success: false, reason: "Meta CAPI not configured for this webinar" });
+      }
+      
+      const clientIp = req.headers["x-forwarded-for"]?.toString().split(",")[0] || req.socket.remoteAddress || "";
+      const userAgent = req.headers["user-agent"] || "";
+      
+      const sanitizedUserData = {
+        email: userData?.email?.toLowerCase()?.trim(),
+        phone: userData?.phone?.replace(/\D/g, ""),
+        firstName: userData?.firstName?.trim(),
+        lastName: userData?.lastName?.trim(),
+        city: userData?.city?.trim(),
+        state: userData?.state?.trim(),
+        clientIpAddress: clientIp,
+        clientUserAgent: userAgent,
+        fbp: userData?.fbp,
+        fbc: userData?.fbc,
+      };
+      
+      const result = await sendCustomEvent(
+        { pixelId, accessToken, testEventCode },
+        {
+          eventName,
+          eventId: eventId || crypto.randomUUID(),
+          eventTime: eventTime || Math.floor(Date.now() / 1000),
+          sourceUrl: sourceUrl || `${getAppUrl()}/w/${webinar.slug}`,
+          userData: sanitizedUserData,
+          customData: {
+            ...customData,
+            content_name: webinar.name,
+            webinar_slug: webinar.slug,
+          },
+        }
+      );
+      
+      if (result.success) {
+        console.log(`[track-event] ${eventName} sent for webinar ${webinar.slug}`);
+      } else {
+        console.warn(`[track-event] ${eventName} failed for webinar ${webinar.slug}:`, result.error);
+      }
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("[track-event] Error:", error.message);
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 

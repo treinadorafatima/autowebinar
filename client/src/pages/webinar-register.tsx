@@ -74,12 +74,24 @@ export default function WebinarRegister() {
   const [consent, setConsent] = useState(false);
 
   // Tracking
-  const { trackRegistration, isConfigured: trackingConfigured } = useWebinarTracking({
-    facebookPixelId: (webinar as any)?.facebookPixelId,
-    googleTagId: (webinar as any)?.googleTagId,
+  const { trackPageView, trackLead, isConfigured: trackingConfigured } = useWebinarTracking({
+    webinarId: webinar?.id,
+    facebookPixelId: webinar?.facebookPixelId,
+    metaCapiEnabled: !!(webinar as any)?.metaCapiEnabled,
+    googleAnalyticsId: webinar?.googleAnalyticsId,
+    googleAdsConversions: webinar?.googleAdsConversions,
     webinarName: webinar?.name,
     webinarSlug: webinar?.slug,
   });
+  
+  const pageViewFired = useRef(false);
+  
+  useEffect(() => {
+    if (webinar && trackingConfigured && !pageViewFired.current) {
+      trackPageView();
+      pageViewFired.current = true;
+    }
+  }, [webinar, trackingConfigured, trackPageView]);
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -173,7 +185,7 @@ export default function WebinarRegister() {
         setSuccess(true);
         
         if (trackingConfigured) {
-          trackRegistration({ name, email, phone: whatsapp });
+          trackLead({ name, email, phone: whatsapp });
         }
         
         localStorage.setItem(`webinar-${params.slug}-registered`, "true");

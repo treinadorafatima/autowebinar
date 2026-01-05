@@ -132,9 +132,12 @@ export default function WebinarReplayPage() {
   const videoStartTracked = useRef(false);
 
   // Tracking hook
-  const { trackVideoStart, trackOfferClick, isConfigured: trackingConfigured } = useWebinarTracking({
+  const { trackInitiateCheckout, isConfigured: trackingConfigured } = useWebinarTracking({
+    webinarId: webinar?.id,
     facebookPixelId: webinar?.facebookPixelId,
-    googleTagId: webinar?.googleTagId,
+    metaCapiEnabled: !!(webinar as any)?.metaCapiEnabled,
+    googleAnalyticsId: webinar?.googleAnalyticsId,
+    googleAdsConversions: webinar?.googleAdsConversions,
     webinarName: webinar?.name,
     webinarSlug: webinar?.slug,
   });
@@ -329,10 +332,6 @@ export default function WebinarReplayPage() {
     const handlePlay = () => {
       setIsPlaying(true);
       setHasStarted(true);
-      if (!videoStartTracked.current && trackingConfigured) {
-        trackVideoStart();
-        videoStartTracked.current = true;
-      }
     };
     const handlePause = () => setIsPlaying(false);
 
@@ -740,7 +739,7 @@ export default function WebinarReplayPage() {
                   className="block w-full"
                   onClick={() => {
                     if (trackingConfigured) {
-                      trackOfferClick(webinar.replayButtonUrl);
+                      trackInitiateCheckout(webinar.replayButtonUrl);
                     }
                   }}
                 >
