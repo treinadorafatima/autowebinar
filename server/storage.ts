@@ -72,7 +72,7 @@ export interface IStorage {
   createAdmin(admin: AdminInsert): Promise<Admin>;
   getAllAdmins(): Promise<Admin[]>;
   deleteAdmin(id: string): Promise<void>;
-  deleteAdminCompletely(id: string): Promise<{ deletedWebinars: number; deletedVideos: number; deletedComments: number }>;
+  deleteAdminCompletely(id: string): Promise<{ deletedWebinars: number; deletedVideos: number; deletedComments: number; cancelledSubscriptions: number }>;
   updateAdmin(id: string, data: Partial<AdminInsert>): Promise<void>;
   updateAdminProfile(id: string, data: { name?: string; email?: string; password?: string; telefone?: string | null }): Promise<void>;
   countWebinarsByOwner(ownerId: string): Promise<number>;
@@ -531,12 +531,131 @@ export class DatabaseStorage implements IStorage {
     await db.delete(admins).where(eq(admins.id, id));
   }
 
-  async deleteAdminCompletely(id: string): Promise<{ deletedWebinars: number; deletedVideos: number; deletedComments: number }> {
+  async deleteAdminCompletely(id: string): Promise<{ deletedWebinars: number; deletedVideos: number; deletedComments: number; cancelledSubscriptions: number }> {
     let deletedWebinars = 0;
     let deletedVideos = 0;
     let deletedComments = 0;
+    let cancelledSubscriptions = 0;
 
-    // 0. Delete all SEO images FIRST (while we still know the owner ID)
+    // 0. CANCEL ALL GATEWAY SUBSCRIPTIONS FIRST (before deleting any data)
+    // This prevents orphaned recurring charges on Stripe/Mercado Pago
+    try {
+      // Get all active subscriptions for this admin
+      const userSubscriptions = await db.select()
+        .from(checkoutAssinaturas)
+        .where(eq(checkoutAssinaturas.adminId, id));
+      
+      // Also check pagamentos for stripeSubscriptionId (recurring payments)
+      const userPagamentos = await db.select()
+        .from(checkoutPagamentos)
+        .where(eq(checkoutPagamentos.adminId, id));
+      
+      // Get gateway credentials
+      const stripeSecretKey = await this.getCheckoutConfig('STRIPE_SECRET_KEY');
+      const mpAccessToken = await this.getCheckoutConfig('MERCADOPAGO_ACCESS_TOKEN');
+      
+      // Cancel subscriptions from checkoutAssinaturas table
+      for (const sub of userSubscriptions) {
+        if (sub.externalId && sub.status !== 'cancelled') {
+          try {
+            if (sub.gateway === 'stripe' && stripeSecretKey) {
+              const response = await fetch(
+                `https://api.stripe.com/v1/subscriptions/${sub.externalId}`,
+                {
+                  method: 'DELETE',
+                  headers: {
+                    'Authorization': `Bearer ${stripeSecretKey}`,
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                  },
+                }
+              );
+              if (response.ok) {
+                console.log(`[deleteAdminCompletely] Cancelled Stripe subscription: ${sub.externalId}`);
+                cancelledSubscriptions++;
+              }
+            } else if (sub.gateway === 'mercadopago' && mpAccessToken) {
+              const response = await fetch(
+                `https://api.mercadopago.com/preapproval/${sub.externalId}`,
+                {
+                  method: 'PUT',
+                  headers: {
+                    'Authorization': `Bearer ${mpAccessToken}`,
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({ status: 'cancelled' }),
+                }
+              );
+              if (response.ok) {
+                console.log(`[deleteAdminCompletely] Cancelled Mercado Pago subscription: ${sub.externalId}`);
+                cancelledSubscriptions++;
+              }
+            }
+          } catch (gatewayErr) {
+            console.error(`[deleteAdminCompletely] Error cancelling subscription ${sub.externalId}:`, gatewayErr);
+          }
+        }
+      }
+      
+      // Cancel subscriptions from checkoutPagamentos table (stripeSubscriptionId)
+      for (const pag of userPagamentos) {
+        if (pag.stripeSubscriptionId && stripeSecretKey) {
+          try {
+            // Check if we already cancelled this subscription above
+            const alreadyCancelled = userSubscriptions.some(s => s.externalId === pag.stripeSubscriptionId);
+            if (!alreadyCancelled) {
+              const response = await fetch(
+                `https://api.stripe.com/v1/subscriptions/${pag.stripeSubscriptionId}`,
+                {
+                  method: 'DELETE',
+                  headers: {
+                    'Authorization': `Bearer ${stripeSecretKey}`,
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                  },
+                }
+              );
+              if (response.ok) {
+                console.log(`[deleteAdminCompletely] Cancelled Stripe subscription from pagamento: ${pag.stripeSubscriptionId}`);
+                cancelledSubscriptions++;
+              }
+            }
+          } catch (gatewayErr) {
+            console.error(`[deleteAdminCompletely] Error cancelling subscription ${pag.stripeSubscriptionId}:`, gatewayErr);
+          }
+        }
+        
+        // Also cancel Mercado Pago preapproval from pagamentos if exists
+        if (pag.mpPreapprovalId && mpAccessToken) {
+          try {
+            const alreadyCancelled = userSubscriptions.some(s => s.externalId === pag.mpPreapprovalId);
+            if (!alreadyCancelled) {
+              const response = await fetch(
+                `https://api.mercadopago.com/preapproval/${pag.mpPreapprovalId}`,
+                {
+                  method: 'PUT',
+                  headers: {
+                    'Authorization': `Bearer ${mpAccessToken}`,
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({ status: 'cancelled' }),
+                }
+              );
+              if (response.ok) {
+                console.log(`[deleteAdminCompletely] Cancelled MP subscription from pagamento: ${pag.mpPreapprovalId}`);
+                cancelledSubscriptions++;
+              }
+            }
+          } catch (gatewayErr) {
+            console.error(`[deleteAdminCompletely] Error cancelling MP subscription ${pag.mpPreapprovalId}:`, gatewayErr);
+          }
+        }
+      }
+      
+      console.log(`[deleteAdminCompletely] Cancelled ${cancelledSubscriptions} gateway subscriptions for admin ${id}`);
+    } catch (err) {
+      console.error(`[deleteAdminCompletely] Error cancelling gateway subscriptions:`, err);
+    }
+
+    // 1. Delete all SEO images (while we still know the owner ID)
     await this.deleteSeoImagesByOwner(id);
 
     // 1. Get all webinars owned by this admin
@@ -642,12 +761,12 @@ export class DatabaseStorage implements IStorage {
     }
     await db.delete(aiAgents).where(eq(aiAgents.adminId, id));
     
-    // 13. Finally, delete the admin account
+    // 14. Finally, delete the admin account
     await db.delete(admins).where(eq(admins.id, id));
     
-    console.log(`[deleteAdminCompletely] Deleted admin ${id}: ${deletedWebinars} webinars, ${deletedVideos} videos, ${deletedComments} comments`);
+    console.log(`[deleteAdminCompletely] Deleted admin ${id}: ${deletedWebinars} webinars, ${deletedVideos} videos, ${deletedComments} comments, ${cancelledSubscriptions} subscriptions cancelled`);
     
-    return { deletedWebinars, deletedVideos, deletedComments };
+    return { deletedWebinars, deletedVideos, deletedComments, cancelledSubscriptions };
   }
 
   async updateAdminProfile(id: string, data: { name?: string; email?: string; password?: string; telefone?: string | null }): Promise<void> {
