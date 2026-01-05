@@ -78,8 +78,10 @@ function calculateExpirationDate(plano: {
   frequencia?: number;
   frequenciaTipo?: string;
   prazoDias?: number;
-}): Date {
-  const expirationDate = new Date();
+}, baseDate?: Date): Date {
+  // Use provided base date (e.g., payment approval date) or current time
+  // This ensures access is calculated from actual payment date, not discovery time
+  const expirationDate = baseDate ? new Date(baseDate) : new Date();
   
   if (plano.tipoCobranca === 'recorrente') {
     // Para planos recorrentes: usar frequencia + frequenciaTipo
@@ -916,48 +918,56 @@ async function syncMercadoPagoSubscriptions(): Promise<void> {
           if (hasPayment) {
             const plano = await storage.getCheckoutPlanoById(pagamento.planoId);
             if (plano) {
+              // Get actual payment date from MP
+              const realPaymentDate = latestApprovedPayment?.date_created 
+                ? new Date(latestApprovedPayment.date_created) 
+                : new Date();
+              const realApprovalDate = latestApprovedPayment?.date_approved 
+                ? new Date(latestApprovedPayment.date_approved) 
+                : realPaymentDate;
+
+              // Get current admin access to determine correct base for extension
+              const currentAccess = admin?.accessExpiresAt ? new Date(admin.accessExpiresAt) : null;
+              
+              // Calculate base: extend from max(currentAccess, approvalDate)
+              // This ensures we never shrink access and always add to existing entitlement
+              const extensionBase = currentAccess && currentAccess > realApprovalDate 
+                ? currentAccess 
+                : realApprovalDate;
+              
+              // Calculate expiration from the correct base
+              const finalExpiration = calculateExpirationDate(plano, extensionBase);
+
               // Update payment status to approved if it wasn't already
               if (pagamento.status !== 'approved') {
-                const realPaymentDate = latestApprovedPayment?.date_created 
-                  ? new Date(latestApprovedPayment.date_created) 
-                  : new Date();
-                const realApprovalDate = latestApprovedPayment?.date_approved 
-                  ? new Date(latestApprovedPayment.date_approved) 
-                  : realPaymentDate;
-
-                // Usar helper consistente para calcular expiração
-                const expirationDate = calculateExpirationDate(plano);
-
                 await storage.updateCheckoutPagamento(pagamento.id, {
                   status: 'approved',
                   statusDetail: 'Assinatura ativa - pagamento confirmado (auto-sync)',
                   dataPagamento: realPaymentDate,
                   dataAprovacao: realApprovalDate,
-                  dataExpiracao: expirationDate,
+                  dataExpiracao: finalExpiration,
                 });
-                console.log(`[subscription-scheduler] Auto-approved payment for ${pagamento.email}, expires: ${expirationDate.toISOString()}`);
+                console.log(`[subscription-scheduler] Auto-approved payment for ${pagamento.email}, base: ${extensionBase.toISOString()}, expires: ${finalExpiration.toISOString()}`);
               }
 
-              // Reactivate admin if needed - also extends access for already active users with pending renewal
-              const needsAccessExtension = admin && (
+              // Only update admin if they need activation OR if this extends their access
+              const needsUpdate = admin && (
                 !admin.isActive || 
                 admin.paymentStatus !== 'ok' ||
-                (admin.accessExpiresAt && new Date(admin.accessExpiresAt) <= new Date())
+                !currentAccess ||
+                currentAccess < finalExpiration // Only extend if new expiration is later
               );
               
-              if (needsAccessExtension) {
-                // Usar helper consistente para calcular expiração
-                const expirationDate = calculateExpirationDate(plano);
-
+              if (needsUpdate) {
                 await storage.updateAdmin(admin.id, {
                   isActive: true,
                   paymentStatus: 'ok',
                   paymentFailedReason: null,
-                  accessExpiresAt: expirationDate,
+                  accessExpiresAt: finalExpiration,
                   planoId: plano.id,
                 });
                 reactivated++;
-                console.log(`[subscription-scheduler] Auto-reactivated ${pagamento.email}, new expiration: ${expirationDate.toISOString()}`);
+                console.log(`[subscription-scheduler] Auto-reactivated ${pagamento.email}, new expiration: ${finalExpiration.toISOString()}`);
               }
             }
           }
@@ -1026,24 +1036,41 @@ async function syncStripePayments(): Promise<void> {
               // Payment was successful but webhook missed it!
               const plano = await storage.getCheckoutPlanoById(pagamento.planoId);
               if (plano) {
-                const expirationDate = calculateExpirationDate(plano);
+                // Get actual payment date from Stripe
                 const paymentDate = paymentIntent.created 
                   ? new Date(paymentIntent.created * 1000) 
                   : new Date();
+                
+                // Get admin to check current access
+                const admin = await storage.getAdminByEmail(pagamento.email);
+                const currentAccess = admin?.accessExpiresAt ? new Date(admin.accessExpiresAt) : null;
+                
+                // Calculate base: extend from max(currentAccess, paymentDate)
+                // This ensures we never shrink access and always add to existing entitlement
+                const extensionBase = currentAccess && currentAccess > paymentDate 
+                  ? currentAccess 
+                  : paymentDate;
+                
+                // Calculate expiration from the correct base
+                const finalExpiration = calculateExpirationDate(plano, extensionBase);
                 
                 await storage.updateCheckoutPagamento(pagamento.id, {
                   status: 'approved',
                   statusDetail: 'Pagamento confirmado (auto-sync)',
                   dataPagamento: paymentDate,
                   dataAprovacao: paymentDate,
-                  dataExpiracao: expirationDate,
+                  dataExpiracao: finalExpiration,
                 });
                 
-                // Update admin access
-                const admin = await storage.getAdminByEmail(pagamento.email);
-                if (admin) {
+                // Only update admin if they need activation OR if this extends their access
+                if (admin && (
+                  !admin.isActive || 
+                  admin.paymentStatus !== 'ok' ||
+                  !currentAccess ||
+                  currentAccess < finalExpiration // Only extend if new expiration is later
+                )) {
                   await storage.updateAdmin(admin.id, {
-                    accessExpiresAt: expirationDate,
+                    accessExpiresAt: finalExpiration,
                     webinarLimit: plano.webinarLimit,
                     uploadLimit: plano.uploadLimit || plano.webinarLimit,
                     isActive: true,
@@ -1052,7 +1079,7 @@ async function syncStripePayments(): Promise<void> {
                     paymentFailedReason: null,
                   });
                   updated++;
-                  console.log(`[subscription-scheduler] Stripe auto-sync: Extended access for ${pagamento.email}, expires: ${expirationDate.toISOString()}`);
+                  console.log(`[subscription-scheduler] Stripe auto-sync: Extended access for ${pagamento.email}, base: ${extensionBase.toISOString()}, expires: ${finalExpiration.toISOString()}`);
                 }
               }
             } else if (paymentIntent.status === 'canceled' || paymentIntent.status === 'failed') {
