@@ -1,5 +1,8 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState } from "react";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { toZonedTime } from "date-fns-tz";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -54,8 +57,6 @@ import {
   X
 } from "lucide-react";
 import { SiWhatsapp } from "react-icons/si";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
 
 interface SubscriptionInfo {
   admin: {
@@ -131,14 +132,20 @@ function formatCurrency(cents: number): string {
   }).format(cents / 100);
 }
 
+const BRAZIL_TIMEZONE = "America/Sao_Paulo";
+
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return "-";
-  return format(new Date(dateStr), "dd/MM/yyyy", { locale: ptBR });
+  const date = new Date(dateStr);
+  const zonedDate = toZonedTime(date, BRAZIL_TIMEZONE);
+  return format(zonedDate, "dd/MM/yyyy", { locale: ptBR });
 }
 
 function formatDateTime(dateStr: string | null): string {
   if (!dateStr) return "-";
-  return format(new Date(dateStr), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
+  const date = new Date(dateStr);
+  const zonedDate = toZonedTime(date, BRAZIL_TIMEZONE);
+  return format(zonedDate, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
 }
 
 function getStatusBadge(status: string) {

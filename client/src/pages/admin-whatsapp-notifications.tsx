@@ -19,6 +19,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { toZonedTime } from "date-fns-tz";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { WhatsappNotificationTemplate } from "@shared/schema";
@@ -556,7 +557,9 @@ export default function AdminWhatsAppNotificationsPage() {
   const formatDate = (dateString: string | null) => {
     if (!dateString) return "-";
     try {
-      return format(new Date(dateString), "dd/MM/yyyy HH:mm", { locale: ptBR });
+      const date = new Date(dateString);
+      const zonedDate = toZonedTime(date, "America/Sao_Paulo");
+      return format(zonedDate, "dd/MM/yyyy HH:mm", { locale: ptBR });
     } catch {
       return "-";
     }

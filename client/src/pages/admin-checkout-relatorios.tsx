@@ -32,6 +32,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { toZonedTime } from "date-fns-tz";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -106,6 +107,14 @@ const statusConfig: Record<string, { label: string; variant: "default" | "second
 type StatusFilter = "all" | "approved" | "pending" | "rejected" | "expired" | "abandoned" | "auto_renewal";
 
 const ITEMS_PER_PAGE = 10;
+const BRAZIL_TIMEZONE = "America/Sao_Paulo";
+
+// Helper para formatar datas no horário de Brasília
+function formatBrazilDate(dateStr: string, formatStr: string = "dd/MM/yyyy HH:mm"): string {
+  const date = new Date(dateStr);
+  const zonedDate = toZonedTime(date, BRAZIL_TIMEZONE);
+  return format(zonedDate, formatStr, { locale: ptBR });
+}
 
 export default function AdminCheckoutRelatorios() {
   const { toast } = useToast();
@@ -645,9 +654,7 @@ export default function AdminCheckoutRelatorios() {
                   return (
                     <TableRow key={pagamento.id} data-testid={`row-pagamento-${pagamento.id}`}>
                       <TableCell>
-                        {format(new Date(pagamento.criadoEm), "dd/MM/yyyy HH:mm", {
-                          locale: ptBR,
-                        })}
+                        {formatBrazilDate(pagamento.criadoEm)}
                       </TableCell>
                       <TableCell>
                         <div>
@@ -866,9 +873,7 @@ export default function AdminCheckoutRelatorios() {
                               )}
                             </div>
                             <span className="text-sm text-muted-foreground">
-                              {format(new Date(attempt.criadoEm), "dd/MM/yyyy 'às' HH:mm:ss", {
-                                locale: ptBR,
-                              })}
+                              {formatBrazilDate(attempt.criadoEm, "dd/MM/yyyy 'às' HH:mm:ss")}
                             </span>
                           </div>
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
@@ -890,9 +895,7 @@ export default function AdminCheckoutRelatorios() {
                               <div>
                                 <span className="text-muted-foreground">Aprovado em:</span>{" "}
                                 <span className="font-medium">
-                                  {format(new Date(attempt.dataAprovacao), "dd/MM/yyyy HH:mm", {
-                                    locale: ptBR,
-                                  })}
+                                  {formatBrazilDate(attempt.dataAprovacao, "dd/MM/yyyy HH:mm")}
                                 </span>
                               </div>
                             )}
