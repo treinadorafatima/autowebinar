@@ -1043,21 +1043,7 @@ export default function AdminSettingsPage() {
             </CardContent>
           </Card>
         </>
-      ) : (
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4 text-muted-foreground">
-              <ShieldAlert className="w-8 h-8" />
-              <div>
-                <p className="font-medium text-foreground">Acesso Restrito</p>
-                <p className="text-sm">
-                  As configurações de API keys estão disponíveis apenas para superadministradores.
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      ) : null}
 
     </div>
   );
