@@ -165,28 +165,7 @@ export default function ScriptCreatorPage() {
     queryKey: ["/api/ai/chats"],
   });
 
-  const isSuperadmin = subscription?.admin?.role === "superadmin";
-  const hasDesignerIAAccess = isSuperadmin || subscription?.plano?.featureDesignerIA === true;
-
-  if (isLoadingSubscription) {
-    return (
-      <div className="p-6 space-y-4">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-64 w-full" />
-      </div>
-    );
-  }
-
-  if (!hasDesignerIAAccess) {
-    return (
-      <FeatureBlocked
-        featureName="Roteirizador com IA"
-        description="O Roteirizador com IA está disponível apenas para planos com esse recurso ativado. Faça upgrade para criar roteiros personalizados com inteligência artificial."
-      />
-    );
-  }
-
-  // Create new chat mutation
+  // Create new chat mutation - MUST be before conditional returns
   const createChatMutation = useMutation({
     mutationFn: async (data: { title: string; webinarId?: string }) => {
       const res = await apiRequest("POST", "/api/ai/chats", data);
@@ -306,6 +285,28 @@ export default function ScriptCreatorPage() {
       }
     };
   }, [messages, generatedScript, currentChatId, selectedWebinar]);
+
+  // Access control checks - AFTER all hooks
+  const isSuperadmin = subscription?.admin?.role === "superadmin";
+  const hasDesignerIAAccess = isSuperadmin || subscription?.plano?.featureDesignerIA === true;
+
+  if (isLoadingSubscription) {
+    return (
+      <div className="p-6 space-y-4">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
+
+  if (!hasDesignerIAAccess) {
+    return (
+      <FeatureBlocked
+        featureName="Roteirizador com IA"
+        description="O Roteirizador com IA está disponível apenas para planos com esse recurso ativado. Faça upgrade para criar roteiros personalizados com inteligência artificial."
+      />
+    );
+  }
 
   const handleSendMessage = async (text?: string) => {
     const messageText = text || userInput.trim();
