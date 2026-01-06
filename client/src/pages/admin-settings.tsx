@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation, useSearch } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -18,11 +19,18 @@ import {
   CheckCircle,
   XCircle,
   Sparkles,
-  Zap
+  Zap,
+  ShieldAlert
 } from "lucide-react";
 import { SiOpenai } from "react-icons/si";
 
 type AIProvider = "openai" | "deepseek";
+
+interface SubscriptionData {
+  admin?: {
+    role?: string;
+  };
+}
 
 export default function AdminSettingsPage() {
   const [loading, setLoading] = useState(true);
@@ -39,6 +47,12 @@ export default function AdminSettingsPage() {
   const searchString = useSearch();
 
   const token = localStorage.getItem("adminToken");
+
+  const { data: subscription } = useQuery<SubscriptionData>({
+    queryKey: ["/api/admin/subscription"],
+  });
+
+  const isSuperadmin = subscription?.admin?.role === "superadmin";
 
   useEffect(() => {
     if (!token) {
@@ -250,311 +264,330 @@ export default function AdminSettingsPage() {
         </p>
       </div>
 
-      {/* Provider Selection */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 shadow-md">
-              <Sparkles className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <CardTitle>Provedor de IA</CardTitle>
-              <CardDescription>
-                Escolha qual serviço usar para o Designer IA
-              </CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <RadioGroup
-            value={aiProvider}
-            onValueChange={(value) => saveProvider(value as AIProvider)}
-            className="space-y-3"
-            data-testid="radio-ai-provider"
-          >
-            <div className="flex items-center space-x-3 p-4 rounded-lg border hover-elevate cursor-pointer">
-              <RadioGroupItem value="openai" id="openai" data-testid="radio-openai" />
-              <Label htmlFor="openai" className="flex-1 cursor-pointer">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <SiOpenai className="w-5 h-5" />
-                    <div>
-                      <p className="font-medium">OpenAI</p>
-                      <p className="text-sm text-muted-foreground">GPT-4o, modelos mais avançados</p>
+      {/* Superadmin-only AI Configuration */}
+      {isSuperadmin ? (
+        <>
+          {/* Provider Selection */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 shadow-md">
+                  <Sparkles className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <CardTitle>Provedor de IA</CardTitle>
+                  <CardDescription>
+                    Escolha qual serviço usar para o Designer IA
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <RadioGroup
+                value={aiProvider}
+                onValueChange={(value) => saveProvider(value as AIProvider)}
+                className="space-y-3"
+                data-testid="radio-ai-provider"
+              >
+                <div className="flex items-center space-x-3 p-4 rounded-lg border hover-elevate cursor-pointer">
+                  <RadioGroupItem value="openai" id="openai" data-testid="radio-openai" />
+                  <Label htmlFor="openai" className="flex-1 cursor-pointer">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <SiOpenai className="w-5 h-5" />
+                        <div>
+                          <p className="font-medium">OpenAI</p>
+                          <p className="text-sm text-muted-foreground">GPT-4o, modelos mais avançados</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {openaiConfigured && (
+                          <Badge variant="secondary" className="gap-1">
+                            <CheckCircle className="w-3 h-3" />
+                            Configurado
+                          </Badge>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {openaiConfigured && (
-                      <Badge variant="secondary" className="gap-1">
-                        <CheckCircle className="w-3 h-3" />
-                        Configurado
-                      </Badge>
+                  </Label>
+                </div>
+
+                <div className="flex items-center space-x-3 p-4 rounded-lg border hover-elevate cursor-pointer">
+                  <RadioGroupItem value="deepseek" id="deepseek" data-testid="radio-deepseek" />
+                  <Label htmlFor="deepseek" className="flex-1 cursor-pointer">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Zap className="w-5 h-5 text-blue-500" />
+                        <div>
+                          <p className="font-medium">DeepSeek</p>
+                          <p className="text-sm text-muted-foreground">~90% mais barato que OpenAI</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge className="bg-green-500/10 text-green-600 border-green-500/20">
+                          Econômico
+                        </Badge>
+                        {deepseekConfigured && (
+                          <Badge variant="secondary" className="gap-1">
+                            <CheckCircle className="w-3 h-3" />
+                            Configurado
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </Label>
+                </div>
+              </RadioGroup>
+
+              {aiProvider === "deepseek" && !deepseekConfigured && (
+                <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                  <p className="text-sm text-amber-600 dark:text-amber-400">
+                    Configure a chave da API DeepSeek abaixo para usar este provedor.
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* OpenAI Key */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-md">
+                  <SiOpenai className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    OpenAI API
+                    {openaiConfigured ? (
+                      <CheckCircle className="w-5 h-5 text-green-500" />
+                    ) : (
+                      <XCircle className="w-5 h-5 text-muted-foreground" />
                     )}
+                  </CardTitle>
+                  <CardDescription>
+                    Chave para usar GPT-4o no Designer IA
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {openaiConfigured ? (
+                <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <CheckCircle className="w-5 h-5 text-green-500" />
+                      <span className="font-medium text-green-600 dark:text-green-400">
+                        Chave configurada
+                      </span>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={removeOpenAIKey}
+                      disabled={saving}
+                      data-testid="button-remove-openai-key"
+                    >
+                      Remover
+                    </Button>
                   </div>
                 </div>
-              </Label>
-            </div>
-
-            <div className="flex items-center space-x-3 p-4 rounded-lg border hover-elevate cursor-pointer">
-              <RadioGroupItem value="deepseek" id="deepseek" data-testid="radio-deepseek" />
-              <Label htmlFor="deepseek" className="flex-1 cursor-pointer">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Zap className="w-5 h-5 text-blue-500" />
-                    <div>
-                      <p className="font-medium">DeepSeek</p>
-                      <p className="text-sm text-muted-foreground">~90% mais barato que OpenAI</p>
+              ) : (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium flex items-center gap-2">
+                      <Key className="w-4 h-4" />
+                      Chave da API OpenAI
+                    </label>
+                    <div className="relative">
+                      <Input
+                        type={showOpenaiKey ? "text" : "password"}
+                        placeholder="sk-..."
+                        value={openaiKey}
+                        onChange={(e) => setOpenaiKey(e.target.value)}
+                        className="pr-10 font-mono"
+                        data-testid="input-openai-key"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-0 top-0 h-full"
+                        onClick={() => setShowOpenaiKey(!showOpenaiKey)}
+                        data-testid="button-toggle-openai-visibility"
+                      >
+                        {showOpenaiKey ? (
+                          <EyeOff className="w-4 h-4" />
+                        ) : (
+                          <Eye className="w-4 h-4" />
+                        )}
+                      </Button>
                     </div>
+                    <p className="text-xs text-muted-foreground">
+                      Obtenha sua chave em{" "}
+                      <a
+                        href="https://platform.openai.com/api-keys"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary hover:underline inline-flex items-center gap-1"
+                        data-testid="link-openai-platform"
+                      >
+                        platform.openai.com
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Badge className="bg-green-500/10 text-green-600 border-green-500/20">
-                      Econômico
+
+                  <Button
+                    onClick={saveOpenAIKey}
+                    disabled={saving || !openaiKey.trim()}
+                    className="gap-2"
+                    data-testid="button-save-openai-key"
+                  >
+                    <Save className="w-4 h-4" />
+                    {saving ? "Salvando..." : "Salvar Chave"}
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* DeepSeek Key */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-600 shadow-md">
+                  <Zap className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    DeepSeek API
+                    {deepseekConfigured ? (
+                      <CheckCircle className="w-5 h-5 text-green-500" />
+                    ) : (
+                      <XCircle className="w-5 h-5 text-muted-foreground" />
+                    )}
+                    <Badge className="bg-green-500/10 text-green-600 border-green-500/20 text-xs">
+                      ~90% mais barato
                     </Badge>
-                    {deepseekConfigured && (
-                      <Badge variant="secondary" className="gap-1">
-                        <CheckCircle className="w-3 h-3" />
-                        Configurado
-                      </Badge>
-                    )}
+                  </CardTitle>
+                  <CardDescription>
+                    Alternativa econômica para o Designer IA
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                <div className="flex gap-3">
+                  <Zap className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
+                  <div className="text-sm">
+                    <p className="font-medium text-blue-600 dark:text-blue-400">
+                      Opção econômica
+                    </p>
+                    <p className="text-muted-foreground mt-1">
+                      DeepSeek oferece qualidade similar ao GPT-4 por uma fração do custo.
+                      Ideal para reduzir gastos sem perder funcionalidade.
+                    </p>
                   </div>
                 </div>
-              </Label>
-            </div>
-          </RadioGroup>
-
-          {aiProvider === "deepseek" && !deepseekConfigured && (
-            <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
-              <p className="text-sm text-amber-600 dark:text-amber-400">
-                Configure a chave da API DeepSeek abaixo para usar este provedor.
-              </p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* OpenAI Key */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-md">
-              <SiOpenai className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                OpenAI API
-                {openaiConfigured ? (
-                  <CheckCircle className="w-5 h-5 text-green-500" />
-                ) : (
-                  <XCircle className="w-5 h-5 text-muted-foreground" />
-                )}
-              </CardTitle>
-              <CardDescription>
-                Chave para usar GPT-4o no Designer IA
-              </CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {openaiConfigured ? (
-            <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="w-5 h-5 text-green-500" />
-                  <span className="font-medium text-green-600 dark:text-green-400">
-                    Chave configurada
-                  </span>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={removeOpenAIKey}
-                  disabled={saving}
-                  data-testid="button-remove-openai-key"
-                >
-                  Remover
-                </Button>
               </div>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium flex items-center gap-2">
-                  <Key className="w-4 h-4" />
-                  Chave da API OpenAI
-                </label>
-                <div className="relative">
-                  <Input
-                    type={showOpenaiKey ? "text" : "password"}
-                    placeholder="sk-..."
-                    value={openaiKey}
-                    onChange={(e) => setOpenaiKey(e.target.value)}
-                    className="pr-10 font-mono"
-                    data-testid="input-openai-key"
-                  />
+
+              {deepseekConfigured ? (
+                <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <CheckCircle className="w-5 h-5 text-green-500" />
+                      <span className="font-medium text-green-600 dark:text-green-400">
+                        Chave configurada
+                      </span>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={removeDeepSeekKey}
+                      disabled={saving}
+                      data-testid="button-remove-deepseek-key"
+                    >
+                      Remover
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium flex items-center gap-2">
+                      <Key className="w-4 h-4" />
+                      Chave da API DeepSeek
+                    </label>
+                    <div className="relative">
+                      <Input
+                        type={showDeepseekKey ? "text" : "password"}
+                        placeholder="sk-..."
+                        value={deepseekKey}
+                        onChange={(e) => setDeepseekKey(e.target.value)}
+                        className="pr-10 font-mono"
+                        data-testid="input-deepseek-key"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-0 top-0 h-full"
+                        onClick={() => setShowDeepseekKey(!showDeepseekKey)}
+                        data-testid="button-toggle-deepseek-visibility"
+                      >
+                        {showDeepseekKey ? (
+                          <EyeOff className="w-4 h-4" />
+                        ) : (
+                          <Eye className="w-4 h-4" />
+                        )}
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Obtenha sua chave em{" "}
+                      <a
+                        href="https://platform.deepseek.com/api_keys"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary hover:underline inline-flex items-center gap-1"
+                        data-testid="link-deepseek-platform"
+                      >
+                        platform.deepseek.com
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </p>
+                  </div>
+
                   <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-0 top-0 h-full"
-                    onClick={() => setShowOpenaiKey(!showOpenaiKey)}
-                    data-testid="button-toggle-openai-visibility"
+                    onClick={saveDeepSeekKey}
+                    disabled={saving || !deepseekKey.trim()}
+                    className="gap-2"
+                    data-testid="button-save-deepseek-key"
                   >
-                    {showOpenaiKey ? (
-                      <EyeOff className="w-4 h-4" />
-                    ) : (
-                      <Eye className="w-4 h-4" />
-                    )}
+                    <Save className="w-4 h-4" />
+                    {saving ? "Salvando..." : "Salvar Chave"}
                   </Button>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Obtenha sua chave em{" "}
-                  <a
-                    href="https://platform.openai.com/api-keys"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-primary hover:underline inline-flex items-center gap-1"
-                    data-testid="link-openai-platform"
-                  >
-                    platform.openai.com
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                </p>
-              </div>
-
-              <Button
-                onClick={saveOpenAIKey}
-                disabled={saving || !openaiKey.trim()}
-                className="gap-2"
-                data-testid="button-save-openai-key"
-              >
-                <Save className="w-4 h-4" />
-                {saving ? "Salvando..." : "Salvar Chave"}
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* DeepSeek Key */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-600 shadow-md">
-              <Zap className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                DeepSeek API
-                {deepseekConfigured ? (
-                  <CheckCircle className="w-5 h-5 text-green-500" />
-                ) : (
-                  <XCircle className="w-5 h-5 text-muted-foreground" />
-                )}
-                <Badge className="bg-green-500/10 text-green-600 border-green-500/20 text-xs">
-                  ~90% mais barato
-                </Badge>
-              </CardTitle>
-              <CardDescription>
-                Alternativa econômica para o Designer IA
-              </CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
-            <div className="flex gap-3">
-              <Zap className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
-              <div className="text-sm">
-                <p className="font-medium text-blue-600 dark:text-blue-400">
-                  Opção econômica
-                </p>
-                <p className="text-muted-foreground mt-1">
-                  DeepSeek oferece qualidade similar ao GPT-4 por uma fração do custo.
-                  Ideal para reduzir gastos sem perder funcionalidade.
+              )}
+            </CardContent>
+          </Card>
+        </>
+      ) : (
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-4 text-muted-foreground">
+              <ShieldAlert className="w-8 h-8" />
+              <div>
+                <p className="font-medium text-foreground">Acesso Restrito</p>
+                <p className="text-sm">
+                  As configurações de API keys estão disponíveis apenas para superadministradores.
                 </p>
               </div>
             </div>
-          </div>
-
-          {deepseekConfigured ? (
-            <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="w-5 h-5 text-green-500" />
-                  <span className="font-medium text-green-600 dark:text-green-400">
-                    Chave configurada
-                  </span>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={removeDeepSeekKey}
-                  disabled={saving}
-                  data-testid="button-remove-deepseek-key"
-                >
-                  Remover
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium flex items-center gap-2">
-                  <Key className="w-4 h-4" />
-                  Chave da API DeepSeek
-                </label>
-                <div className="relative">
-                  <Input
-                    type={showDeepseekKey ? "text" : "password"}
-                    placeholder="sk-..."
-                    value={deepseekKey}
-                    onChange={(e) => setDeepseekKey(e.target.value)}
-                    className="pr-10 font-mono"
-                    data-testid="input-deepseek-key"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-0 top-0 h-full"
-                    onClick={() => setShowDeepseekKey(!showDeepseekKey)}
-                    data-testid="button-toggle-deepseek-visibility"
-                  >
-                    {showDeepseekKey ? (
-                      <EyeOff className="w-4 h-4" />
-                    ) : (
-                      <Eye className="w-4 h-4" />
-                    )}
-                  </Button>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Obtenha sua chave em{" "}
-                  <a
-                    href="https://platform.deepseek.com/api_keys"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-primary hover:underline inline-flex items-center gap-1"
-                    data-testid="link-deepseek-platform"
-                  >
-                    platform.deepseek.com
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                </p>
-              </div>
-
-              <Button
-                onClick={saveDeepSeekKey}
-                disabled={saving || !deepseekKey.trim()}
-                className="gap-2"
-                data-testid="button-save-deepseek-key"
-              >
-                <Save className="w-4 h-4" />
-                {saving ? "Salvando..." : "Salvar Chave"}
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
     </div>
   );
