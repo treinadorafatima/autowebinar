@@ -2,7 +2,7 @@ import { type User, type InsertUser, type WebinarConfig, type WebinarConfigInser
 import * as crypto from "crypto";
 import { randomUUID } from "crypto";
 import { db } from "./db";
-import { eq, and, or, sql, isNull, desc, lte, gte, notInArray } from "drizzle-orm";
+import { eq, and, or, sql, isNull, desc, lte, gte, ne, notInArray } from "drizzle-orm";
 import * as fs from "fs";
 import * as path from "path";
 import { createClient } from "@supabase/supabase-js";
@@ -381,6 +381,8 @@ export interface IStorage {
   getPendingWhatsappNotifications(): Promise<WhatsappNotificationLog[]>;
   cancelPendingWhatsappNotifications(): Promise<number>;
   updateWhatsappNotificationLog(id: string, data: Partial<WhatsappNotificationLogInsert>): Promise<void>;
+  deleteAllWhatsappNotificationLogs(): Promise<number>;
+  deleteWhatsappNotificationLogsByDateRange(startDate: Date, endDate: Date): Promise<number>;
   // WhatsApp Notification Templates
   listWhatsappNotificationTemplates(): Promise<WhatsappNotificationTemplate[]>;
   getWhatsappNotificationTemplateByType(notificationType: string): Promise<WhatsappNotificationTemplate | undefined>;
@@ -4849,6 +4851,26 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
     await db.update(whatsappNotificationsLog)
       .set(data)
       .where(eq(whatsappNotificationsLog.id, id));
+  }
+
+  async deleteAllWhatsappNotificationLogs(): Promise<number> {
+    const result = await db.delete(whatsappNotificationsLog)
+      .where(ne(whatsappNotificationsLog.status, 'pending'))
+      .returning();
+    return result.length;
+  }
+
+  async deleteWhatsappNotificationLogsByDateRange(startDate: Date, endDate: Date): Promise<number> {
+    const result = await db.delete(whatsappNotificationsLog)
+      .where(
+        and(
+          ne(whatsappNotificationsLog.status, 'pending'),
+          gte(whatsappNotificationsLog.createdAt, startDate),
+          lte(whatsappNotificationsLog.createdAt, endDate)
+        )
+      )
+      .returning();
+    return result.length;
   }
 
   // WhatsApp Notification Templates

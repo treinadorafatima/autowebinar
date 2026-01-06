@@ -7302,6 +7302,50 @@ Seja conversacional e objetivo.`;
     }
   });
 
+  // WhatsApp Notifications - Delete logs (all or by date range)
+  app.delete("/api/notifications/whatsapp/logs", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.replace("Bearer ", "");
+      if (!token) return res.status(401).json({ error: "Token não fornecido" });
+      
+      const email = await validateSession(token);
+      if (!email) return res.status(401).json({ error: "Sessão inválida" });
+      
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin || admin.role !== "superadmin") {
+        return res.status(403).json({ error: "Acesso negado - apenas superadmin" });
+      }
+
+      const { startDate, endDate, deleteAll } = req.query;
+      
+      let deletedCount: number;
+      
+      if (startDate && endDate) {
+        const start = new Date(startDate as string);
+        const end = new Date(endDate as string);
+        
+        if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+          return res.status(400).json({ error: "Datas inválidas. Use formato ISO." });
+        }
+        if (start > end) {
+          return res.status(400).json({ error: "Data inicial não pode ser maior que data final." });
+        }
+        
+        start.setHours(0, 0, 0, 0);
+        end.setHours(23, 59, 59, 999);
+        deletedCount = await storage.deleteWhatsappNotificationLogsByDateRange(start, end);
+      } else if (deleteAll === "true") {
+        deletedCount = await storage.deleteAllWhatsappNotificationLogs();
+      } else {
+        return res.status(400).json({ error: "Forneça startDate e endDate para excluir por período, ou deleteAll=true para excluir tudo." });
+      }
+      
+      res.json({ success: true, deletedCount });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // WhatsApp Notification Templates - List all templates
   app.get("/api/notifications/whatsapp/templates", async (req, res) => {
     try {

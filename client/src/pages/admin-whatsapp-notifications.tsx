@@ -10,7 +10,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { 
   CheckCircle, XCircle, Loader2, Wifi, WifiOff, RefreshCcw, 
   QrCode, Smartphone, Bell, BellOff, AlertCircle, Clock, 
-  History, Trash2, MessageSquare, Ban, RotateCcw, Settings, Save, FileText, Edit3
+  History, Trash2, MessageSquare, Ban, RotateCcw, Settings, Save, FileText, Edit3, CalendarIcon
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -19,6 +19,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { WhatsappNotificationTemplate } from "@shared/schema";
 
 interface WhatsappNotificationLog {
@@ -93,6 +95,9 @@ export default function AdminWhatsAppNotificationsPage() {
   const [showPairingCodeInput, setShowPairingCodeInput] = useState(false);
   const [pairingPhoneNumber, setPairingPhoneNumber] = useState("");
   const [generatedPairingCode, setGeneratedPairingCode] = useState<string | null>(null);
+  const [deleteStartDate, setDeleteStartDate] = useState<Date | undefined>(undefined);
+  const [deleteEndDate, setDeleteEndDate] = useState<Date | undefined>(undefined);
+  const [showDeleteDatePicker, setShowDeleteDatePicker] = useState(false);
 
   const { data: notificationStatus, isLoading: loadingStatus, refetch: refetchStatus } = useQuery<NotificationStatus>({
     queryKey: ["/api/notifications/whatsapp/status"],
@@ -167,6 +172,35 @@ export default function AdminWhatsAppNotificationsPage() {
       toast({
         title: "Erro",
         description: error.message || "Não foi possível cancelar a fila",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteLogsMutation = useMutation({
+    mutationFn: async ({ startDate, endDate, deleteAll }: { startDate?: Date; endDate?: Date; deleteAll?: boolean }) => {
+      let url = "/api/notifications/whatsapp/logs";
+      if (startDate && endDate) {
+        url += `?startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`;
+      } else if (deleteAll) {
+        url += `?deleteAll=true`;
+      }
+      return apiRequest("DELETE", url);
+    },
+    onSuccess: (data: { deletedCount: number }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications/whatsapp/logs"] });
+      setDeleteStartDate(undefined);
+      setDeleteEndDate(undefined);
+      setShowDeleteDatePicker(false);
+      toast({
+        title: "Histórico excluído",
+        description: `${data.deletedCount} mensagem(ns) excluída(s) do histórico`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro",
+        description: error.message || "Não foi possível excluir o histórico",
         variant: "destructive",
       });
     },
@@ -1124,19 +1158,142 @@ export default function AdminWhatsAppNotificationsPage() {
                 Histórico de Mensagens
               </CardTitle>
               <CardDescription>
-                Histórico de notificações enviadas
+                Histórico de notificações enviadas (não inclui mensagens pendentes na fila)
               </CardDescription>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => refetchLogs()}
-              disabled={loadingLogs}
-              data-testid="button-refresh-logs"
-            >
-              <RefreshCcw className={`w-4 h-4 mr-2 ${loadingLogs ? "animate-spin" : ""}`} />
-              Atualizar
-            </Button>
+            <div className="flex gap-2 flex-wrap">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => refetchLogs()}
+                disabled={loadingLogs}
+                data-testid="button-refresh-logs"
+              >
+                <RefreshCcw className={`w-4 h-4 mr-2 ${loadingLogs ? "animate-spin" : ""}`} />
+                Atualizar
+              </Button>
+              {notificationLogs.length > 0 && (
+                <>
+                  <Popover open={showDeleteDatePicker} onOpenChange={setShowDeleteDatePicker}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        data-testid="button-delete-by-date"
+                      >
+                        <CalendarIcon className="w-4 h-4 mr-2" />
+                        Excluir por Data
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-4" align="end">
+                      <div className="space-y-4">
+                        <p className="text-sm font-medium">Selecione o período para excluir:</p>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>Data Inicial</Label>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  className="w-full justify-start text-left font-normal"
+                                  data-testid="button-start-date"
+                                >
+                                  <CalendarIcon className="mr-2 h-4 w-4" />
+                                  {deleteStartDate ? format(deleteStartDate, "dd/MM/yyyy", { locale: ptBR }) : "Selecionar"}
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar
+                                  mode="single"
+                                  selected={deleteStartDate}
+                                  onSelect={setDeleteStartDate}
+                                  locale={ptBR}
+                                />
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Data Final</Label>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  className="w-full justify-start text-left font-normal"
+                                  data-testid="button-end-date"
+                                >
+                                  <CalendarIcon className="mr-2 h-4 w-4" />
+                                  {deleteEndDate ? format(deleteEndDate, "dd/MM/yyyy", { locale: ptBR }) : "Selecionar"}
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar
+                                  mode="single"
+                                  selected={deleteEndDate}
+                                  onSelect={setDeleteEndDate}
+                                  locale={ptBR}
+                                />
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => {
+                              if (deleteStartDate && deleteEndDate) {
+                                if (confirm(`Tem certeza que deseja excluir todas as mensagens entre ${format(deleteStartDate, "dd/MM/yyyy", { locale: ptBR })} e ${format(deleteEndDate, "dd/MM/yyyy", { locale: ptBR })}?`)) {
+                                  deleteLogsMutation.mutate({ startDate: deleteStartDate, endDate: deleteEndDate });
+                                }
+                              }
+                            }}
+                            disabled={!deleteStartDate || !deleteEndDate || deleteLogsMutation.isPending}
+                            data-testid="button-confirm-delete-by-date"
+                          >
+                            {deleteLogsMutation.isPending ? (
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-4 h-4 mr-2" />
+                            )}
+                            Excluir Período
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              setDeleteStartDate(undefined);
+                              setDeleteEndDate(undefined);
+                              setShowDeleteDatePicker(false);
+                            }}
+                            data-testid="button-cancel-delete-by-date"
+                          >
+                            Cancelar
+                          </Button>
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => {
+                      if (confirm("Tem certeza que deseja excluir TODO o histórico de mensagens? Esta ação não pode ser desfeita.")) {
+                        deleteLogsMutation.mutate({ deleteAll: true });
+                      }
+                    }}
+                    disabled={deleteLogsMutation.isPending}
+                    data-testid="button-delete-all-logs"
+                  >
+                    {deleteLogsMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-4 h-4 mr-2" />
+                    )}
+                    Excluir Tudo
+                  </Button>
+                </>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent>
