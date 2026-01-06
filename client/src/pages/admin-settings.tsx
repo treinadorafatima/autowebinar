@@ -813,10 +813,12 @@ export default function AdminSettingsPage() {
                       </div>
                     </div>
                   </div>
-                  {showOpenaiMasked && openaiMaskedKey && (
+                  {showOpenaiMasked && (
                     <div className="p-3 rounded-lg bg-muted border">
                       <div className="flex items-center justify-between">
-                        <code className="text-sm font-mono">{openaiMaskedKey}</code>
+                        <code className="text-sm font-mono">
+                          {openaiMaskedKey || "Chave não encontrada"}
+                        </code>
                         <Button
                           variant="ghost"
                           size="sm"
@@ -963,10 +965,12 @@ export default function AdminSettingsPage() {
                       </div>
                     </div>
                   </div>
-                  {showDeepseekMasked && deepseekMaskedKey && (
+                  {showDeepseekMasked && (
                     <div className="p-3 rounded-lg bg-muted border">
                       <div className="flex items-center justify-between">
-                        <code className="text-sm font-mono">{deepseekMaskedKey}</code>
+                        <code className="text-sm font-mono">
+                          {deepseekMaskedKey || "Chave não encontrada"}
+                        </code>
                         <Button
                           variant="ghost"
                           size="sm"
