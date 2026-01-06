@@ -685,7 +685,7 @@ export default function AdminSettingsPage() {
                 <div>
                   <CardTitle>Provedor de IA</CardTitle>
                   <CardDescription>
-                    Escolha qual serviço usar para o Designer IA
+                    Usado em: Designer IA, Roteirizador, Gerador de Mensagens e Transcrição
                   </CardDescription>
                 </div>
               </div>
@@ -774,7 +774,7 @@ export default function AdminSettingsPage() {
                     )}
                   </CardTitle>
                   <CardDescription>
-                    Chave para usar GPT-4o no Designer IA
+                    Usada no Designer IA, Roteirizador, Gerador de Mensagens e Transcrição
                   </CardDescription>
                 </div>
               </div>
@@ -911,7 +911,7 @@ export default function AdminSettingsPage() {
                     </Badge>
                   </CardTitle>
                   <CardDescription>
-                    Alternativa econômica para o Designer IA
+                    Usada no Designer IA, Roteirizador, Gerador de Mensagens e Transcrição
                   </CardDescription>
                 </div>
               </div>
