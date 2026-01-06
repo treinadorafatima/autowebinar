@@ -7302,6 +7302,33 @@ Seja conversacional e objetivo.`;
     }
   });
 
+  // WhatsApp Notifications - Delete single pending message from queue
+  app.delete("/api/notifications/whatsapp/queue/:id", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.replace("Bearer ", "");
+      if (!token) return res.status(401).json({ error: "Token não fornecido" });
+      
+      const email = await validateSession(token);
+      if (!email) return res.status(401).json({ error: "Sessão inválida" });
+      
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin || admin.role !== "superadmin") {
+        return res.status(403).json({ error: "Acesso negado - apenas superadmin" });
+      }
+
+      const { id } = req.params;
+      const deleted = await storage.deletePendingWhatsappNotification(id);
+      
+      if (deleted) {
+        res.json({ success: true, message: "Mensagem removida da fila" });
+      } else {
+        res.status(404).json({ error: "Mensagem não encontrada ou já processada" });
+      }
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // WhatsApp Notifications - Delete logs (all or by date range)
   app.delete("/api/notifications/whatsapp/logs", async (req, res) => {
     try {

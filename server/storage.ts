@@ -383,6 +383,8 @@ export interface IStorage {
   updateWhatsappNotificationLog(id: string, data: Partial<WhatsappNotificationLogInsert>): Promise<void>;
   deleteAllWhatsappNotificationLogs(): Promise<number>;
   deleteWhatsappNotificationLogsByDateRange(startDate: Date, endDate: Date): Promise<number>;
+  deletePendingWhatsappNotification(id: string): Promise<boolean>;
+  getWhatsappNotificationLogsByStatus(status: string): Promise<WhatsappNotificationLog[]>;
   // WhatsApp Notification Templates
   listWhatsappNotificationTemplates(): Promise<WhatsappNotificationTemplate[]>;
   getWhatsappNotificationTemplateByType(notificationType: string): Promise<WhatsappNotificationTemplate | undefined>;
@@ -4871,6 +4873,24 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
       )
       .returning();
     return result.length;
+  }
+
+  async deletePendingWhatsappNotification(id: string): Promise<boolean> {
+    const result = await db.delete(whatsappNotificationsLog)
+      .where(
+        and(
+          eq(whatsappNotificationsLog.id, id),
+          eq(whatsappNotificationsLog.status, 'pending')
+        )
+      )
+      .returning();
+    return result.length > 0;
+  }
+
+  async getWhatsappNotificationLogsByStatus(status: string): Promise<WhatsappNotificationLog[]> {
+    return db.select().from(whatsappNotificationsLog)
+      .where(eq(whatsappNotificationsLog.status, status))
+      .orderBy(whatsappNotificationsLog.createdAt);
   }
 
   // WhatsApp Notification Templates

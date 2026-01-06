@@ -253,8 +253,8 @@ async function sendNotificationMessage(
     // Selecionar conta usando rotação automática
     const selectedAccount = await selectAccountForSending();
     if (!selectedAccount) {
-      console.log("[whatsapp-notifications] Nenhuma conta disponível para envio");
-      if (logId) await updateNotificationLog(logId, 'failed', 'Nenhuma conta WhatsApp conectada ou disponível para envio');
+      console.log("[whatsapp-notifications] Nenhuma conta disponível para envio - mantendo na fila");
+      // Mantém como 'pending' para reprocessar depois quando houver conexão
       return false;
     }
     
@@ -262,8 +262,8 @@ async function sendNotificationMessage(
     
     const status = await getWhatsAppStatus(accountId);
     if (status.status !== "connected") {
-      console.log(`[whatsapp-notifications] Conta ${label} não está conectada (status: ${status.status})`);
-      if (logId) await updateNotificationLog(logId, 'failed', `Conta ${label} não está conectada (status: ${status.status})`);
+      console.log(`[whatsapp-notifications] Conta ${label} não está conectada (status: ${status.status}) - mantendo na fila`);
+      // Mantém como 'pending' para reprocessar depois quando houver conexão
       return false;
     }
     
@@ -1077,5 +1077,108 @@ Duvidas? Responda esta mensagem!`;
   } catch (error) {
     console.error("[whatsapp-notifications] Erro em sendWhatsAppPaymentPendingSafe:", error);
     return false;
+  }
+}
+
+// ============================================================
+// RETRY MECHANISM - Processa mensagens pendentes periodicamente
+// ============================================================
+
+const RETRY_INTERVAL_MS = 60000; // Tenta reenviar a cada 1 minuto
+let retryInterval: NodeJS.Timeout | null = null;
+
+/**
+ * Processa mensagens pendentes na fila
+ * Chamado periodicamente para reenviar mensagens que falharam por falta de conexão
+ */
+async function processPendingMessages(): Promise<void> {
+  try {
+    // Verifica se há conexão disponível ANTES de buscar mensagens
+    const isAvailable = await isWhatsAppNotificationServiceAvailable();
+    if (!isAvailable) {
+      return; // Não há conexão, próxima tentativa no próximo intervalo
+    }
+
+    // Pré-seleciona conta disponível antes de buscar mensagens
+    const selectedAccount = await selectAccountForSending();
+    if (!selectedAccount) {
+      return; // Nenhuma conta disponível, próxima tentativa no próximo intervalo
+    }
+
+    const { accountId, label } = selectedAccount;
+    const status = await getWhatsAppStatus(accountId);
+    
+    if (status.status !== "connected") {
+      return; // Conta não conectada, próxima tentativa no próximo intervalo
+    }
+
+    // Busca mensagens pendentes apenas se há conta conectada
+    const pendingMessages = await storage.getWhatsappNotificationLogsByStatus('pending');
+    if (pendingMessages.length === 0) {
+      return;
+    }
+
+    console.log(`[whatsapp-notifications] Processando ${pendingMessages.length} mensagem(ns) pendente(s) via ${label}`);
+
+    for (const msg of pendingMessages) {
+      try {
+        // Verifica se a conta ainda está conectada
+        const currentStatus = await getWhatsAppStatus(accountId);
+        if (currentStatus.status !== "connected") {
+          console.log(`[whatsapp-notifications] Retry: Conta ${label} desconectou durante processamento, parando`);
+          return; // Conta desconectou, próxima tentativa no próximo intervalo
+        }
+
+        // Tenta enviar a mensagem
+        const result = await sendWhatsAppMessage(accountId, msg.recipientPhone, msg.message || '');
+        
+        if (result.success) {
+          await storage.incrementWhatsappAccountMessageCount(accountId);
+          await updateNotificationLog(msg.id, 'sent');
+          console.log(`[whatsapp-notifications] Retry: Mensagem ${msg.id} enviada com sucesso para ${msg.recipientPhone}`);
+        } else {
+          await updateNotificationLog(msg.id, 'failed', result.error || 'Erro ao enviar mensagem');
+          console.log(`[whatsapp-notifications] Retry: Falha ao enviar mensagem ${msg.id}: ${result.error}`);
+        }
+
+        // Delay entre mensagens para evitar spam
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      } catch (error: any) {
+        console.error(`[whatsapp-notifications] Retry: Erro ao processar mensagem ${msg.id}:`, error);
+        await updateNotificationLog(msg.id, 'failed', error.message || 'Erro interno');
+      }
+    }
+  } catch (error) {
+    console.error("[whatsapp-notifications] Erro ao processar mensagens pendentes:", error);
+  }
+}
+
+/**
+ * Inicia o mecanismo de retry para mensagens pendentes
+ */
+export function startPendingMessagesRetry(): void {
+  if (retryInterval) {
+    clearInterval(retryInterval);
+  }
+  
+  console.log("[whatsapp-notifications] Iniciando retry de mensagens pendentes (intervalo: 1 min)");
+  
+  // Primeira execução após 30 segundos
+  setTimeout(() => {
+    processPendingMessages();
+  }, 30000);
+  
+  // Execuções periódicas
+  retryInterval = setInterval(processPendingMessages, RETRY_INTERVAL_MS);
+}
+
+/**
+ * Para o mecanismo de retry
+ */
+export function stopPendingMessagesRetry(): void {
+  if (retryInterval) {
+    clearInterval(retryInterval);
+    retryInterval = null;
+    console.log("[whatsapp-notifications] Retry de mensagens pendentes parado");
   }
 }

@@ -206,6 +206,26 @@ export default function AdminWhatsAppNotificationsPage() {
     },
   });
 
+  const deleteQueueItemMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("DELETE", `/api/notifications/whatsapp/queue/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications/whatsapp/queue"] });
+      toast({
+        title: "Mensagem removida",
+        description: "Mensagem removida da fila com sucesso",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro",
+        description: error.message || "Não foi possível remover a mensagem",
+        variant: "destructive",
+      });
+    },
+  });
+
   const toggleMutation = useMutation({
     mutationFn: async (enabled: boolean) => {
       return apiRequest("POST", "/api/notifications/whatsapp/toggle", { enabled });
@@ -1128,6 +1148,7 @@ export default function AdminWhatsAppNotificationsPage() {
                     <TableHead>Telefone</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Criado em</TableHead>
+                    <TableHead className="w-[80px]">Ação</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1140,6 +1161,21 @@ export default function AdminWhatsAppNotificationsPage() {
                       <TableCell data-testid={`cell-queue-phone-${log.id}`}>{log.recipientPhone}</TableCell>
                       <TableCell data-testid={`cell-queue-status-${log.id}`}>{getNotificationStatusBadge(log.status, log.id)}</TableCell>
                       <TableCell data-testid={`cell-queue-date-${log.id}`}>{formatDate(log.createdAt)}</TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            if (confirm("Tem certeza que deseja remover esta mensagem da fila?")) {
+                              deleteQueueItemMutation.mutate(log.id);
+                            }
+                          }}
+                          disabled={deleteQueueItemMutation.isPending}
+                          data-testid={`button-delete-queue-${log.id}`}
+                        >
+                          <Trash2 className="w-4 h-4 text-destructive" />
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

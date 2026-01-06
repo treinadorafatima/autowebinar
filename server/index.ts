@@ -9,6 +9,7 @@ import { startSubscriptionScheduler } from "./subscription-scheduler";
 import { startAffiliatePayoutScheduler } from "./affiliate-payout-scheduler";
 import { startPixExpirationScheduler } from "./pix-expiration-scheduler";
 import { startEmailRetryScheduler } from "./email";
+import { startPendingMessagesRetry } from "./whatsapp-notifications";
 
 const app = express();
 
@@ -154,5 +155,8 @@ app.use((req, res, next) => {
     
     // Start email retry scheduler for failed webhook emails
     startEmailRetryScheduler();
+    
+    // Start WhatsApp pending messages retry scheduler
+    startPendingMessagesRetry();
   });
 })();
