@@ -116,8 +116,8 @@ const accountMenuItems = [
     superadminOnly: false,
   },
   {
-    title: "Segurança",
-    url: "/admin/change-password",
+    title: "Perfil e Segurança",
+    url: "/admin/settings",
     icon: Shield,
     superadminOnly: false,
   },
