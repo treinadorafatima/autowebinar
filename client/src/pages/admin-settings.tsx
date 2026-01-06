@@ -36,6 +36,79 @@ interface SubscriptionData {
   };
 }
 
+// Country codes for international phone support
+interface CountryCode {
+  code: string;
+  dial: string;
+  name: string;
+  flag: string;
+  format: string;
+  phoneLength: number;
+}
+
+const COUNTRY_CODES: CountryCode[] = [
+  { code: "BR", dial: "+55", name: "Brasil", flag: "🇧🇷", format: "(00) 00000-0000", phoneLength: 11 },
+  { code: "US", dial: "+1", name: "Estados Unidos", flag: "🇺🇸", format: "(000) 000-0000", phoneLength: 10 },
+  { code: "PT", dial: "+351", name: "Portugal", flag: "🇵🇹", format: "000 000 000", phoneLength: 9 },
+  { code: "ES", dial: "+34", name: "Espanha", flag: "🇪🇸", format: "000 00 00 00", phoneLength: 9 },
+  { code: "AR", dial: "+54", name: "Argentina", flag: "🇦🇷", format: "00 0000-0000", phoneLength: 10 },
+  { code: "MX", dial: "+52", name: "México", flag: "🇲🇽", format: "00 0000 0000", phoneLength: 10 },
+  { code: "CO", dial: "+57", name: "Colômbia", flag: "🇨🇴", format: "000 000 0000", phoneLength: 10 },
+  { code: "CL", dial: "+56", name: "Chile", flag: "🇨🇱", format: "0 0000 0000", phoneLength: 9 },
+  { code: "PE", dial: "+51", name: "Peru", flag: "🇵🇪", format: "000 000 000", phoneLength: 9 },
+  { code: "VE", dial: "+58", name: "Venezuela", flag: "🇻🇪", format: "0000-0000000", phoneLength: 11 },
+  { code: "UY", dial: "+598", name: "Uruguai", flag: "🇺🇾", format: "00 000 000", phoneLength: 8 },
+  { code: "PY", dial: "+595", name: "Paraguai", flag: "🇵🇾", format: "000 000 000", phoneLength: 9 },
+  { code: "BO", dial: "+591", name: "Bolívia", flag: "🇧🇴", format: "0 000 0000", phoneLength: 8 },
+  { code: "EC", dial: "+593", name: "Equador", flag: "🇪🇨", format: "00 000 0000", phoneLength: 9 },
+  { code: "GB", dial: "+44", name: "Reino Unido", flag: "🇬🇧", format: "0000 000000", phoneLength: 10 },
+  { code: "FR", dial: "+33", name: "França", flag: "🇫🇷", format: "0 00 00 00 00", phoneLength: 9 },
+  { code: "DE", dial: "+49", name: "Alemanha", flag: "🇩🇪", format: "0000 0000000", phoneLength: 11 },
+  { code: "IT", dial: "+39", name: "Itália", flag: "🇮🇹", format: "000 000 0000", phoneLength: 10 },
+  { code: "CA", dial: "+1", name: "Canadá", flag: "🇨🇦", format: "(000) 000-0000", phoneLength: 10 },
+  { code: "AU", dial: "+61", name: "Austrália", flag: "🇦🇺", format: "0000 000 000", phoneLength: 9 },
+  { code: "JP", dial: "+81", name: "Japão", flag: "🇯🇵", format: "00-0000-0000", phoneLength: 10 },
+  { code: "CN", dial: "+86", name: "China", flag: "🇨🇳", format: "000 0000 0000", phoneLength: 11 },
+  { code: "IN", dial: "+91", name: "Índia", flag: "🇮🇳", format: "00000 00000", phoneLength: 10 },
+  { code: "RU", dial: "+7", name: "Rússia", flag: "🇷🇺", format: "000 000-00-00", phoneLength: 10 },
+  { code: "ZA", dial: "+27", name: "África do Sul", flag: "🇿🇦", format: "00 000 0000", phoneLength: 9 },
+];
+
+// Format phone number based on country
+const formatPhoneByCountry = (value: string, country: CountryCode): string => {
+  const numbers = value.replace(/\D/g, '').slice(0, country.phoneLength);
+  
+  switch (country.code) {
+    case "BR":
+      if (numbers.length <= 2) return numbers;
+      if (numbers.length <= 7) return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`;
+      return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7)}`;
+    case "US":
+    case "CA":
+      if (numbers.length <= 3) return numbers;
+      if (numbers.length <= 6) return `(${numbers.slice(0, 3)}) ${numbers.slice(3)}`;
+      return `(${numbers.slice(0, 3)}) ${numbers.slice(3, 6)}-${numbers.slice(6)}`;
+    case "PT":
+    case "ES":
+    case "PE":
+    case "PY":
+      if (numbers.length <= 3) return numbers;
+      if (numbers.length <= 6) return `${numbers.slice(0, 3)} ${numbers.slice(3)}`;
+      return `${numbers.slice(0, 3)} ${numbers.slice(3, 6)} ${numbers.slice(6)}`;
+    case "AR":
+      if (numbers.length <= 2) return numbers;
+      if (numbers.length <= 6) return `${numbers.slice(0, 2)} ${numbers.slice(2)}`;
+      return `${numbers.slice(0, 2)} ${numbers.slice(2, 6)}-${numbers.slice(6)}`;
+    case "MX":
+    case "CO":
+      if (numbers.length <= 2) return numbers;
+      if (numbers.length <= 6) return `${numbers.slice(0, 2)} ${numbers.slice(2)}`;
+      return `${numbers.slice(0, 2)} ${numbers.slice(2, 6)} ${numbers.slice(6)}`;
+    default:
+      return numbers.replace(/(\d{3})(?=\d)/g, '$1 ').trim();
+  }
+};
+
 export default function AdminSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -58,6 +131,7 @@ export default function AdminSettingsPage() {
   const [profileEmail, setProfileEmail] = useState("");
   const [originalEmail, setOriginalEmail] = useState("");
   const [profileTelefone, setProfileTelefone] = useState("");
+  const [selectedCountry, setSelectedCountry] = useState<CountryCode>(COUNTRY_CODES[0]);
   const [emailPassword, setEmailPassword] = useState("");
   const [showEmailPassword, setShowEmailPassword] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
@@ -81,10 +155,35 @@ export default function AdminSettingsPage() {
   const isSuperadmin = subscription?.admin?.role === "superadmin";
 
   const formatPhone = (value: string) => {
-    const numbers = value.replace(/\D/g, '').slice(0, 11);
-    if (numbers.length <= 2) return numbers;
-    if (numbers.length <= 7) return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`;
-    return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7)}`;
+    return formatPhoneByCountry(value, selectedCountry);
+  };
+  
+  // Get full phone number with country code for storage
+  const getFullPhoneNumber = () => {
+    const digits = profileTelefone.replace(/\D/g, '');
+    if (!digits) return '';
+    return `${selectedCountry.dial}${digits}`;
+  };
+  
+  // Parse existing phone to detect country
+  const parseExistingPhone = (phone: string) => {
+    if (!phone) return;
+    
+    // Check if phone starts with +
+    if (phone.startsWith('+')) {
+      // Find matching country by dial code
+      for (const country of COUNTRY_CODES) {
+        if (phone.startsWith(country.dial)) {
+          setSelectedCountry(country);
+          const localNumber = phone.substring(country.dial.length);
+          setProfileTelefone(formatPhoneByCountry(localNumber, country));
+          return;
+        }
+      }
+    }
+    
+    // If no + prefix, assume it's Brazilian format
+    setProfileTelefone(formatPhoneByCountry(phone, COUNTRY_CODES[0]));
   };
 
   useEffect(() => {
@@ -114,7 +213,10 @@ export default function AdminSettingsPage() {
         setProfileName(data.name || "");
         setProfileEmail(data.email || "");
         setOriginalEmail(data.email || "");
-        setProfileTelefone(data.telefone || "");
+        // Parse existing phone to detect country and format
+        if (data.telefone) {
+          parseExistingPhone(data.telefone);
+        }
       }
     } catch (error) {
       console.error("Error fetching profile:", error);
@@ -202,7 +304,7 @@ export default function AdminSettingsPage() {
     try {
       const body: any = {
         name: profileName,
-        telefone: profileTelefone,
+        telefone: getFullPhoneNumber(),
       };
 
       // Include email change if modified
@@ -532,13 +634,34 @@ export default function AdminSettingsPage() {
                 <Phone className="w-4 h-4" />
                 Telefone
               </label>
-              <Input
-                placeholder="(00) 00000-0000"
-                value={profileTelefone}
-                onChange={(e) => setProfileTelefone(formatPhone(e.target.value))}
-                maxLength={15}
-                data-testid="input-profile-telefone"
-              />
+              <div className="flex gap-2">
+                <select
+                  value={selectedCountry.code}
+                  onChange={(e) => {
+                    const country = COUNTRY_CODES.find(c => c.code === e.target.value);
+                    if (country) {
+                      setSelectedCountry(country);
+                      setProfileTelefone('');
+                    }
+                  }}
+                  className="h-9 px-3 rounded-md border border-input bg-background text-sm min-w-[100px]"
+                  data-testid="select-profile-country-code"
+                >
+                  {COUNTRY_CODES.map((country) => (
+                    <option key={country.code} value={country.code}>
+                      {country.flag} {country.dial}
+                    </option>
+                  ))}
+                </select>
+                <Input
+                  placeholder={selectedCountry.format}
+                  value={profileTelefone}
+                  onChange={(e) => setProfileTelefone(formatPhone(e.target.value))}
+                  maxLength={selectedCountry.format.length + 2}
+                  className="flex-1"
+                  data-testid="input-profile-telefone"
+                />
+              </div>
             </div>
           </div>
 
