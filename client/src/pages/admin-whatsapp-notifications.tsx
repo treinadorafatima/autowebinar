@@ -1113,7 +1113,11 @@ export default function AdminWhatsAppNotificationsPage() {
                 <Button
                   variant="destructive"
                   size="sm"
-                  onClick={() => cancelQueueMutation.mutate()}
+                  onClick={() => {
+                    if (confirm(`Tem certeza que deseja cancelar todas as ${notificationQueue.length} mensagem(ns) pendente(s)?`)) {
+                      cancelQueueMutation.mutate();
+                    }
+                  }}
                   disabled={cancelQueueMutation.isPending}
                   data-testid="button-cancel-queue"
                 >
