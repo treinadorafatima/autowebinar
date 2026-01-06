@@ -255,6 +255,11 @@ export default function AdminSubscription() {
   const isExpired = admin.accessExpiresAt && new Date(admin.accessExpiresAt) < new Date();
   const isActive = assinatura?.status === "active";
   const needsRenewal = !isActive || isExpired || assinatura?.status === "paused";
+  
+  // Show cancel button for recurring subscriptions that are not already cancelled
+  const canCancelSubscription = assinatura && 
+    assinatura.status !== "cancelled" && 
+    plano?.tipoCobranca === "recorrente";
 
   const isUnlimited = consumo.isSuperadmin || consumo.webinarsLimite === -1;
   const webinarPercent = isUnlimited ? 0 : (consumo.webinarsLimite > 0 
@@ -594,12 +599,13 @@ export default function AdminSubscription() {
                   Fazer Upgrade
                 </Button>
               )}
-              {isActive && plano?.tipoCobranca === "recorrente" && (
+              {canCancelSubscription && (
                 <Button 
-                  variant="outline"
+                  variant="destructive"
                   onClick={() => setShowCancelDialog(true)}
                   data-testid="button-cancel"
                 >
+                  <XCircle className="w-4 h-4 mr-2" />
                   Cancelar Assinatura
                 </Button>
               )}
