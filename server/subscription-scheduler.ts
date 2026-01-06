@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { admins, checkoutPlanos, checkoutPagamentos } from "@shared/schema";
+import { admins, checkoutPlanos, checkoutPagamentos, checkoutAssinaturas } from "@shared/schema";
 import { eq, and, gte, lte, isNotNull, sql } from "drizzle-orm";
 import { 
   sendExpirationReminderEmail, 
@@ -274,11 +274,83 @@ async function generateRenewalPixBoleto(admin: AdminWithPlan): Promise<boolean> 
     
     const plan = plano[0];
     
+    // Check if user has an active recurring subscription (Stripe or Mercado Pago)
+    // If they have active recurring billing, skip generating manual renewal PIX/Boleto
+    // Include various active states: 'active', 'authorized', 'auto_renewal', 'pending' (payment being processed)
+    const activeSubscription = await db
+      .select()
+      .from(checkoutAssinaturas)
+      .where(
+        and(
+          eq(checkoutAssinaturas.adminId, admin.id),
+          sql`${checkoutAssinaturas.status} IN ('active', 'authorized', 'auto_renewal', 'pending')`
+        )
+      )
+      .limit(1);
+    
+    if (activeSubscription[0]) {
+      console.log(`[subscription-scheduler] Skipping PIX/Boleto renewal for ${admin.email} - has active recurring subscription (gateway: ${activeSubscription[0].gateway}, status: ${activeSubscription[0].status})`);
+      return false;
+    }
+    
+    // Also check Stripe directly if user has any active subscription
+    const stripeSecretKey = await storage.getCheckoutConfig('STRIPE_SECRET_KEY');
+    if (stripeSecretKey) {
+      try {
+        const searchParams = new URLSearchParams({ query: `email:'${admin.email}'` });
+        const searchResponse = await fetch(`https://api.stripe.com/v1/customers/search?${searchParams}`, {
+          headers: { 'Authorization': `Bearer ${stripeSecretKey}` },
+        });
+        
+        if (searchResponse.ok) {
+          const searchData = await searchResponse.json();
+          if (searchData.data && searchData.data.length > 0) {
+            const customerId = searchData.data[0].id;
+            
+            // Check for active subscriptions
+            const subsResponse = await fetch(`https://api.stripe.com/v1/subscriptions?customer=${customerId}&status=active`, {
+              headers: { 'Authorization': `Bearer ${stripeSecretKey}` },
+            });
+            
+            if (subsResponse.ok) {
+              const subsData = await subsResponse.json();
+              if (subsData.data && subsData.data.length > 0) {
+                console.log(`[subscription-scheduler] Skipping PIX/Boleto renewal for ${admin.email} - has active Stripe subscription (${subsData.data[0].id})`);
+                return false;
+              }
+            }
+          }
+        }
+      } catch (stripeError) {
+        console.error('[subscription-scheduler] Error checking Stripe subscriptions:', stripeError);
+        // Continue with PIX generation if Stripe check fails
+      }
+    }
+    
     // Use Mercado Pago for PIX/Boleto renewals (checkout híbrido)
     const mpAccessToken = await storage.getCheckoutConfig('MERCADOPAGO_ACCESS_TOKEN');
     if (!mpAccessToken) {
       console.log('[subscription-scheduler] Mercado Pago not configured, skipping auto-renewal PIX/Boleto');
       return false;
+    }
+    
+    // Also check Mercado Pago directly for active preapprovals (recurring subscriptions)
+    try {
+      const mpSearchResponse = await fetch(
+        `https://api.mercadopago.com/preapproval/search?payer_email=${encodeURIComponent(admin.email)}&status=authorized`,
+        { headers: { 'Authorization': `Bearer ${mpAccessToken}` } }
+      );
+      
+      if (mpSearchResponse.ok) {
+        const mpSearchData = await mpSearchResponse.json();
+        if (mpSearchData.results && mpSearchData.results.length > 0) {
+          console.log(`[subscription-scheduler] Skipping PIX/Boleto renewal for ${admin.email} - has active Mercado Pago subscription (${mpSearchData.results[0].id})`);
+          return false;
+        }
+      }
+    } catch (mpError) {
+      console.error('[subscription-scheduler] Error checking Mercado Pago subscriptions:', mpError);
+      // Continue with PIX generation if MP check fails
     }
 
     // Try to get CPF from previous approved payments for this user
