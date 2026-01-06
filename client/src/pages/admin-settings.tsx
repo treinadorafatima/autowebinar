@@ -50,7 +50,10 @@ export default function AdminSettingsPage() {
   // Profile states
   const [profileName, setProfileName] = useState("");
   const [profileEmail, setProfileEmail] = useState("");
+  const [originalEmail, setOriginalEmail] = useState("");
   const [profileTelefone, setProfileTelefone] = useState("");
+  const [emailPassword, setEmailPassword] = useState("");
+  const [showEmailPassword, setShowEmailPassword] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -97,6 +100,7 @@ export default function AdminSettingsPage() {
         const data = await res.json();
         setProfileName(data.name || "");
         setProfileEmail(data.email || "");
+        setOriginalEmail(data.email || "");
         setProfileTelefone(data.telefone || "");
       }
     } catch (error) {
@@ -132,26 +136,59 @@ export default function AdminSettingsPage() {
     }
   }
 
+  const isEmailChanged = profileEmail.toLowerCase() !== originalEmail.toLowerCase();
+
   async function saveProfile() {
+    // If email is being changed, require password
+    if (isEmailChanged && !emailPassword) {
+      toast({
+        title: "Senha necessária",
+        description: "Para alterar o email, digite sua senha atual",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setSavingProfile(true);
     try {
+      const body: any = {
+        name: profileName,
+        telefone: profileTelefone,
+      };
+
+      // Include email change if modified
+      if (isEmailChanged) {
+        body.newEmail = profileEmail;
+        body.currentPassword = emailPassword;
+      }
+
       const res = await fetch("/api/admin/profile", {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          name: profileName,
-          telefone: profileTelefone,
-        }),
+        body: JSON.stringify(body),
       });
 
       if (res.ok) {
-        toast({
-          title: "Sucesso",
-          description: "Perfil atualizado com sucesso",
-        });
+        if (isEmailChanged) {
+          toast({
+            title: "Email alterado",
+            description: "Você será redirecionado para fazer login novamente",
+          });
+          // Clear session and redirect to login
+          localStorage.removeItem("adminToken");
+          setTimeout(() => {
+            setLocation("/login");
+          }, 2000);
+        } else {
+          toast({
+            title: "Sucesso",
+            description: "Perfil atualizado com sucesso",
+          });
+        }
+        setEmailPassword("");
       } else {
         const error = await res.json();
         throw new Error(error.error || "Erro ao atualizar perfil");
@@ -430,14 +467,16 @@ export default function AdminSettingsPage() {
               </label>
               <Input
                 type="email"
+                placeholder="seu@email.com"
                 value={profileEmail}
-                disabled
-                className="bg-muted"
+                onChange={(e) => setProfileEmail(e.target.value)}
                 data-testid="input-profile-email"
               />
-              <p className="text-xs text-muted-foreground">
-                O email não pode ser alterado
-              </p>
+              {isEmailChanged && (
+                <p className="text-xs text-amber-600 dark:text-amber-400">
+                  Ao alterar o email, você precisará fazer login novamente
+                </p>
+              )}
             </div>
             <div className="space-y-2 sm:col-span-2">
               <label className="text-sm font-medium flex items-center gap-2">
@@ -452,9 +491,42 @@ export default function AdminSettingsPage() {
               />
             </div>
           </div>
+
+          {isEmailChanged && (
+            <div className="p-4 rounded-lg border border-amber-500/30 bg-amber-500/10 space-y-3">
+              <p className="text-sm font-medium text-amber-600 dark:text-amber-400">
+                Confirme sua senha para alterar o email
+              </p>
+              <div className="relative">
+                <Input
+                  type={showEmailPassword ? "text" : "password"}
+                  placeholder="Digite sua senha atual"
+                  value={emailPassword}
+                  onChange={(e) => setEmailPassword(e.target.value)}
+                  className="pr-10"
+                  data-testid="input-email-password"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-0 top-0 h-full"
+                  onClick={() => setShowEmailPassword(!showEmailPassword)}
+                  data-testid="button-toggle-email-password"
+                >
+                  {showEmailPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+
           <Button
             onClick={saveProfile}
-            disabled={savingProfile}
+            disabled={savingProfile || (isEmailChanged && !emailPassword)}
             className="gap-2"
             data-testid="button-save-profile"
           >
