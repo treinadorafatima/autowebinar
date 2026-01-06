@@ -12307,12 +12307,21 @@ Seja conversacional e objetivo.`;
       if (!admin) return res.status(404).json({ error: "Admin não encontrado" });
 
       const assinatura = await storage.getCheckoutAssinaturaByAdminId(admin.id);
-      if (!assinatura) {
-        return res.status(400).json({ error: "Nenhuma assinatura ativa encontrada" });
+      
+      // Get user's plan to check if it's recurring
+      let plano = null;
+      if (admin.planoId) {
+        plano = await storage.getCheckoutPlanoById(admin.planoId);
+      }
+      
+      if (!plano || plano.tipoCobranca !== "recorrente") {
+        return res.status(400).json({ error: "Este plano não é recorrente e não pode ser cancelado" });
       }
 
-      // Cancel subscription on the gateway if it has an external ID (recurring)
-      if (assinatura.externalId && assinatura.gateway) {
+      let cancelledOnGateway = false;
+
+      // If we have an assinatura record with external ID, cancel on the gateway
+      if (assinatura && assinatura.externalId && assinatura.gateway) {
         try {
           if (assinatura.gateway === "stripe") {
             // Cancel Stripe subscription
@@ -12332,6 +12341,7 @@ Seja conversacional e objetivo.`;
                 console.error("Erro ao cancelar no Stripe:", await stripeResponse.text());
               } else {
                 console.log(`[subscription] Cancelled Stripe subscription: ${assinatura.externalId}`);
+                cancelledOnGateway = true;
               }
             }
           } else if (assinatura.gateway === "mercadopago") {
@@ -12353,6 +12363,7 @@ Seja conversacional e objetivo.`;
                 console.error("Erro ao cancelar no Mercado Pago:", await mpResponse.text());
               } else {
                 console.log(`[subscription] Cancelled Mercado Pago subscription: ${assinatura.externalId}`);
+                cancelledOnGateway = true;
               }
             }
           }
@@ -12360,10 +12371,56 @@ Seja conversacional e objetivo.`;
           console.error("Erro ao cancelar no gateway:", gatewayError);
           // Continue with local cancellation even if gateway fails
         }
+      } else if (!assinatura) {
+        // No assinatura record - try to find and cancel Stripe subscription by customer email
+        const stripeSecretKey = await storage.getCheckoutConfig('STRIPE_SECRET_KEY');
+        if (stripeSecretKey) {
+          try {
+            // Search for customer by email
+            const searchParams = new URLSearchParams({ query: `email:'${admin.email}'` });
+            const searchResponse = await fetch(`https://api.stripe.com/v1/customers/search?${searchParams}`, {
+              headers: { 'Authorization': `Bearer ${stripeSecretKey}` },
+            });
+            
+            if (searchResponse.ok) {
+              const searchData = await searchResponse.json();
+              if (searchData.data && searchData.data.length > 0) {
+                const customerId = searchData.data[0].id;
+                
+                // Get active subscriptions for this customer
+                const subsResponse = await fetch(`https://api.stripe.com/v1/subscriptions?customer=${customerId}&status=active`, {
+                  headers: { 'Authorization': `Bearer ${stripeSecretKey}` },
+                });
+                
+                if (subsResponse.ok) {
+                  const subsData = await subsResponse.json();
+                  for (const sub of subsData.data || []) {
+                    // Cancel each active subscription
+                    const cancelResponse = await fetch(`https://api.stripe.com/v1/subscriptions/${sub.id}`, {
+                      method: 'DELETE',
+                      headers: {
+                        'Authorization': `Bearer ${stripeSecretKey}`,
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                      },
+                    });
+                    if (cancelResponse.ok) {
+                      console.log(`[subscription] Cancelled Stripe subscription ${sub.id} for customer ${admin.email}`);
+                      cancelledOnGateway = true;
+                    }
+                  }
+                }
+              }
+            }
+          } catch (stripeError: any) {
+            console.error("Erro ao buscar/cancelar assinatura no Stripe:", stripeError);
+          }
+        }
       }
 
-      // Update subscription status to cancelled in our database
-      await storage.updateCheckoutAssinatura(assinatura.id, { status: "cancelled" });
+      // Update subscription status to cancelled in our database if record exists
+      if (assinatura) {
+        await storage.updateCheckoutAssinatura(assinatura.id, { status: "cancelled" });
+      }
       
       res.json({ success: true, message: "Assinatura cancelada com sucesso" });
     } catch (error: any) {

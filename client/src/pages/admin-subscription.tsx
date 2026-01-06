@@ -257,9 +257,9 @@ export default function AdminSubscription() {
   const needsRenewal = !isActive || isExpired || assinatura?.status === "paused";
   
   // Show cancel button for recurring subscriptions that are not already cancelled
-  const canCancelSubscription = assinatura && 
-    assinatura.status !== "cancelled" && 
-    plano?.tipoCobranca === "recorrente";
+  // Also show if user has a recurring plan even without a formal subscription record
+  const canCancelSubscription = plano?.tipoCobranca === "recorrente" && 
+    (!assinatura || assinatura.status !== "cancelled");
 
   const isUnlimited = consumo.isSuperadmin || consumo.webinarsLimite === -1;
   const webinarPercent = isUnlimited ? 0 : (consumo.webinarsLimite > 0 
