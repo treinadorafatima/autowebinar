@@ -3785,6 +3785,17 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
         .set({ ...data, updatedAt: now })
         .where(eq(whatsappSessions.accountId, accountId))
         .returning();
+      
+      // Also sync status and phoneNumber to whatsapp_accounts table
+      if (data.status || data.phoneNumber !== undefined) {
+        await db.update(whatsappAccounts)
+          .set({
+            ...(data.status && { status: data.status }),
+            ...(data.phoneNumber !== undefined && { phoneNumber: data.phoneNumber }),
+          })
+          .where(eq(whatsappAccounts.id, accountId));
+      }
+      
       return result;
     } else {
       const id = randomUUID();
@@ -3797,6 +3808,17 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
         createdAt: now,
         updatedAt: now,
       }).returning();
+      
+      // Also sync status and phoneNumber to whatsapp_accounts table
+      if (data.status || data.phoneNumber !== undefined) {
+        await db.update(whatsappAccounts)
+          .set({
+            ...(data.status && { status: data.status }),
+            ...(data.phoneNumber !== undefined && { phoneNumber: data.phoneNumber }),
+          })
+          .where(eq(whatsappAccounts.id, accountId));
+      }
+      
       return result;
     }
   }
