@@ -1441,6 +1441,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get masked API key (superadmin only) - shows first 8 chars and last 4 for identification
+  app.get("/api/settings/api-key/:keyName", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const currentAdmin = await storage.getAdminByEmail(email);
+      if (!currentAdmin || currentAdmin.role !== "superadmin") {
+        return res.status(403).json({ error: "Access denied. Superadmin only." });
+      }
+
+      const { keyName } = req.params;
+      if (keyName !== "openai_api_key" && keyName !== "deepseek_api_key") {
+        return res.status(400).json({ error: "Invalid key name" });
+      }
+
+      const value = await storage.getSetting(keyName);
+      if (!value) {
+        return res.json({ maskedValue: "", configured: false });
+      }
+      
+      // Mask the key: show first 8 chars + "..." + last 4 chars for identification
+      const maskedValue = value.length > 12 
+        ? `${value.substring(0, 8)}...${value.substring(value.length - 4)}`
+        : "****";
+      
+      res.json({ maskedValue, configured: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.post("/api/settings", async (req, res) => {
     try {
       const token = req.headers.authorization?.split(" ")[1];

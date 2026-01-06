@@ -46,6 +46,12 @@ export default function AdminSettingsPage() {
   const [showDeepseekKey, setShowDeepseekKey] = useState(false);
   const [openaiConfigured, setOpenaiConfigured] = useState(false);
   const [deepseekConfigured, setDeepseekConfigured] = useState(false);
+  const [openaiMaskedKey, setOpenaiMaskedKey] = useState("");
+  const [deepseekMaskedKey, setDeepseekMaskedKey] = useState("");
+  const [showOpenaiMasked, setShowOpenaiMasked] = useState(false);
+  const [showDeepseekMasked, setShowDeepseekMasked] = useState(false);
+  const [loadingOpenaiKey, setLoadingOpenaiKey] = useState(false);
+  const [loadingDeepseekKey, setLoadingDeepseekKey] = useState(false);
   
   // Profile states
   const [profileName, setProfileName] = useState("");
@@ -133,6 +139,42 @@ export default function AdminSettingsPage() {
       }
     } catch (error) {
       console.error("Error fetching settings:", error);
+    }
+  }
+
+  async function viewOpenAIKey() {
+    setLoadingOpenaiKey(true);
+    try {
+      const res = await fetch("/api/settings/api-key/openai_api_key", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setOpenaiMaskedKey(data.maskedValue || "");
+        setShowOpenaiMasked(true);
+      }
+    } catch (error) {
+      console.error("Error fetching OpenAI key:", error);
+    } finally {
+      setLoadingOpenaiKey(false);
+    }
+  }
+
+  async function viewDeepSeekKey() {
+    setLoadingDeepseekKey(true);
+    try {
+      const res = await fetch("/api/settings/api-key/deepseek_api_key", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setDeepseekMaskedKey(data.maskedValue || "");
+        setShowDeepseekMasked(true);
+      }
+    } catch (error) {
+      console.error("Error fetching DeepSeek key:", error);
+    } finally {
+      setLoadingDeepseekKey(false);
     }
   }
 
@@ -739,24 +781,53 @@ export default function AdminSettingsPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {openaiConfigured ? (
-                <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <CheckCircle className="w-5 h-5 text-green-500" />
-                      <span className="font-medium text-green-600 dark:text-green-400">
-                        Chave configurada
-                      </span>
+                <div className="space-y-3">
+                  <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-3">
+                        <CheckCircle className="w-5 h-5 text-green-500" />
+                        <span className="font-medium text-green-600 dark:text-green-400">
+                          Chave configurada
+                        </span>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={viewOpenAIKey}
+                          disabled={loadingOpenaiKey}
+                          data-testid="button-view-openai-key"
+                        >
+                          <Eye className="w-4 h-4 mr-1" />
+                          {loadingOpenaiKey ? "Carregando..." : "Visualizar"}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={removeOpenAIKey}
+                          disabled={saving}
+                          data-testid="button-remove-openai-key"
+                        >
+                          Remover
+                        </Button>
+                      </div>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={removeOpenAIKey}
-                      disabled={saving}
-                      data-testid="button-remove-openai-key"
-                    >
-                      Remover
-                    </Button>
                   </div>
+                  {showOpenaiMasked && openaiMaskedKey && (
+                    <div className="p-3 rounded-lg bg-muted border">
+                      <div className="flex items-center justify-between">
+                        <code className="text-sm font-mono">{openaiMaskedKey}</code>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setShowOpenaiMasked(false)}
+                          data-testid="button-hide-openai-key"
+                        >
+                          <EyeOff className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -860,24 +931,53 @@ export default function AdminSettingsPage() {
               </div>
 
               {deepseekConfigured ? (
-                <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <CheckCircle className="w-5 h-5 text-green-500" />
-                      <span className="font-medium text-green-600 dark:text-green-400">
-                        Chave configurada
-                      </span>
+                <div className="space-y-3">
+                  <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-3">
+                        <CheckCircle className="w-5 h-5 text-green-500" />
+                        <span className="font-medium text-green-600 dark:text-green-400">
+                          Chave configurada
+                        </span>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={viewDeepSeekKey}
+                          disabled={loadingDeepseekKey}
+                          data-testid="button-view-deepseek-key"
+                        >
+                          <Eye className="w-4 h-4 mr-1" />
+                          {loadingDeepseekKey ? "Carregando..." : "Visualizar"}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={removeDeepSeekKey}
+                          disabled={saving}
+                          data-testid="button-remove-deepseek-key"
+                        >
+                          Remover
+                        </Button>
+                      </div>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={removeDeepSeekKey}
-                      disabled={saving}
-                      data-testid="button-remove-deepseek-key"
-                    >
-                      Remover
-                    </Button>
                   </div>
+                  {showDeepseekMasked && deepseekMaskedKey && (
+                    <div className="p-3 rounded-lg bg-muted border">
+                      <div className="flex items-center justify-between">
+                        <code className="text-sm font-mono">{deepseekMaskedKey}</code>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setShowDeepseekMasked(false)}
+                          data-testid="button-hide-deepseek-key"
+                        >
+                          <EyeOff className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-4">
