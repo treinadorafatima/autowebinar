@@ -12244,6 +12244,9 @@ Seja conversacional e objetivo.`;
           })
       );
 
+      // Debug log for cancel button issue
+      console.log(`[subscription-debug] User: ${admin.email}, plano.tipoCobranca: ${plano?.tipoCobranca}, assinatura.status: ${assinatura?.status}, assinatura.id: ${assinatura?.id}`);
+
       res.json({
         admin: {
           id: admin.id,
