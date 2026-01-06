@@ -150,7 +150,7 @@ export default function AdminSettingsPage() {
       });
       if (res.ok) {
         const data = await res.json();
-        setOpenaiMaskedKey(data.maskedValue || "");
+        setOpenaiMaskedKey(data.value || "");
         setShowOpenaiMasked(true);
       }
     } catch (error) {
@@ -168,7 +168,7 @@ export default function AdminSettingsPage() {
       });
       if (res.ok) {
         const data = await res.json();
-        setDeepseekMaskedKey(data.maskedValue || "");
+        setDeepseekMaskedKey(data.value || "");
         setShowDeepseekMasked(true);
       }
     } catch (error) {

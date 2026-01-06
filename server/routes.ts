@@ -1441,7 +1441,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get masked API key (superadmin only) - shows first 8 chars and last 4 for identification
+  // Get full API key (superadmin only)
   app.get("/api/settings/api-key/:keyName", async (req, res) => {
     try {
       const token = req.headers.authorization?.split(" ")[1];
@@ -1462,15 +1462,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const value = await storage.getSetting(keyName);
       if (!value) {
-        return res.json({ maskedValue: "", configured: false });
+        return res.json({ value: "", configured: false });
       }
       
-      // Mask the key: show first 8 chars + "..." + last 4 chars for identification
-      const maskedValue = value.length > 12 
-        ? `${value.substring(0, 8)}...${value.substring(value.length - 4)}`
-        : "****";
-      
-      res.json({ maskedValue, configured: true });
+      res.json({ value, configured: true });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
