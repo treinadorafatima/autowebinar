@@ -20,7 +20,11 @@ import {
   XCircle,
   Sparkles,
   Zap,
-  ShieldAlert
+  ShieldAlert,
+  User,
+  Mail,
+  Lock,
+  Phone
 } from "lucide-react";
 import { SiOpenai } from "react-icons/si";
 
@@ -42,6 +46,19 @@ export default function AdminSettingsPage() {
   const [showDeepseekKey, setShowDeepseekKey] = useState(false);
   const [openaiConfigured, setOpenaiConfigured] = useState(false);
   const [deepseekConfigured, setDeepseekConfigured] = useState(false);
+  
+  // Profile states
+  const [profileName, setProfileName] = useState("");
+  const [profileEmail, setProfileEmail] = useState("");
+  const [profileTelefone, setProfileTelefone] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [savingPassword, setSavingPassword] = useState(false);
+  
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const searchString = useSearch();
@@ -59,11 +76,35 @@ export default function AdminSettingsPage() {
       setLocation("/login");
       return;
     }
-    fetchSettings();
+    fetchAllData();
   }, []);
 
-  async function fetchSettings() {
+  async function fetchAllData() {
     setLoading(true);
+    try {
+      await Promise.all([fetchProfile(), fetchSettings()]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function fetchProfile() {
+    try {
+      const res = await fetch("/api/admin/profile", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setProfileName(data.name || "");
+        setProfileEmail(data.email || "");
+        setProfileTelefone(data.telefone || "");
+      }
+    } catch (error) {
+      console.error("Error fetching profile:", error);
+    }
+  }
+
+  async function fetchSettings() {
     try {
       const res = await fetch("/api/settings", {
         headers: { Authorization: `Bearer ${token}` },
@@ -88,8 +129,97 @@ export default function AdminSettingsPage() {
       }
     } catch (error) {
       console.error("Error fetching settings:", error);
+    }
+  }
+
+  async function saveProfile() {
+    setSavingProfile(true);
+    try {
+      const res = await fetch("/api/admin/profile", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: profileName,
+          telefone: profileTelefone,
+        }),
+      });
+
+      if (res.ok) {
+        toast({
+          title: "Sucesso",
+          description: "Perfil atualizado com sucesso",
+        });
+      } else {
+        const error = await res.json();
+        throw new Error(error.error || "Erro ao atualizar perfil");
+      }
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message,
+        variant: "destructive",
+      });
     } finally {
-      setLoading(false);
+      setSavingProfile(false);
+    }
+  }
+
+  async function savePassword() {
+    if (newPassword !== confirmPassword) {
+      toast({
+        title: "Erro",
+        description: "As senhas não coincidem",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      toast({
+        title: "Erro",
+        description: "A nova senha deve ter pelo menos 6 caracteres",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSavingPassword(true);
+    try {
+      const res = await fetch("/api/admin/profile", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          currentPassword,
+          newPassword,
+        }),
+      });
+
+      if (res.ok) {
+        toast({
+          title: "Sucesso",
+          description: "Senha alterada com sucesso",
+        });
+        setCurrentPassword("");
+        setNewPassword("");
+        setConfirmPassword("");
+      } else {
+        const error = await res.json();
+        throw new Error(error.error || "Erro ao alterar senha");
+      }
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setSavingPassword(false);
     }
   }
 
@@ -260,9 +390,173 @@ export default function AdminSettingsPage() {
           Configurações
         </h1>
         <p className="text-muted-foreground mt-1">
-          Gerencie as configurações do sistema
+          Gerencie seu perfil e configurações do sistema
         </p>
       </div>
+
+      {/* Profile Settings - Available to all admins */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-md">
+              <User className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <CardTitle>Meu Perfil</CardTitle>
+              <CardDescription>
+                Gerencie suas informações pessoais
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <label className="text-sm font-medium flex items-center gap-2">
+                <User className="w-4 h-4" />
+                Nome
+              </label>
+              <Input
+                placeholder="Seu nome"
+                value={profileName}
+                onChange={(e) => setProfileName(e.target.value)}
+                data-testid="input-profile-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium flex items-center gap-2">
+                <Mail className="w-4 h-4" />
+                Email
+              </label>
+              <Input
+                type="email"
+                value={profileEmail}
+                disabled
+                className="bg-muted"
+                data-testid="input-profile-email"
+              />
+              <p className="text-xs text-muted-foreground">
+                O email não pode ser alterado
+              </p>
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <label className="text-sm font-medium flex items-center gap-2">
+                <Phone className="w-4 h-4" />
+                Telefone
+              </label>
+              <Input
+                placeholder="(00) 00000-0000"
+                value={profileTelefone}
+                onChange={(e) => setProfileTelefone(e.target.value)}
+                data-testid="input-profile-telefone"
+              />
+            </div>
+          </div>
+          <Button
+            onClick={saveProfile}
+            disabled={savingProfile}
+            className="gap-2"
+            data-testid="button-save-profile"
+          >
+            <Save className="w-4 h-4" />
+            {savingProfile ? "Salvando..." : "Salvar Perfil"}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Password Change - Available to all admins */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 shadow-md">
+              <Lock className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <CardTitle>Alterar Senha</CardTitle>
+              <CardDescription>
+                Atualize sua senha de acesso
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Senha Atual</label>
+            <div className="relative">
+              <Input
+                type={showCurrentPassword ? "text" : "password"}
+                placeholder="Digite sua senha atual"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                className="pr-10"
+                data-testid="input-current-password"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="absolute right-0 top-0 h-full"
+                onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                data-testid="button-toggle-current-password"
+              >
+                {showCurrentPassword ? (
+                  <EyeOff className="w-4 h-4" />
+                ) : (
+                  <Eye className="w-4 h-4" />
+                )}
+              </Button>
+            </div>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Nova Senha</label>
+              <div className="relative">
+                <Input
+                  type={showNewPassword ? "text" : "password"}
+                  placeholder="Digite a nova senha"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="pr-10"
+                  data-testid="input-new-password"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-0 top-0 h-full"
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                  data-testid="button-toggle-new-password"
+                >
+                  {showNewPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Confirmar Nova Senha</label>
+              <Input
+                type={showNewPassword ? "text" : "password"}
+                placeholder="Confirme a nova senha"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                data-testid="input-confirm-password"
+              />
+            </div>
+          </div>
+          <Button
+            onClick={savePassword}
+            disabled={savingPassword || !currentPassword || !newPassword || !confirmPassword}
+            className="gap-2"
+            data-testid="button-save-password"
+          >
+            <Lock className="w-4 h-4" />
+            {savingPassword ? "Alterando..." : "Alterar Senha"}
+          </Button>
+        </CardContent>
+      </Card>
 
       {/* Superadmin-only AI Configuration */}
       {isSuperadmin ? (
