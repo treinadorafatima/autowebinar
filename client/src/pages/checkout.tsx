@@ -35,6 +35,43 @@ interface Plano {
   frequenciaTipo?: string;
 }
 
+interface CountryCode {
+  code: string;
+  name: string;
+  dial: string;
+  flag: string;
+  phoneLength: number;
+  format: string;
+}
+
+const COUNTRY_CODES: CountryCode[] = [
+  { code: "BR", name: "Brasil", dial: "+55", flag: "🇧🇷", phoneLength: 11, format: "(00) 00000-0000" },
+  { code: "PT", name: "Portugal", dial: "+351", flag: "🇵🇹", phoneLength: 9, format: "000 000 000" },
+  { code: "US", name: "Estados Unidos", dial: "+1", flag: "🇺🇸", phoneLength: 10, format: "(000) 000-0000" },
+  { code: "ES", name: "Espanha", dial: "+34", flag: "🇪🇸", phoneLength: 9, format: "000 00 00 00" },
+  { code: "AR", name: "Argentina", dial: "+54", flag: "🇦🇷", phoneLength: 10, format: "00 0000-0000" },
+  { code: "MX", name: "México", dial: "+52", flag: "🇲🇽", phoneLength: 10, format: "00 0000 0000" },
+  { code: "CO", name: "Colômbia", dial: "+57", flag: "🇨🇴", phoneLength: 10, format: "000 000 0000" },
+  { code: "CL", name: "Chile", dial: "+56", flag: "🇨🇱", phoneLength: 9, format: "0 0000 0000" },
+  { code: "PE", name: "Peru", dial: "+51", flag: "🇵🇪", phoneLength: 9, format: "000 000 000" },
+  { code: "UY", name: "Uruguai", dial: "+598", flag: "🇺🇾", phoneLength: 8, format: "0000 0000" },
+  { code: "PY", name: "Paraguai", dial: "+595", flag: "🇵🇾", phoneLength: 9, format: "000 000 000" },
+  { code: "BO", name: "Bolívia", dial: "+591", flag: "🇧🇴", phoneLength: 8, format: "0000 0000" },
+  { code: "EC", name: "Equador", dial: "+593", flag: "🇪🇨", phoneLength: 9, format: "00 000 0000" },
+  { code: "VE", name: "Venezuela", dial: "+58", flag: "🇻🇪", phoneLength: 10, format: "000-0000000" },
+  { code: "GB", name: "Reino Unido", dial: "+44", flag: "🇬🇧", phoneLength: 10, format: "0000 000000" },
+  { code: "DE", name: "Alemanha", dial: "+49", flag: "🇩🇪", phoneLength: 11, format: "0000 0000000" },
+  { code: "FR", name: "França", dial: "+33", flag: "🇫🇷", phoneLength: 9, format: "0 00 00 00 00" },
+  { code: "IT", name: "Itália", dial: "+39", flag: "🇮🇹", phoneLength: 10, format: "000 000 0000" },
+  { code: "CA", name: "Canadá", dial: "+1", flag: "🇨🇦", phoneLength: 10, format: "(000) 000-0000" },
+  { code: "AU", name: "Austrália", dial: "+61", flag: "🇦🇺", phoneLength: 9, format: "000 000 000" },
+  { code: "JP", name: "Japão", dial: "+81", flag: "🇯🇵", phoneLength: 10, format: "00-0000-0000" },
+  { code: "CN", name: "China", dial: "+86", flag: "🇨🇳", phoneLength: 11, format: "000 0000 0000" },
+  { code: "IN", name: "Índia", dial: "+91", flag: "🇮🇳", phoneLength: 10, format: "00000 00000" },
+  { code: "AO", name: "Angola", dial: "+244", flag: "🇦🇴", phoneLength: 9, format: "000 000 000" },
+  { code: "MZ", name: "Moçambique", dial: "+258", flag: "🇲🇿", phoneLength: 9, format: "00 000 0000" },
+];
+
 function getFrequenciaTexto(frequencia?: number, frequenciaTipo?: string): string {
   if (!frequenciaTipo) return "mensalmente";
   const freq = frequencia || 1;
@@ -178,6 +215,8 @@ export default function Checkout() {
     documento: "",
     telefone: "",
   });
+  const [selectedCountry, setSelectedCountry] = useState<CountryCode>(COUNTRY_CODES[0]);
+  const [countryDetected, setCountryDetected] = useState(false);
   const [step, setStep] = useState<"form" | "payment">("form");
   const [pagamentoId, setPagamentoId] = useState<string | null>(null);
   const [mpInitialized, setMpInitialized] = useState(false);
@@ -239,6 +278,32 @@ export default function Checkout() {
     }
   }, [gatewayConfig, mpInitialized, stripePromise]);
 
+  // Detect country by IP
+  useEffect(() => {
+    if (countryDetected) return;
+    
+    async function detectCountry() {
+      try {
+        const res = await fetch("https://ipapi.co/json/", { signal: AbortSignal.timeout(3000) });
+        if (res.ok) {
+          const data = await res.json();
+          const countryCode = data.country_code;
+          const found = COUNTRY_CODES.find(c => c.code === countryCode);
+          if (found) {
+            setSelectedCountry(found);
+          }
+        }
+      } catch (error) {
+        // Fallback to Brazil if detection fails
+        console.log("Country detection failed, using default (Brazil)");
+      } finally {
+        setCountryDetected(true);
+      }
+    }
+    
+    detectCountry();
+  }, [countryDetected]);
+
   useEffect(() => {
     if (selectedPlano) {
       trackViewContent({
@@ -283,7 +348,11 @@ export default function Checkout() {
   const iniciarMutation = useMutation({
     mutationFn: async () => {
       if (!selectedPlano) throw new Error("Selecione um plano");
-      const res = await apiRequest("POST", `/api/checkout/iniciar/${selectedPlano.id}`, formData);
+      const fullPhone = getFullPhoneNumber();
+      const res = await apiRequest("POST", `/api/checkout/iniciar/${selectedPlano.id}`, {
+        ...formData,
+        telefone: fullPhone,
+      });
       return res.json();
     },
     onSuccess: (data: any) => {
@@ -329,7 +398,7 @@ export default function Checkout() {
       : docDigits.length === 14;
     
     const phoneDigits = formData.telefone.replace(/\D/g, '');
-    const isPhoneComplete = phoneDigits.length >= 10;
+    const isPhoneComplete = phoneDigits.length >= selectedCountry.phoneLength - 1;
     
     if (isDocComplete && isPhoneComplete) {
       hasAutoStartedRef.current = true;
@@ -338,12 +407,12 @@ export default function Checkout() {
         content_name: selectedPlano?.nome,
         value: selectedPlano ? selectedPlano.preco / 100 : undefined,
         email: formData.email,
-        phone: formData.telefone,
+        phone: getFullPhoneNumber(),
         name: formData.nome,
       });
       iniciarMutation.mutate();
     }
-  }, [formData.documento, formData.tipoDocumento, formData.nome, formData.email, formData.telefone, step, selectedPlano, iniciarMutation, trackLead]);
+  }, [formData.documento, formData.tipoDocumento, formData.nome, formData.email, formData.telefone, step, selectedPlano, iniciarMutation, trackLead, selectedCountry]);
 
   const processarPagamentoMpMutation = useMutation({
     mutationFn: async (paymentData: any) => {
@@ -560,7 +629,7 @@ export default function Checkout() {
       content_name: selectedPlano?.nome,
       payment_type: mpFormData?.payment_method_id || 'mercadopago',
       email: formData.email,
-      phone: formData.telefone,
+      phone: getFullPhoneNumber(),
       name: formData.nome,
     });
     try {
@@ -578,7 +647,7 @@ export default function Checkout() {
       content_name: selectedPlano?.nome,
       payment_type: 'credit_card',
       email: formData.email,
-      phone: formData.telefone,
+      phone: getFullPhoneNumber(),
       name: formData.nome,
     });
     try {
@@ -672,12 +741,13 @@ export default function Checkout() {
       return;
     }
     
-    // Validate phone has at least 10 digits
+    // Validate phone has minimum digits for selected country
     const phoneDigits = formData.telefone.replace(/\D/g, '');
-    if (phoneDigits.length < 10) {
+    const minLength = Math.max(selectedCountry.phoneLength - 2, 7);
+    if (phoneDigits.length < minLength) {
       toast({
         title: "Telefone inválido",
-        description: "Informe um telefone válido com DDD.",
+        description: `Informe um telefone válido para ${selectedCountry.name}.`,
         variant: "destructive",
       });
       return;
@@ -688,7 +758,7 @@ export default function Checkout() {
       content_name: selectedPlano?.nome,
       value: selectedPlano ? selectedPlano.preco / 100 : undefined,
       email: formData.email,
-      phone: formData.telefone,
+      phone: getFullPhoneNumber(),
       name: formData.nome,
     });
     
@@ -731,11 +801,65 @@ export default function Checkout() {
     return formData.tipoDocumento === "CPF" ? formatCPF(value) : formatCNPJ(value);
   };
 
-  const formatPhone = (value: string) => {
-    const numbers = value.replace(/\D/g, '').slice(0, 11);
-    if (numbers.length <= 2) return numbers;
-    if (numbers.length <= 7) return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`;
-    return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7)}`;
+  const formatPhone = (value: string, country: CountryCode) => {
+    const numbers = value.replace(/\D/g, '').slice(0, country.phoneLength);
+    
+    // Brazil format: (00) 00000-0000
+    if (country.code === "BR") {
+      if (numbers.length <= 2) return numbers;
+      if (numbers.length <= 7) return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`;
+      return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7)}`;
+    }
+    
+    // USA/Canada format: (000) 000-0000
+    if (country.code === "US" || country.code === "CA") {
+      if (numbers.length <= 3) return numbers;
+      if (numbers.length <= 6) return `(${numbers.slice(0, 3)}) ${numbers.slice(3)}`;
+      return `(${numbers.slice(0, 3)}) ${numbers.slice(3, 6)}-${numbers.slice(6)}`;
+    }
+    
+    // Portugal format: 000 000 000
+    if (country.code === "PT" || country.code === "PE" || country.code === "PY" || country.code === "AO") {
+      if (numbers.length <= 3) return numbers;
+      if (numbers.length <= 6) return `${numbers.slice(0, 3)} ${numbers.slice(3)}`;
+      return `${numbers.slice(0, 3)} ${numbers.slice(3, 6)} ${numbers.slice(6)}`;
+    }
+    
+    // Spain format: 000 00 00 00
+    if (country.code === "ES") {
+      if (numbers.length <= 3) return numbers;
+      if (numbers.length <= 5) return `${numbers.slice(0, 3)} ${numbers.slice(3)}`;
+      if (numbers.length <= 7) return `${numbers.slice(0, 3)} ${numbers.slice(3, 5)} ${numbers.slice(5)}`;
+      return `${numbers.slice(0, 3)} ${numbers.slice(3, 5)} ${numbers.slice(5, 7)} ${numbers.slice(7)}`;
+    }
+    
+    // Argentina format: 00 0000-0000
+    if (country.code === "AR") {
+      if (numbers.length <= 2) return numbers;
+      if (numbers.length <= 6) return `${numbers.slice(0, 2)} ${numbers.slice(2)}`;
+      return `${numbers.slice(0, 2)} ${numbers.slice(2, 6)}-${numbers.slice(6)}`;
+    }
+    
+    // Mexico/Colombia format: 00 0000 0000 or 000 000 0000
+    if (country.code === "MX" || country.code === "CO" || country.code === "IT") {
+      if (numbers.length <= 3) return numbers;
+      if (numbers.length <= 6) return `${numbers.slice(0, 3)} ${numbers.slice(3)}`;
+      return `${numbers.slice(0, 3)} ${numbers.slice(3, 6)} ${numbers.slice(6)}`;
+    }
+    
+    // Default format: groups of 3-4 digits with spaces
+    const groups = [];
+    for (let i = 0; i < numbers.length; i += 3) {
+      groups.push(numbers.slice(i, Math.min(i + 3, numbers.length)));
+    }
+    return groups.join(' ');
+  };
+
+  // Get full phone number with country code for storage
+  const getFullPhoneNumber = () => {
+    const digits = formData.telefone.replace(/\D/g, '');
+    if (!digits) return '';
+    return `${selectedCountry.dial}${digits}`;
   };
 
   if (loadingPlanos || (planoId && loadingDirectPlano)) {
@@ -1204,17 +1328,38 @@ export default function Checkout() {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="telefone" className="text-slate-700">Telefone *</Label>
-                      <Input
-                        id="telefone"
-                        data-testid="input-checkout-telefone"
-                        value={formData.telefone}
-                        onChange={(e) => setFormData({ ...formData, telefone: formatPhone(e.target.value) })}
-                        placeholder="(00) 00000-0000"
-                        className="bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400 h-12"
-                        maxLength={15}
-                        required
-                        disabled={step === "payment"}
-                      />
+                      <div className="flex gap-2">
+                        <select
+                          value={selectedCountry.code}
+                          onChange={(e) => {
+                            const country = COUNTRY_CODES.find(c => c.code === e.target.value);
+                            if (country) {
+                              setSelectedCountry(country);
+                              setFormData({ ...formData, telefone: '' });
+                            }
+                          }}
+                          className="h-12 px-3 rounded-md border border-slate-200 bg-slate-50 text-slate-900 text-sm min-w-[100px]"
+                          disabled={step === "payment"}
+                          data-testid="select-country-code"
+                        >
+                          {COUNTRY_CODES.map((country) => (
+                            <option key={country.code} value={country.code}>
+                              {country.flag} {country.dial}
+                            </option>
+                          ))}
+                        </select>
+                        <Input
+                          id="telefone"
+                          data-testid="input-checkout-telefone"
+                          value={formData.telefone}
+                          onChange={(e) => setFormData({ ...formData, telefone: formatPhone(e.target.value, selectedCountry) })}
+                          placeholder={selectedCountry.format}
+                          className="bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400 h-12 flex-1"
+                          maxLength={selectedCountry.format.length + 2}
+                          required
+                          disabled={step === "payment"}
+                        />
+                      </div>
                     </div>
                   </div>
 
