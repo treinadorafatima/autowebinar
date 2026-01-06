@@ -398,7 +398,7 @@ export default function Checkout() {
       : docDigits.length === 14;
     
     const phoneDigits = formData.telefone.replace(/\D/g, '');
-    const isPhoneComplete = phoneDigits.length >= selectedCountry.phoneLength - 1;
+    const isPhoneComplete = phoneDigits.length >= selectedCountry.phoneLength;
     
     if (isDocComplete && isPhoneComplete) {
       hasAutoStartedRef.current = true;
