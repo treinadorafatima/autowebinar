@@ -80,6 +80,13 @@ export default function AdminSettingsPage() {
 
   const isSuperadmin = subscription?.admin?.role === "superadmin";
 
+  const formatPhone = (value: string) => {
+    const numbers = value.replace(/\D/g, '').slice(0, 11);
+    if (numbers.length <= 2) return numbers;
+    if (numbers.length <= 7) return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`;
+    return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7)}`;
+  };
+
   useEffect(() => {
     if (!token) {
       setLocation("/login");
@@ -528,7 +535,8 @@ export default function AdminSettingsPage() {
               <Input
                 placeholder="(00) 00000-0000"
                 value={profileTelefone}
-                onChange={(e) => setProfileTelefone(e.target.value)}
+                onChange={(e) => setProfileTelefone(formatPhone(e.target.value))}
+                maxLength={15}
                 data-testid="input-profile-telefone"
               />
             </div>
