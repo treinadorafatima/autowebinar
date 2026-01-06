@@ -2,7 +2,7 @@ import { type User, type InsertUser, type WebinarConfig, type WebinarConfigInser
 import * as crypto from "crypto";
 import { randomUUID } from "crypto";
 import { db } from "./db";
-import { eq, and, or, sql, isNull, desc, lte, gte } from "drizzle-orm";
+import { eq, and, or, sql, isNull, desc, lte, gte, notInArray } from "drizzle-orm";
 import * as fs from "fs";
 import * as path from "path";
 import { createClient } from "@supabase/supabase-js";
@@ -3798,8 +3798,10 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
   }
 
   async getActiveWhatsappSessions(): Promise<WhatsappSession[]> {
+    // Return ALL sessions (not just "connected") so we can restore sessions
+    // that have valid credentials on disk after server restart
     return db.select().from(whatsappSessions)
-      .where(eq(whatsappSessions.status, "connected"));
+      .where(notInArray(whatsappSessions.status, ["banned"]));
   }
 
   // ============================================

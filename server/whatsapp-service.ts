@@ -56,7 +56,7 @@ function getAuthDir(accountId: string): string {
   return dir;
 }
 
-// Check if session credentials are valid (registered and complete)
+// Check if session credentials are valid (has completed connection)
 function isSessionValid(accountId: string): boolean {
   const authDir = path.join(AUTH_DIR, accountId);
   const credsFile = path.join(authDir, "creds.json");
@@ -67,17 +67,33 @@ function isSessionValid(accountId: string): boolean {
   
   try {
     const creds = JSON.parse(fs.readFileSync(credsFile, "utf-8"));
-    // Session is only valid if it was fully registered
-    if (!creds.registered) {
-      console.log(`[whatsapp] Session ${accountId} has registered=false, marking as invalid`);
-      return false;
-    }
+    
     // Check if essential credentials exist
     if (!creds.signedIdentityKey || !creds.signedPreKey) {
       console.log(`[whatsapp] Session ${accountId} missing essential keys, marking as invalid`);
       return false;
     }
-    return true;
+    
+    // A session is valid if it has 'me' data (indicates a completed connection)
+    // The 'registered' flag is not reliable - sometimes stays false even after successful connection
+    if (creds.me && creds.me.id) {
+      console.log(`[whatsapp] Session ${accountId} has valid credentials (me.id: ${creds.me.id})`);
+      return true;
+    }
+    
+    // Also valid if has account data
+    if (creds.account && creds.account.accountSignatureKey) {
+      console.log(`[whatsapp] Session ${accountId} has valid credentials (account data present)`);
+      return true;
+    }
+    
+    // If registered flag is true, consider it valid as fallback
+    if (creds.registered) {
+      return true;
+    }
+    
+    console.log(`[whatsapp] Session ${accountId} missing connection data (no me/account info)`);
+    return false;
   } catch (error) {
     console.log(`[whatsapp] Error reading session ${accountId}:`, error);
     return false;
