@@ -663,6 +663,10 @@ Duvidas? Responda esta mensagem!`;
 
 /**
  * Envia lembrete de expiração via WhatsApp (antes de expirar)
+ * Usa templates específicos baseado nos dias restantes:
+ * - 0 dias: expiration_reminder_today
+ * - 1 dia: expiration_reminder_1day  
+ * - 3+ dias: expiration_reminder_3days
  * Safe version - nunca lança erros
  */
 export async function sendWhatsAppExpirationReminderSafe(
@@ -692,30 +696,58 @@ export async function sendWhatsAppExpirationReminderSafe(
 
     const formattedDate = expirationDate.toLocaleDateString('pt-BR');
     
-    let urgencyText = "";
+    // Determinar qual template usar baseado nos dias até o vencimento
+    let templateType: string;
+    let defaultMessage: string;
+    
     if (daysUntilExpiration === 0) {
-      urgencyText = "*VENCE HOJE!*";
+      templateType = 'expiration_reminder_today';
+      defaultMessage = `🚨 *ÚLTIMO AVISO - VENCE HOJE!*
+
+Olá ${name}!
+
+Seu plano *${planName}* vence *HOJE* (${formattedDate}).
+
+⚠️ Após o vencimento, seus webinários serão pausados automaticamente.
+
+Renove agora para não perder o acesso:
+🔗 ${getRenewUrl()}
+
+Qualquer dúvida, estamos à disposição!`;
     } else if (daysUntilExpiration === 1) {
-      urgencyText = "*VENCE AMANHA!*";
+      templateType = 'expiration_reminder_1day';
+      defaultMessage = `⚠️ *SEU PLANO VENCE AMANHÃ!*
+
+Olá ${name}!
+
+Seu plano *${planName}* vence *amanhã* (${formattedDate}).
+
+Renove agora para continuar aproveitando:
+✅ Webinários automatizados 24/7
+✅ Ferramentas de IA
+✅ Captura de leads
+
+🔗 Renovar: ${getRenewUrl()}
+
+Não deixe para última hora!`;
     } else {
-      urgencyText = `Vence em *${daysUntilExpiration} dias*`;
+      templateType = 'expiration_reminder_3days';
+      defaultMessage = `📅 *Lembrete: Seu plano vence em breve*
+
+Olá ${name}!
+
+Seu plano *${planName}* vence em *${daysUntilExpiration} dias* (${formattedDate}).
+
+Para continuar aproveitando todos os recursos sem interrupção, renove agora:
+🔗 ${getRenewUrl()}
+
+Benefícios que você mantém:
+✅ Webinários automatizados 24/7
+✅ Ferramentas de IA
+✅ Captura de leads
+
+Qualquer dúvida, estamos à disposição!`;
     }
-
-    const defaultMessage = `Ola ${name}!
-
-${urgencyText}
-
-Seu plano *${planName}* expira em ${formattedDate}.
-
-Renove agora para nao perder o acesso:
-${getRenewUrl()}
-
-Beneficios que voce mantem:
-- Webinarios automatizados 24/7
-- Ferramentas de IA
-- Captura de leads
-
-Duvidas? Estamos aqui para ajudar!`;
 
     const templateData = {
       name,
@@ -726,8 +758,8 @@ Duvidas? Estamos aqui para ajudar!`;
       appName: APP_NAME,
     };
 
-    const message = await getTemplateMessage("expiration_reminder", templateData, defaultMessage);
-    return await sendNotificationMessage(formattedPhone, message, 'expiration_reminder', name);
+    const message = await getTemplateMessage(templateType, templateData, defaultMessage);
+    return await sendNotificationMessage(formattedPhone, message, templateType, name);
   } catch (error) {
     console.error("[whatsapp-notifications] Erro em sendWhatsAppExpirationReminderSafe:", error);
     return false;

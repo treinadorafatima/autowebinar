@@ -5059,15 +5059,19 @@ Qualquer dúvida, estamos à disposição!`,
         notificationType: "expiration_reminder_3days",
         name: "Lembrete de Vencimento - 3 dias",
         description: "Enviado 3 dias antes do vencimento do plano",
-        messageTemplate: `⚠️ *Seu plano vence em 3 dias!*
+        messageTemplate: `📅 *Lembrete: Seu plano vence em breve*
 
 Olá, {name}!
 
-Seu plano *{planName}* expira em *{expirationDate}*.
+Seu plano *{planName}* vence em *3 dias* ({expirationDate}).
 
-Para continuar aproveitando todos os recursos sem interrupção, renove agora!
+Para continuar aproveitando todos os recursos sem interrupção, renove agora:
+🔗 {renewUrl}
 
-🔗 Renovar: {renewUrl}
+Benefícios que você mantém:
+✅ Webinários automatizados 24/7
+✅ Ferramentas de IA
+✅ Captura de leads
 
 Qualquer dúvida, estamos à disposição!`,
         isActive: true,
@@ -5077,35 +5081,37 @@ Qualquer dúvida, estamos à disposição!`,
         notificationType: "expiration_reminder_1day",
         name: "Lembrete de Vencimento - 1 dia",
         description: "Enviado 1 dia antes do vencimento do plano",
-        messageTemplate: `🚨 *Seu plano vence AMANHÃ!*
+        messageTemplate: `⚠️ *SEU PLANO VENCE AMANHÃ!*
 
 Olá, {name}!
 
-Seu plano *{planName}* expira em *{expirationDate}*.
+Seu plano *{planName}* vence *amanhã* ({expirationDate}).
 
-⚠️ *Não perca seu acesso!*
-
-Para evitar a suspensão dos seus webinários e serviços, renove agora mesmo!
+Renove agora para continuar aproveitando:
+✅ Webinários automatizados 24/7
+✅ Ferramentas de IA
+✅ Captura de leads
 
 🔗 Renovar: {renewUrl}
 
-Qualquer dúvida, estamos à disposição!`,
+Não deixe para última hora!`,
         isActive: true,
       },
       {
         id: randomUUID(),
         notificationType: "expiration_reminder_today",
-        name: "Vencimento Hoje",
-        description: "Enviado horas antes do vencimento para planos diários",
-        messageTemplate: `🔴 *Seu plano vence HOJE!*
+        name: "Último Aviso - Vence Hoje",
+        description: "Enviado no dia do vencimento do plano",
+        messageTemplate: `🚨 *ÚLTIMO AVISO - VENCE HOJE!*
 
 Olá, {name}!
 
-Seu plano *{planName}* vence em *{expirationDate}*.
+Seu plano *{planName}* vence *HOJE* ({expirationDate}).
 
-⚠️ *Renove agora para não perder o acesso!*
+⚠️ Após o vencimento, seus webinários serão pausados automaticamente.
 
-🔗 Renovar: {renewUrl}
+Renove agora para não perder o acesso:
+🔗 {renewUrl}
 
 Qualquer dúvida, estamos à disposição!`,
         isActive: true,
@@ -5239,24 +5245,6 @@ O que fazer:
 ✅ Verificar o limite do cartão
 ✅ Atualizar forma de pagamento
 ✅ Liberar transação com seu banco
-
-Qualquer dúvida, estamos à disposição!`,
-        isActive: true,
-      },
-      {
-        id: randomUUID(),
-        notificationType: "expiration_reminder",
-        name: "Lembrete de Expiração (Genérico)",
-        description: "Enviado como lembrete geral antes do vencimento do plano",
-        messageTemplate: `⏰ *Seu plano vence em breve!*
-
-Olá, {name}!
-
-Seu plano *{planName}* expira em *{expirationDate}* ({daysUntilExpiration} dias).
-
-Para continuar aproveitando todos os recursos sem interrupção, renove agora!
-
-🔗 Renovar: {renewUrl}
 
 Qualquer dúvida, estamos à disposição!`,
         isActive: true,
