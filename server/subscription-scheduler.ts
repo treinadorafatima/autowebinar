@@ -616,7 +616,9 @@ async function processExpirationReminders(): Promise<void> {
         admin.name || "Cliente",
         planName,
         0,
-        admin.accessExpiresAt!
+        admin.accessExpiresAt!,
+        admin.email,
+        admin.planoId
       );
       
       if (emailSuccess || whatsappSuccess) {
@@ -694,7 +696,9 @@ async function processExpirationReminders(): Promise<void> {
         admin.name || "Cliente",
         planName,
         3,
-        admin.accessExpiresAt!
+        admin.accessExpiresAt!,
+        admin.email,
+        admin.planoId
       );
       
       if (emailSuccess || whatsappSuccess) {
@@ -729,7 +733,9 @@ async function processExpirationReminders(): Promise<void> {
         admin.name || "Cliente",
         planName,
         1,
-        admin.accessExpiresAt!
+        admin.accessExpiresAt!,
+        admin.email,
+        admin.planoId
       );
       
       if (emailSuccess || whatsappSuccess) {

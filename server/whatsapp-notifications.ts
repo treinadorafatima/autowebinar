@@ -40,8 +40,20 @@ function getAppUrl(): string {
 
 function getLoginUrl(): string { return `${getAppUrl()}/login`; }
 function getAdminUrl(): string { return `${getAppUrl()}/admin`; }
-function getRenewUrl(): string { return `${getAppUrl()}/checkout`; }
-function getPaymentUrl(): string { return `${getAppUrl()}/checkout`; }
+function getRenewUrl(planId?: string, email?: string, name?: string): string { 
+  const baseUrl = `${getAppUrl()}/checkout`;
+  if (!planId) return baseUrl;
+  
+  const params = new URLSearchParams();
+  if (email) params.set('email', email);
+  if (name) params.set('nome', name);
+  
+  const queryString = params.toString();
+  return queryString ? `${baseUrl}/${planId}?${queryString}` : `${baseUrl}/${planId}`;
+}
+function getPaymentUrl(planId?: string, email?: string, name?: string): string { 
+  return getRenewUrl(planId, email, name);
+}
 
 /**
  * Substitui placeholders no template com valores reais
@@ -674,7 +686,9 @@ export async function sendWhatsAppExpirationReminderSafe(
   name: string,
   planName: string,
   daysUntilExpiration: number,
-  expirationDate: Date
+  expirationDate: Date,
+  email?: string,
+  planId?: string | null
 ): Promise<boolean> {
   try {
     if (!phone) {
@@ -700,6 +714,9 @@ export async function sendWhatsAppExpirationReminderSafe(
     let templateType: string;
     let defaultMessage: string;
     
+    // Gerar URL de renovação com dados do usuário
+    const renewUrl = getRenewUrl(planId || undefined, email, name);
+    
     if (daysUntilExpiration === 0) {
       templateType = 'expiration_reminder_today';
       defaultMessage = `🚨 *ÚLTIMO AVISO - VENCE HOJE!*
@@ -711,7 +728,7 @@ Seu plano *${planName}* vence *HOJE* (${formattedDate}).
 ⚠️ Após o vencimento, seus webinários serão pausados automaticamente.
 
 Renove agora para não perder o acesso:
-🔗 ${getRenewUrl()}
+🔗 ${renewUrl}
 
 Qualquer dúvida, estamos à disposição!`;
     } else if (daysUntilExpiration === 1) {
@@ -727,7 +744,7 @@ Renove agora para continuar aproveitando:
 ✅ Ferramentas de IA
 ✅ Captura de leads
 
-🔗 Renovar: ${getRenewUrl()}
+🔗 Renovar: ${renewUrl}
 
 Não deixe para última hora!`;
     } else {
@@ -739,7 +756,7 @@ Olá ${name}!
 Seu plano *${planName}* vence em *${daysUntilExpiration} dias* (${formattedDate}).
 
 Para continuar aproveitando todos os recursos sem interrupção, renove agora:
-🔗 ${getRenewUrl()}
+🔗 ${renewUrl}
 
 Benefícios que você mantém:
 ✅ Webinários automatizados 24/7
@@ -754,7 +771,7 @@ Qualquer dúvida, estamos à disposição!`;
       planName,
       daysUntilExpiration: daysUntilExpiration.toString(),
       expirationDate: formattedDate,
-      renewUrl: getRenewUrl(),
+      renewUrl,
       appName: APP_NAME,
     };
 
