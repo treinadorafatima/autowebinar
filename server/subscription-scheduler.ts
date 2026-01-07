@@ -608,7 +608,8 @@ async function processExpirationReminders(): Promise<void> {
         planName,
         0, // 0 dias = vence hoje
         admin.accessExpiresAt!,
-        admin.planoId
+        admin.planoId,
+        admin.telefone
       );
       
       // Enviar WhatsApp também
@@ -619,7 +620,8 @@ async function processExpirationReminders(): Promise<void> {
         0,
         admin.accessExpiresAt!,
         admin.email,
-        admin.planoId
+        admin.planoId,
+        admin.telefone
       );
       
       if (emailSuccess || whatsappSuccess) {
@@ -647,7 +649,8 @@ async function processExpirationReminders(): Promise<void> {
         admin.email,
         admin.name || "Cliente",
         planName,
-        admin.planoId
+        admin.planoId,
+        admin.telefone
       );
       
       // Enviar WhatsApp também
@@ -690,7 +693,8 @@ async function processExpirationReminders(): Promise<void> {
         planName,
         3,
         admin.accessExpiresAt!,
-        admin.planoId
+        admin.planoId,
+        admin.telefone
       );
       
       // Enviar WhatsApp também
@@ -701,7 +705,8 @@ async function processExpirationReminders(): Promise<void> {
         3,
         admin.accessExpiresAt!,
         admin.email,
-        admin.planoId
+        admin.planoId,
+        admin.telefone
       );
       
       if (emailSuccess || whatsappSuccess) {
@@ -728,7 +733,8 @@ async function processExpirationReminders(): Promise<void> {
         planName,
         1,
         admin.accessExpiresAt!,
-        admin.planoId
+        admin.planoId,
+        admin.telefone
       );
       
       // Enviar WhatsApp também
@@ -739,7 +745,8 @@ async function processExpirationReminders(): Promise<void> {
         1,
         admin.accessExpiresAt!,
         admin.email,
-        admin.planoId
+        admin.planoId,
+        admin.telefone
       );
       
       if (emailSuccess || whatsappSuccess) {
@@ -766,7 +773,8 @@ async function processExpirationReminders(): Promise<void> {
           admin.email,
           admin.name || "Cliente",
           planName,
-          admin.planoId
+          admin.planoId,
+          admin.telefone
         );
         
         // Enviar WhatsApp também

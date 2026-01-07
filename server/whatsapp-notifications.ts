@@ -40,19 +40,24 @@ function getAppUrl(): string {
 
 function getLoginUrl(): string { return `${getAppUrl()}/login`; }
 function getAdminUrl(): string { return `${getAppUrl()}/admin`; }
-function getRenewUrl(planId?: string, email?: string, name?: string): string { 
+function getRenewUrl(planId?: string, email?: string, name?: string, phone?: string): string { 
   const baseUrl = `${getAppUrl()}/checkout`;
-  if (!planId) return baseUrl;
   
   const params = new URLSearchParams();
   if (email) params.set('email', email);
   if (name) params.set('nome', name);
+  if (phone) params.set('telefone', phone);
   
   const queryString = params.toString();
+  
+  if (!planId) {
+    return queryString ? `${baseUrl}?${queryString}` : baseUrl;
+  }
+  
   return queryString ? `${baseUrl}/${planId}?${queryString}` : `${baseUrl}/${planId}`;
 }
-function getPaymentUrl(planId?: string, email?: string, name?: string): string { 
-  return getRenewUrl(planId, email, name);
+function getPaymentUrl(planId?: string, email?: string, name?: string, phone?: string): string { 
+  return getRenewUrl(planId, email, name, phone);
 }
 
 /**
@@ -472,14 +477,9 @@ export async function sendWhatsAppPlanExpiredSafe(
     }
     
     // Build checkout URL with user data pre-filled
-    const checkoutParams = new URLSearchParams();
-    if (email) checkoutParams.set('email', email);
-    if (name) checkoutParams.set('nome', name);
-    if (phone) checkoutParams.set('telefone', phone);
-    const queryString = checkoutParams.toString();
-    const renewUrl = planoId && planoId !== 'trial'
-      ? `${getAppUrl()}/checkout/${planoId}?${queryString}`
-      : `${getAppUrl()}/checkout?${queryString}`;
+    // Para trial/teste gratuito, não incluir planId para mostrar todos os planos
+    const isTrialPlan = !planoId || planoId === 'trial' || planName.toLowerCase().includes('trial') || planName.toLowerCase().includes('teste') || planName.toLowerCase().includes('gratuito');
+    const renewUrl = getRenewUrl(isTrialPlan ? undefined : planoId, email, name, phone || undefined);
     
     const defaultMessage = `Ola ${name}!
 
@@ -525,7 +525,9 @@ export async function sendWhatsAppPaymentFailedSafe(
 ): Promise<boolean> {
   try {
     const formattedPhone = formatPhoneNumber(phone);
-    const paymentUrl = getPaymentUrl(planId || undefined, email, name);
+    // Para trial/teste gratuito, não incluir planId para mostrar todos os planos
+    const isTrialPlan = !planId || planId === 'trial' || planName.toLowerCase().includes('trial') || planName.toLowerCase().includes('teste') || planName.toLowerCase().includes('gratuito');
+    const paymentUrl = getPaymentUrl(isTrialPlan ? undefined : planId, email, name, phone);
     
     let defaultMessage = `Ola ${name}!
 
@@ -691,7 +693,8 @@ export async function sendWhatsAppExpirationReminderSafe(
   daysUntilExpiration: number,
   expirationDate: Date,
   email?: string,
-  planId?: string | null
+  planId?: string | null,
+  telefone?: string | null
 ): Promise<boolean> {
   try {
     if (!phone) {
@@ -718,7 +721,9 @@ export async function sendWhatsAppExpirationReminderSafe(
     let defaultMessage: string;
     
     // Gerar URL de renovação com dados do usuário
-    const renewUrl = getRenewUrl(planId || undefined, email, name);
+    // Para trial/teste gratuito, não incluir planId para mostrar todos os planos
+    const isTrialPlan = !planId || planId === 'trial' || planName.toLowerCase().includes('trial') || planName.toLowerCase().includes('teste') || planName.toLowerCase().includes('gratuito');
+    const renewUrl = getRenewUrl(isTrialPlan ? undefined : planId, email, name, telefone || undefined);
     
     if (daysUntilExpiration === 0) {
       templateType = 'expiration_reminder_today';

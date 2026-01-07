@@ -196,6 +196,7 @@ export default function Checkout() {
   const urlParams = new URLSearchParams(window.location.search);
   const emailFromUrl = urlParams.get("email") || "";
   const nomeFromUrl = urlParams.get("nome") || "";
+  const telefoneFromUrl = urlParams.get("telefone") || "";
   const isRenovacao = urlParams.get("renovacao") === "true";
   
   // Get affiliate code from URL param or cookie for persistent tracking
@@ -213,7 +214,7 @@ export default function Checkout() {
     email: emailFromUrl,
     tipoDocumento: "CPF" as "CPF" | "CNPJ",
     documento: "",
-    telefone: "",
+    telefone: telefoneFromUrl,
   });
   const [selectedCountry, setSelectedCountry] = useState<CountryCode>(COUNTRY_CODES[0]);
   const [countryDetected, setCountryDetected] = useState(false);
@@ -1176,13 +1177,30 @@ export default function Checkout() {
   }
 
   if (!selectedPlano) {
+    // Se o plano não foi encontrado, redirecionar para lista de planos mantendo os dados do usuário
+    const params = new URLSearchParams(window.location.search);
+    const emailParam = params.get('email');
+    const nomeParam = params.get('nome');
+    const telefoneParam = params.get('telefone');
+    
+    // Construir nova URL com os dados preservados
+    const newParams = new URLSearchParams();
+    if (emailParam) newParams.set('email', emailParam);
+    if (nomeParam) newParams.set('nome', nomeParam);
+    if (telefoneParam) newParams.set('telefone', telefoneParam);
+    const queryString = newParams.toString();
+    
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
         <Card className="max-w-md bg-slate-800/50 border-slate-700">
           <CardContent className="py-12 text-center">
-            <p className="text-slate-300">Plano não encontrado</p>
-            <Button className="mt-4" onClick={() => setLocation("/checkout")}>
-              Ver todos os planos
+            <p className="text-slate-300 mb-2">Este plano não está mais disponível.</p>
+            <p className="text-slate-400 text-sm mb-4">Veja nossos planos atuais para renovar seu acesso.</p>
+            <Button 
+              className="bg-cyan-500 hover:bg-cyan-600" 
+              onClick={() => setLocation(`/checkout${queryString ? `?${queryString}` : ''}`)}
+            >
+              Ver planos disponíveis
             </Button>
           </CardContent>
         </Card>

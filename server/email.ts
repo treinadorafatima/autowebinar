@@ -1404,19 +1404,22 @@ ${APP_NAME}
   }
 }
 
-export async function sendExpirationReminderEmail(to: string, name: string, planName: string, daysUntilExpiration: number, expirationDate: Date, planId?: string | null): Promise<boolean> {
+export async function sendExpirationReminderEmail(to: string, name: string, planName: string, daysUntilExpiration: number, expirationDate: Date, planId?: string | null, telefone?: string | null): Promise<boolean> {
   try {
     const { client, fromEmail } = await getResendClient();
     const formattedDate = expirationDate.toLocaleDateString('pt-BR');
     
     // Build checkout URL with user data pre-filled
+    // Para trial/teste gratuito, não incluir planId para mostrar todos os planos
+    const isTrialPlan = !planId || planId === 'trial' || planName.toLowerCase().includes('trial') || planName.toLowerCase().includes('teste') || planName.toLowerCase().includes('gratuito');
     const checkoutParams = new URLSearchParams();
     checkoutParams.set('email', to);
     if (name) checkoutParams.set('nome', name);
+    if (telefone) checkoutParams.set('telefone', telefone);
     const queryString = checkoutParams.toString();
-    const renewUrl = planId && planId !== 'trial'
-      ? `${getAppUrl()}/checkout/${planId}?${queryString}`
-      : `${getAppUrl()}/checkout?${queryString}`;
+    const renewUrl = isTrialPlan
+      ? `${getAppUrl()}/checkout?${queryString}`
+      : `${getAppUrl()}/checkout/${planId}?${queryString}`;
     
     // Determinar qual template usar baseado nos dias até o vencimento
     let templateType: string;
@@ -1537,18 +1540,21 @@ ${APP_NAME}
   }
 }
 
-export async function sendExpiredRenewalEmail(to: string, name: string, planName: string, planId?: string | null): Promise<boolean> {
+export async function sendExpiredRenewalEmail(to: string, name: string, planName: string, planId?: string | null, telefone?: string | null): Promise<boolean> {
   try {
     const { client, fromEmail } = await getResendClient();
     
     // Build checkout URL with user data pre-filled
+    // Para trial/teste gratuito, não incluir planId para mostrar todos os planos
+    const isTrialPlan = !planId || planId === 'trial' || planName.toLowerCase().includes('trial') || planName.toLowerCase().includes('teste') || planName.toLowerCase().includes('gratuito');
     const checkoutParams = new URLSearchParams();
     checkoutParams.set('email', to);
     if (name) checkoutParams.set('nome', name);
+    if (telefone) checkoutParams.set('telefone', telefone);
     const queryString = checkoutParams.toString();
-    const renewUrl = planId && planId !== 'trial'
-      ? `${getAppUrl()}/checkout/${planId}?${queryString}`
-      : `${getAppUrl()}/checkout?${queryString}`;
+    const renewUrl = isTrialPlan
+      ? `${getAppUrl()}/checkout?${queryString}`
+      : `${getAppUrl()}/checkout/${planId}?${queryString}`;
     
     const text = `
 Ola ${name},
