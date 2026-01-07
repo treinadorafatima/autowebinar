@@ -5114,17 +5114,20 @@ Qualquer dúvida, estamos à disposição!`,
         id: randomUUID(),
         notificationType: "auto_renewal_payment",
         name: "Pagamento de Renovação Automática",
-        description: "Enviado com dados de pagamento para renovação",
-        messageTemplate: `💳 *Pagamento para Renovação*
+        description: "Enviado com link para renovação do plano",
+        messageTemplate: `💳 *Renovação do seu Plano*
 
 Olá, {name}!
 
-Para renovar seu plano *{planName}* que vence em *{expirationDate}*, utilize os dados abaixo:
+Seu plano *{planName}* vence em *{expirationDate}*.
 
-📋 *PIX Copia e Cola:*
-{pixCopiaCola}
+Para renovar e continuar aproveitando todos os recursos:
+🔗 {checkoutUrl}
 
-🔗 Ou acesse o boleto: {boletoUrl}
+Você pode pagar com:
+✅ PIX (aprovação instantânea)
+✅ Boleto (até 3 dias úteis)
+✅ Cartão (até 12x)
 
 Após o pagamento, seu acesso será renovado automaticamente!
 
@@ -6005,14 +6008,14 @@ Renove agora para nao perder o acesso! Apos o vencimento, seus webinarios serao 
         id: randomUUID(),
         notificationType: "auto_renewal_payment",
         name: "Pagamento de Renovação Automática",
-        description: "Enviado com dados de pagamento para renovação",
-        subject: `Dados para Renovacao do Seu Plano - {appName}`,
+        description: "Enviado com link para renovação do plano",
+        subject: `Renove seu Plano - {appName}`,
         htmlTemplate: `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dados para Renovacao - {appName}</title>
+  <title>Renovar Plano - {appName}</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background-color: #f4f4f5;">
   <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f5;">
@@ -6021,7 +6024,7 @@ Renove agora para nao perder o acesso! Apos o vencimento, seus webinarios serao 
         <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden;">
           <tr>
             <td style="background-color: #3b82f6; padding: 30px; text-align: center;">
-              <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 600;">Dados para Renovacao</h1>
+              <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 600;">Renovar seu Plano</h1>
             </td>
           </tr>
           <tr>
@@ -6030,24 +6033,29 @@ Renove agora para nao perder o acesso! Apos o vencimento, seus webinarios serao 
                 Ola <strong>{name}</strong>,
               </p>
               <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
-                Para renovar seu plano <strong>{planName}</strong> que vence em <strong>{expirationDate}</strong>, utilize os dados abaixo:
+                Seu plano <strong>{planName}</strong> vence em <strong>{expirationDate}</strong>.
               </p>
-              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 25px 0; background-color: #ecfdf5; border-radius: 6px; border: 2px solid #10b981;">
-                <tr>
-                  <td style="padding: 20px;">
-                    <p style="margin: 0 0 12px; color: #047857; font-weight: 600; font-size: 14px;">PIX Copia e Cola:</p>
-                    <p style="margin: 0; color: #374151; font-size: 13px; line-height: 1.6; word-break: break-all; background-color: #d1fae5; padding: 10px; border-radius: 4px; font-family: monospace;">
-                      {pixCopiaCola}
-                    </p>
-                  </td>
-                </tr>
-              </table>
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Para renovar e continuar aproveitando todos os recursos, clique no botao abaixo:
+              </p>
               <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                 <tr>
                   <td style="text-align: center; padding: 20px 0;">
-                    <a href="{boletoUrl}" style="display: inline-block; background-color: #3b82f6; color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 6px; font-weight: 600; font-size: 16px;">
-                      Acessar Boleto
+                    <a href="{checkoutUrl}" style="display: inline-block; background-color: #10b981; color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 6px; font-weight: 600; font-size: 16px;">
+                      Renovar Agora
                     </a>
+                  </td>
+                </tr>
+              </table>
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 20px 0; background-color: #f3f4f6; border-radius: 6px;">
+                <tr>
+                  <td style="padding: 20px;">
+                    <p style="margin: 0 0 10px; color: #374151; font-weight: 600;">Formas de pagamento:</p>
+                    <p style="margin: 0; color: #6b7280; font-size: 14px; line-height: 1.8;">
+                      ✅ PIX (aprovacao instantanea)<br>
+                      ✅ Boleto (ate 3 dias uteis)<br>
+                      ✅ Cartao (ate 12x)
+                    </p>
                   </td>
                 </tr>
               </table>
@@ -6071,12 +6079,15 @@ Renove agora para nao perder o acesso! Apos o vencimento, seus webinarios serao 
 </html>`,
         textTemplate: `Ola {name},
 
-Para renovar seu plano {planName} que vence em {expirationDate}, utilize os dados abaixo:
+Seu plano {planName} vence em {expirationDate}.
 
-PIX Copia e Cola:
-{pixCopiaCola}
+Para renovar e continuar aproveitando todos os recursos:
+{checkoutUrl}
 
-Ou acesse o boleto: {boletoUrl}
+Formas de pagamento:
+- PIX (aprovacao instantanea)
+- Boleto (ate 3 dias uteis)
+- Cartao (ate 12x)
 
 Apos o pagamento, seu acesso sera renovado automaticamente!
 

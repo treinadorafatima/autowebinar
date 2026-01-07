@@ -75,7 +75,7 @@ const templatePlaceholders: Record<string, string[]> = {
   expiration_reminder_1day: ["{name}", "{planName}", "{expirationDate}", "{renewUrl}", "{appName}"],
   expiration_reminder_today: ["{name}", "{planName}", "{expirationDate}", "{renewUrl}", "{appName}"],
   expiration_reminder: ["{name}", "{planName}", "{expirationDate}", "{daysUntilExpiration}", "{renewUrl}", "{appName}"],
-  auto_renewal_payment: ["{name}", "{planName}", "{expirationDate}", "{pixCopiaCola}", "{boletoUrl}", "{appName}"],
+  auto_renewal_payment: ["{name}", "{planName}", "{expirationDate}", "{checkoutUrl}", "{appName}"],
   payment_recovery: ["{name}", "{planName}", "{amount}", "{checkoutUrl}", "{appName}"],
   payment_pending: ["{name}", "{planName}", "{paymentMethod}", "{checkoutUrl}", "{appName}"],
   pix_generated: ["{name}", "{planName}", "{amount}", "{expirationTime}", "{pixCopiaCola}", "{appName}"],
