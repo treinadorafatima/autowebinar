@@ -1404,11 +1404,19 @@ ${APP_NAME}
   }
 }
 
-export async function sendExpirationReminderEmail(to: string, name: string, planName: string, daysUntilExpiration: number, expirationDate: Date): Promise<boolean> {
+export async function sendExpirationReminderEmail(to: string, name: string, planName: string, daysUntilExpiration: number, expirationDate: Date, planId?: string | null): Promise<boolean> {
   try {
     const { client, fromEmail } = await getResendClient();
     const formattedDate = expirationDate.toLocaleDateString('pt-BR');
-    const renewUrl = `${getAppUrl()}/checkout?email=${encodeURIComponent(to)}`;
+    
+    // Build checkout URL with user data pre-filled
+    const checkoutParams = new URLSearchParams();
+    checkoutParams.set('email', to);
+    if (name) checkoutParams.set('nome', name);
+    const queryString = checkoutParams.toString();
+    const renewUrl = planId && planId !== 'trial'
+      ? `${getAppUrl()}/checkout/${planId}?${queryString}`
+      : `${getAppUrl()}/checkout?${queryString}`;
     
     // Determinar qual template usar baseado nos dias até o vencimento
     let templateType: string;
@@ -1529,10 +1537,18 @@ ${APP_NAME}
   }
 }
 
-export async function sendExpiredRenewalEmail(to: string, name: string, planName: string): Promise<boolean> {
+export async function sendExpiredRenewalEmail(to: string, name: string, planName: string, planId?: string | null): Promise<boolean> {
   try {
     const { client, fromEmail } = await getResendClient();
-    const renewUrl = `${getAppUrl()}/checkout?email=${encodeURIComponent(to)}`;
+    
+    // Build checkout URL with user data pre-filled
+    const checkoutParams = new URLSearchParams();
+    checkoutParams.set('email', to);
+    if (name) checkoutParams.set('nome', name);
+    const queryString = checkoutParams.toString();
+    const renewUrl = planId && planId !== 'trial'
+      ? `${getAppUrl()}/checkout/${planId}?${queryString}`
+      : `${getAppUrl()}/checkout?${queryString}`;
     
     const text = `
 Ola ${name},

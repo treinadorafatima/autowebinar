@@ -607,7 +607,8 @@ async function processExpirationReminders(): Promise<void> {
         admin.name || "Cliente",
         planName,
         0, // 0 dias = vence hoje
-        admin.accessExpiresAt!
+        admin.accessExpiresAt!,
+        admin.planoId
       );
       
       // Enviar WhatsApp também
@@ -645,7 +646,8 @@ async function processExpirationReminders(): Promise<void> {
       const emailSuccess = await sendExpiredRenewalEmail(
         admin.email,
         admin.name || "Cliente",
-        planName
+        planName,
+        admin.planoId
       );
       
       // Enviar WhatsApp também
@@ -687,7 +689,8 @@ async function processExpirationReminders(): Promise<void> {
         admin.name || "Cliente",
         planName,
         3,
-        admin.accessExpiresAt!
+        admin.accessExpiresAt!,
+        admin.planoId
       );
       
       // Enviar WhatsApp também
@@ -724,7 +727,8 @@ async function processExpirationReminders(): Promise<void> {
         admin.name || "Cliente",
         planName,
         1,
-        admin.accessExpiresAt!
+        admin.accessExpiresAt!,
+        admin.planoId
       );
       
       // Enviar WhatsApp também
@@ -761,7 +765,8 @@ async function processExpirationReminders(): Promise<void> {
         const emailSuccess = await sendExpiredRenewalEmail(
           admin.email,
           admin.name || "Cliente",
-          planName
+          planName,
+          admin.planoId
         );
         
         // Enviar WhatsApp também

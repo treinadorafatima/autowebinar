@@ -519,10 +519,13 @@ export async function sendWhatsAppPaymentFailedSafe(
   phone: string,
   name: string,
   planName: string,
-  reason?: string
+  reason?: string,
+  email?: string,
+  planId?: string | null
 ): Promise<boolean> {
   try {
     const formattedPhone = formatPhoneNumber(phone);
+    const paymentUrl = getPaymentUrl(planId || undefined, email, name);
     
     let defaultMessage = `Ola ${name}!
 
@@ -538,7 +541,7 @@ Motivo: ${reason}`;
 
 Por favor, verifique seus dados de pagamento e tente novamente.
 
-Regularizar: ${getPaymentUrl()}
+Regularizar: ${paymentUrl}
 
 Duvidas? Estamos aqui para ajudar!`;
 
@@ -546,7 +549,7 @@ Duvidas? Estamos aqui para ajudar!`;
       name,
       planName,
       reason: reason || "",
-      paymentUrl: getPaymentUrl(),
+      paymentUrl: paymentUrl,
       appName: APP_NAME,
     };
 
