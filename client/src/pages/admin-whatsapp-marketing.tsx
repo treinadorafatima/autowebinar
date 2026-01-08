@@ -2302,10 +2302,15 @@ export default function AdminWhatsAppMarketing() {
                               </div>
                               <p className="text-sm text-muted-foreground">
                                 {new Date(broadcast.createdAt).toLocaleDateString("pt-BR")} - {broadcast.totalRecipients} destinatários
+                                {broadcast.status === "scheduled" && broadcast.scheduledAt && (
+                                  <span className="ml-2 text-purple-500">
+                                    • Agendado para {new Date(broadcast.scheduledAt).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Sao_Paulo" })}
+                                  </span>
+                                )}
                               </p>
                             </div>
                             <div className="flex items-center gap-2">
-                              {(broadcast.status === "pending" || broadcast.status === "paused") && (
+                              {(broadcast.status === "draft" || broadcast.status === "pending" || broadcast.status === "paused") && (
                                 <Button
                                   size="sm"
                                   onClick={() => startBroadcastMutation.mutate(broadcast.id)}
@@ -2344,7 +2349,23 @@ export default function AdminWhatsAppMarketing() {
                                   Cancelar
                                 </Button>
                               )}
-                              {(broadcast.status === "completed" || broadcast.status === "cancelled") && (
+                              {broadcast.status === "scheduled" && (
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={() => {
+                                    if (confirm("Tem certeza que deseja cancelar este agendamento?")) {
+                                      cancelBroadcastMutation.mutate(broadcast.id);
+                                    }
+                                  }}
+                                  disabled={cancelBroadcastMutation.isPending}
+                                  data-testid={`button-cancel-scheduled-${broadcast.id}`}
+                                >
+                                  <X className="w-3 h-3 mr-1" />
+                                  Cancelar
+                                </Button>
+                              )}
+                              {(broadcast.status === "draft" || broadcast.status === "completed" || broadcast.status === "cancelled") && (
                                 <Button
                                   size="sm"
                                   variant="ghost"

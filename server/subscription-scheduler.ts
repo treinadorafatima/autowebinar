@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { admins, checkoutPlanos, checkoutPagamentos, checkoutAssinaturas } from "@shared/schema";
+import { admins, checkoutPlanos, checkoutPagamentos, checkoutAssinaturas, whatsappBroadcasts } from "@shared/schema";
 import { eq, and, gte, lte, isNotNull, sql } from "drizzle-orm";
 import { 
   sendExpirationReminderEmail, 
@@ -14,6 +14,7 @@ import {
 } from "./whatsapp-notifications";
 import { storage } from "./storage";
 import { getAppUrl } from "./utils/getAppUrl";
+import { startBroadcastOrchestrator } from "./whatsapp-routes";
 
 const SCHEDULER_INTERVAL_MS = 3600000; // Check every hour
 let schedulerInterval: NodeJS.Timeout | null = null;
@@ -1339,6 +1340,75 @@ async function runPaymentSync(): Promise<void> {
 // Intervalo de sync de pagamentos (30 minutos para recuperar webhooks perdidos rapidamente)
 const PAYMENT_SYNC_INTERVAL_MS = 30 * 60 * 1000; // 30 minutos
 
+// Intervalo de verificação de broadcasts agendados (1 minuto)
+const BROADCAST_SCHEDULER_INTERVAL_MS = 60 * 1000; // 1 minuto
+
+// Process scheduled broadcasts
+async function processScheduledBroadcasts(): Promise<void> {
+  try {
+    const now = new Date();
+    
+    // Find broadcasts that are scheduled and should start now
+    const scheduledBroadcasts = await db
+      .select()
+      .from(whatsappBroadcasts)
+      .where(
+        and(
+          eq(whatsappBroadcasts.status, 'scheduled'),
+          isNotNull(whatsappBroadcasts.scheduledAt),
+          lte(whatsappBroadcasts.scheduledAt, now)
+        )
+      );
+    
+    if (scheduledBroadcasts.length === 0) {
+      return;
+    }
+    
+    console.log(`[broadcast-scheduler] Found ${scheduledBroadcasts.length} scheduled broadcasts to process`);
+    
+    for (const broadcast of scheduledBroadcasts) {
+      try {
+        console.log(`[broadcast-scheduler] Starting scheduled broadcast ${broadcast.id} (${broadcast.name})`);
+        
+        // Check if there are connected WhatsApp accounts for this admin
+        const accounts = await storage.listWhatsappAccountsByAdmin(broadcast.adminId);
+        if (!accounts || accounts.length === 0) {
+          console.log(`[broadcast-scheduler] No WhatsApp accounts for admin ${broadcast.adminId}, skipping broadcast ${broadcast.id}`);
+          continue;
+        }
+        
+        // Update status to sending
+        await db
+          .update(whatsappBroadcasts)
+          .set({ 
+            status: 'sending',
+            startedAt: new Date(),
+            updatedAt: new Date()
+          })
+          .where(eq(whatsappBroadcasts.id, broadcast.id));
+        
+        // Start the broadcast orchestrator
+        startBroadcastOrchestrator(broadcast.id, broadcast.adminId);
+        
+        console.log(`[broadcast-scheduler] Broadcast ${broadcast.id} started successfully`);
+      } catch (error) {
+        console.error(`[broadcast-scheduler] Error starting broadcast ${broadcast.id}:`, error);
+        
+        // Mark as paused if there was an error starting
+        await db
+          .update(whatsappBroadcasts)
+          .set({ 
+            status: 'paused',
+            updatedAt: new Date()
+          })
+          .where(eq(whatsappBroadcasts.id, broadcast.id));
+      }
+    }
+  } catch (error) {
+    console.error("[broadcast-scheduler] Error processing scheduled broadcasts:", error);
+  }
+}
+
 export function startSubscriptionScheduler(): void {
   if (schedulerInterval) {
     console.log("[subscription-scheduler] Scheduler already running");
@@ -1365,6 +1435,17 @@ export function startSubscriptionScheduler(): void {
   }, PAYMENT_SYNC_INTERVAL_MS); // Then every 30 minutes
   
   console.log("[subscription-scheduler] Payment sync scheduled every 30 minutes");
+  
+  // Run broadcast scheduler every minute to check for scheduled broadcasts
+  setTimeout(() => {
+    processScheduledBroadcasts();
+  }, 30000); // First run after 30 seconds
+  
+  setInterval(() => {
+    processScheduledBroadcasts();
+  }, BROADCAST_SCHEDULER_INTERVAL_MS); // Then every minute
+  
+  console.log("[broadcast-scheduler] Broadcast scheduler started (checks every minute)");
 }
 
 export function stopSubscriptionScheduler(): void {

@@ -1334,7 +1334,7 @@ export function registerWhatsAppRoutes(app: Express) {
 
 const activeBroadcasts = new Map<string, boolean>();
 
-async function startBroadcastOrchestrator(broadcastId: string, adminId: string) {
+export async function startBroadcastOrchestrator(broadcastId: string, adminId: string) {
   if (activeBroadcasts.get(broadcastId)) {
     console.log(`[broadcast] Broadcast ${broadcastId} already running`);
     return;
