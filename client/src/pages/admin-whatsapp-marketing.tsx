@@ -3510,8 +3510,8 @@ export default function AdminWhatsAppMarketing() {
                         )}
                         
                         {/* File info */}
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{newBroadcast.mediaFileName}</p>
+                        <div className="flex-1 min-w-0 overflow-hidden">
+                          <p className="text-sm font-medium truncate max-w-[200px]">{newBroadcast.mediaFileName}</p>
                           <p className="text-xs text-muted-foreground">{newBroadcast.mediaMimeType}</p>
                         </div>
                         
