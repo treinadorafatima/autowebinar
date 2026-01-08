@@ -1461,21 +1461,25 @@ export async function sendWhatsAppMediaMessage(
         if (isPtt) {
           audioMimetype = "audio/ogg; codecs=opus";
         } else {
-          // For regular audio (not PTT), auto-detect mimetype from URL extension
-          if (!media.mimetype) {
-            if (urlLower.includes('.mp3')) {
-              audioMimetype = "audio/mpeg";
-            } else if (urlLower.includes('.wav')) {
-              audioMimetype = "audio/wav";
-            } else if (urlLower.includes('.m4a')) {
-              audioMimetype = "audio/mp4";
-            } else if (urlLower.includes('.ogg')) {
-              audioMimetype = "audio/ogg; codecs=opus";
-            }
+          // For regular audio (not PTT), normalize mimetypes to WhatsApp-compatible formats
+          // Always normalize, even if mimetype is provided, because some stored values are invalid
+          const mimetypeLower = audioMimetype.toLowerCase();
+          
+          // Normalize invalid/non-standard mimetypes
+          if (mimetypeLower === 'audio/mp3' || mimetypeLower.includes('mp3') || urlLower.includes('.mp3')) {
+            audioMimetype = "audio/mpeg";
+          } else if (mimetypeLower.includes('wav') || urlLower.includes('.wav')) {
+            audioMimetype = "audio/wav";
+          } else if (mimetypeLower.includes('m4a') || mimetypeLower === 'audio/x-m4a' || urlLower.includes('.m4a')) {
+            audioMimetype = "audio/mp4";
+          } else if (mimetypeLower.includes('ogg') || urlLower.includes('.ogg')) {
+            audioMimetype = "audio/ogg; codecs=opus";
+          } else if (mimetypeLower.includes('aac') || urlLower.includes('.aac')) {
+            audioMimetype = "audio/aac";
           }
         }
         
-        console.log(`[whatsapp] Sending audio: mimetype=${audioMimetype}, ptt=${isPtt}, bufferSize=${buffer.length}, url=${media.url.substring(0, 50)}...`);
+        console.log(`[whatsapp] Sending audio: mimetype=${audioMimetype}, ptt=${isPtt}, originalMimetype=${media.mimetype}, bufferSize=${buffer.length}`);
         
         messageContent = {
           audio: buffer,
