@@ -1360,13 +1360,26 @@ async function processScheduledBroadcasts(): Promise<void> {
         )
       );
     
-    if (scheduledBroadcasts.length === 0) {
+    // Also find broadcasts that are pending but were supposed to start immediately (recovery for stuck broadcasts)
+    const pendingBroadcasts = await db
+      .select()
+      .from(whatsappBroadcasts)
+      .where(
+        and(
+          eq(whatsappBroadcasts.status, 'pending'),
+          isNotNull(whatsappBroadcasts.startedAt)
+        )
+      );
+    
+    const allBroadcasts = [...scheduledBroadcasts, ...pendingBroadcasts];
+    
+    if (allBroadcasts.length === 0) {
       return;
     }
     
-    console.log(`[broadcast-scheduler] Found ${scheduledBroadcasts.length} scheduled broadcasts to process`);
+    console.log(`[broadcast-scheduler] Found ${scheduledBroadcasts.length} scheduled, ${pendingBroadcasts.length} pending broadcasts to process`);
     
-    for (const broadcast of scheduledBroadcasts) {
+    for (const broadcast of allBroadcasts) {
       try {
         console.log(`[broadcast-scheduler] Starting scheduled broadcast ${broadcast.id} (${broadcast.name})`);
         

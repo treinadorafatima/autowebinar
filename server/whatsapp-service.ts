@@ -1237,11 +1237,19 @@ async function validateMediaBeforeSend(media: MediaMessage): Promise<MediaValida
   }
 
   try {
+    // Convert relative URLs to absolute URLs
+    let mediaUrl = media.url;
+    if (mediaUrl.startsWith('/')) {
+      const host = process.env.REPLIT_DEV_DOMAIN || 'localhost:5000';
+      const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
+      mediaUrl = `${protocol}://${host}${mediaUrl}`;
+    }
+    
     // HEAD request to check size and type without downloading
-    const headResponse = await fetch(media.url, { method: "HEAD" });
+    const headResponse = await fetch(mediaUrl, { method: "HEAD" });
     if (!headResponse.ok) {
       // Try GET with range to check if URL is accessible
-      const rangeResponse = await fetch(media.url, { 
+      const rangeResponse = await fetch(mediaUrl, { 
         method: "GET",
         headers: { "Range": "bytes=0-0" }
       });
@@ -1347,7 +1355,15 @@ export async function sendWhatsAppMediaMessage(
     }
     const jid = formattedPhone + "@s.whatsapp.net";
 
-    const response = await fetch(media.url);
+    // Convert relative URLs to absolute URLs
+    let mediaUrl = media.url;
+    if (mediaUrl.startsWith('/')) {
+      const host = process.env.REPLIT_DEV_DOMAIN || 'localhost:5000';
+      const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
+      mediaUrl = `${protocol}://${host}${mediaUrl}`;
+    }
+
+    const response = await fetch(mediaUrl);
     if (!response.ok) {
       return { success: false, error: "Erro ao baixar arquivo de mídia" };
     }
