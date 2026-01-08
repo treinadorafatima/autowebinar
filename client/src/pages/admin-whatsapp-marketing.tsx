@@ -628,6 +628,9 @@ export default function AdminWhatsAppMarketing() {
   });
   const [previewLeads, setPreviewLeads] = useState<BroadcastPreview | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
+  const [broadcastAction, setBroadcastAction] = useState<"draft" | "scheduled" | "immediate">("draft");
+  const [broadcastScheduledDate, setBroadcastScheduledDate] = useState<string>("");
+  const [broadcastScheduledTime, setBroadcastScheduledTime] = useState<string>("");
 
   // Cloud API states
   const [showCloudApiDialog, setShowCloudApiDialog] = useState(false);
@@ -1042,11 +1045,19 @@ export default function AdminWhatsAppMarketing() {
       return res.json();
     },
     onSuccess: () => {
-      toast({ title: "Envio em massa criado com sucesso" });
+      const actionMessages = {
+        draft: "Rascunho salvo com sucesso",
+        scheduled: "Envio agendado com sucesso",
+        immediate: "Envio iniciado com sucesso"
+      };
+      toast({ title: actionMessages[broadcastAction] || "Envio criado" });
       queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/broadcasts"] });
       setShowNewBroadcastDialog(false);
       setNewBroadcast({ name: "", messageText: "", messageType: "text", mediaUrl: "", mediaFileName: "", mediaMimeType: "", sendAsVoiceNote: false });
       setPreviewLeads(null);
+      setBroadcastAction("draft");
+      setBroadcastScheduledDate("");
+      setBroadcastScheduledTime("");
     },
     onError: (error: any) => {
       toast({ title: "Erro", description: error.message, variant: "destructive" });
@@ -1175,6 +1186,24 @@ export default function AdminWhatsAppMarketing() {
       return;
     }
 
+    // Validate scheduled date/time
+    if (broadcastAction === "scheduled") {
+      if (!broadcastScheduledDate || !broadcastScheduledTime) {
+        toast({ title: "Preencha a data e hora do agendamento", variant: "destructive" });
+        return;
+      }
+      const scheduledDateTime = new Date(`${broadcastScheduledDate}T${broadcastScheduledTime}:00`);
+      if (scheduledDateTime <= new Date()) {
+        toast({ title: "A data/hora deve ser no futuro", variant: "destructive" });
+        return;
+      }
+    }
+
+    // Build scheduledAt ISO string for scheduled broadcasts
+    const scheduledAt = broadcastAction === "scheduled" 
+      ? new Date(`${broadcastScheduledDate}T${broadcastScheduledTime}:00`).toISOString()
+      : undefined;
+
     createBroadcastMutation.mutate({
       sourceType: broadcastSourceType,
       webinarId: broadcastSourceType === "webinar" ? broadcastWebinarId : undefined,
@@ -1190,13 +1219,17 @@ export default function AdminWhatsAppMarketing() {
       filterDateStart: broadcastSourceType === "webinar" && broadcastFilterType === "date_range" ? broadcastDateStart : undefined,
       filterDateEnd: broadcastSourceType === "webinar" && broadcastFilterType === "date_range" ? broadcastDateEnd : undefined,
       filterSessionDate: broadcastSourceType === "webinar" && broadcastFilterType === "session" ? broadcastSessionDate : undefined,
+      action: broadcastAction,
+      scheduledAt,
     });
   };
 
   const getBroadcastStatusBadge = (status: string) => {
     switch (status) {
       case "draft": return <Badge variant="outline">Rascunho</Badge>;
+      case "scheduled": return <Badge className="bg-purple-500/10 text-purple-500 border-purple-500/20"><Clock className="w-3 h-3 mr-1" />Agendado</Badge>;
       case "pending": return <Badge className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20">Pendente</Badge>;
+      case "sending": return <Badge className="bg-blue-500/10 text-blue-500 border-blue-500/20"><Loader2 className="w-3 h-3 mr-1 animate-spin" />Enviando</Badge>;
       case "running": return <Badge className="bg-blue-500/10 text-blue-500 border-blue-500/20"><Loader2 className="w-3 h-3 mr-1 animate-spin" />Enviando</Badge>;
       case "paused": return <Badge className="bg-orange-500/10 text-orange-500 border-orange-500/20">Pausado</Badge>;
       case "completed": return <Badge className="bg-green-500/10 text-green-500 border-green-500/20">Concluído</Badge>;
@@ -3499,6 +3532,69 @@ export default function AdminWhatsAppMarketing() {
                   </p>
                 </div>
               )}
+
+              <div className="space-y-3 pt-2 border-t">
+                <Label>Ação</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  <Button
+                    type="button"
+                    variant={broadcastAction === "draft" ? "default" : "outline"}
+                    className="flex flex-col h-auto py-3 gap-1"
+                    onClick={() => setBroadcastAction("draft")}
+                    data-testid="button-action-draft"
+                  >
+                    <FileText className="w-4 h-4" />
+                    <span className="text-xs">Salvar Rascunho</span>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={broadcastAction === "scheduled" ? "default" : "outline"}
+                    className="flex flex-col h-auto py-3 gap-1"
+                    onClick={() => setBroadcastAction("scheduled")}
+                    data-testid="button-action-scheduled"
+                  >
+                    <Clock className="w-4 h-4" />
+                    <span className="text-xs">Agendar</span>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={broadcastAction === "immediate" ? "default" : "outline"}
+                    className="flex flex-col h-auto py-3 gap-1"
+                    onClick={() => setBroadcastAction("immediate")}
+                    data-testid="button-action-immediate"
+                  >
+                    <Send className="w-4 h-4" />
+                    <span className="text-xs">Enviar Agora</span>
+                  </Button>
+                </div>
+
+                {broadcastAction === "scheduled" && (
+                  <div className="grid grid-cols-2 gap-3 p-3 border rounded-lg bg-muted/30">
+                    <div className="space-y-2">
+                      <Label>Data</Label>
+                      <Input
+                        type="date"
+                        value={broadcastScheduledDate}
+                        onChange={(e) => setBroadcastScheduledDate(e.target.value)}
+                        min={new Date().toISOString().split("T")[0]}
+                        data-testid="input-scheduled-date"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Hora</Label>
+                      <Input
+                        type="time"
+                        value={broadcastScheduledTime}
+                        onChange={(e) => setBroadcastScheduledTime(e.target.value)}
+                        data-testid="input-scheduled-time"
+                      />
+                    </div>
+                    <p className="col-span-2 text-xs text-muted-foreground">
+                      O envio será iniciado automaticamente na data e hora selecionadas (horário de Brasília)
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
             <DialogFooter className="gap-2">
               <Button variant="outline" onClick={() => setShowNewBroadcastDialog(false)}>Cancelar</Button>
@@ -3512,12 +3608,13 @@ export default function AdminWhatsAppMarketing() {
                   (newBroadcast.messageType === "text" && !newBroadcast.messageText) ||
                   (newBroadcast.messageType !== "text" && !newBroadcast.mediaUrl) ||
                   (broadcastSourceType === "webinar" && (!broadcastWebinarId || !previewLeads || previewLeads.count === 0)) ||
-                  (broadcastSourceType === "contact_list" && !broadcastContactListId)
+                  (broadcastSourceType === "contact_list" && !broadcastContactListId) ||
+                  (broadcastAction === "scheduled" && (!broadcastScheduledDate || !broadcastScheduledTime))
                 }
                 data-testid="button-create-broadcast"
               >
                 {createBroadcastMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                Criar Envio
+                {broadcastAction === "draft" ? "Salvar Rascunho" : broadcastAction === "scheduled" ? "Agendar Envio" : "Enviar Agora"}
               </Button>
             </DialogFooter>
           </DialogContent>
