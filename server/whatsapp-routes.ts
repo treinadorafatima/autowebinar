@@ -1430,10 +1430,15 @@ export async function startBroadcastOrchestrator(broadcastId: string, adminId: s
       const recipients = await storage.getPendingBroadcastRecipients(broadcastId, BATCH_SIZE);
       if (recipients.length === 0) {
         console.log(`[broadcast] All recipients processed for ${broadcastId}`);
-        await storage.updateWhatsappBroadcast(broadcastId, { 
-          status: 'completed',
-          completedAt: new Date()
-        });
+        try {
+          const updatedBroadcast = await storage.updateWhatsappBroadcast(broadcastId, { 
+            status: 'completed',
+            completedAt: new Date()
+          });
+          console.log(`[broadcast] Updated status to completed for ${broadcastId}:`, updatedBroadcast?.status);
+        } catch (updateError: any) {
+          console.error(`[broadcast] Failed to update status to completed for ${broadcastId}:`, updateError.message);
+        }
         break;
       }
 
