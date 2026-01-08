@@ -1108,7 +1108,7 @@ export function registerWhatsAppRoutes(app: Express) {
         mediaFileName: mediaFileName || null,
         mediaMimeType: mediaMimeType || null,
         sendAsVoiceNote: sendAsVoiceNote || false,
-        filterType: sourceType === 'webinar' ? filterType : null,
+        filterType: sourceType === 'webinar' ? filterType : 'all',
         filterDateStart: filterDateStart || null,
         filterDateEnd: filterDateEnd || null,
         filterSessionDate: filterSessionDate || null,
