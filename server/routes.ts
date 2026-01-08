@@ -3850,7 +3850,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Nome do arquivo é obrigatório" });
       }
 
-      const updated = await storage.renameMediaFile(admin.id, mediaId, fileName.trim());
+      // Get original file to preserve extension
+      const originalFile = await storage.getMediaFileById(mediaId);
+      if (!originalFile || originalFile.adminId !== admin.id) {
+        return res.status(404).json({ error: "Arquivo não encontrado" });
+      }
+
+      // Extract original extension
+      const originalExt = originalFile.fileName.includes('.') 
+        ? originalFile.fileName.substring(originalFile.fileName.lastIndexOf('.'))
+        : '';
+      
+      // Remove any extension from new name and append original
+      let newName = fileName.trim();
+      const lastDotIndex = newName.lastIndexOf('.');
+      if (lastDotIndex > 0) {
+        newName = newName.substring(0, lastDotIndex);
+      }
+      const finalFileName = newName + originalExt;
+
+      const updated = await storage.renameMediaFile(admin.id, mediaId, finalFileName);
       
       if (!updated) {
         return res.status(404).json({ error: "Arquivo não encontrado ou sem permissão" });
