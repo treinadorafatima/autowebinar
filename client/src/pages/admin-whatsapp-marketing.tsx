@@ -3630,44 +3630,46 @@ export default function AdminWhatsAppMarketing() {
                 <div className="space-y-2">
                   <Label>Arquivo de Mídia</Label>
                   {newBroadcast.mediaUrl ? (
-                    <div className="relative inline-block">
-                      {newBroadcast.messageType === "image" && (
-                        <img 
-                          src={newBroadcast.mediaUrl} 
-                          alt="Preview" 
-                          className="w-16 h-16 rounded-lg object-cover"
-                        />
-                      )}
-                      {newBroadcast.messageType === "video" && (
-                        <div className="flex items-center gap-2">
-                          <div className="w-16 h-16 rounded-lg bg-muted flex items-center justify-center overflow-hidden relative">
+                    <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                      <div className="relative flex-shrink-0">
+                        {newBroadcast.messageType === "image" && (
+                          <img 
+                            src={newBroadcast.mediaUrl} 
+                            alt="Preview" 
+                            className="w-14 h-14 rounded-lg object-cover"
+                          />
+                        )}
+                        {newBroadcast.messageType === "video" && (
+                          <div className="w-14 h-14 rounded-lg bg-muted overflow-hidden relative">
                             <video 
                               src={newBroadcast.mediaUrl} 
                               className="w-full h-full object-cover"
                             />
                             <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-                              <Play className="w-6 h-6 text-white" />
+                              <Play className="w-5 h-5 text-white" />
                             </div>
                           </div>
-                          <span className="text-xs text-muted-foreground truncate max-w-[120px]">{newBroadcast.mediaFileName}</span>
-                        </div>
-                      )}
-                      {newBroadcast.messageType === "audio" && (
-                        <div className="flex items-center gap-2">
-                          <div className="w-10 h-10 rounded bg-muted flex items-center justify-center flex-shrink-0">
-                            <Mic className="w-5 h-5 text-muted-foreground" />
+                        )}
+                        {newBroadcast.messageType === "audio" && (
+                          <div className="w-14 h-14 rounded-lg bg-muted flex items-center justify-center">
+                            <Mic className="w-6 h-6 text-muted-foreground" />
                           </div>
-                          <audio controls className="h-8 max-w-[180px]" src={newBroadcast.mediaUrl} />
-                        </div>
-                      )}
-                      {newBroadcast.messageType === "document" && (
-                        <div className="w-16 h-16 rounded-lg bg-muted flex items-center justify-center">
-                          <FileText className="w-8 h-8 text-muted-foreground" />
-                        </div>
-                      )}
-                      <button
+                        )}
+                        {newBroadcast.messageType === "document" && (
+                          <div className="w-14 h-14 rounded-lg bg-muted flex items-center justify-center">
+                            <FileText className="w-6 h-6 text-muted-foreground" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{newBroadcast.mediaFileName}</p>
+                        <p className="text-xs text-muted-foreground capitalize">{newBroadcast.messageType}</p>
+                      </div>
+                      <Button
                         type="button"
-                        className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center"
+                        size="icon"
+                        variant="ghost"
+                        className="flex-shrink-0 h-8 w-8 text-muted-foreground hover:text-destructive"
                         onClick={() => setNewBroadcast({
                           ...newBroadcast,
                           mediaUrl: "",
@@ -3676,8 +3678,8 @@ export default function AdminWhatsAppMarketing() {
                         })}
                         data-testid="button-remove-broadcast-media"
                       >
-                        <X className="w-3 h-3" />
-                      </button>
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
                     </div>
                   ) : (
                     <Tabs value={broadcastMediaSource} onValueChange={(v) => setBroadcastMediaSource(v as "upload" | "library")}>
