@@ -1157,6 +1157,36 @@ export function registerWhatsAppRoutes(app: Express) {
 
       await storage.createWhatsappBroadcastRecipientsBulk(recipientData);
 
+      // For immediate broadcasts, start the orchestrator automatically
+      if (action === 'immediate') {
+        // Check if there are connected WhatsApp accounts
+        const accounts = await storage.listWhatsappAccountsByAdmin(admin.id);
+        const connectedAccounts = [];
+        for (const acc of accounts) {
+          const status = await getWhatsAppStatus(acc.id);
+          if (status.status === 'connected') {
+            connectedAccounts.push(acc);
+          }
+        }
+
+        if (connectedAccounts.length === 0) {
+          // Revert to draft status if no connected accounts
+          await storage.updateWhatsappBroadcast(broadcast.id, { 
+            status: 'draft',
+            startedAt: null,
+          });
+          return res.status(400).json({ error: "Nenhuma conta WhatsApp conectada. Conecte pelo menos uma conta para iniciar o envio." });
+        }
+
+        // Update to sending and start orchestrator
+        await storage.updateWhatsappBroadcast(broadcast.id, { 
+          status: 'sending',
+        });
+        
+        // Start the broadcast orchestrator in background
+        startBroadcastOrchestrator(broadcast.id, admin.id);
+      }
+
       res.json(broadcast);
     } catch (error: any) {
       console.error("[whatsapp-api] Error creating broadcast:", error);
