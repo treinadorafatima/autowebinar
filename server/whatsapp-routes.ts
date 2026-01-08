@@ -1209,7 +1209,7 @@ export function registerWhatsAppRoutes(app: Express) {
       if (broadcast.adminId !== admin.id) {
         return res.status(403).json({ error: "Acesso negado" });
       }
-      if (broadcast.status !== 'draft' && broadcast.status !== 'paused') {
+      if (broadcast.status !== 'draft' && broadcast.status !== 'paused' && broadcast.status !== 'pending') {
         return res.status(400).json({ error: "Broadcast já foi iniciado ou concluído" });
       }
 
