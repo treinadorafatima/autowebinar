@@ -1480,8 +1480,15 @@ export async function startBroadcastOrchestrator(broadcastId: string, adminId: s
 
     let accountIndex = 0;
     const BATCH_SIZE = 10;
-    const DELAY_BETWEEN_MESSAGES = 3000; // 3 seconds between messages
-    const DELAY_BETWEEN_BATCHES = 10000; // 10 seconds between batches
+
+    // Helper function to calculate random delay with variation
+    const calculateDelay = (baseSeconds: number, variationPercent: number): number => {
+      const baseMs = baseSeconds * 1000;
+      const variation = variationPercent / 100;
+      const minDelay = Math.round(baseMs * (1 - variation));
+      const maxDelay = Math.round(baseMs * (1 + variation));
+      return Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
+    };
 
     while (true) {
       // Check if broadcast is still running
@@ -1611,12 +1618,17 @@ export async function startBroadcastOrchestrator(broadcastId: string, adminId: s
           });
         }
 
-        // Delay between messages
-        await new Promise(r => setTimeout(r, DELAY_BETWEEN_MESSAGES));
+        // Delay between messages (using broadcast settings with random variation)
+        // Clamp values to safe ranges: base 1-300 seconds, variation 0-100%
+        const delayBase = Math.max(1, Math.min(300, broadcast.delaySeconds || 5));
+        const delayVariation = Math.max(0, Math.min(100, broadcast.delayVariationPercent || 30));
+        const messageDelay = calculateDelay(delayBase, delayVariation);
+        console.log(`[broadcast] Waiting ${messageDelay}ms before next message (base: ${delayBase}s, variation: ${delayVariation}%)`);
+        await new Promise(r => setTimeout(r, messageDelay));
       }
 
-      // Delay between batches
-      await new Promise(r => setTimeout(r, DELAY_BETWEEN_BATCHES));
+      // Brief delay between batches (fixed)
+      await new Promise(r => setTimeout(r, 1000));
     }
   } catch (error: any) {
     console.error(`[broadcast] Orchestrator error for ${broadcastId}:`, error);
