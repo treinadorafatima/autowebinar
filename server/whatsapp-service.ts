@@ -677,6 +677,30 @@ export async function initWhatsAppConnection(accountId: string, adminId: string,
       }
     });
 
+    // Track message delivery status
+    socket.ev.on("messages.update", async (updates) => {
+      for (const update of updates) {
+        const { key, update: statusUpdate } = update;
+        if (!key.fromMe || !key.id) continue;
+        
+        const status = statusUpdate?.status;
+        const recipient = key.remoteJid?.split("@")[0];
+        
+        // Status codes: 0=ERROR, 1=PENDING, 2=SERVER_ACK, 3=DELIVERY_ACK, 4=READ, 5=PLAYED
+        if (status === 0) {
+          console.error(`[whatsapp] MESSAGE DELIVERY FAILED for ${recipient} (msgId: ${key.id}) - ERROR status`);
+        } else if (status === 2) {
+          console.log(`[whatsapp] Message to ${recipient} received by server (msgId: ${key.id})`);
+        } else if (status === 3) {
+          console.log(`[whatsapp] Message DELIVERED to ${recipient} (msgId: ${key.id})`);
+        } else if (status === 4) {
+          console.log(`[whatsapp] Message READ by ${recipient} (msgId: ${key.id})`);
+        } else if (status === 5) {
+          console.log(`[whatsapp] Audio/Video PLAYED by ${recipient} (msgId: ${key.id})`);
+        }
+      }
+    });
+
     return {
       success: true,
       status: "connecting",
