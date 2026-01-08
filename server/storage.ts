@@ -282,6 +282,7 @@ export interface IStorage {
   listMediaFilesByAdmin(adminId: string): Promise<MediaFile[]>;
   getMediaFileById(id: string): Promise<MediaFile | undefined>;
   createMediaFile(data: MediaFileInsert): Promise<MediaFile>;
+  renameMediaFile(adminId: string, mediaId: string, newFileName: string): Promise<boolean>;
   deleteMediaFile(adminId: string, mediaId: string): Promise<boolean>;
   // Webinar View Logs - Histórico de visualizações
   logWebinarView(webinarId: string, ownerId: string | null, source: 'live' | 'replay' | 'embed', viewerId?: string): Promise<void>;
@@ -3967,6 +3968,20 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
       createdAt: new Date(),
     }).returning();
     return result;
+  }
+
+  async renameMediaFile(adminId: string, mediaId: string, newFileName: string): Promise<boolean> {
+    const file = await this.getMediaFileById(mediaId);
+    if (!file || file.adminId !== adminId) {
+      return false;
+    }
+    
+    await db.update(mediaFiles)
+      .set({ fileName: newFileName })
+      .where(eq(mediaFiles.id, mediaId));
+    
+    console.log(`[storage] Media file renamed: ${mediaId} -> ${newFileName}`);
+    return true;
   }
 
   async deleteMediaFile(adminId: string, mediaId: string): Promise<boolean> {

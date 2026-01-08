@@ -3829,6 +3829,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Rename media file (file manager)
+  app.patch("/api/media/:id", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin) {
+        return res.status(401).json({ error: "Admin not found" });
+      }
+
+      const mediaId = req.params.id;
+      const { fileName } = req.body;
+      
+      if (!fileName || typeof fileName !== 'string' || fileName.trim().length === 0) {
+        return res.status(400).json({ error: "Nome do arquivo é obrigatório" });
+      }
+
+      const updated = await storage.renameMediaFile(admin.id, mediaId, fileName.trim());
+      
+      if (!updated) {
+        return res.status(404).json({ error: "Arquivo não encontrado ou sem permissão" });
+      }
+
+      res.json({ success: true, fileName: fileName.trim() });
+    } catch (error: any) {
+      console.error("[media-rename] Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Delete media file (file manager)
   app.delete("/api/media/:id", async (req, res) => {
     try {

@@ -17,7 +17,7 @@ import {
   Clock, QrCode, Smartphone, Wifi, WifiOff, RefreshCcw, ArrowLeft,
   Upload, FileAudio, FileVideo, FileText, Image, Mic, Info, Check,
   Radio, Play, Pause, X, Users, Calendar, Filter, Eye, Download,
-  FileSpreadsheet, List, History, FolderOpen
+  FileSpreadsheet, List, History, FolderOpen, Pencil, Copy, Video
 } from "lucide-react";
 import { SiWhatsapp } from "react-icons/si";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -656,6 +656,10 @@ export default function AdminWhatsAppMarketing() {
   const [selectedBroadcastId, setSelectedBroadcastId] = useState<string | null>(null);
   const [detailsStatusFilter, setDetailsStatusFilter] = useState<string>("all");
 
+  // Media file rename states
+  const [renamingFileId, setRenamingFileId] = useState<string | null>(null);
+  const [renameFileName, setRenameFileName] = useState("");
+
   // Cloud API states
   const [showCloudApiDialog, setShowCloudApiDialog] = useState(false);
   const [cloudApiConfig, setCloudApiConfig] = useState({
@@ -1069,6 +1073,22 @@ export default function AdminWhatsAppMarketing() {
     },
     onError: (error: any) => {
       toast({ title: "Erro ao excluir", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const renameMediaFileMutation = useMutation({
+    mutationFn: async ({ id, fileName }: { id: string; fileName: string }) => {
+      const res = await apiRequest("PATCH", `/api/media/${id}`, { fileName });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Arquivo renomeado" });
+      queryClient.invalidateQueries({ queryKey: ["/api/media"] });
+      setRenamingFileId(null);
+      setRenameFileName("");
+    },
+    onError: (error: any) => {
+      toast({ title: "Erro ao renomear", description: error.message, variant: "destructive" });
     },
   });
 
@@ -2555,12 +2575,13 @@ export default function AdminWhatsAppMarketing() {
                     <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
                   </div>
                 ) : mediaFiles && mediaFiles.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                     {mediaFiles.map((file) => {
                       const MediaIcon = getMediaIcon(file.mediaType);
+                      const isEditing = renamingFileId === file.id;
                       return (
-                        <Card key={file.id} className="overflow-hidden" data-testid={`card-media-${file.id}`}>
-                          <div className="aspect-video bg-muted flex items-center justify-center relative">
+                        <div key={file.id} className="group relative" data-testid={`card-media-${file.id}`}>
+                          <div className="aspect-square bg-muted rounded-lg overflow-hidden relative">
                             {file.mediaType === "image" ? (
                               <img 
                                 src={file.publicUrl} 
@@ -2573,49 +2594,97 @@ export default function AdminWhatsAppMarketing() {
                                 className="w-full h-full object-cover"
                               />
                             ) : (
-                              <MediaIcon className="w-16 h-16 text-muted-foreground" />
+                              <div className="w-full h-full flex items-center justify-center">
+                                <MediaIcon className="w-10 h-10 text-muted-foreground" />
+                              </div>
                             )}
-                            <Badge className="absolute top-2 right-2" variant="secondary">
+                            <Badge className="absolute top-1 right-1 text-xs py-0" variant="secondary">
                               {file.mediaType}
                             </Badge>
-                          </div>
-                          <CardContent className="p-3 space-y-2">
-                            <p className="font-medium text-sm truncate" title={file.fileName}>
-                              {file.fileName}
-                            </p>
-                            <div className="flex items-center justify-between text-xs text-muted-foreground">
-                              <span>{formatFileSize(file.sizeBytes)}</span>
-                              <span>{new Date(file.createdAt).toLocaleDateString('pt-BR')}</span>
+                            
+                            {/* Hover overlay with actions */}
+                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-8 w-8 text-white hover:bg-white/20"
+                                onClick={() => {
+                                  setRenamingFileId(file.id);
+                                  setRenameFileName(file.fileName);
+                                }}
+                                title="Renomear"
+                                data-testid={`button-rename-${file.id}`}
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-8 w-8 text-white hover:bg-white/20"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(file.publicUrl);
+                                  toast({ title: "URL copiada!" });
+                                }}
+                                title="Copiar URL"
+                                data-testid={`button-copy-url-${file.id}`}
+                              >
+                                <Copy className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-8 w-8 text-white hover:bg-red-500/50"
+                                onClick={() => {
+                                  if (confirm("Excluir este arquivo?")) {
+                                    deleteMediaFileMutation.mutate(file.id);
+                                  }
+                                }}
+                                title="Excluir"
+                                data-testid={`button-delete-file-${file.id}`}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
                             </div>
-                          </CardContent>
-                          <CardFooter className="p-3 pt-0 gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="flex-1"
-                              onClick={() => {
-                                navigator.clipboard.writeText(file.publicUrl);
-                                toast({ title: "URL copiada!" });
-                              }}
-                              data-testid={`button-copy-url-${file.id}`}
-                            >
-                              Copiar URL
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => {
-                                if (confirm("Tem certeza que deseja excluir este arquivo? Sequências que usam este arquivo podem parar de funcionar.")) {
-                                  deleteMediaFileMutation.mutate(file.id);
-                                }
-                              }}
-                              disabled={deleteMediaFileMutation.isPending}
-                              data-testid={`button-delete-file-${file.id}`}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </CardFooter>
-                        </Card>
+                          </div>
+                          
+                          {/* File info */}
+                          <div className="mt-1 px-1">
+                            {isEditing ? (
+                              <div className="flex gap-1">
+                                <Input
+                                  value={renameFileName}
+                                  onChange={(e) => setRenameFileName(e.target.value)}
+                                  className="h-6 text-xs"
+                                  autoFocus
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      renameMediaFileMutation.mutate({ id: file.id, fileName: renameFileName });
+                                    } else if (e.key === 'Escape') {
+                                      setRenamingFileId(null);
+                                    }
+                                  }}
+                                  data-testid={`input-rename-${file.id}`}
+                                />
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-6 w-6"
+                                  onClick={() => renameMediaFileMutation.mutate({ id: file.id, fileName: renameFileName })}
+                                  disabled={renameMediaFileMutation.isPending}
+                                >
+                                  <Check className="w-3 h-3" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <p className="text-xs truncate" title={file.fileName}>
+                                {file.fileName}
+                              </p>
+                            )}
+                            <p className="text-xs text-muted-foreground">
+                              {formatFileSize(file.sizeBytes)}
+                            </p>
+                          </div>
+                        </div>
                       );
                     })}
                   </div>
