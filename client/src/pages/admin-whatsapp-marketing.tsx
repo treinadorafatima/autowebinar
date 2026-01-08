@@ -2680,8 +2680,8 @@ export default function AdminWhatsAppMarketing() {
                               {file.mediaType}
                             </Badge>
                             
-                            {/* Hover overlay with actions - hide when video is playing */}
-                            <div className={`absolute inset-0 bg-black/60 transition-opacity flex items-center justify-center gap-1 ${playingMediaId === file.id ? 'opacity-0 pointer-events-none' : 'opacity-0 group-hover:opacity-100'}`}>
+                            {/* Hover overlay with actions - positioned at bottom */}
+                            <div className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent transition-opacity flex items-center justify-center gap-1 py-2 ${playingMediaId === file.id ? 'opacity-0 pointer-events-none' : 'opacity-0 group-hover:opacity-100'}`}>
                               <Button
                                 size="icon"
                                 variant="ghost"
@@ -3639,8 +3639,17 @@ export default function AdminWhatsAppMarketing() {
                         />
                       )}
                       {newBroadcast.messageType === "video" && (
-                        <div className="w-16 h-16 rounded-lg bg-muted flex items-center justify-center">
-                          <Video className="w-8 h-8 text-muted-foreground" />
+                        <div className="flex items-center gap-2">
+                          <div className="w-16 h-16 rounded-lg bg-muted flex items-center justify-center overflow-hidden relative">
+                            <video 
+                              src={newBroadcast.mediaUrl} 
+                              className="w-full h-full object-cover"
+                            />
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                              <Play className="w-6 h-6 text-white" />
+                            </div>
+                          </div>
+                          <span className="text-xs text-muted-foreground truncate max-w-[120px]">{newBroadcast.mediaFileName}</span>
                         </div>
                       )}
                       {newBroadcast.messageType === "audio" && (
@@ -3758,8 +3767,11 @@ export default function AdminWhatsAppMarketing() {
                                       </div>
                                     )}
                                     {file.mediaType === "video" && (
-                                      <div className="w-full h-full bg-muted flex items-center justify-center">
-                                        <FileVideo className="w-6 h-6 text-muted-foreground" />
+                                      <div className="w-full h-full bg-muted relative">
+                                        <video src={file.publicUrl} className="w-full h-full object-cover" />
+                                        <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                                          <Play className="w-6 h-6 text-white" />
+                                        </div>
                                       </div>
                                     )}
                                     {file.mediaType === "document" && (
