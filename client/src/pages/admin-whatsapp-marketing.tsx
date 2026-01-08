@@ -3543,12 +3543,12 @@ export default function AdminWhatsAppMarketing() {
                                     type="button"
                                     className="w-full flex items-center gap-3 p-3 hover-elevate text-left"
                                     onClick={() => {
-                                      setNewBroadcast({
-                                        ...newBroadcast,
+                                      setNewBroadcast(prev => ({
+                                        ...prev,
                                         mediaUrl: file.publicUrl,
                                         mediaFileName: file.fileName,
                                         mediaMimeType: file.mimeType
-                                      });
+                                      }));
                                     }}
                                     data-testid={`button-select-file-${file.id}`}
                                   >
