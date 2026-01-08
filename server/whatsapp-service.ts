@@ -284,6 +284,20 @@ async function processMessageQueue(accountId: string): Promise<void> {
       }
       const jid = formattedPhone + "@s.whatsapp.net";
       
+      // Check if number exists on WhatsApp before sending
+      try {
+        const [exists] = await conn.socket.onWhatsApp(formattedPhone);
+        if (!exists || !exists.exists) {
+          console.log(`[whatsapp] Number ${formattedPhone} does not have WhatsApp`);
+          item.resolve({ success: false, error: "Número não tem WhatsApp" });
+          conn.messageQueue.shift();
+          continue;
+        }
+      } catch (checkError: any) {
+        console.warn(`[whatsapp] Could not verify if ${formattedPhone} has WhatsApp:`, checkError.message);
+        // Continue anyway - verification failed but message might still work
+      }
+      
       await conn.socket.sendMessage(jid, { text: item.message });
       conn.lastMessageSentAt = Date.now();
       
@@ -1365,6 +1379,18 @@ export async function sendWhatsAppMediaMessage(
       formattedPhone = "55" + formattedPhone;
     }
     const jid = formattedPhone + "@s.whatsapp.net";
+
+    // Check if number exists on WhatsApp before sending
+    try {
+      const [exists] = await conn.socket.onWhatsApp(formattedPhone);
+      if (!exists || !exists.exists) {
+        console.log(`[whatsapp] Number ${formattedPhone} does not have WhatsApp`);
+        return { success: false, error: "Número não tem WhatsApp" };
+      }
+    } catch (checkError: any) {
+      console.warn(`[whatsapp] Could not verify if ${formattedPhone} has WhatsApp:`, checkError.message);
+      // Continue anyway - verification failed but message might still work
+    }
 
     // Convert relative URLs to absolute URLs
     let mediaUrl = media.url;
