@@ -960,6 +960,7 @@ export const whatsappBroadcasts = pgTable("whatsapp_broadcasts", {
   filterDateEnd: text("filter_date_end"),
   filterSessionDate: text("filter_session_date"),
   status: text("status").notNull().default("draft"),
+  scheduledAt: timestamp("scheduled_at"),
   totalRecipients: integer("total_recipients").notNull().default(0),
   sentCount: integer("sent_count").notNull().default(0),
   failedCount: integer("failed_count").notNull().default(0),
