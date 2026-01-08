@@ -1038,10 +1038,26 @@ export function registerWhatsAppRoutes(app: Express) {
         webinarId, contactListId,
         filterType = 'all', filterDateStart, filterDateEnd, filterSessionDate,
         sendAsVoiceNote = false,
+        action = 'draft', // 'draft' | 'scheduled' | 'immediate'
+        scheduledAt, // ISO string for scheduled broadcasts
       } = req.body;
 
       if (!name || !messageText) {
         return res.status(400).json({ error: "name e messageText são obrigatórios" });
+      }
+
+      // Validate action and scheduledAt
+      if (action === 'scheduled') {
+        if (!scheduledAt) {
+          return res.status(400).json({ error: "scheduledAt é obrigatório para envios agendados" });
+        }
+        const scheduledDate = new Date(scheduledAt);
+        if (isNaN(scheduledDate.getTime())) {
+          return res.status(400).json({ error: "scheduledAt deve ser uma data válida" });
+        }
+        if (scheduledDate <= new Date()) {
+          return res.status(400).json({ error: "scheduledAt deve ser uma data futura" });
+        }
       }
 
       let recipients: { id?: string; phone: string; name: string | null; email?: string | null; sessionDate?: string | null }[] = [];
@@ -1112,12 +1128,13 @@ export function registerWhatsAppRoutes(app: Express) {
         filterDateStart: filterDateStart || null,
         filterDateEnd: filterDateEnd || null,
         filterSessionDate: filterSessionDate || null,
-        status: 'draft',
+        status: action === 'scheduled' ? 'scheduled' : action === 'immediate' ? 'pending' : 'draft',
+        scheduledAt: action === 'scheduled' ? new Date(scheduledAt) : null,
         totalRecipients: recipients.length,
         pendingCount: recipients.length,
         sentCount: 0,
         failedCount: 0,
-        startedAt: null,
+        startedAt: action === 'immediate' ? new Date() : null,
         completedAt: null,
       });
 
