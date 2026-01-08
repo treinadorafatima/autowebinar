@@ -1163,10 +1163,20 @@ export function registerWhatsAppRoutes(app: Express) {
 
       // For immediate broadcasts, start the orchestrator automatically
       if (action === 'immediate') {
-        // Check if there are connected WhatsApp accounts
-        const accounts = await storage.listWhatsappAccountsByAdmin(admin.id);
+        // Check if there are connected MARKETING WhatsApp accounts (broadcasts must use marketing accounts)
+        const allAccounts = await storage.listWhatsappAccountsByAdmin(admin.id);
+        const marketingAccounts = allAccounts.filter(acc => acc.scope === 'marketing');
+        
+        if (marketingAccounts.length === 0) {
+          await storage.updateWhatsappBroadcast(broadcast.id, { 
+            status: 'draft',
+            startedAt: null,
+          });
+          return res.status(400).json({ error: "Nenhuma conta de marketing configurada. Adicione uma conta WhatsApp de marketing na aba 'Contas' para enviar broadcasts." });
+        }
+        
         const connectedAccounts = [];
-        for (const acc of accounts) {
+        for (const acc of marketingAccounts) {
           const status = await getWhatsAppStatus(acc.id);
           if (status.status === 'connected') {
             connectedAccounts.push(acc);
@@ -1174,12 +1184,12 @@ export function registerWhatsAppRoutes(app: Express) {
         }
 
         if (connectedAccounts.length === 0) {
-          // Revert to draft status if no connected accounts
+          // Revert to draft status if no connected marketing accounts
           await storage.updateWhatsappBroadcast(broadcast.id, { 
             status: 'draft',
             startedAt: null,
           });
-          return res.status(400).json({ error: "Nenhuma conta WhatsApp conectada. Conecte pelo menos uma conta para iniciar o envio." });
+          return res.status(400).json({ error: "Nenhuma conta de marketing conectada. Conecte sua conta de marketing na aba 'Contas' antes de iniciar o envio." });
         }
 
         // Update to sending and start orchestrator
@@ -1217,10 +1227,16 @@ export function registerWhatsAppRoutes(app: Express) {
         return res.status(400).json({ error: "Broadcast já foi iniciado ou concluído" });
       }
 
-      // Check if there are connected WhatsApp accounts
-      const accounts = await storage.listWhatsappAccountsByAdmin(admin.id);
+      // Check if there are connected MARKETING WhatsApp accounts (broadcasts must use marketing accounts)
+      const allAccounts = await storage.listWhatsappAccountsByAdmin(admin.id);
+      const marketingAccounts = allAccounts.filter(acc => acc.scope === 'marketing');
+      
+      if (marketingAccounts.length === 0) {
+        return res.status(400).json({ error: "Nenhuma conta de marketing configurada. Adicione uma conta WhatsApp de marketing na aba 'Contas' para enviar broadcasts." });
+      }
+      
       const connectedAccounts = [];
-      for (const acc of accounts) {
+      for (const acc of marketingAccounts) {
         const status = await getWhatsAppStatus(acc.id);
         if (status.status === 'connected') {
           connectedAccounts.push(acc);
@@ -1228,7 +1244,7 @@ export function registerWhatsAppRoutes(app: Express) {
       }
 
       if (connectedAccounts.length === 0) {
-        return res.status(400).json({ error: "Nenhuma conta WhatsApp conectada. Conecte pelo menos uma conta para iniciar o envio." });
+        return res.status(400).json({ error: "Nenhuma conta de marketing conectada. Conecte sua conta de marketing na aba 'Contas' antes de iniciar o envio." });
       }
 
       await storage.updateWhatsappBroadcast(req.params.id, { 
@@ -1378,11 +1394,23 @@ export async function startBroadcastOrchestrator(broadcastId: string, adminId: s
   console.log(`[broadcast] Starting orchestrator for ${broadcastId}`);
 
   try {
-    // Get connected accounts sorted by priority and available capacity
-    const accounts = await storage.listWhatsappAccountsByAdmin(adminId);
+    // Get connected MARKETING accounts sorted by priority and available capacity
+    // Broadcasts should ONLY use marketing accounts, never notifications accounts
+    const allAccounts = await storage.listWhatsappAccountsByAdmin(adminId);
+    const marketingAccounts = allAccounts.filter(acc => acc.scope === 'marketing');
+    
+    if (marketingAccounts.length === 0) {
+      console.log(`[broadcast] No marketing accounts configured for admin ${adminId}`);
+      await storage.updateWhatsappBroadcast(broadcastId, { 
+        status: 'paused' 
+      });
+      activeBroadcasts.delete(broadcastId);
+      return;
+    }
+    
     const connectedAccounts = [];
     
-    for (const acc of accounts) {
+    for (const acc of marketingAccounts) {
       const status = await getWhatsAppStatus(acc.id);
       if (status.status === 'connected') {
         // Check daily limit
