@@ -1173,7 +1173,8 @@ export default function AdminWhatsAppMarketing() {
       toast({ title: "Preencha o nome do envio", variant: "destructive" });
       return;
     }
-    if (!newBroadcast.messageText) {
+    // Message is only required for text type, optional for media types (caption)
+    if (newBroadcast.messageType === "text" && !newBroadcast.messageText) {
       toast({ title: "Preencha a mensagem", variant: "destructive" });
       return;
     }
