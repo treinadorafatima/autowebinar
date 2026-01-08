@@ -17,7 +17,7 @@ import {
   Clock, QrCode, Smartphone, Wifi, WifiOff, RefreshCcw, ArrowLeft,
   Upload, FileAudio, FileVideo, FileText, Image, Mic, Info, Check,
   Radio, Play, Pause, X, Users, Calendar, Filter, Eye, Download,
-  FileSpreadsheet, List, History
+  FileSpreadsheet, List, History, FolderOpen
 } from "lucide-react";
 import { SiWhatsapp } from "react-icons/si";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -631,6 +631,7 @@ export default function AdminWhatsAppMarketing() {
   const [broadcastAction, setBroadcastAction] = useState<"draft" | "scheduled" | "immediate">("draft");
   const [broadcastScheduledDate, setBroadcastScheduledDate] = useState<string>("");
   const [broadcastScheduledTime, setBroadcastScheduledTime] = useState<string>("");
+  const [broadcastMediaSource, setBroadcastMediaSource] = useState<"upload" | "library">("upload");
 
   // Cloud API states
   const [showCloudApiDialog, setShowCloudApiDialog] = useState(false);
@@ -724,7 +725,7 @@ export default function AdminWhatsAppMarketing() {
       }
       return res.json();
     },
-    enabled: activeTab === "files"
+    enabled: activeTab === "files" || showNewBroadcastDialog
   });
 
   // Broadcast queries
@@ -3428,83 +3429,162 @@ export default function AdminWhatsAppMarketing() {
               {newBroadcast.messageType !== "text" && (
                 <div className="space-y-2">
                   <Label>Arquivo de Mídia</Label>
-                  <div className="border-2 border-dashed rounded-lg p-4">
-                    {newBroadcast.mediaUrl ? (
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-sm truncate">{newBroadcast.mediaFileName}</p>
-                          </div>
-                          <Button
-                            type="button"
-                            variant="destructive"
-                            size="icon"
-                            onClick={() => setNewBroadcast({
-                              ...newBroadcast,
-                              mediaUrl: "",
-                              mediaFileName: "",
-                              mediaMimeType: ""
-                            })}
-                            data-testid="button-remove-broadcast-media"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                  {newBroadcast.mediaUrl ? (
+                    <div className="border-2 border-dashed rounded-lg p-4 space-y-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate">{newBroadcast.mediaFileName}</p>
                         </div>
-                        {newBroadcast.messageType === "audio" && (
-                          <audio controls className="w-full h-10" src={newBroadcast.mediaUrl}>
-                            Seu navegador não suporta o elemento de áudio.
-                          </audio>
-                        )}
-                        {newBroadcast.messageType === "image" && (
-                          <img 
-                            src={newBroadcast.mediaUrl} 
-                            alt="Preview" 
-                            className="max-h-32 rounded-lg object-contain mx-auto"
-                          />
-                        )}
-                        {newBroadcast.messageType === "video" && (
-                          <video controls className="w-full max-h-32 rounded-lg" src={newBroadcast.mediaUrl}>
-                            Seu navegador não suporta o elemento de vídeo.
-                          </video>
-                        )}
-                        {newBroadcast.messageType === "document" && (
-                          <div className="flex items-center gap-2 p-2 bg-muted rounded">
-                            <FileText className="w-5 h-5 text-muted-foreground" />
-                            <span className="text-sm text-muted-foreground">Documento pronto para envio</span>
-                          </div>
-                        )}
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="icon"
+                          onClick={() => setNewBroadcast({
+                            ...newBroadcast,
+                            mediaUrl: "",
+                            mediaFileName: "",
+                            mediaMimeType: ""
+                          })}
+                          data-testid="button-remove-broadcast-media"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
                       </div>
-                    ) : (
-                      <label className="cursor-pointer block">
-                        <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                          <Upload className="w-8 h-8" />
-                          <span className="text-sm">Clique para enviar</span>
-                          <span className="text-xs">
-                            {MEDIA_LIMITS[newBroadcast.messageType as keyof typeof MEDIA_LIMITS]?.extensions || ""}
-                            {" - Máx: "}
-                            {MEDIA_LIMITS[newBroadcast.messageType as keyof typeof MEDIA_LIMITS]?.label || ""}
-                          </span>
-                        </div>
-                        <input
-                          type="file"
-                          className="hidden"
-                          accept={MEDIA_LIMITS[newBroadcast.messageType as keyof typeof MEDIA_LIMITS]?.formats.join(",")}
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) handleBroadcastMediaUpload(file);
-                          }}
-                          disabled={uploadingMedia}
-                          data-testid="input-broadcast-media-upload"
+                      {newBroadcast.messageType === "audio" && (
+                        <audio controls className="w-full h-10" src={newBroadcast.mediaUrl}>
+                          Seu navegador não suporta o elemento de áudio.
+                        </audio>
+                      )}
+                      {newBroadcast.messageType === "image" && (
+                        <img 
+                          src={newBroadcast.mediaUrl} 
+                          alt="Preview" 
+                          className="max-h-32 rounded-lg object-contain mx-auto"
                         />
-                        {uploadingMedia && (
-                          <div className="flex items-center gap-2 mt-2 justify-center">
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            <span className="text-sm">Enviando...</span>
-                          </div>
-                        )}
-                      </label>
-                    )}
-                  </div>
+                      )}
+                      {newBroadcast.messageType === "video" && (
+                        <video controls className="w-full max-h-32 rounded-lg" src={newBroadcast.mediaUrl}>
+                          Seu navegador não suporta o elemento de vídeo.
+                        </video>
+                      )}
+                      {newBroadcast.messageType === "document" && (
+                        <div className="flex items-center gap-2 p-2 bg-muted rounded">
+                          <FileText className="w-5 h-5 text-muted-foreground" />
+                          <span className="text-sm text-muted-foreground">Documento pronto para envio</span>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <Tabs value={broadcastMediaSource} onValueChange={(v) => setBroadcastMediaSource(v as "upload" | "library")}>
+                      <TabsList className="grid w-full grid-cols-2">
+                        <TabsTrigger value="upload" className="gap-2" data-testid="tab-media-upload">
+                          <Upload className="w-4 h-4" />
+                          Enviar Arquivo
+                        </TabsTrigger>
+                        <TabsTrigger value="library" className="gap-2" data-testid="tab-media-library">
+                          <FolderOpen className="w-4 h-4" />
+                          Meus Arquivos
+                        </TabsTrigger>
+                      </TabsList>
+                      <TabsContent value="upload" className="mt-3">
+                        <div className="border-2 border-dashed rounded-lg p-4">
+                          <label className="cursor-pointer block">
+                            <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                              <Upload className="w-8 h-8" />
+                              <span className="text-sm">Clique para enviar</span>
+                              <span className="text-xs">
+                                {MEDIA_LIMITS[newBroadcast.messageType as keyof typeof MEDIA_LIMITS]?.extensions || ""}
+                                {" - Máx: "}
+                                {MEDIA_LIMITS[newBroadcast.messageType as keyof typeof MEDIA_LIMITS]?.label || ""}
+                              </span>
+                            </div>
+                            <input
+                              type="file"
+                              className="hidden"
+                              accept={MEDIA_LIMITS[newBroadcast.messageType as keyof typeof MEDIA_LIMITS]?.formats.join(",")}
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) handleBroadcastMediaUpload(file);
+                              }}
+                              disabled={uploadingMedia}
+                              data-testid="input-broadcast-media-upload"
+                            />
+                            {uploadingMedia && (
+                              <div className="flex items-center gap-2 mt-2 justify-center">
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <span className="text-sm">Enviando...</span>
+                              </div>
+                            )}
+                          </label>
+                        </div>
+                      </TabsContent>
+                      <TabsContent value="library" className="mt-3">
+                        <div className="border rounded-lg max-h-48 overflow-y-auto">
+                          {loadingMediaFiles ? (
+                            <div className="flex items-center justify-center py-8">
+                              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                            </div>
+                          ) : (() => {
+                            const filteredFiles = mediaFiles?.filter(f => f.mediaType === newBroadcast.messageType) || [];
+                            if (filteredFiles.length === 0) {
+                              return (
+                                <div className="text-center py-6 text-muted-foreground">
+                                  <FolderOpen className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                                  <p className="text-sm">Nenhum arquivo de {newBroadcast.messageType === "audio" ? "áudio" : newBroadcast.messageType === "image" ? "imagem" : newBroadcast.messageType === "video" ? "vídeo" : "documento"} encontrado</p>
+                                  <p className="text-xs mt-1">Envie um arquivo ou acesse "Meus Arquivos"</p>
+                                </div>
+                              );
+                            }
+                            return (
+                              <div className="divide-y">
+                                {filteredFiles.map((file) => (
+                                  <button
+                                    key={file.id}
+                                    type="button"
+                                    className="w-full flex items-center gap-3 p-3 hover-elevate text-left"
+                                    onClick={() => {
+                                      setNewBroadcast({
+                                        ...newBroadcast,
+                                        mediaUrl: file.publicUrl,
+                                        mediaFileName: file.fileName,
+                                        mediaMimeType: file.mimeType
+                                      });
+                                    }}
+                                    data-testid={`button-select-file-${file.id}`}
+                                  >
+                                    {file.mediaType === "image" && (
+                                      <img src={file.publicUrl} alt={file.fileName} className="w-10 h-10 object-cover rounded" />
+                                    )}
+                                    {file.mediaType === "audio" && (
+                                      <div className="w-10 h-10 bg-muted rounded flex items-center justify-center">
+                                        <FileAudio className="w-5 h-5 text-muted-foreground" />
+                                      </div>
+                                    )}
+                                    {file.mediaType === "video" && (
+                                      <div className="w-10 h-10 bg-muted rounded flex items-center justify-center">
+                                        <FileVideo className="w-5 h-5 text-muted-foreground" />
+                                      </div>
+                                    )}
+                                    {file.mediaType === "document" && (
+                                      <div className="w-10 h-10 bg-muted rounded flex items-center justify-center">
+                                        <FileText className="w-5 h-5 text-muted-foreground" />
+                                      </div>
+                                    )}
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-sm font-medium truncate">{file.fileName}</p>
+                                      <p className="text-xs text-muted-foreground">
+                                        {(file.sizeBytes / 1024).toFixed(0)} KB
+                                      </p>
+                                    </div>
+                                  </button>
+                                ))}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      </TabsContent>
+                    </Tabs>
+                  )}
                 </div>
               )}
 
