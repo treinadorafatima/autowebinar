@@ -445,7 +445,20 @@ export function registerWhatsAppRoutes(app: Express) {
       }
 
       const accounts = await storage.listWhatsappAccountsByAdmin(admin.id);
-      res.json(accounts);
+      
+      // Enrich with real-time status (not stale DB status)
+      const enrichedAccounts = await Promise.all(
+        accounts.map(async (account) => {
+          const realStatus = await getWhatsAppStatus(account.id);
+          return {
+            ...account,
+            status: realStatus.status,
+            phoneNumber: realStatus.phoneNumber || account.phoneNumber,
+          };
+        })
+      );
+      
+      res.json(enrichedAccounts);
     } catch (error: any) {
       console.error("[whatsapp-api] Error listing accounts:", error);
       res.status(500).json({ error: error.message });
@@ -463,7 +476,20 @@ export function registerWhatsAppRoutes(app: Express) {
       const accounts = await storage.listWhatsappAccountsByAdmin(admin.id);
       // Filter only marketing accounts - must have scope explicitly set to 'marketing'
       const marketingAccounts = accounts.filter(a => a.scope === "marketing");
-      res.json(marketingAccounts);
+      
+      // Enrich with real-time status (not stale DB status)
+      const enrichedAccounts = await Promise.all(
+        marketingAccounts.map(async (account) => {
+          const realStatus = await getWhatsAppStatus(account.id);
+          return {
+            ...account,
+            status: realStatus.status,
+            phoneNumber: realStatus.phoneNumber || account.phoneNumber,
+          };
+        })
+      );
+      
+      res.json(enrichedAccounts);
     } catch (error: any) {
       console.error("[whatsapp-api] Error listing marketing accounts:", error);
       res.status(500).json({ error: error.message });
