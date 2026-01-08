@@ -616,6 +616,7 @@ export default function AdminWhatsAppMarketing() {
   const [testPhone, setTestPhone] = useState("");
   const [testMessage, setTestMessage] = useState("");
   const [showMergeTagsInfo, setShowMergeTagsInfo] = useState(false);
+  const [sequenceMediaSource, setSequenceMediaSource] = useState<"upload" | "library">("upload");
 
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   const [showNewAccountDialog, setShowNewAccountDialog] = useState(false);
@@ -3000,86 +3001,163 @@ export default function AdminWhatsAppMarketing() {
 
               {newSequence.messageType !== "text" && (
                 <div className="space-y-2">
-                  <Label>Upload de Mídia</Label>
-                  <div className="border-2 border-dashed rounded-lg p-4">
-                    {newSequence.mediaUrl ? (
-                      <div className="space-y-3">
+                  <Label>Arquivo de Mídia</Label>
+                  {newSequence.mediaUrl ? (
+                    <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                      <div className="relative flex-shrink-0">
                         {newSequence.messageType === "image" && (
-                          <div className="flex justify-center">
-                            <img 
-                              src={newSequence.mediaUrl} 
-                              alt="Prévia" 
-                              className="max-h-48 rounded-lg object-contain border"
-                            />
-                          </div>
+                          <img 
+                            src={newSequence.mediaUrl} 
+                            alt="Preview" 
+                            className="w-14 h-14 rounded-lg object-cover"
+                          />
                         )}
                         {newSequence.messageType === "video" && (
-                          <div className="flex justify-center">
+                          <div className="w-14 h-14 rounded-lg bg-muted overflow-hidden relative">
                             <video 
-                              src={newSequence.mediaUrl}
-                              className="max-h-48 rounded-lg border"
-                              controls
+                              src={newSequence.mediaUrl} 
+                              className="w-full h-full object-cover"
                             />
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                              <Play className="w-5 h-5 text-white" />
+                            </div>
                           </div>
                         )}
                         {newSequence.messageType === "audio" && (
-                          <div className="flex justify-center">
-                            <audio 
-                              src={newSequence.mediaUrl}
-                              controls
-                              className="w-full max-w-md"
-                            />
+                          <div className="w-14 h-14 rounded-lg bg-muted flex items-center justify-center">
+                            <Mic className="w-6 h-6 text-muted-foreground" />
                           </div>
                         )}
-                        <div className="flex items-center justify-between bg-muted p-3 rounded-lg">
-                          <div className="flex items-center gap-2">
-                            <Check className="w-4 h-4 text-green-500" />
-                            <span className="text-sm font-medium">{newSequence.mediaFileName}</span>
+                        {newSequence.messageType === "document" && (
+                          <div className="w-14 h-14 rounded-lg bg-muted flex items-center justify-center">
+                            <FileText className="w-6 h-6 text-muted-foreground" />
                           </div>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setNewSequence({
-                              ...newSequence,
-                              mediaUrl: "",
-                              mediaFileName: "",
-                              mediaMimeType: ""
-                            })}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
+                        )}
                       </div>
-                    ) : (
-                      <label className="flex flex-col items-center gap-2 cursor-pointer">
-                        <Upload className="w-8 h-8 text-muted-foreground" />
-                        <span className="text-sm text-muted-foreground">
-                          Clique para enviar {MESSAGE_TYPES.find(t => t.value === newSequence.messageType)?.label.toLowerCase()}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {MEDIA_LIMITS[newSequence.messageType as keyof typeof MEDIA_LIMITS]?.extensions} (máx {MEDIA_LIMITS[newSequence.messageType as keyof typeof MEDIA_LIMITS]?.label})
-                        </span>
-                        <input
-                          type="file"
-                          className="hidden"
-                          accept={MEDIA_LIMITS[newSequence.messageType as keyof typeof MEDIA_LIMITS]?.formats.join(",")}
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) handleMediaUpload(file, false);
-                          }}
-                          disabled={uploadingMedia}
-                          data-testid="input-media-upload"
-                        />
-                        {uploadingMedia && (
-                          <div className="flex items-center gap-2 mt-2">
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            <span className="text-sm">Enviando...</span>
-                          </div>
-                        )}
-                      </label>
-                    )}
-                  </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{newSequence.mediaFileName}</p>
+                        <p className="text-xs text-muted-foreground capitalize">{newSequence.messageType}</p>
+                      </div>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="flex-shrink-0 h-8 w-8 text-muted-foreground hover:text-destructive"
+                        onClick={() => setNewSequence({
+                          ...newSequence,
+                          mediaUrl: "",
+                          mediaFileName: "",
+                          mediaMimeType: ""
+                        })}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <Tabs value={sequenceMediaSource} onValueChange={(v) => setSequenceMediaSource(v as "upload" | "library")}>
+                      <TabsList className="grid w-full grid-cols-2">
+                        <TabsTrigger value="upload" className="gap-2">
+                          <Upload className="w-4 h-4" />
+                          Enviar Arquivo
+                        </TabsTrigger>
+                        <TabsTrigger value="library" className="gap-2">
+                          <FolderOpen className="w-4 h-4" />
+                          Meus Arquivos
+                        </TabsTrigger>
+                      </TabsList>
+                      <TabsContent value="upload" className="mt-3">
+                        <div className="border-2 border-dashed rounded-lg p-4">
+                          <label className="flex flex-col items-center gap-2 cursor-pointer">
+                            <Upload className="w-8 h-8 text-muted-foreground" />
+                            <span className="text-sm text-muted-foreground">
+                              Clique para enviar {MESSAGE_TYPES.find(t => t.value === newSequence.messageType)?.label.toLowerCase()}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {MEDIA_LIMITS[newSequence.messageType as keyof typeof MEDIA_LIMITS]?.extensions} (máx {MEDIA_LIMITS[newSequence.messageType as keyof typeof MEDIA_LIMITS]?.label})
+                            </span>
+                            <input
+                              type="file"
+                              className="hidden"
+                              accept={MEDIA_LIMITS[newSequence.messageType as keyof typeof MEDIA_LIMITS]?.formats.join(",")}
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) handleMediaUpload(file, false);
+                              }}
+                              disabled={uploadingMedia}
+                              data-testid="input-media-upload"
+                            />
+                            {uploadingMedia && (
+                              <div className="flex items-center gap-2 mt-2">
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <span className="text-sm">Enviando...</span>
+                              </div>
+                            )}
+                          </label>
+                        </div>
+                      </TabsContent>
+                      <TabsContent value="library" className="mt-3">
+                        <div className="border rounded-lg max-h-48 overflow-y-auto">
+                          {loadingMediaFiles ? (
+                            <div className="flex items-center justify-center py-8">
+                              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                            </div>
+                          ) : (() => {
+                            const filteredFiles = mediaFiles?.filter(f => f.mediaType === newSequence.messageType) || [];
+                            if (filteredFiles.length === 0) {
+                              return (
+                                <div className="text-center py-6 text-muted-foreground">
+                                  <FolderOpen className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                                  <p className="text-sm">Nenhum arquivo de {newSequence.messageType === "audio" ? "áudio" : newSequence.messageType === "image" ? "imagem" : newSequence.messageType === "video" ? "vídeo" : "documento"} encontrado</p>
+                                </div>
+                              );
+                            }
+                            return (
+                              <div className="grid grid-cols-4 gap-2 p-2">
+                                {filteredFiles.map((file) => (
+                                  <button
+                                    key={file.id}
+                                    type="button"
+                                    className="aspect-square rounded-lg overflow-hidden hover-elevate border-2 border-transparent hover:border-primary"
+                                    onClick={() => {
+                                      setNewSequence(prev => ({
+                                        ...prev,
+                                        mediaUrl: file.publicUrl,
+                                        mediaFileName: file.fileName,
+                                        mediaMimeType: file.mimeType
+                                      }));
+                                    }}
+                                    title={file.fileName}
+                                  >
+                                    {file.mediaType === "image" && (
+                                      <img src={file.publicUrl} alt={file.fileName} className="w-full h-full object-cover" />
+                                    )}
+                                    {file.mediaType === "audio" && (
+                                      <div className="w-full h-full bg-muted flex items-center justify-center">
+                                        <FileAudio className="w-6 h-6 text-muted-foreground" />
+                                      </div>
+                                    )}
+                                    {file.mediaType === "video" && (
+                                      <div className="w-full h-full bg-muted relative">
+                                        <video src={file.publicUrl} className="w-full h-full object-cover" />
+                                        <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                                          <Play className="w-6 h-6 text-white" />
+                                        </div>
+                                      </div>
+                                    )}
+                                    {file.mediaType === "document" && (
+                                      <div className="w-full h-full bg-muted flex items-center justify-center">
+                                        <FileText className="w-6 h-6 text-muted-foreground" />
+                                      </div>
+                                    )}
+                                  </button>
+                                ))}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      </TabsContent>
+                    </Tabs>
+                  )}
                 </div>
               )}
 
@@ -3280,86 +3358,163 @@ export default function AdminWhatsAppMarketing() {
 
                 {editingSequence.messageType !== "text" && (
                   <div className="space-y-2">
-                    <Label>Upload de Mídia</Label>
-                    <div className="border-2 border-dashed rounded-lg p-4">
-                      {editingSequence.mediaUrl ? (
-                        <div className="space-y-3">
+                    <Label>Arquivo de Mídia</Label>
+                    {editingSequence.mediaUrl ? (
+                      <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                        <div className="relative flex-shrink-0">
                           {editingSequence.messageType === "image" && (
-                            <div className="flex justify-center">
-                              <img 
-                                src={editingSequence.mediaUrl} 
-                                alt="Prévia" 
-                                className="max-h-48 rounded-lg object-contain border"
-                              />
-                            </div>
+                            <img 
+                              src={editingSequence.mediaUrl} 
+                              alt="Preview" 
+                              className="w-14 h-14 rounded-lg object-cover"
+                            />
                           )}
                           {editingSequence.messageType === "video" && (
-                            <div className="flex justify-center">
+                            <div className="w-14 h-14 rounded-lg bg-muted overflow-hidden relative">
                               <video 
-                                src={editingSequence.mediaUrl}
-                                className="max-h-48 rounded-lg border"
-                                controls
+                                src={editingSequence.mediaUrl} 
+                                className="w-full h-full object-cover"
                               />
+                              <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                                <Play className="w-5 h-5 text-white" />
+                              </div>
                             </div>
                           )}
                           {editingSequence.messageType === "audio" && (
-                            <div className="flex justify-center">
-                              <audio 
-                                src={editingSequence.mediaUrl}
-                                controls
-                                className="w-full max-w-md"
-                              />
+                            <div className="w-14 h-14 rounded-lg bg-muted flex items-center justify-center">
+                              <Mic className="w-6 h-6 text-muted-foreground" />
                             </div>
                           )}
-                          <div className="flex items-center justify-between bg-muted p-3 rounded-lg">
-                            <div className="flex items-center gap-2">
-                              <Check className="w-4 h-4 text-green-500" />
-                              <span className="text-sm font-medium">{editingSequence.mediaFileName || "Arquivo enviado"}</span>
+                          {editingSequence.messageType === "document" && (
+                            <div className="w-14 h-14 rounded-lg bg-muted flex items-center justify-center">
+                              <FileText className="w-6 h-6 text-muted-foreground" />
                             </div>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setEditingSequence({
-                                ...editingSequence,
-                                mediaUrl: null,
-                                mediaFileName: null,
-                                mediaMimeType: null
-                              })}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
+                          )}
                         </div>
-                      ) : (
-                        <label className="flex flex-col items-center gap-2 cursor-pointer">
-                          <Upload className="w-8 h-8 text-muted-foreground" />
-                          <span className="text-sm text-muted-foreground">
-                            Clique para enviar {MESSAGE_TYPES.find(t => t.value === editingSequence.messageType)?.label.toLowerCase()}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            {MEDIA_LIMITS[editingSequence.messageType as keyof typeof MEDIA_LIMITS]?.extensions} (máx {MEDIA_LIMITS[editingSequence.messageType as keyof typeof MEDIA_LIMITS]?.label})
-                          </span>
-                          <input
-                            type="file"
-                            className="hidden"
-                            accept={MEDIA_LIMITS[editingSequence.messageType as keyof typeof MEDIA_LIMITS]?.formats.join(",")}
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) handleMediaUpload(file, true);
-                            }}
-                            disabled={uploadingMedia}
-                            data-testid="input-edit-media-upload"
-                          />
-                          {uploadingMedia && (
-                            <div className="flex items-center gap-2 mt-2">
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                              <span className="text-sm">Enviando...</span>
-                            </div>
-                          )}
-                        </label>
-                      )}
-                    </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{editingSequence.mediaFileName || "Arquivo"}</p>
+                          <p className="text-xs text-muted-foreground capitalize">{editingSequence.messageType}</p>
+                        </div>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="flex-shrink-0 h-8 w-8 text-muted-foreground hover:text-destructive"
+                          onClick={() => setEditingSequence({
+                            ...editingSequence,
+                            mediaUrl: null,
+                            mediaFileName: null,
+                            mediaMimeType: null
+                          })}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <Tabs value={sequenceMediaSource} onValueChange={(v) => setSequenceMediaSource(v as "upload" | "library")}>
+                        <TabsList className="grid w-full grid-cols-2">
+                          <TabsTrigger value="upload" className="gap-2">
+                            <Upload className="w-4 h-4" />
+                            Enviar Arquivo
+                          </TabsTrigger>
+                          <TabsTrigger value="library" className="gap-2">
+                            <FolderOpen className="w-4 h-4" />
+                            Meus Arquivos
+                          </TabsTrigger>
+                        </TabsList>
+                        <TabsContent value="upload" className="mt-3">
+                          <div className="border-2 border-dashed rounded-lg p-4">
+                            <label className="flex flex-col items-center gap-2 cursor-pointer">
+                              <Upload className="w-8 h-8 text-muted-foreground" />
+                              <span className="text-sm text-muted-foreground">
+                                Clique para enviar {MESSAGE_TYPES.find(t => t.value === editingSequence.messageType)?.label.toLowerCase()}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                {MEDIA_LIMITS[editingSequence.messageType as keyof typeof MEDIA_LIMITS]?.extensions} (máx {MEDIA_LIMITS[editingSequence.messageType as keyof typeof MEDIA_LIMITS]?.label})
+                              </span>
+                              <input
+                                type="file"
+                                className="hidden"
+                                accept={MEDIA_LIMITS[editingSequence.messageType as keyof typeof MEDIA_LIMITS]?.formats.join(",")}
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) handleMediaUpload(file, true);
+                                }}
+                                disabled={uploadingMedia}
+                                data-testid="input-edit-media-upload"
+                              />
+                              {uploadingMedia && (
+                                <div className="flex items-center gap-2 mt-2">
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                  <span className="text-sm">Enviando...</span>
+                                </div>
+                              )}
+                            </label>
+                          </div>
+                        </TabsContent>
+                        <TabsContent value="library" className="mt-3">
+                          <div className="border rounded-lg max-h-48 overflow-y-auto">
+                            {loadingMediaFiles ? (
+                              <div className="flex items-center justify-center py-8">
+                                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                              </div>
+                            ) : (() => {
+                              const filteredFiles = mediaFiles?.filter(f => f.mediaType === editingSequence.messageType) || [];
+                              if (filteredFiles.length === 0) {
+                                return (
+                                  <div className="text-center py-6 text-muted-foreground">
+                                    <FolderOpen className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                                    <p className="text-sm">Nenhum arquivo encontrado</p>
+                                  </div>
+                                );
+                              }
+                              return (
+                                <div className="grid grid-cols-4 gap-2 p-2">
+                                  {filteredFiles.map((file) => (
+                                    <button
+                                      key={file.id}
+                                      type="button"
+                                      className="aspect-square rounded-lg overflow-hidden hover-elevate border-2 border-transparent hover:border-primary"
+                                      onClick={() => {
+                                        setEditingSequence(prev => prev ? ({
+                                          ...prev,
+                                          mediaUrl: file.publicUrl,
+                                          mediaFileName: file.fileName,
+                                          mediaMimeType: file.mimeType
+                                        }) : null);
+                                      }}
+                                      title={file.fileName}
+                                    >
+                                      {file.mediaType === "image" && (
+                                        <img src={file.publicUrl} alt={file.fileName} className="w-full h-full object-cover" />
+                                      )}
+                                      {file.mediaType === "audio" && (
+                                        <div className="w-full h-full bg-muted flex items-center justify-center">
+                                          <FileAudio className="w-6 h-6 text-muted-foreground" />
+                                        </div>
+                                      )}
+                                      {file.mediaType === "video" && (
+                                        <div className="w-full h-full bg-muted relative">
+                                          <video src={file.publicUrl} className="w-full h-full object-cover" />
+                                          <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                                            <Play className="w-6 h-6 text-white" />
+                                          </div>
+                                        </div>
+                                      )}
+                                      {file.mediaType === "document" && (
+                                        <div className="w-full h-full bg-muted flex items-center justify-center">
+                                          <FileText className="w-6 h-6 text-muted-foreground" />
+                                        </div>
+                                      )}
+                                    </button>
+                                  ))}
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        </TabsContent>
+                      </Tabs>
+                    )}
                   </div>
                 )}
 
