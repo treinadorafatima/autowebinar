@@ -398,8 +398,17 @@ export function registerWhatsAppRoutes(app: Express) {
         return res.status(errorCode || 401).json({ error: error || "Não autenticado" });
       }
 
+      const scope = req.query.scope as string | undefined;
       const isSuperadmin = admin.role === "superadmin";
-      const existingAccounts = await storage.listWhatsappAccountsByAdmin(admin.id);
+      let existingAccounts = await storage.listWhatsappAccountsByAdmin(admin.id);
+      
+      // Filter by scope if specified
+      if (scope === "marketing") {
+        existingAccounts = existingAccounts.filter(a => a.scope === "marketing");
+      } else if (scope === "notifications") {
+        existingAccounts = existingAccounts.filter(a => a.scope === "notifications");
+      }
+      
       let accountLimit = 2; // Limite padrão (Essencial)
       let planName = "Essencial";
       

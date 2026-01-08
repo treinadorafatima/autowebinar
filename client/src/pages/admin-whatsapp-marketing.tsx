@@ -653,21 +653,19 @@ export default function AdminWhatsAppMarketing() {
   }
 
   const { data: accountLimit } = useQuery<AccountLimitInfo>({
-    queryKey: ["/api/whatsapp/accounts/limit"],
+    queryKey: ["/api/whatsapp/accounts/limit", "marketing"],
     queryFn: async () => {
-      const res = await fetch("/api/whatsapp/accounts/limit", {
+      const res = await fetch("/api/whatsapp/accounts/limit?scope=marketing", {
         headers: { Authorization: `Bearer ${localStorage.getItem("adminToken")}` }
       });
       return res.json();
     },
   });
 
-  const { data: allAccounts, isLoading: loadingAccounts } = useQuery<WhatsAppAccount[]>({
-    queryKey: ["/api/whatsapp/accounts"],
+  // Use marketing-only endpoint to get only marketing accounts
+  const { data: accounts, isLoading: loadingAccounts } = useQuery<WhatsAppAccount[]>({
+    queryKey: ["/api/whatsapp/accounts/marketing"],
   });
-
-  // Filter out notification system accounts - they should only appear in the notifications page
-  const accounts = allAccounts?.filter(acc => !acc.label.toLowerCase().includes("notificaç") && !acc.label.toLowerCase().includes("notificac"));
 
   useEffect(() => {
     if (accounts && accounts.length > 0 && !selectedAccountId) {
@@ -791,7 +789,7 @@ export default function AdminWhatsAppMarketing() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/status"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/accounts/marketing"] });
     },
     onError: (error: any) => {
       toast({ title: "Erro", description: error.message, variant: "destructive" });
@@ -806,7 +804,7 @@ export default function AdminWhatsAppMarketing() {
     onSuccess: () => {
       toast({ title: "Desconectado do WhatsApp" });
       queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/status"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/accounts/marketing"] });
     },
     onError: (error: any) => {
       toast({ title: "Erro", description: error.message, variant: "destructive" });
@@ -824,8 +822,8 @@ export default function AdminWhatsAppMarketing() {
     },
     onSuccess: () => {
       toast({ title: "Conta WhatsApp criada com sucesso" });
-      queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/accounts"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/accounts/limit"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/accounts/marketing"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/accounts/limit", "marketing"] });
       setShowNewAccountDialog(false);
       setNewAccount({ label: "", dailyLimit: 100, priority: 0 });
     },
@@ -841,7 +839,7 @@ export default function AdminWhatsAppMarketing() {
     },
     onSuccess: () => {
       toast({ title: "Conta atualizada com sucesso" });
-      queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/accounts/marketing"] });
       setEditingAccount(null);
     },
     onError: (error: any) => {
@@ -856,8 +854,8 @@ export default function AdminWhatsAppMarketing() {
     },
     onSuccess: () => {
       toast({ title: "Conta excluída com sucesso" });
-      queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/accounts"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/accounts/limit"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/accounts/marketing"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/accounts/limit", "marketing"] });
       if (selectedAccountId && accounts) {
         const remaining = accounts.filter(a => a.id !== selectedAccountId);
         setSelectedAccountId(remaining.length > 0 ? remaining[0].id : null);
@@ -879,7 +877,7 @@ export default function AdminWhatsAppMarketing() {
     },
     onSuccess: () => {
       toast({ title: "Cloud API configurada com sucesso" });
-      queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/accounts/marketing"] });
       setShowCloudApiDialog(false);
       setCloudApiConfig({ accessToken: "", phoneNumberId: "", businessAccountId: "", webhookVerifyToken: "", apiVersion: "v20.0" });
       setCloudApiValidation(null);
@@ -900,7 +898,7 @@ export default function AdminWhatsAppMarketing() {
     },
     onSuccess: (_, variables) => {
       toast({ title: `Alterado para ${variables.provider === "cloud_api" ? "Cloud API (Meta)" : "Baileys (QR Code)"}` });
-      queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/accounts/marketing"] });
       queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/status"] });
     },
     onError: (error: any) => {
