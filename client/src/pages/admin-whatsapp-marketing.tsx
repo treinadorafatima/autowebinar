@@ -3483,48 +3483,68 @@ export default function AdminWhatsAppMarketing() {
                 <div className="space-y-2">
                   <Label>Arquivo de Mídia</Label>
                   {newBroadcast.mediaUrl ? (
-                    <div className="border-2 border-dashed rounded-lg p-4 space-y-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm truncate">{newBroadcast.mediaFileName}</p>
+                    <div className="border-2 border-dashed rounded-lg p-4">
+                      <div className="flex items-start gap-3">
+                        {/* Preview thumbnail on the left */}
+                        <div className="flex-shrink-0">
+                          {newBroadcast.messageType === "image" && (
+                            <img 
+                              src={newBroadcast.mediaUrl} 
+                              alt="Preview" 
+                              className="w-20 h-20 rounded-lg object-cover"
+                            />
+                          )}
+                          {newBroadcast.messageType === "video" && (
+                            <div className="w-20 h-20 rounded-lg bg-muted flex items-center justify-center">
+                              <Video className="w-8 h-8 text-muted-foreground" />
+                            </div>
+                          )}
+                          {newBroadcast.messageType === "audio" && (
+                            <div className="w-20 h-20 rounded-lg bg-muted flex items-center justify-center">
+                              <Mic className="w-8 h-8 text-muted-foreground" />
+                            </div>
+                          )}
+                          {newBroadcast.messageType === "document" && (
+                            <div className="w-20 h-20 rounded-lg bg-muted flex items-center justify-center">
+                              <FileText className="w-8 h-8 text-muted-foreground" />
+                            </div>
+                          )}
                         </div>
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          size="icon"
-                          onClick={() => setNewBroadcast({
-                            ...newBroadcast,
-                            mediaUrl: "",
-                            mediaFileName: "",
-                            mediaMimeType: ""
-                          })}
-                          data-testid="button-remove-broadcast-media"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                        
+                        {/* File info and remove button */}
+                        <div className="flex-1 min-w-0 flex flex-col gap-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="font-medium text-sm break-all line-clamp-2">{newBroadcast.mediaFileName}</p>
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              size="icon"
+                              className="flex-shrink-0"
+                              onClick={() => setNewBroadcast({
+                                ...newBroadcast,
+                                mediaUrl: "",
+                                mediaFileName: "",
+                                mediaMimeType: ""
+                              })}
+                              data-testid="button-remove-broadcast-media"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                          <p className="text-xs text-muted-foreground">{newBroadcast.mediaMimeType}</p>
+                        </div>
                       </div>
+                      
+                      {/* Audio/Video player below */}
                       {newBroadcast.messageType === "audio" && (
-                        <audio controls className="w-full h-10" src={newBroadcast.mediaUrl}>
+                        <audio controls className="w-full h-10 mt-3" src={newBroadcast.mediaUrl}>
                           Seu navegador não suporta o elemento de áudio.
                         </audio>
                       )}
-                      {newBroadcast.messageType === "image" && (
-                        <img 
-                          src={newBroadcast.mediaUrl} 
-                          alt="Preview" 
-                          className="max-h-32 rounded-lg object-contain mx-auto"
-                        />
-                      )}
                       {newBroadcast.messageType === "video" && (
-                        <video controls className="w-full max-h-32 rounded-lg" src={newBroadcast.mediaUrl}>
+                        <video controls className="w-full max-h-32 rounded-lg mt-3" src={newBroadcast.mediaUrl}>
                           Seu navegador não suporta o elemento de vídeo.
                         </video>
-                      )}
-                      {newBroadcast.messageType === "document" && (
-                        <div className="flex items-center gap-2 p-2 bg-muted rounded">
-                          <FileText className="w-5 h-5 text-muted-foreground" />
-                          <span className="text-sm text-muted-foreground">Documento pronto para envio</span>
-                        </div>
                       )}
                     </div>
                   ) : (

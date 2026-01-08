@@ -1441,10 +1441,28 @@ export async function sendWhatsAppMediaMessage(
     
     switch (media.type) {
       case "image":
+        // Normalize image mimetypes to WhatsApp-compatible formats
+        let imageMimetype = media.mimetype || "image/jpeg";
+        const imageUrlLower = media.url.toLowerCase();
+        const imageMimetypeLower = imageMimetype.toLowerCase();
+        
+        // Auto-detect and normalize from URL extension if mimetype seems wrong
+        if (imageUrlLower.includes('.png') || imageMimetypeLower.includes('png')) {
+          imageMimetype = "image/png";
+        } else if (imageUrlLower.includes('.gif') || imageMimetypeLower.includes('gif')) {
+          imageMimetype = "image/gif";
+        } else if (imageUrlLower.includes('.webp') || imageMimetypeLower.includes('webp')) {
+          imageMimetype = "image/webp";
+        } else if (imageUrlLower.includes('.jpg') || imageUrlLower.includes('.jpeg') || imageMimetypeLower.includes('jpeg') || imageMimetypeLower.includes('jpg')) {
+          imageMimetype = "image/jpeg";
+        }
+        
+        console.log(`[whatsapp] Sending image: mimetype=${imageMimetype}, originalMimetype=${media.mimetype}, bufferSize=${buffer.length}`);
+        
         messageContent = {
           image: buffer,
           caption: media.caption || undefined,
-          mimetype: media.mimetype || "image/jpeg",
+          mimetype: imageMimetype,
         };
         break;
         
