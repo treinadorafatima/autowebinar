@@ -659,6 +659,10 @@ export default function AdminWhatsAppMarketing() {
   // Media file rename states
   const [renamingFileId, setRenamingFileId] = useState<string | null>(null);
   const [renameFileName, setRenameFileName] = useState("");
+  
+  // Media playback states
+  const [playingMediaId, setPlayingMediaId] = useState<string | null>(null);
+  const mediaRefs = useRef<Record<string, HTMLAudioElement | HTMLVideoElement | null>>({});
 
   // Cloud API states
   const [showCloudApiDialog, setShowCloudApiDialog] = useState(false);
@@ -2589,10 +2593,84 @@ export default function AdminWhatsAppMarketing() {
                                 className="w-full h-full object-cover"
                               />
                             ) : file.mediaType === "video" ? (
-                              <video 
-                                src={file.publicUrl}
-                                className="w-full h-full object-cover"
-                              />
+                              <div className="w-full h-full relative">
+                                <video 
+                                  ref={(el) => { mediaRefs.current[file.id] = el; }}
+                                  src={file.publicUrl}
+                                  className="w-full h-full object-cover"
+                                  onEnded={() => setPlayingMediaId(null)}
+                                  onPause={() => playingMediaId === file.id && setPlayingMediaId(null)}
+                                />
+                                {playingMediaId !== file.id && (
+                                  <button
+                                    className="absolute inset-0 flex items-center justify-center bg-black/30 hover:bg-black/40 transition-colors"
+                                    onClick={() => {
+                                      const video = mediaRefs.current[file.id] as HTMLVideoElement;
+                                      if (video) {
+                                        video.play();
+                                        setPlayingMediaId(file.id);
+                                      }
+                                    }}
+                                    data-testid={`button-play-video-${file.id}`}
+                                  >
+                                    <div className="w-12 h-12 rounded-full bg-white/90 flex items-center justify-center">
+                                      <Play className="w-6 h-6 text-black ml-1" />
+                                    </div>
+                                  </button>
+                                )}
+                                {playingMediaId === file.id && (
+                                  <button
+                                    className="absolute bottom-2 right-2 p-2 rounded-full bg-black/50 hover:bg-black/70 transition-colors"
+                                    onClick={() => {
+                                      const video = mediaRefs.current[file.id] as HTMLVideoElement;
+                                      if (video) {
+                                        video.pause();
+                                        setPlayingMediaId(null);
+                                      }
+                                    }}
+                                    data-testid={`button-pause-video-${file.id}`}
+                                  >
+                                    <Pause className="w-4 h-4 text-white" />
+                                  </button>
+                                )}
+                              </div>
+                            ) : file.mediaType === "audio" ? (
+                              <div className="w-full h-full flex flex-col items-center justify-center gap-2 p-2">
+                                <audio 
+                                  ref={(el) => { mediaRefs.current[file.id] = el; }}
+                                  src={file.publicUrl}
+                                  onEnded={() => setPlayingMediaId(null)}
+                                  onPause={() => playingMediaId === file.id && setPlayingMediaId(null)}
+                                  className="hidden"
+                                />
+                                <MediaIcon className="w-8 h-8 text-muted-foreground" />
+                                <button
+                                  className="w-10 h-10 rounded-full bg-primary hover:bg-primary/90 flex items-center justify-center transition-colors"
+                                  onClick={() => {
+                                    const audio = mediaRefs.current[file.id] as HTMLAudioElement;
+                                    if (audio) {
+                                      if (playingMediaId === file.id) {
+                                        audio.pause();
+                                        setPlayingMediaId(null);
+                                      } else {
+                                        // Pause any other playing media
+                                        if (playingMediaId && mediaRefs.current[playingMediaId]) {
+                                          (mediaRefs.current[playingMediaId] as HTMLMediaElement).pause();
+                                        }
+                                        audio.play();
+                                        setPlayingMediaId(file.id);
+                                      }
+                                    }
+                                  }}
+                                  data-testid={`button-play-audio-${file.id}`}
+                                >
+                                  {playingMediaId === file.id ? (
+                                    <Pause className="w-5 h-5 text-primary-foreground" />
+                                  ) : (
+                                    <Play className="w-5 h-5 text-primary-foreground ml-0.5" />
+                                  )}
+                                </button>
+                              </div>
                             ) : (
                               <div className="w-full h-full flex items-center justify-center">
                                 <MediaIcon className="w-10 h-10 text-muted-foreground" />
@@ -2602,8 +2680,8 @@ export default function AdminWhatsAppMarketing() {
                               {file.mediaType}
                             </Badge>
                             
-                            {/* Hover overlay with actions */}
-                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
+                            {/* Hover overlay with actions - hide when video is playing */}
+                            <div className={`absolute inset-0 bg-black/60 transition-opacity flex items-center justify-center gap-1 ${playingMediaId === file.id ? 'opacity-0 pointer-events-none' : 'opacity-0 group-hover:opacity-100'}`}>
                               <Button
                                 size="icon"
                                 variant="ghost"
