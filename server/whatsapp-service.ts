@@ -1449,10 +1449,32 @@ export async function sendWhatsAppMediaMessage(
         break;
         
       case "audio":
+        // Determine correct mimetype for the audio
+        let audioMimetype = media.mimetype || "audio/ogg; codecs=opus";
+        const urlLower = media.url.toLowerCase();
+        
+        // Auto-detect mimetype from URL extension if not provided
+        if (!media.mimetype) {
+          if (urlLower.includes('.mp3')) {
+            audioMimetype = "audio/mpeg";
+          } else if (urlLower.includes('.wav')) {
+            audioMimetype = "audio/wav";
+          } else if (urlLower.includes('.m4a')) {
+            audioMimetype = "audio/mp4";
+          } else if (urlLower.includes('.ogg')) {
+            audioMimetype = "audio/ogg; codecs=opus";
+          }
+        }
+        
+        // For PTT (voice note), WhatsApp prefers ogg/opus but accepts other formats
+        const isPtt = media.ptt !== undefined ? media.ptt : true;
+        
+        console.log(`[whatsapp] Sending audio: mimetype=${audioMimetype}, ptt=${isPtt}, url=${media.url.substring(0, 50)}...`);
+        
         messageContent = {
           audio: buffer,
-          mimetype: media.mimetype || "audio/ogg; codecs=opus",
-          ptt: media.ptt !== undefined ? media.ptt : true, // Default to voice note
+          mimetype: audioMimetype,
+          ptt: isPtt,
         };
         break;
         
