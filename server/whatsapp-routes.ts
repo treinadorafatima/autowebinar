@@ -1042,8 +1042,12 @@ export function registerWhatsAppRoutes(app: Express) {
         scheduledAt, // ISO string for scheduled broadcasts
       } = req.body;
 
-      if (!name || !messageText) {
-        return res.status(400).json({ error: "name e messageText são obrigatórios" });
+      if (!name) {
+        return res.status(400).json({ error: "name é obrigatório" });
+      }
+      // messageText is only required for text type, optional for media types (caption)
+      if (messageType === 'text' && !messageText) {
+        return res.status(400).json({ error: "messageText é obrigatório para mensagens de texto" });
       }
 
       // Validate action and scheduledAt
