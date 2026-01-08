@@ -127,6 +127,24 @@ interface WhatsappContact {
   createdAt: string;
 }
 
+interface BroadcastRecipient {
+  id: string;
+  broadcastId: string;
+  leadId: string | null;
+  contactId: string | null;
+  phone: string;
+  name: string | null;
+  email: string | null;
+  sessionDate: string | null;
+  accountId: string | null;
+  status: string;
+  attempts: number;
+  lastAttemptAt: string | null;
+  sentAt: string | null;
+  errorMessage: string | null;
+  createdAt: string;
+}
+
 const PHASES = [
   { value: "pre", label: "Pré-Webinar", description: "Antes do evento começar" },
   { value: "during", label: "Durante", description: "Durante o webinar" },
@@ -633,6 +651,11 @@ export default function AdminWhatsAppMarketing() {
   const [broadcastScheduledTime, setBroadcastScheduledTime] = useState<string>("");
   const [broadcastMediaSource, setBroadcastMediaSource] = useState<"upload" | "library">("upload");
 
+  // Broadcast details modal states
+  const [showBroadcastDetailsDialog, setShowBroadcastDetailsDialog] = useState(false);
+  const [selectedBroadcastId, setSelectedBroadcastId] = useState<string | null>(null);
+  const [detailsStatusFilter, setDetailsStatusFilter] = useState<string>("all");
+
   // Cloud API states
   const [showCloudApiDialog, setShowCloudApiDialog] = useState(false);
   const [cloudApiConfig, setCloudApiConfig] = useState({
@@ -755,6 +778,20 @@ export default function AdminWhatsAppMarketing() {
   const { data: broadcastContactLists } = useQuery<WhatsappContactList[]>({
     queryKey: ["/api/whatsapp/contact-lists"],
     enabled: activeTab === "broadcasts",
+  });
+
+  // Query for broadcast recipients (details view)
+  const { data: broadcastRecipients, isLoading: loadingRecipients } = useQuery<BroadcastRecipient[]>({
+    queryKey: ["/api/whatsapp/broadcasts", selectedBroadcastId, "recipients"],
+    queryFn: async () => {
+      if (!selectedBroadcastId) return [];
+      const res = await fetch(`/api/whatsapp/broadcasts/${selectedBroadcastId}/recipients`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("adminToken")}` }
+      });
+      return res.json();
+    },
+    enabled: !!selectedBroadcastId && showBroadcastDetailsDialog,
+    refetchInterval: showBroadcastDetailsDialog ? 3000 : false,
   });
 
   useEffect(() => {
@@ -2413,6 +2450,21 @@ export default function AdminWhatsAppMarketing() {
                               </p>
                             </div>
                           )}
+                          <div className="mt-3 flex justify-end">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setSelectedBroadcastId(broadcast.id);
+                                setDetailsStatusFilter("all");
+                                setShowBroadcastDetailsDialog(true);
+                              }}
+                              data-testid={`button-details-${broadcast.id}`}
+                            >
+                              <Eye className="w-3 h-3 mr-1" />
+                              Ver Detalhes
+                            </Button>
+                          </div>
                         </CardContent>
                       </Card>
                     ))}
@@ -3970,6 +4022,128 @@ export default function AdminWhatsAppMarketing() {
               >
                 {configureCloudApiMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                 Salvar e Ativar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Broadcast Details Modal */}
+        <Dialog open={showBroadcastDetailsDialog} onOpenChange={setShowBroadcastDetailsDialog}>
+          <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Eye className="w-5 h-5" />
+                Detalhes do Envio
+              </DialogTitle>
+              <DialogDescription>
+                Visualize o status de envio para cada destinatário
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="flex items-center gap-4 py-2">
+              <Label>Filtrar por status:</Label>
+              <Select value={detailsStatusFilter} onValueChange={setDetailsStatusFilter}>
+                <SelectTrigger className="w-[180px]" data-testid="select-details-filter">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="pending">Pendente</SelectItem>
+                  <SelectItem value="sent">Enviado</SelectItem>
+                  <SelectItem value="failed">Falha</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              {broadcastRecipients && (
+                <div className="flex gap-4 text-sm ml-auto">
+                  <span className="text-green-500 font-medium">
+                    {broadcastRecipients.filter(r => r.status === 'sent').length} enviados
+                  </span>
+                  <span className="text-red-500 font-medium">
+                    {broadcastRecipients.filter(r => r.status === 'failed').length} falhas
+                  </span>
+                  <span className="text-muted-foreground">
+                    {broadcastRecipients.filter(r => r.status === 'pending').length} pendentes
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex-1 overflow-auto border rounded-lg">
+              {loadingRecipients ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : broadcastRecipients && broadcastRecipients.length > 0 ? (
+                <table className="w-full text-sm">
+                  <thead className="bg-muted sticky top-0">
+                    <tr>
+                      <th className="text-left p-3 font-medium">Telefone</th>
+                      <th className="text-left p-3 font-medium">Nome</th>
+                      <th className="text-left p-3 font-medium">Status</th>
+                      <th className="text-left p-3 font-medium">Conta</th>
+                      <th className="text-left p-3 font-medium">Data/Hora</th>
+                      <th className="text-left p-3 font-medium">Erro</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {broadcastRecipients
+                      .filter(r => detailsStatusFilter === "all" || r.status === detailsStatusFilter)
+                      .map((recipient) => {
+                        const account = accounts?.find(a => a.id === recipient.accountId);
+                        return (
+                          <tr key={recipient.id} className="border-t hover-elevate" data-testid={`row-recipient-${recipient.id}`}>
+                            <td className="p-3 font-mono text-xs">{recipient.phone}</td>
+                            <td className="p-3">{recipient.name || "-"}</td>
+                            <td className="p-3">
+                              {recipient.status === "sent" && (
+                                <Badge variant="default" className="bg-green-500/10 text-green-500 border-green-500/20">
+                                  <CheckCircle className="w-3 h-3 mr-1" />
+                                  Enviado
+                                </Badge>
+                              )}
+                              {recipient.status === "failed" && (
+                                <Badge variant="destructive">
+                                  <XCircle className="w-3 h-3 mr-1" />
+                                  Falha
+                                </Badge>
+                              )}
+                              {recipient.status === "pending" && (
+                                <Badge variant="outline">
+                                  <Clock className="w-3 h-3 mr-1" />
+                                  Pendente
+                                </Badge>
+                              )}
+                            </td>
+                            <td className="p-3 text-xs">
+                              {account ? account.label : (recipient.accountId ? recipient.accountId.substring(0, 8) : "-")}
+                            </td>
+                            <td className="p-3 text-xs text-muted-foreground">
+                              {recipient.sentAt 
+                                ? new Date(recipient.sentAt).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })
+                                : recipient.lastAttemptAt 
+                                  ? new Date(recipient.lastAttemptAt).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })
+                                  : "-"}
+                            </td>
+                            <td className="p-3 text-xs text-red-500 max-w-[200px] truncate" title={recipient.errorMessage || undefined}>
+                              {recipient.errorMessage || "-"}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <p>Nenhum destinatário encontrado</p>
+                </div>
+              )}
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowBroadcastDetailsDialog(false)}>
+                Fechar
               </Button>
             </DialogFooter>
           </DialogContent>
