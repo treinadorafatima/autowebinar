@@ -120,7 +120,8 @@ export async function isWhatsAppNotificationServiceAvailable(): Promise<boolean>
     const superadminId = await getSuperadminId();
     if (!superadminId) return false;
     
-    const accounts = await storage.getAvailableWhatsappAccountsForRotation(superadminId);
+    // Check only NOTIFICATIONS accounts - marketing accounts should not be used for notifications
+    const accounts = await storage.getAvailableWhatsappAccountsForRotation(superadminId, 'notifications');
     return accounts.length > 0;
   } catch (error) {
     console.error("[whatsapp-notifications] Erro ao verificar disponibilidade:", error);
@@ -140,9 +141,10 @@ async function selectAccountForSending(): Promise<{ accountId: string; label: st
       return null;
     }
     
-    const accounts = await storage.getAvailableWhatsappAccountsForRotation(superadminId);
+    // Only use NOTIFICATIONS accounts for automated notifications - never use marketing accounts
+    const accounts = await storage.getAvailableWhatsappAccountsForRotation(superadminId, 'notifications');
     if (accounts.length === 0) {
-      console.log("[whatsapp-notifications] Nenhuma conta WhatsApp conectada");
+      console.log("[whatsapp-notifications] Nenhuma conta de NOTIFICAÇÕES conectada (scope='notifications')");
       return null;
     }
     
@@ -820,16 +822,18 @@ export async function getNotificationStatus(): Promise<{
     }
     
     const allAccounts = await storage.listWhatsappAccountsByAdmin(superadminId);
-    const connectedAccounts = await storage.getAvailableWhatsappAccountsForRotation(superadminId);
+    // Filter to show only NOTIFICATIONS accounts (scope='notifications')
+    const notificationsAccounts = allAccounts.filter(a => a.scope === 'notifications');
+    const connectedAccounts = await storage.getAvailableWhatsappAccountsForRotation(superadminId, 'notifications');
     
     if (connectedAccounts.length === 0) {
       return {
-        configured: allAccounts.length > 0,
-        accountId: allAccounts.length > 0 ? allAccounts[0].id : null,
-        status: allAccounts.length > 0 ? "disconnected" : "not_configured",
+        configured: notificationsAccounts.length > 0,
+        accountId: notificationsAccounts.length > 0 ? notificationsAccounts[0].id : null,
+        status: notificationsAccounts.length > 0 ? "disconnected" : "not_configured",
         enabled,
         connectedAccounts: 0,
-        totalAccounts: allAccounts.length,
+        totalAccounts: notificationsAccounts.length,
       };
     }
     
@@ -843,7 +847,7 @@ export async function getNotificationStatus(): Promise<{
       phoneNumber: firstConnected.phoneNumber || undefined,
       enabled,
       connectedAccounts: connectedAccounts.length,
-      totalAccounts: allAccounts.length,
+      totalAccounts: notificationsAccounts.length,
     };
   } catch (error) {
     console.error("[whatsapp-notifications] Erro ao obter status:", error);

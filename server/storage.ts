@@ -257,7 +257,7 @@ export interface IStorage {
   updateWhatsappAccount(id: string, data: Partial<WhatsappAccountInsert>): Promise<WhatsappAccount | undefined>;
   deleteWhatsappAccount(id: string): Promise<void>;
   getNextAvailableWhatsappAccount(adminId: string): Promise<WhatsappAccount | undefined>;
-  getAvailableWhatsappAccountsForRotation(adminId: string): Promise<WhatsappAccount[]>;
+  getAvailableWhatsappAccountsForRotation(adminId: string, scope?: 'marketing' | 'notifications'): Promise<WhatsappAccount[]>;
   incrementWhatsappAccountMessageCount(accountId: string): Promise<void>;
   // WhatsApp Marketing - Sessions
   getWhatsappSession(adminId: string): Promise<WhatsappSession | undefined>;
@@ -3673,18 +3673,25 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
     return accounts[0];
   }
   
-  async getAvailableWhatsappAccountsForRotation(adminId: string): Promise<WhatsappAccount[]> {
+  async getAvailableWhatsappAccountsForRotation(adminId: string, scope?: 'marketing' | 'notifications'): Promise<WhatsappAccount[]> {
     // Get today's date in YYYY-MM-DD format for counter reset check
     const today = new Date().toISOString().split('T')[0];
     const now = new Date();
     const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
     
     // Find connected accounts ordered by priority (higher first), then by messages sent this hour (fewer first)
+    // Filter by scope if specified (notifications should ONLY use notifications accounts, marketing should ONLY use marketing accounts)
+    const conditions = [
+      eq(whatsappAccounts.adminId, adminId),
+      eq(whatsappAccounts.status, "connected")
+    ];
+    
+    if (scope) {
+      conditions.push(eq(whatsappAccounts.scope, scope));
+    }
+    
     const accounts = await db.select().from(whatsappAccounts)
-      .where(and(
-        eq(whatsappAccounts.adminId, adminId),
-        eq(whatsappAccounts.status, "connected")
-      ))
+      .where(and(...conditions))
       .orderBy(desc(whatsappAccounts.priority), whatsappAccounts.messagesSentThisHour);
     
     // Process each account to ensure counters are reset if needed

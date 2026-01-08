@@ -1400,7 +1400,9 @@ export async function startBroadcastOrchestrator(broadcastId: string, adminId: s
     const marketingAccounts = allAccounts.filter(acc => acc.scope === 'marketing');
     
     if (marketingAccounts.length === 0) {
-      console.log(`[broadcast] No marketing accounts configured for admin ${adminId}`);
+      console.log(`[broadcast] ERROR: No marketing accounts configured for admin ${adminId}`);
+      console.log(`[broadcast] All accounts: ${allAccounts.map(a => `${a.label}(${a.scope})`).join(', ')}`);
+      // Use 'paused' for recoverable errors - user can add/configure marketing accounts
       await storage.updateWhatsappBroadcast(broadcastId, { 
         status: 'paused' 
       });
@@ -1431,13 +1433,18 @@ export async function startBroadcastOrchestrator(broadcastId: string, adminId: s
     }
 
     if (connectedAccounts.length === 0) {
-      console.log(`[broadcast] No accounts with capacity for ${broadcastId}`);
+      console.log(`[broadcast] ERROR: No connected marketing accounts for ${broadcastId}`);
+      console.log(`[broadcast] Marketing accounts: ${marketingAccounts.map(a => `${a.label}(id=${a.id.slice(0,8)})`).join(', ')}`);
+      // Use 'paused' for recoverable errors - user can connect marketing accounts
       await storage.updateWhatsappBroadcast(broadcastId, { 
         status: 'paused' 
       });
       activeBroadcasts.delete(broadcastId);
       return;
     }
+    
+    console.log(`[broadcast] Using ${connectedAccounts.length} connected marketing account(s): ${connectedAccounts.map(a => `${a.label}(id=${a.id.slice(0,8)}, scope=${a.scope})`).join(', ')}`);
+
 
     // Sort by priority (lower = higher priority) then by remaining capacity
     connectedAccounts.sort((a, b) => {
@@ -1520,8 +1527,10 @@ export async function startBroadcastOrchestrator(broadcastId: string, adminId: s
             .replace(/\{\{name\}\}/gi, recipient.name || 'Hi')
             .replace(/\{name\}/gi, recipient.name || 'Hi');
           
+          let sendResult: { success: boolean; error?: string };
+          
           if (broadcast.messageType === 'text') {
-            await sendWhatsAppMessage(selectedAccount.id, recipient.phone, messageText);
+            sendResult = await sendWhatsAppMessage(selectedAccount.id, recipient.phone, messageText);
           } else if (broadcast.mediaUrl) {
             const mediaMessage: MediaMessage = {
               type: broadcast.messageType as 'image' | 'audio' | 'video' | 'document',
@@ -1531,7 +1540,14 @@ export async function startBroadcastOrchestrator(broadcastId: string, adminId: s
               mimetype: broadcast.mediaMimeType || undefined,
               ptt: broadcast.messageType === 'audio' && broadcast.sendAsVoiceNote === true,
             };
-            await sendWhatsAppMediaMessage(selectedAccount.id, recipient.phone, mediaMessage);
+            sendResult = await sendWhatsAppMediaMessage(selectedAccount.id, recipient.phone, mediaMessage);
+          } else {
+            sendResult = { success: false, error: 'Tipo de mensagem inválido' };
+          }
+          
+          // Check if message was actually sent successfully
+          if (!sendResult.success) {
+            throw new Error(sendResult.error || 'Falha ao enviar mensagem');
           }
 
           await storage.updateWhatsappBroadcastRecipient(recipient.id, {
@@ -1551,7 +1567,7 @@ export async function startBroadcastOrchestrator(broadcastId: string, adminId: s
           selectedAccount.remaining--;
           await storage.incrementWhatsappAccountMessageCount(selectedAccount.id);
 
-          console.log(`[broadcast] Sent to ${recipient.phone} via ${selectedAccount.label || selectedAccount.id}`);
+          console.log(`[broadcast] Sent to ${recipient.phone} via ${selectedAccount.label}(id=${selectedAccount.id.slice(0,8)}, scope=${selectedAccount.scope})`);
         } catch (err: any) {
           console.error(`[broadcast] Failed to send to ${recipient.phone}:`, err.message);
           
