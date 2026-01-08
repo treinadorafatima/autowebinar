@@ -757,7 +757,7 @@ export default function AdminWhatsAppMarketing() {
       }
       return res.json();
     },
-    enabled: activeTab === "files" || showNewBroadcastDialog
+    enabled: activeTab === "files" || showNewBroadcastDialog || showNewSequenceDialog || !!editingSequence
   });
 
   // Broadcast queries
