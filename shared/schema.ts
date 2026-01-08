@@ -955,6 +955,8 @@ export const whatsappBroadcasts = pgTable("whatsapp_broadcasts", {
   mediaFileName: text("media_file_name"),
   mediaMimeType: text("media_mime_type"),
   sendAsVoiceNote: boolean("send_as_voice_note").notNull().default(false),
+  delaySeconds: integer("delay_seconds").notNull().default(5),
+  delayVariationPercent: integer("delay_variation_percent").notNull().default(30),
   filterType: text("filter_type").notNull().default("all"),
   filterDateStart: text("filter_date_start"),
   filterDateEnd: text("filter_date_end"),

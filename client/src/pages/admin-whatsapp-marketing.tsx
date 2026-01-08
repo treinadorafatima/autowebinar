@@ -644,6 +644,8 @@ export default function AdminWhatsAppMarketing() {
     mediaFileName: "",
     mediaMimeType: "",
     sendAsVoiceNote: false,
+    delaySeconds: 5,
+    delayVariationPercent: 30,
   });
   const [previewLeads, setPreviewLeads] = useState<BroadcastPreview | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
@@ -1116,7 +1118,7 @@ export default function AdminWhatsAppMarketing() {
       toast({ title: actionMessages[broadcastAction] || "Envio criado" });
       queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/broadcasts"] });
       setShowNewBroadcastDialog(false);
-      setNewBroadcast({ name: "", messageText: "", messageType: "text", mediaUrl: "", mediaFileName: "", mediaMimeType: "", sendAsVoiceNote: false });
+      setNewBroadcast({ name: "", messageText: "", messageType: "text", mediaUrl: "", mediaFileName: "", mediaMimeType: "", sendAsVoiceNote: false, delaySeconds: 5, delayVariationPercent: 30 });
       setPreviewLeads(null);
       setBroadcastAction("draft");
       setBroadcastScheduledDate("");
@@ -3993,6 +3995,49 @@ export default function AdminWhatsAppMarketing() {
                   </p>
                 </div>
               )}
+
+              <div className="space-y-3 pt-2 border-t">
+                <Label className="flex items-center gap-2">
+                  <Clock className="w-4 h-4" />
+                  Intervalo entre Envios
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Adicione atraso entre cada mensagem para evitar bloqueios. A variação cria intervalos aleatórios.
+                </p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-sm">Delay Base (segundos)</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={300}
+                      value={newBroadcast.delaySeconds}
+                      onChange={(e) => setNewBroadcast({ ...newBroadcast, delaySeconds: Math.max(1, parseInt(e.target.value) || 5) })}
+                      data-testid="input-delay-seconds"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm">Variação (%)</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={newBroadcast.delayVariationPercent}
+                      onChange={(e) => setNewBroadcast({ ...newBroadcast, delayVariationPercent: Math.min(100, Math.max(0, parseInt(e.target.value) || 0)) })}
+                      data-testid="input-delay-variation"
+                    />
+                  </div>
+                </div>
+                <div className="text-xs text-muted-foreground bg-muted/30 p-2 rounded">
+                  {(() => {
+                    const base = newBroadcast.delaySeconds;
+                    const variation = newBroadcast.delayVariationPercent / 100;
+                    const min = Math.round(base * (1 - variation));
+                    const max = Math.round(base * (1 + variation));
+                    return `Intervalo: ${min}s a ${max}s entre cada mensagem`;
+                  })()}
+                </div>
+              </div>
 
               <div className="space-y-3 pt-2 border-t">
                 <Label>Ação</Label>
