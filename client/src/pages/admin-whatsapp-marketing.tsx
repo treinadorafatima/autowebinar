@@ -3483,68 +3483,61 @@ export default function AdminWhatsAppMarketing() {
                 <div className="space-y-2">
                   <Label>Arquivo de Mídia</Label>
                   {newBroadcast.mediaUrl ? (
-                    <div className="border-2 border-dashed rounded-lg p-4">
-                      <div className="flex items-start gap-3">
-                        {/* Preview thumbnail on the left */}
-                        <div className="flex-shrink-0">
-                          {newBroadcast.messageType === "image" && (
-                            <img 
-                              src={newBroadcast.mediaUrl} 
-                              alt="Preview" 
-                              className="w-20 h-20 rounded-lg object-cover"
-                            />
-                          )}
-                          {newBroadcast.messageType === "video" && (
-                            <div className="w-20 h-20 rounded-lg bg-muted flex items-center justify-center">
-                              <Video className="w-8 h-8 text-muted-foreground" />
-                            </div>
-                          )}
-                          {newBroadcast.messageType === "audio" && (
-                            <div className="w-20 h-20 rounded-lg bg-muted flex items-center justify-center">
-                              <Mic className="w-8 h-8 text-muted-foreground" />
-                            </div>
-                          )}
-                          {newBroadcast.messageType === "document" && (
-                            <div className="w-20 h-20 rounded-lg bg-muted flex items-center justify-center">
-                              <FileText className="w-8 h-8 text-muted-foreground" />
-                            </div>
-                          )}
-                        </div>
-                        
-                        {/* File info and remove button */}
-                        <div className="flex-1 min-w-0 flex flex-col gap-2">
-                          <div className="flex items-start justify-between gap-2">
-                            <p className="font-medium text-sm break-all line-clamp-2">{newBroadcast.mediaFileName}</p>
-                            <Button
-                              type="button"
-                              variant="destructive"
-                              size="icon"
-                              className="flex-shrink-0"
-                              onClick={() => setNewBroadcast({
-                                ...newBroadcast,
-                                mediaUrl: "",
-                                mediaFileName: "",
-                                mediaMimeType: ""
-                              })}
-                              data-testid="button-remove-broadcast-media"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
+                    <div className="border rounded-lg p-3 bg-muted/30">
+                      <div className="flex items-center gap-3">
+                        {/* Thumbnail */}
+                        {newBroadcast.messageType === "image" && (
+                          <img 
+                            src={newBroadcast.mediaUrl} 
+                            alt="Preview" 
+                            className="w-12 h-12 rounded object-cover flex-shrink-0"
+                          />
+                        )}
+                        {newBroadcast.messageType === "video" && (
+                          <div className="w-12 h-12 rounded bg-muted flex items-center justify-center flex-shrink-0">
+                            <Video className="w-6 h-6 text-muted-foreground" />
                           </div>
+                        )}
+                        {newBroadcast.messageType === "audio" && (
+                          <div className="w-12 h-12 rounded bg-muted flex items-center justify-center flex-shrink-0">
+                            <Mic className="w-6 h-6 text-muted-foreground" />
+                          </div>
+                        )}
+                        {newBroadcast.messageType === "document" && (
+                          <div className="w-12 h-12 rounded bg-muted flex items-center justify-center flex-shrink-0">
+                            <FileText className="w-6 h-6 text-muted-foreground" />
+                          </div>
+                        )}
+                        
+                        {/* File info */}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{newBroadcast.mediaFileName}</p>
                           <p className="text-xs text-muted-foreground">{newBroadcast.mediaMimeType}</p>
                         </div>
+                        
+                        {/* Remove button */}
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="flex-shrink-0 text-destructive hover:text-destructive"
+                          onClick={() => setNewBroadcast({
+                            ...newBroadcast,
+                            mediaUrl: "",
+                            mediaFileName: "",
+                            mediaMimeType: ""
+                          })}
+                          data-testid="button-remove-broadcast-media"
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
                       </div>
                       
-                      {/* Audio/Video player below */}
+                      {/* Audio player */}
                       {newBroadcast.messageType === "audio" && (
-                        <audio controls className="w-full h-10 mt-3" src={newBroadcast.mediaUrl}>
+                        <audio controls className="w-full h-8 mt-2" src={newBroadcast.mediaUrl}>
                           Seu navegador não suporta o elemento de áudio.
                         </audio>
-                      )}
-                      {newBroadcast.messageType === "video" && (
-                        <video controls className="w-full max-h-32 rounded-lg mt-3" src={newBroadcast.mediaUrl}>
-                          Seu navegador não suporta o elemento de vídeo.
-                        </video>
                       )}
                     </div>
                   ) : (
