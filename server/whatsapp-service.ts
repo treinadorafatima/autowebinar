@@ -928,8 +928,19 @@ export async function getWhatsAppStatus(accountId: string): Promise<{
     };
   }
 
+  // No active in-memory connection - check DB session for persistent data
+  // but do NOT trust DB status as "connected" if there's no active socket
   const session = await storage.getWhatsappSessionByAccountId(accountId);
   if (session) {
+    // If DB says connected but there's no socket in memory, return disconnected
+    // The session data is stale - actual connection doesn't exist
+    if (session.status === 'connected') {
+      console.log(`[whatsapp] Session ${accountId} says connected in DB but no active socket - returning disconnected`);
+      return {
+        status: "disconnected",
+        phoneNumber: session.phoneNumber || undefined,
+      };
+    }
     return {
       status: session.status,
       qrCode: session.qrCode || undefined,
