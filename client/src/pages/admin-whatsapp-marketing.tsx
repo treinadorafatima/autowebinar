@@ -3585,12 +3585,12 @@ export default function AdminWhatsAppMarketing() {
                               );
                             }
                             return (
-                              <div className="divide-y">
+                              <div className="grid grid-cols-4 gap-2 p-2">
                                 {filteredFiles.map((file) => (
                                   <button
                                     key={file.id}
                                     type="button"
-                                    className="w-full flex items-center gap-3 p-3 hover-elevate text-left"
+                                    className="aspect-square rounded-lg overflow-hidden hover-elevate border-2 border-transparent hover:border-primary"
                                     onClick={() => {
                                       setNewBroadcast(prev => ({
                                         ...prev,
@@ -3599,32 +3599,27 @@ export default function AdminWhatsAppMarketing() {
                                         mediaMimeType: file.mimeType
                                       }));
                                     }}
+                                    title={file.fileName}
                                     data-testid={`button-select-file-${file.id}`}
                                   >
                                     {file.mediaType === "image" && (
-                                      <img src={file.publicUrl} alt={file.fileName} className="w-10 h-10 object-cover rounded" />
+                                      <img src={file.publicUrl} alt={file.fileName} className="w-full h-full object-cover" />
                                     )}
                                     {file.mediaType === "audio" && (
-                                      <div className="w-10 h-10 bg-muted rounded flex items-center justify-center">
-                                        <FileAudio className="w-5 h-5 text-muted-foreground" />
+                                      <div className="w-full h-full bg-muted flex items-center justify-center">
+                                        <FileAudio className="w-6 h-6 text-muted-foreground" />
                                       </div>
                                     )}
                                     {file.mediaType === "video" && (
-                                      <div className="w-10 h-10 bg-muted rounded flex items-center justify-center">
-                                        <FileVideo className="w-5 h-5 text-muted-foreground" />
+                                      <div className="w-full h-full bg-muted flex items-center justify-center">
+                                        <FileVideo className="w-6 h-6 text-muted-foreground" />
                                       </div>
                                     )}
                                     {file.mediaType === "document" && (
-                                      <div className="w-10 h-10 bg-muted rounded flex items-center justify-center">
-                                        <FileText className="w-5 h-5 text-muted-foreground" />
+                                      <div className="w-full h-full bg-muted flex items-center justify-center">
+                                        <FileText className="w-6 h-6 text-muted-foreground" />
                                       </div>
                                     )}
-                                    <div className="flex-1 min-w-0">
-                                      <p className="text-sm font-medium truncate">{file.fileName}</p>
-                                      <p className="text-xs text-muted-foreground">
-                                        {(file.sizeBytes / 1024).toFixed(0)} KB
-                                      </p>
-                                    </div>
                                   </button>
                                 ))}
                               </div>
