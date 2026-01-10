@@ -6164,6 +6164,8 @@ Apos o pagamento, seu acesso sera renovado automaticamente!
       escalationMessage: data.escalationMessage ?? "Vou transferir você para um atendente humano.",
       calendarEnabled: data.calendarEnabled ?? false,
       adminCalendarId: data.adminCalendarId ?? null,
+      calendarDuration: data.calendarDuration ?? 60,
+      calendarInstructions: data.calendarInstructions ?? null,
       mediaImageResponse: data.mediaImageResponse ?? "Desculpe, não consigo processar imagens no momento. Por favor, descreva em texto o que você precisa.",
       mediaAudioResponse: data.mediaAudioResponse ?? "Desculpe, não consigo processar áudios no momento. Por favor, digite sua mensagem.",
       mediaDocumentResponse: data.mediaDocumentResponse ?? "Desculpe, não consigo ler documentos no momento. Por favor, copie e cole o conteúdo em texto.",
