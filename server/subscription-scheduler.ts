@@ -1385,17 +1385,20 @@ async function processScheduledBroadcasts(): Promise<void> {
         
         // Check if there are connected WhatsApp accounts for this admin
         const accounts = await storage.listWhatsappAccountsByAdmin(broadcast.adminId);
-        if (!accounts || accounts.length === 0) {
-          console.log(`[broadcast-scheduler] No WhatsApp accounts for admin ${broadcast.adminId}, skipping broadcast ${broadcast.id}`);
+        const connectedAccounts = accounts?.filter(a => a.status === 'connected') || [];
+        
+        if (connectedAccounts.length === 0) {
+          // Keep as scheduled/pending so it can be retried when accounts become available
+          console.log(`[broadcast-scheduler] No connected WhatsApp accounts for admin ${broadcast.adminId}, keeping broadcast ${broadcast.id} in queue for retry`);
           continue;
         }
         
-        // Update status to sending
+        // Update status to sending (required for orchestrator to process)
         await db
           .update(whatsappBroadcasts)
           .set({ 
             status: 'sending',
-            startedAt: new Date(),
+            startedAt: broadcast.startedAt || new Date(),
             updatedAt: new Date()
           })
           .where(eq(whatsappBroadcasts.id, broadcast.id));
@@ -1407,14 +1410,18 @@ async function processScheduledBroadcasts(): Promise<void> {
       } catch (error) {
         console.error(`[broadcast-scheduler] Error starting broadcast ${broadcast.id}:`, error);
         
-        // Mark as paused if there was an error starting
+        // Reset to scheduled so it can be retried - don't mark as paused
+        // Clear startedAt so the broadcast is treated as not started for retries
+        // This prevents broadcasts from getting stuck in paused state
         await db
           .update(whatsappBroadcasts)
           .set({ 
-            status: 'paused',
+            status: broadcast.scheduledAt ? 'scheduled' : 'pending',
+            startedAt: null,
             updatedAt: new Date()
           })
           .where(eq(whatsappBroadcasts.id, broadcast.id));
+        console.log(`[broadcast-scheduler] Reset broadcast ${broadcast.id} to retry state after error`);
       }
     }
   } catch (error) {

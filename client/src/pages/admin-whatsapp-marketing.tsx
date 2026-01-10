@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { fromZonedTime, toZonedTime, format } from "date-fns-tz";
 import { 
   CheckCircle, XCircle, Loader2, Send, Trash2, Plus, Edit, 
   Clock, QrCode, Smartphone, Wifi, WifiOff, RefreshCcw, ArrowLeft,
@@ -1258,7 +1259,10 @@ export default function AdminWhatsAppMarketing() {
         toast({ title: "Preencha a data e hora do agendamento", variant: "destructive" });
         return;
       }
-      const scheduledDateTime = new Date(`${broadcastScheduledDate}T${broadcastScheduledTime}:00`);
+      // Create ISO string representing the time as if it were in São Paulo timezone
+      // Then convert to UTC using fromZonedTime
+      const saoPauloTimeString = `${broadcastScheduledDate}T${broadcastScheduledTime}:00`;
+      const scheduledDateTime = fromZonedTime(saoPauloTimeString, "America/Sao_Paulo");
       if (scheduledDateTime <= new Date()) {
         toast({ title: "A data/hora deve ser no futuro", variant: "destructive" });
         return;
@@ -1266,9 +1270,12 @@ export default function AdminWhatsAppMarketing() {
     }
 
     // Build scheduledAt ISO string for scheduled broadcasts
-    const scheduledAt = broadcastAction === "scheduled" 
-      ? new Date(`${broadcastScheduledDate}T${broadcastScheduledTime}:00`).toISOString()
-      : undefined;
+    // Convert from Brazil timezone (America/Sao_Paulo) to UTC
+    let scheduledAt: string | undefined;
+    if (broadcastAction === "scheduled") {
+      const saoPauloTimeString = `${broadcastScheduledDate}T${broadcastScheduledTime}:00`;
+      scheduledAt = fromZonedTime(saoPauloTimeString, "America/Sao_Paulo").toISOString();
+    }
 
     createBroadcastMutation.mutate({
       sourceType: broadcastSourceType,
@@ -4082,7 +4089,7 @@ export default function AdminWhatsAppMarketing() {
                         type="date"
                         value={broadcastScheduledDate}
                         onChange={(e) => setBroadcastScheduledDate(e.target.value)}
-                        min={new Date().toISOString().split("T")[0]}
+                        min={format(toZonedTime(new Date(), "America/Sao_Paulo"), "yyyy-MM-dd", { timeZone: "America/Sao_Paulo" })}
                         data-testid="input-scheduled-date"
                       />
                     </div>
@@ -4096,7 +4103,7 @@ export default function AdminWhatsAppMarketing() {
                       />
                     </div>
                     <p className="col-span-2 text-xs text-muted-foreground">
-                      O envio será iniciado automaticamente na data e hora selecionadas (horário de Brasília)
+                      Horário de Brasília (agora: {format(toZonedTime(new Date(), "America/Sao_Paulo"), "HH:mm", { timeZone: "America/Sao_Paulo" })})
                     </p>
                   </div>
                 )}
