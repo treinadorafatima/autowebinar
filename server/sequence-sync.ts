@@ -183,6 +183,11 @@ export async function rescheduleSequencesForWebinar(
           );
           
           if (sendAt > now) {
+            const alreadyScheduled = await storage.hasScheduledEmailForLeadSequence(leadInfo.leadId, sequence.id);
+            if (alreadyScheduled) {
+              console.log(`[sequence-sync] Skipping email sequence ${sequence.id} - already scheduled for lead ${leadInfo.leadId}`);
+              continue;
+            }
             await storage.createScheduledEmail({
               adminId: leadInfo.adminId,
               webinarId,
@@ -211,6 +216,11 @@ export async function rescheduleSequencesForWebinar(
           );
           
           if (sendAt > now) {
+            const alreadyScheduled = await storage.hasScheduledWhatsappForLeadSequence(leadInfo.leadId, sequence.id);
+            if (alreadyScheduled) {
+              console.log(`[sequence-sync] Skipping whatsapp sequence ${sequence.id} - already scheduled for lead ${leadInfo.leadId}`);
+              continue;
+            }
             await storage.createScheduledWhatsappMessage({
               adminId: leadInfo.adminId,
               webinarId,

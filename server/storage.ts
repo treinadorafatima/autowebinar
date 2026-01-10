@@ -245,6 +245,7 @@ export interface IStorage {
   deleteScheduledEmail(id: string): Promise<void>;
   cancelScheduledEmailsByWebinar(webinarId: string): Promise<number>;
   listQueuedScheduledEmailsByWebinar(webinarId: string): Promise<ScheduledEmail[]>;
+  hasScheduledEmailForLeadSequence(leadId: string, sequenceId: string): Promise<boolean>;
   // Email Marketing - Lead Form Configs
   getLeadFormConfigByWebinar(webinarId: string): Promise<LeadFormConfig | undefined>;
   createLeadFormConfig(data: LeadFormConfigInsert): Promise<LeadFormConfig>;
@@ -277,6 +278,7 @@ export interface IStorage {
   createScheduledWhatsappMessage(data: ScheduledWhatsappMessageInsert): Promise<ScheduledWhatsappMessage>;
   updateScheduledWhatsappMessage(id: string, data: Partial<ScheduledWhatsappMessageInsert>): Promise<ScheduledWhatsappMessage | undefined>;
   cancelScheduledWhatsappMessagesByWebinar(webinarId: string): Promise<number>;
+  hasScheduledWhatsappForLeadSequence(leadId: string, sequenceId: string): Promise<boolean>;
   listQueuedWhatsappMessagesByWebinar(webinarId: string): Promise<ScheduledWhatsappMessage[]>;
   // Media Files - Per-user file repository
   listMediaFilesByAdmin(adminId: string): Promise<MediaFile[]>;
@@ -3538,6 +3540,17 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
     return result.length;
   }
 
+  async hasScheduledEmailForLeadSequence(leadId: string, sequenceId: string): Promise<boolean> {
+    const result = await db.select({ count: sql<number>`count(*)` })
+      .from(scheduledEmails)
+      .where(and(
+        eq(scheduledEmails.leadId, leadId),
+        eq(scheduledEmails.sequenceId, sequenceId),
+        eq(scheduledEmails.status, 'queued')
+      ));
+    return Number(result[0]?.count || 0) > 0;
+  }
+
   // ============================================
   // EMAIL MARKETING - LEAD FORM CONFIGS
   // ============================================
@@ -3928,6 +3941,17 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
       ))
       .returning();
     return result.length;
+  }
+
+  async hasScheduledWhatsappForLeadSequence(leadId: string, sequenceId: string): Promise<boolean> {
+    const result = await db.select({ count: sql<number>`count(*)` })
+      .from(scheduledWhatsappMessages)
+      .where(and(
+        eq(scheduledWhatsappMessages.leadId, leadId),
+        eq(scheduledWhatsappMessages.sequenceId, sequenceId),
+        eq(scheduledWhatsappMessages.status, 'queued')
+      ));
+    return Number(result[0]?.count || 0) > 0;
   }
 
   async listQueuedScheduledEmailsByWebinar(webinarId: string): Promise<ScheduledEmail[]> {

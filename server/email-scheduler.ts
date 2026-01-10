@@ -204,6 +204,12 @@ export async function scheduleEmailsForLead(
         continue;
       }
 
+      const alreadyScheduled = await storage.hasScheduledEmailForLeadSequence(leadId, sequence.id);
+      if (alreadyScheduled) {
+        console.log(`[email-scheduler] Skipping sequence ${sequence.id} - already scheduled for lead ${leadId}`);
+        continue;
+      }
+
       await storage.createScheduledEmail({
         adminId,
         webinarId,
