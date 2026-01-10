@@ -583,6 +583,9 @@ async function processExpirationReminders(): Promise<void> {
   
   console.log(`[subscription-scheduler] Running expiration check at ${new Date().toISOString()}`);
   
+  // Track processed admins to prevent duplicate notifications in same run
+  const processedAdmins = new Set<string>();
+  
   try {
     // ==========================================
     // PLANOS DIÁRIOS: Verifica a cada hora
@@ -590,6 +593,12 @@ async function processExpirationReminders(): Promise<void> {
     // ==========================================
     const adminsExpiringSoon = await getAdminsExpiringInHours(6);
     for (const admin of adminsExpiringSoon) {
+      // Skip if already processed in this run
+      if (processedAdmins.has(admin.id)) {
+        console.log(`[subscription-scheduler] Skipping duplicate for ${admin.email} - already processed`);
+        continue;
+      }
+      
       const planFreq = await getPlanFrequency(admin.planoId);
       
       // Só processa se for plano diário
@@ -626,6 +635,7 @@ async function processExpirationReminders(): Promise<void> {
       );
       
       if (emailSuccess || whatsappSuccess) {
+        processedAdmins.add(admin.id);
         await markEmailSent(admin.id);
         console.log(`[subscription-scheduler] Sent daily reminder to ${admin.email} - expires in ${hoursLeft} hours (email: ${emailSuccess}, whatsapp: ${whatsappSuccess})`);
         await generateRenewalPixBoleto(admin);
@@ -635,6 +645,12 @@ async function processExpirationReminders(): Promise<void> {
     // Planos diários expirados nas últimas 6 horas
     const adminsExpiredRecently = await getAdminsExpiredInLastHours(6);
     for (const admin of adminsExpiredRecently) {
+      // Skip if already processed in this run
+      if (processedAdmins.has(admin.id)) {
+        console.log(`[subscription-scheduler] Skipping duplicate for ${admin.email} - already processed`);
+        continue;
+      }
+      
       const planFreq = await getPlanFrequency(admin.planoId);
       
       // Só processa se for plano diário
@@ -664,6 +680,7 @@ async function processExpirationReminders(): Promise<void> {
       );
       
       if (emailSuccess || whatsappSuccess) {
+        processedAdmins.add(admin.id);
         await markEmailSent(admin.id);
         console.log(`[subscription-scheduler] Sent daily expired to ${admin.email} (email: ${emailSuccess}, whatsapp: ${whatsappSuccess})`);
       }
@@ -679,6 +696,12 @@ async function processExpirationReminders(): Promise<void> {
     // Lembrete 3 dias antes (apenas planos não-diários)
     const admins3Days = await getAdminsExpiringInDays(3);
     for (const admin of admins3Days) {
+      // Skip if already processed in this run
+      if (processedAdmins.has(admin.id)) {
+        console.log(`[subscription-scheduler] Skipping duplicate for ${admin.email} - already processed`);
+        continue;
+      }
+      
       const planFreq = await getPlanFrequency(admin.planoId);
       if (isDailyPlan(planFreq)) continue; // Ignora planos diários aqui
       
@@ -711,6 +734,7 @@ async function processExpirationReminders(): Promise<void> {
       );
       
       if (emailSuccess || whatsappSuccess) {
+        processedAdmins.add(admin.id);
         await markEmailSent(admin.id);
         console.log(`[subscription-scheduler] Sent 3-day reminder to ${admin.email} (email: ${emailSuccess}, whatsapp: ${whatsappSuccess})`);
       }
@@ -719,6 +743,12 @@ async function processExpirationReminders(): Promise<void> {
     // Lembrete 1 dia antes (apenas planos não-diários)
     const admins1Day = await getAdminsExpiringInDays(1);
     for (const admin of admins1Day) {
+      // Skip if already processed in this run
+      if (processedAdmins.has(admin.id)) {
+        console.log(`[subscription-scheduler] Skipping duplicate for ${admin.email} - already processed`);
+        continue;
+      }
+      
       const planFreq = await getPlanFrequency(admin.planoId);
       if (isDailyPlan(planFreq)) continue; // Ignora planos diários aqui
       
@@ -751,6 +781,7 @@ async function processExpirationReminders(): Promise<void> {
       );
       
       if (emailSuccess || whatsappSuccess) {
+        processedAdmins.add(admin.id);
         await markEmailSent(admin.id);
         console.log(`[subscription-scheduler] Sent 1-day reminder to ${admin.email} (email: ${emailSuccess}, whatsapp: ${whatsappSuccess})`);
         await generateRenewalPixBoleto(admin);
@@ -761,6 +792,12 @@ async function processExpirationReminders(): Promise<void> {
     if (currentHour >= 8 && currentHour < 10) {
       const expiredAdmins = await getAdminsExpiredYesterday();
       for (const admin of expiredAdmins) {
+        // Skip if already processed in this run
+        if (processedAdmins.has(admin.id)) {
+          console.log(`[subscription-scheduler] Skipping duplicate for ${admin.email} - already processed`);
+          continue;
+        }
+        
         const planFreq = await getPlanFrequency(admin.planoId);
         if (isDailyPlan(planFreq)) continue; // Ignora planos diários aqui
         
@@ -788,6 +825,7 @@ async function processExpirationReminders(): Promise<void> {
         );
         
         if (emailSuccess || whatsappSuccess) {
+          processedAdmins.add(admin.id);
           await markEmailSent(admin.id);
           console.log(`[subscription-scheduler] Sent expired renewal to ${admin.email} (email: ${emailSuccess}, whatsapp: ${whatsappSuccess})`);
         }

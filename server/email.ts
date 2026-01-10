@@ -805,14 +805,14 @@ export async function sendPlanExpiredEmail(to: string, name: string, planName: s
   try {
     const { client, fromEmail } = await getResendClient();
     // Build checkout URL with user data pre-filled
-    // Para trial/teste gratuito, não incluir planId para mostrar todos os planos
-    const isTrialPlan = !planoId || planoId === 'trial' || planName.toLowerCase().includes('trial') || planName.toLowerCase().includes('teste') || planName.toLowerCase().includes('gratuito');
+    // Só mostra todos os planos se realmente não tiver planoId (null/undefined/empty/trial literal)
+    const shouldShowAllPlans = !planoId || planoId === 'trial' || planoId === '';
     const checkoutParams = new URLSearchParams();
     checkoutParams.set('email', to);
     if (name) checkoutParams.set('nome', name);
     if (telefone) checkoutParams.set('telefone', telefone);
     const queryString = checkoutParams.toString();
-    const renewUrl = isTrialPlan
+    const renewUrl = shouldShowAllPlans
       ? `${getAppUrl()}/checkout?${queryString}`
       : `${getAppUrl()}/checkout/${planoId}?${queryString}`;
     
@@ -1413,14 +1413,14 @@ export async function sendExpirationReminderEmail(to: string, name: string, plan
     const formattedDate = expirationDate.toLocaleDateString('pt-BR');
     
     // Build checkout URL with user data pre-filled
-    // Para trial/teste gratuito, não incluir planId para mostrar todos os planos
-    const isTrialPlan = !planId || planId === 'trial' || planName.toLowerCase().includes('trial') || planName.toLowerCase().includes('teste') || planName.toLowerCase().includes('gratuito');
+    // Só mostra todos os planos se realmente não tiver planoId (null/undefined/empty/trial literal)
+    const shouldShowAllPlans = !planId || planId === 'trial' || planId === '';
     const checkoutParams = new URLSearchParams();
     checkoutParams.set('email', to);
     if (name) checkoutParams.set('nome', name);
     if (telefone) checkoutParams.set('telefone', telefone);
     const queryString = checkoutParams.toString();
-    const renewUrl = isTrialPlan
+    const renewUrl = shouldShowAllPlans
       ? `${getAppUrl()}/checkout?${queryString}`
       : `${getAppUrl()}/checkout/${planId}?${queryString}`;
     
@@ -1548,14 +1548,14 @@ export async function sendExpiredRenewalEmail(to: string, name: string, planName
     const { client, fromEmail } = await getResendClient();
     
     // Build checkout URL with user data pre-filled
-    // Para trial/teste gratuito, não incluir planId para mostrar todos os planos
-    const isTrialPlan = !planId || planId === 'trial' || planName.toLowerCase().includes('trial') || planName.toLowerCase().includes('teste') || planName.toLowerCase().includes('gratuito');
+    // Só mostra todos os planos se realmente não tiver planoId (null/undefined/empty/trial literal)
+    const shouldShowAllPlans = !planId || planId === 'trial' || planId === '';
     const checkoutParams = new URLSearchParams();
     checkoutParams.set('email', to);
     if (name) checkoutParams.set('nome', name);
     if (telefone) checkoutParams.set('telefone', telefone);
     const queryString = checkoutParams.toString();
-    const renewUrl = isTrialPlan
+    const renewUrl = shouldShowAllPlans
       ? `${getAppUrl()}/checkout?${queryString}`
       : `${getAppUrl()}/checkout/${planId}?${queryString}`;
     

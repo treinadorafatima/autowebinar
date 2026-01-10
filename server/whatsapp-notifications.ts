@@ -480,8 +480,9 @@ export async function sendWhatsAppPlanExpiredSafe(
     
     // Build checkout URL with user data pre-filled
     // Para trial/teste gratuito, não incluir planId para mostrar todos os planos
-    const isTrialPlan = !planoId || planoId === 'trial' || planName.toLowerCase().includes('trial') || planName.toLowerCase().includes('teste') || planName.toLowerCase().includes('gratuito');
-    const renewUrl = getRenewUrl(isTrialPlan ? undefined : planoId, email, name, phone || undefined);
+    // Só mostra todos os planos se realmente não tiver planoId (null/undefined/empty/trial literal)
+    const shouldShowAllPlans = !planoId || planoId === 'trial' || planoId === '';
+    const renewUrl = getRenewUrl(shouldShowAllPlans ? undefined : planoId, email, name, phone || undefined);
     
     const defaultMessage = `Ola ${name}!
 
@@ -527,9 +528,9 @@ export async function sendWhatsAppPaymentFailedSafe(
 ): Promise<boolean> {
   try {
     const formattedPhone = formatPhoneNumber(phone);
-    // Para trial/teste gratuito, não incluir planId para mostrar todos os planos
-    const isTrialPlan = !planId || planId === 'trial' || planName.toLowerCase().includes('trial') || planName.toLowerCase().includes('teste') || planName.toLowerCase().includes('gratuito');
-    const paymentUrl = getPaymentUrl(isTrialPlan ? undefined : planId, email, name, phone);
+    // Só mostra todos os planos se realmente não tiver planoId (null/undefined/empty/trial literal)
+    const shouldShowAllPlans = !planId || planId === 'trial' || planId === '';
+    const paymentUrl = getPaymentUrl(shouldShowAllPlans ? undefined : planId, email, name, phone);
     
     let defaultMessage = `Ola ${name}!
 
@@ -723,9 +724,10 @@ export async function sendWhatsAppExpirationReminderSafe(
     let defaultMessage: string;
     
     // Gerar URL de renovação com dados do usuário
-    // Para trial/teste gratuito, não incluir planId para mostrar todos os planos
-    const isTrialPlan = !planId || planId === 'trial' || planName.toLowerCase().includes('trial') || planName.toLowerCase().includes('teste') || planName.toLowerCase().includes('gratuito');
-    const renewUrl = getRenewUrl(isTrialPlan ? undefined : planId, email, name, telefone || undefined);
+    // Só mostra todos os planos se realmente não tiver planoId (null/undefined/empty/trial literal)
+    // Se o usuário tem um plano vinculado, sempre mostrar apenas esse plano
+    const shouldShowAllPlans = !planId || planId === 'trial' || planId === '';
+    const renewUrl = getRenewUrl(shouldShowAllPlans ? undefined : planId, email, name, telefone || undefined);
     
     if (daysUntilExpiration === 0) {
       templateType = 'expiration_reminder_today';
