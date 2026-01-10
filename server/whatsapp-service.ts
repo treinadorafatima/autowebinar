@@ -264,6 +264,15 @@ async function handleIncomingMediaMessage(
     
     const { processMediaMessage, checkWorkingHours, checkEscalationKeywords } = await import("./ai-processor");
     
+    // Check if provider supports media processing (only OpenAI supports it)
+    if (agent.provider !== "openai") {
+      const mediaTypeName = media.type === "image" ? "imagens" : media.type === "audio" ? "áudios" : "documentos";
+      const warningMessage = `Desculpe, para que eu possa entender ${mediaTypeName}, é necessário que o administrador configure o provedor OpenAI nas configurações do agente. Por favor, envie sua mensagem em texto.`;
+      await sendWhatsAppMessage(accountId, senderPhone, warningMessage);
+      console.log(`[whatsapp-ai] Media processing not supported for provider ${agent.provider}, sent warning to ${senderPhone}`);
+      return;
+    }
+    
     if (!checkWorkingHours(agent)) {
       console.log(`[whatsapp-ai] Outside working hours for agent ${agent.id}`);
       return;
