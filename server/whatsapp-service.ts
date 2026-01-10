@@ -266,10 +266,17 @@ async function handleIncomingMediaMessage(
     
     // Check if provider supports media processing (only OpenAI supports it)
     if (agent.provider !== "openai") {
-      const mediaTypeName = media.type === "image" ? "imagens" : media.type === "audio" ? "áudios" : "documentos";
-      const warningMessage = `Desculpe, para que eu possa entender ${mediaTypeName}, é necessário que o administrador configure o provedor OpenAI nas configurações do agente. Por favor, envie sua mensagem em texto.`;
-      await sendWhatsAppMessage(accountId, senderPhone, warningMessage);
-      console.log(`[whatsapp-ai] Media processing not supported for provider ${agent.provider}, sent warning to ${senderPhone}`);
+      // Use custom response messages from agent settings
+      let responseMessage: string;
+      if (media.type === "image") {
+        responseMessage = agent.mediaImageResponse || "Desculpe, não consigo processar imagens no momento. Por favor, descreva em texto o que você precisa.";
+      } else if (media.type === "audio") {
+        responseMessage = agent.mediaAudioResponse || "Desculpe, não consigo processar áudios no momento. Por favor, digite sua mensagem.";
+      } else {
+        responseMessage = agent.mediaDocumentResponse || "Desculpe, não consigo ler documentos no momento. Por favor, copie e cole o conteúdo em texto.";
+      }
+      await sendWhatsAppMessage(accountId, senderPhone, responseMessage);
+      console.log(`[whatsapp-ai] Media processing not supported for provider ${agent.provider}, sent custom response to ${senderPhone}`);
       return;
     }
     

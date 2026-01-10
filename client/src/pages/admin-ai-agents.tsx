@@ -17,7 +17,7 @@ import {
   TestTube, Send, MessageSquare, Settings, Clock,
   Key, Cpu, AlertTriangle, CheckCircle, Info, FileText, Upload, File,
   ChevronRight, ChevronLeft, Sparkles, Brain, Zap, Calendar, Link2, Copy, CheckCheck, RefreshCw,
-  Image, User
+  Image as ImageIcon, User
 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { Progress } from "@/components/ui/progress";
@@ -72,6 +72,9 @@ interface AiAgent {
   timezone: string;
   escalationKeywords: string | null;
   escalationMessage: string | null;
+  mediaImageResponse: string | null;
+  mediaAudioResponse: string | null;
+  mediaDocumentResponse: string | null;
   calendarEnabled: boolean;
   calendarAuthType: "admin" | "client";
   adminCalendarId: string | null;
@@ -261,6 +264,9 @@ export default function AdminAiAgents() {
     timezone: "America/Sao_Paulo",
     escalationKeywords: "",
     escalationMessage: "",
+    mediaImageResponse: "Desculpe, não consigo processar imagens no momento. Por favor, descreva em texto o que você precisa.",
+    mediaAudioResponse: "Desculpe, não consigo processar áudios no momento. Por favor, digite sua mensagem.",
+    mediaDocumentResponse: "Desculpe, não consigo ler documentos no momento. Por favor, copie e cole o conteúdo em texto.",
     calendarEnabled: false,
     calendarAuthType: "admin",
     adminCalendarId: null as string | null,
@@ -450,6 +456,14 @@ export default function AdminAiAgents() {
       timezone: "America/Sao_Paulo",
       escalationKeywords: "",
       escalationMessage: "",
+      mediaImageResponse: "Desculpe, não consigo processar imagens no momento. Por favor, descreva em texto o que você precisa.",
+      mediaAudioResponse: "Desculpe, não consigo processar áudios no momento. Por favor, digite sua mensagem.",
+      mediaDocumentResponse: "Desculpe, não consigo ler documentos no momento. Por favor, copie e cole o conteúdo em texto.",
+      calendarEnabled: false,
+      calendarAuthType: "admin",
+      adminCalendarId: null,
+      calendarDuration: 60,
+      calendarInstructions: "",
     });
     setWizardStep(1);
     setPendingFiles([]);
@@ -481,6 +495,14 @@ export default function AdminAiAgents() {
       timezone: agent.timezone || "America/Sao_Paulo",
       escalationKeywords: agent.escalationKeywords || "",
       escalationMessage: agent.escalationMessage || "",
+      mediaImageResponse: agent.mediaImageResponse || "Desculpe, não consigo processar imagens no momento. Por favor, descreva em texto o que você precisa.",
+      mediaAudioResponse: agent.mediaAudioResponse || "Desculpe, não consigo processar áudios no momento. Por favor, digite sua mensagem.",
+      mediaDocumentResponse: agent.mediaDocumentResponse || "Desculpe, não consigo ler documentos no momento. Por favor, copie e cole o conteúdo em texto.",
+      calendarEnabled: agent.calendarEnabled || false,
+      calendarAuthType: agent.calendarAuthType || "admin",
+      adminCalendarId: agent.adminCalendarId || null,
+      calendarDuration: agent.calendarDuration || 60,
+      calendarInstructions: agent.calendarInstructions || "",
     });
     setWizardStep(1);
     setPendingFiles([]);
@@ -1816,6 +1838,70 @@ export default function AdminAiAgents() {
                         value={formData.escalationMessage}
                         onChange={(e) => setFormData({ ...formData, escalationMessage: e.target.value })}
                         data-testid="input-escalation-message"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-4 p-4 border rounded-lg">
+                    <Label className="flex items-center gap-2">
+                      <ImageIcon className="h-4 w-4" />
+                      Respostas para Mídia
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Personalize as respostas quando clientes enviarem imagens, áudios ou documentos
+                    </p>
+                    
+                    {formData.provider !== "openai" && (
+                      <div className="flex items-start gap-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                        <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+                        <div className="text-xs text-amber-600 dark:text-amber-400">
+                          <strong>Atenção:</strong> Para que o agente possa analisar imagens e transcrever áudios automaticamente, 
+                          é necessário usar o provedor <strong>OpenAI</strong>. Com outros provedores, o agente enviará as mensagens 
+                          personalizadas abaixo.
+                        </div>
+                      </div>
+                    )}
+                    
+                    {formData.provider === "openai" && (
+                      <div className="flex items-start gap-2 p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
+                        <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
+                        <div className="text-xs text-green-600 dark:text-green-400">
+                          <strong>OpenAI ativado:</strong> O agente pode analisar imagens (GPT-4o Vision) e transcrever áudios 
+                          (Whisper) automaticamente. As mensagens abaixo são usadas apenas como fallback em caso de erro.
+                        </div>
+                      </div>
+                    )}
+                    
+                    <div className="space-y-2">
+                      <Label>Resposta para Imagens</Label>
+                      <Textarea
+                        placeholder="Desculpe, não consigo processar imagens..."
+                        value={formData.mediaImageResponse}
+                        onChange={(e) => setFormData({ ...formData, mediaImageResponse: e.target.value })}
+                        rows={2}
+                        data-testid="input-media-image-response"
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label>Resposta para Áudios</Label>
+                      <Textarea
+                        placeholder="Desculpe, não consigo processar áudios..."
+                        value={formData.mediaAudioResponse}
+                        onChange={(e) => setFormData({ ...formData, mediaAudioResponse: e.target.value })}
+                        rows={2}
+                        data-testid="input-media-audio-response"
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label>Resposta para Documentos</Label>
+                      <Textarea
+                        placeholder="Desculpe, não consigo ler documentos..."
+                        value={formData.mediaDocumentResponse}
+                        onChange={(e) => setFormData({ ...formData, mediaDocumentResponse: e.target.value })}
+                        rows={2}
+                        data-testid="input-media-document-response"
                       />
                     </div>
                   </div>

@@ -1151,6 +1151,10 @@ export const aiAgents = pgTable("ai_agents", {
   escalationMessage: text("escalation_message").default("Vou transferir você para um atendente humano."),
   calendarEnabled: boolean("calendar_enabled").notNull().default(false), // Habilitar agendamentos via calendário
   adminCalendarId: text("admin_calendar_id"), // FK para admin_google_calendars (qual agenda usar)
+  // Respostas personalizadas para mídia não suportada (quando provider != openai)
+  mediaImageResponse: text("media_image_response").default("Desculpe, não consigo processar imagens no momento. Por favor, descreva em texto o que você precisa."),
+  mediaAudioResponse: text("media_audio_response").default("Desculpe, não consigo processar áudios no momento. Por favor, digite sua mensagem."),
+  mediaDocumentResponse: text("media_document_response").default("Desculpe, não consigo ler documentos no momento. Por favor, copie e cole o conteúdo em texto."),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
