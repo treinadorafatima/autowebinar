@@ -3,6 +3,9 @@ import makeWASocket, {
   useMultiFileAuthState,
   WASocket,
   fetchLatestBaileysVersion,
+  downloadMediaMessage,
+  getContentType,
+  proto,
 } from "@whiskeysockets/baileys";
 import { Boom } from "@hapi/boom";
 import * as QRCode from "qrcode";
@@ -229,6 +232,123 @@ async function handleIncomingMessage(accountId: string, senderPhone: string, tex
     
   } catch (error) {
     console.error(`[whatsapp-ai] Error handling message from ${senderPhone}:`, error);
+  }
+}
+
+// Handler para mensagens de mídia (imagens, áudios, documentos)
+interface MediaContent {
+  type: "image" | "audio" | "document";
+  buffer: Buffer;
+  mimetype: string;
+  filename?: string;
+}
+
+async function handleIncomingMediaMessage(
+  accountId: string, 
+  senderPhone: string, 
+  media: MediaContent,
+  textContent: string = ""
+): Promise<void> {
+  try {
+    const account = await storage.getWhatsappAccountById(accountId);
+    if (!account) {
+      console.log(`[whatsapp-ai] Account not found: ${accountId}`);
+      return;
+    }
+    
+    const agent = await storage.getAiAgentByWhatsappAccount(accountId);
+    if (!agent || !agent.isActive) {
+      console.log(`[whatsapp-ai] No active AI agent for account ${accountId}`);
+      return;
+    }
+    
+    const { processMediaMessage, checkWorkingHours, checkEscalationKeywords } = await import("./ai-processor");
+    
+    if (!checkWorkingHours(agent)) {
+      console.log(`[whatsapp-ai] Outside working hours for agent ${agent.id}`);
+      return;
+    }
+    
+    // Check escalation only if there's text content
+    if (textContent && checkEscalationKeywords(agent, textContent)) {
+      if (agent.escalationMessage) {
+        await sendWhatsAppMessage(accountId, senderPhone, agent.escalationMessage);
+        console.log(`[whatsapp-ai] Escalation triggered for ${senderPhone}`);
+      }
+      return;
+    }
+    
+    const contactJid = senderPhone + "@s.whatsapp.net";
+    const conversation = await storage.getOrCreateAiConversation(agent.id, contactJid, undefined, senderPhone);
+    
+    // Save user message (indicate media type)
+    const mediaIndicator = media.type === "image" ? "[Imagem]" : media.type === "audio" ? "[Áudio]" : "[Documento]";
+    const userMessageContent = textContent ? `${mediaIndicator} ${textContent}` : mediaIndicator;
+    
+    await storage.createAiMessage({
+      conversationId: conversation.id,
+      role: "user",
+      content: userMessageContent,
+      tokensUsed: 0,
+    });
+    
+    const recentMessages = await storage.listAiMessagesByConversation(conversation.id, agent.memoryLength);
+    const knowledgeFiles = await storage.listAiAgentFiles(agent.id);
+    
+    let googleCalendarId: string | undefined;
+    if (agent.calendarEnabled && agent.adminCalendarId) {
+      const adminCalendar = await storage.getAdminCalendarById(agent.adminCalendarId);
+      if (adminCalendar) {
+        googleCalendarId = adminCalendar.googleCalendarId;
+      }
+    }
+    
+    const calendarContext = agent.calendarEnabled ? {
+      adminId: agent.adminId,
+      contactPhone: senderPhone,
+      contactName: conversation.contactName || undefined,
+      googleCalendarId,
+    } : undefined;
+    
+    // Process media message
+    const response = await processMediaMessage(
+      agent, 
+      media, 
+      textContent, 
+      recentMessages, 
+      knowledgeFiles, 
+      calendarContext
+    );
+    
+    if (response.error) {
+      console.error(`[whatsapp-ai] AI media processing error for ${senderPhone}:`, response.error);
+      // Send a friendly error message
+      await sendWhatsAppMessage(accountId, senderPhone, "Desculpe, não consegui processar sua mensagem. Pode tentar novamente?");
+      return;
+    }
+    
+    await storage.createAiMessage({
+      conversationId: conversation.id,
+      role: "assistant",
+      content: response.content,
+      tokensUsed: response.tokensUsed,
+    });
+    
+    await storage.updateAiConversation(conversation.id, {
+      totalMessages: (conversation.totalMessages || 0) + 2,
+      totalTokensUsed: (conversation.totalTokensUsed || 0) + response.tokensUsed,
+      lastMessageAt: new Date(),
+    });
+    
+    if (agent.responseDelayMs > 0) {
+      await new Promise(resolve => setTimeout(resolve, agent.responseDelayMs));
+    }
+    
+    await sendWhatsAppMessage(accountId, senderPhone, response.content);
+    console.log(`[whatsapp-ai] Sent AI media response to ${senderPhone} (${response.tokensUsed} tokens)`);
+    
+  } catch (error) {
+    console.error(`[whatsapp-ai] Error handling media message from ${senderPhone}:`, error);
   }
 }
 
@@ -663,10 +783,75 @@ export async function initWhatsAppConnection(accountId: string, adminId: string,
         if (!senderJid || senderJid.includes("@g.us")) continue;
         
         const senderPhone = senderJid.split("@")[0];
+        
+        // Detect message type
+        const messageType = getContentType(message.message);
+        
+        // Handle text messages
         const textContent = message.message?.conversation || 
                            message.message?.extendedTextMessage?.text || 
                            "";
         
+        // Handle media messages (image, audio, document)
+        if (messageType === "imageMessage" || messageType === "audioMessage" || messageType === "documentMessage") {
+          try {
+            console.log(`[whatsapp] Media message (${messageType}) received from ${senderPhone} on account ${accountId}`);
+            
+            // Download media
+            const buffer = await downloadMediaMessage(
+              message,
+              "buffer",
+              {},
+              {
+                logger,
+                reuploadRequest: socket.updateMediaMessage,
+              }
+            ) as Buffer;
+            
+            if (!buffer || buffer.length === 0) {
+              console.error(`[whatsapp] Failed to download media from ${senderPhone}`);
+              continue;
+            }
+            
+            // Get media details
+            let mediaType: "image" | "audio" | "document" = "image";
+            let mimetype = "application/octet-stream";
+            let filename: string | undefined;
+            let caption = "";
+            
+            if (messageType === "imageMessage") {
+              mediaType = "image";
+              mimetype = message.message.imageMessage?.mimetype || "image/jpeg";
+              caption = message.message.imageMessage?.caption || "";
+            } else if (messageType === "audioMessage") {
+              mediaType = "audio";
+              mimetype = message.message.audioMessage?.mimetype || "audio/ogg";
+            } else if (messageType === "documentMessage") {
+              mediaType = "document";
+              mimetype = message.message.documentMessage?.mimetype || "application/pdf";
+              filename = message.message.documentMessage?.fileName || undefined;
+              caption = message.message.documentMessage?.caption || "";
+            }
+            
+            console.log(`[whatsapp] Downloaded ${mediaType} (${buffer.length} bytes, ${mimetype}) from ${senderPhone}`);
+            
+            // Process media message
+            handleIncomingMediaMessage(accountId, senderPhone, {
+              type: mediaType,
+              buffer,
+              mimetype,
+              filename,
+            }, caption || textContent).catch(err => {
+              console.error(`[whatsapp] Error handling incoming media message:`, err);
+            });
+            
+          } catch (mediaError: any) {
+            console.error(`[whatsapp] Error downloading media from ${senderPhone}:`, mediaError.message);
+          }
+          continue;
+        }
+        
+        // Standard text message
         if (!textContent.trim()) continue;
         
         console.log(`[whatsapp] Message received from ${senderPhone} on account ${accountId}: "${textContent.substring(0, 50)}..."`);

@@ -18,7 +18,23 @@ interface CalendarAction {
 
 interface ChatMessage {
   role: "user" | "assistant" | "system";
-  content: string;
+  content: string | ChatMessageContent[];
+}
+
+interface ChatMessageContent {
+  type: "text" | "image_url";
+  text?: string;
+  image_url?: {
+    url: string;
+    detail?: "low" | "high" | "auto";
+  };
+}
+
+export interface MediaContent {
+  type: "image" | "audio" | "document";
+  buffer: Buffer;
+  mimetype: string;
+  filename?: string;
 }
 
 interface CalendarContext {
@@ -353,6 +369,190 @@ async function callGrok(apiKey: string, model: string, messages: ChatMessage[], 
     tokensUsed: data.usage?.total_tokens || 0,
     processingTimeMs: Date.now() - startTime,
   };
+}
+
+// Transcreve áudio usando OpenAI Whisper API
+export async function transcribeAudio(apiKey: string, audioBuffer: Buffer, mimetype: string): Promise<{ text: string; error?: string }> {
+  try {
+    // Determine file extension based on mimetype
+    let extension = "ogg";
+    if (mimetype.includes("mp3") || mimetype.includes("mpeg")) extension = "mp3";
+    else if (mimetype.includes("mp4") || mimetype.includes("m4a")) extension = "m4a";
+    else if (mimetype.includes("wav")) extension = "wav";
+    else if (mimetype.includes("webm")) extension = "webm";
+    
+    // Use native FormData and Blob for Node.js fetch compatibility
+    const formData = new FormData();
+    const audioBlob = new Blob([audioBuffer], { type: mimetype });
+    formData.append("file", audioBlob, `audio.${extension}`);
+    formData.append("model", "whisper-1");
+    formData.append("language", "pt");
+    
+    const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+      },
+      body: formData,
+    });
+    
+    const data = await response.json();
+    
+    if (!response.ok) {
+      console.error("[ai-processor] Whisper API error:", data);
+      return { text: "", error: data.error?.message || "Erro ao transcrever áudio" };
+    }
+    
+    console.log(`[ai-processor] Audio transcribed: "${data.text?.substring(0, 100)}..."`);
+    return { text: data.text || "" };
+  } catch (error: any) {
+    console.error("[ai-processor] Error transcribing audio:", error);
+    return { text: "", error: error.message };
+  }
+}
+
+// Analisa imagem usando GPT-4 Vision
+export async function analyzeImage(
+  apiKey: string, 
+  imageBuffer: Buffer, 
+  mimetype: string, 
+  userPrompt?: string
+): Promise<{ description: string; error?: string }> {
+  try {
+    const base64Image = imageBuffer.toString("base64");
+    const mimeType = mimetype.startsWith("image/") ? mimetype : "image/jpeg";
+    
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: userPrompt || "Descreva esta imagem de forma breve e objetiva em português. O que você vê?",
+              },
+              {
+                type: "image_url",
+                image_url: {
+                  url: `data:${mimeType};base64,${base64Image}`,
+                  detail: "low",
+                },
+              },
+            ],
+          },
+        ],
+        max_tokens: 300,
+      }),
+    });
+    
+    const data = await response.json();
+    
+    if (!response.ok) {
+      console.error("[ai-processor] Vision API error:", data);
+      return { description: "", error: data.error?.message || "Erro ao analisar imagem" };
+    }
+    
+    const description = data.choices?.[0]?.message?.content || "";
+    console.log(`[ai-processor] Image analyzed: "${description.substring(0, 100)}..."`);
+    return { description };
+  } catch (error: any) {
+    console.error("[ai-processor] Error analyzing image:", error);
+    return { description: "", error: error.message };
+  }
+}
+
+// Processa mensagem com mídia (imagem ou áudio)
+export async function processMediaMessage(
+  agent: AiAgent,
+  media: MediaContent,
+  textMessage: string,
+  conversationHistory: AiMessage[],
+  knowledgeFiles: AiAgentFile[] = [],
+  calendarContext?: {
+    adminId: string;
+    contactPhone?: string;
+    contactName?: string;
+    googleCalendarId?: string;
+  }
+): Promise<AIResponse> {
+  try {
+    // Só suporta OpenAI para mídia (Vision e Whisper)
+    if (agent.provider !== "openai") {
+      return {
+        content: "Desculpe, o processamento de imagens e áudios só está disponível com o provedor OpenAI. No momento, só consigo responder mensagens de texto.",
+        tokensUsed: 0,
+        processingTimeMs: 0,
+      };
+    }
+    
+    let processedContent = textMessage;
+    
+    if (media.type === "audio") {
+      // Transcreve o áudio
+      const transcription = await transcribeAudio(agent.apiKey, media.buffer, media.mimetype);
+      
+      if (transcription.error || !transcription.text) {
+        return {
+          content: "Desculpe, não consegui entender o áudio. Pode enviar uma mensagem de texto?",
+          tokensUsed: 0,
+          processingTimeMs: 0,
+          error: transcription.error,
+        };
+      }
+      
+      processedContent = transcription.text;
+      console.log(`[ai-processor] Audio transcribed to: "${processedContent.substring(0, 50)}..."`);
+      
+    } else if (media.type === "image") {
+      // Analisa a imagem
+      const analysis = await analyzeImage(agent.apiKey, media.buffer, media.mimetype, textMessage || undefined);
+      
+      if (analysis.error || !analysis.description) {
+        return {
+          content: "Desculpe, não consegui analisar a imagem. Pode descrever o que precisa?",
+          tokensUsed: 0,
+          processingTimeMs: 0,
+          error: analysis.error,
+        };
+      }
+      
+      // Se o usuário enviou texto junto com a imagem, combina
+      if (textMessage) {
+        processedContent = `[O usuário enviou uma imagem. Descrição da imagem: ${analysis.description}]\n\nMensagem do usuário: ${textMessage}`;
+      } else {
+        processedContent = `[O usuário enviou uma imagem. Descrição da imagem: ${analysis.description}]\n\nResponda sobre o que você viu na imagem.`;
+      }
+      
+      console.log(`[ai-processor] Image analyzed, content: "${processedContent.substring(0, 80)}..."`);
+      
+    } else if (media.type === "document") {
+      // Por enquanto só informa que recebeu o documento
+      return {
+        content: `Recebi seu documento "${media.filename || 'arquivo'}". No momento, consigo processar melhor imagens e áudios. Pode me dizer o que precisa sobre este documento?`,
+        tokensUsed: 0,
+        processingTimeMs: 0,
+      };
+    }
+    
+    // Agora processa a mensagem normalmente com o conteúdo extraído
+    return processMessage(agent, processedContent, conversationHistory, knowledgeFiles, calendarContext);
+    
+  } catch (error: any) {
+    console.error("[ai-processor] Error processing media message:", error);
+    return {
+      content: "",
+      tokensUsed: 0,
+      processingTimeMs: 0,
+      error: error.message,
+    };
+  }
 }
 
 export async function processMessage(

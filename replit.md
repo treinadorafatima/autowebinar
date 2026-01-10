@@ -146,3 +146,42 @@ O sistema de renovação de assinaturas usa múltiplas camadas de redundância p
 - `[subscription-scheduler] Auto-reactivated X` - Acesso estendido via sync
 - `[subscription-scheduler] Stripe auto-sync: Extended access for X` - Stripe sync recuperou
 - `[MP Webhook] PAYMENT CONFIRMED` - Webhook processou renovação
+
+## AI Agents - WhatsApp Media Support (Implementado)
+
+### Funcionalidades
+Os agentes de IA do WhatsApp agora suportam processamento de mídia além de texto:
+
+1. **Imagens (GPT-4o Vision)**
+   - Quando usuário envia imagem, o agente analisa usando GPT-4o Vision API
+   - Gera descrição da imagem e responde contextualmente
+   - Se enviou texto junto com imagem, combina análise + pergunta do usuário
+
+2. **Áudios (OpenAI Whisper)**
+   - Quando usuário envia áudio/voz, transcreve usando Whisper API
+   - Processa a transcrição como se fosse mensagem de texto normal
+   - Suporta formatos: ogg, mp3, mp4, m4a, wav, webm
+
+3. **Documentos**
+   - Recebe documentos mas ainda não extrai conteúdo automaticamente
+   - Responde informando que recebeu o documento
+
+### Implementação Técnica
+- **Detecção**: Usa `getContentType()` do Baileys para detectar tipo de mensagem
+- **Download**: Usa `downloadMediaMessage()` do Baileys para baixar mídia
+- **Análise de Imagens**: `analyzeImage()` em `ai-processor.ts` usando Vision API
+- **Transcrição de Áudio**: `transcribeAudio()` em `ai-processor.ts` usando Whisper API
+- **Orquestração**: `processMediaMessage()` coordena o fluxo de processamento
+
+### Limitações
+- Processamento de mídia requer provedor OpenAI (gpt-4o para imagens, whisper-1 para áudio)
+- Outros provedores (Gemini, DeepSeek, Grok) ainda não suportam mídia
+- Limite de 25MB para áudios (limite da API Whisper)
+- Imagens muito grandes podem ser reduzidas para "low" detail
+
+### Logs de Diagnóstico
+- `[whatsapp] Media message (imageMessage) received from X` - Mídia detectada
+- `[whatsapp] Downloaded image (X bytes, image/jpeg) from Y` - Mídia baixada
+- `[ai-processor] Audio transcribed: "..."` - Áudio transcrito
+- `[ai-processor] Image analyzed: "..."` - Imagem analisada
+- `[whatsapp-ai] Sent AI media response to X` - Resposta enviada
