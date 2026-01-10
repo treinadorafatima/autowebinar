@@ -1330,7 +1330,7 @@ export default function Checkout() {
                       </label>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="documento" className="text-slate-700">{formData.tipoDocumento} *</Label>
                       <Input
@@ -1467,7 +1467,7 @@ export default function Checkout() {
                       <>
                         <div className="mb-6">
                           <Label className="text-sm font-medium text-slate-700 mb-3 block">Escolha a forma de pagamento</Label>
-                          <div className="grid grid-cols-3 gap-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                             <button
                               type="button"
                               onClick={() => { setRecurringPaymentMethod("card"); setRecurringPixData(null); setRecurringBoletoData(null); }}
@@ -1681,7 +1681,7 @@ export default function Checkout() {
                     <>
                       <div className="mb-6">
                         <Label className="text-sm font-medium text-slate-700 mb-3 block">Escolha a forma de pagamento</Label>
-                        <div className="grid grid-cols-3 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                           <button
                             type="button"
                             onClick={() => { setHybridPaymentMethod("card"); setHybridPixData(null); setHybridBoletoData(null); }}
