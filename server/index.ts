@@ -10,6 +10,7 @@ import { startAffiliatePayoutScheduler } from "./affiliate-payout-scheduler";
 import { startPixExpirationScheduler } from "./pix-expiration-scheduler";
 import { startEmailRetryScheduler } from "./email";
 import { startPendingMessagesRetry } from "./whatsapp-notifications";
+import { startAiMemoryCleanupScheduler } from "./ai-memory-cleanup-scheduler";
 
 const app = express();
 
@@ -158,5 +159,8 @@ app.use((req, res, next) => {
     
     // Start WhatsApp pending messages retry scheduler
     startPendingMessagesRetry();
+    
+    // Start AI memory cleanup scheduler (runs every 6 hours)
+    startAiMemoryCleanupScheduler();
   });
 })();

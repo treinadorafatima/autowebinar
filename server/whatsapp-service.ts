@@ -164,6 +164,10 @@ async function handleIncomingMessage(accountId: string, senderPhone: string, tex
     
     if (!checkWorkingHours(agent)) {
       console.log(`[whatsapp-ai] Outside working hours for agent ${agent.id}`);
+      if (agent.awayMessage) {
+        await sendWhatsAppMessage(accountId, senderPhone, agent.awayMessage);
+        console.log(`[whatsapp-ai] Sent away message to ${senderPhone}`);
+      }
       return;
     }
     
@@ -282,6 +286,10 @@ async function handleIncomingMediaMessage(
     
     if (!checkWorkingHours(agent)) {
       console.log(`[whatsapp-ai] Outside working hours for agent ${agent.id}`);
+      if (agent.awayMessage) {
+        await sendWhatsAppMessage(accountId, senderPhone, agent.awayMessage);
+        console.log(`[whatsapp-ai] Sent away message to ${senderPhone}`);
+      }
       return;
     }
     

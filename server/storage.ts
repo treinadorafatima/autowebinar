@@ -6262,10 +6262,11 @@ Apos o pagamento, seu acesso sera renovado automaticamente!
 
   // AI Messages
   async listAiMessagesByConversation(conversationId: string, limit: number = 50): Promise<AiMessage[]> {
-    return db.select().from(aiMessages)
+    const messages = await db.select().from(aiMessages)
       .where(eq(aiMessages.conversationId, conversationId))
       .orderBy(desc(aiMessages.createdAt))
       .limit(limit);
+    return messages.reverse();
   }
 
   async createAiMessage(data: AiMessageInsert): Promise<AiMessage> {
