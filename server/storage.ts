@@ -2814,6 +2814,22 @@ export class DatabaseStorage implements IStorage {
   }
 
   async listCheckoutPagamentosByEmail(email: string): Promise<CheckoutPagamento[]> {
+    // First, try to find the admin by email to also search by adminId
+    const admin = await this.getAdminByEmail(email);
+    
+    if (admin) {
+      // Search by both email (case-insensitive) AND adminId to catch all payments including renewals
+      return db.select().from(checkoutPagamentos)
+        .where(
+          or(
+            sql`LOWER(${checkoutPagamentos.email}) = LOWER(${email})`,
+            eq(checkoutPagamentos.adminId, admin.id)
+          )
+        )
+        .orderBy(desc(checkoutPagamentos.criadoEm));
+    }
+    
+    // Fallback to email-only search if admin not found
     return db.select().from(checkoutPagamentos)
       .where(sql`LOWER(${checkoutPagamentos.email}) = LOWER(${email})`)
       .orderBy(desc(checkoutPagamentos.criadoEm));
