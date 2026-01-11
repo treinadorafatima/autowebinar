@@ -233,7 +233,12 @@ export default function AfiliadoDashboardPage() {
   });
 
   const { data: planos } = useQuery<Plano[]>({
-    queryKey: ["/api/checkout/planos/ativos?afiliados=true"],
+    queryKey: ["/api/checkout/planos/ativos", "afiliados"],
+    queryFn: async () => {
+      const res = await fetch("/api/checkout/planos/ativos?afiliados=true");
+      if (!res.ok) throw new Error("Erro ao carregar planos");
+      return res.json();
+    },
   });
 
   const { data: affiliateLeads, isLoading: isLoadingLeads } = useQuery<AffiliateLead[]>({
