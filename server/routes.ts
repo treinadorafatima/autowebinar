@@ -14679,36 +14679,179 @@ Seja conversacional e objetivo.`;
         });
       }
 
-      // Create withdrawal request
-      const withdrawal = await storage.createAffiliateWithdrawal({
-        affiliateId: affiliate.id,
-        amount,
-        pixKey: affiliate.pixKey,
-        pixKeyType: affiliate.pixKeyType,
-        status: 'pending',
-      });
+      // Get available sales sorted by creation date (FIFO)
+      const allSales = await storage.listAffiliateSalesByAffiliate(affiliate.id);
+      const availableSales = allSales
+        .filter(s => s.status === 'available')
+        .sort((a, b) => new Date(a.createdAt!).getTime() - new Date(b.createdAt!).getTime());
+      
+      const totalAvailable = availableSales.reduce((sum, s) => sum + (s.commissionAmount || 0), 0);
+      
+      // Meet-in-the-middle subset sum (handles up to ~40 items efficiently)
+      const findExactSubset = (commissions: number[], target: number): number[] | null => {
+        const n = commissions.length;
+        
+        // For small sets, use simple DP
+        if (n <= 20) {
+          let current = new Map<number, number[]>();
+          current.set(0, []);
+          
+          for (let i = 0; i < n; i++) {
+            const commission = commissions[i];
+            const next = new Map<number, number[]>(current);
+            
+            for (const [sum, indices] of current) {
+              const newSum = sum + commission;
+              if (newSum <= target && !next.has(newSum)) {
+                next.set(newSum, [...indices, i]);
+              }
+              if (newSum === target) return [...indices, i];
+            }
+            current = next;
+          }
+          return current.get(target) || null;
+        }
+        
+        // Meet-in-the-middle for larger sets
+        const mid = Math.floor(n / 2);
+        const leftHalf = commissions.slice(0, mid);
+        const rightHalf = commissions.slice(mid);
+        
+        // Generate all sums for left half
+        const leftSums = new Map<number, number[]>();
+        leftSums.set(0, []);
+        for (let i = 0; i < leftHalf.length; i++) {
+          const entries = Array.from(leftSums.entries());
+          for (const [sum, indices] of entries) {
+            const newSum = sum + leftHalf[i];
+            if (newSum <= target && !leftSums.has(newSum)) {
+              leftSums.set(newSum, [...indices, i]);
+            }
+          }
+        }
+        
+        // Generate right half sums and check for matches
+        let rightCurrent = new Map<number, number[]>();
+        rightCurrent.set(0, []);
+        for (let i = 0; i < rightHalf.length; i++) {
+          const entries = Array.from(rightCurrent.entries());
+          for (const [sum, indices] of entries) {
+            const newSum = sum + rightHalf[i];
+            if (newSum <= target && !rightCurrent.has(newSum)) {
+              rightCurrent.set(newSum, [...indices, i + mid]); // Offset by mid
+              
+              // Check if complement exists in left half
+              const complement = target - newSum;
+              if (leftSums.has(complement)) {
+                return [...leftSums.get(complement)!, ...indices, i + mid];
+              }
+            }
+          }
+        }
+        
+        // Check existing right sums against left
+        for (const [rightSum, rightIndices] of rightCurrent) {
+          const complement = target - rightSum;
+          if (leftSums.has(complement)) {
+            return [...leftSums.get(complement)!, ...rightIndices];
+          }
+        }
+        
+        return null;
+      };
 
-      // Deduct from available amount
-      await storage.updateAffiliate(affiliate.id, {
-        availableAmount: availableAmount - amount,
-      });
+      const commissions = availableSales.map(s => s.commissionAmount || 0);
+      const selectedIndices = findExactSubset(commissions, amount);
+
+      if (!selectedIndices || selectedIndices.length === 0) {
+        return res.status(400).json({ 
+          error: `Não foi possível encontrar uma combinação exata para R$ ${(amount / 100).toFixed(2)}. ` +
+                 `Total disponível: R$ ${(totalAvailable / 100).toFixed(2)}. ` +
+                 `Tente outro valor ou saque o total disponível.` 
+        });
+      }
+      
+      const salesToLink = selectedIndices.map(i => availableSales[i]);
+      const withdrawalAmount = amount;
+
+      // Create withdrawal with compensating rollback on failure
+      let withdrawal;
+      const linkedSaleIds: string[] = [];
+      
+      try {
+        // Step 1: Create withdrawal
+        withdrawal = await storage.createAffiliateWithdrawal({
+          affiliateId: affiliate.id,
+          amount: withdrawalAmount,
+          pixKey: affiliate.pixKey,
+          pixKeyType: affiliate.pixKeyType,
+          status: 'pending',
+        });
+
+        // Step 2: Link sales to this withdrawal
+        for (const sale of salesToLink) {
+          await storage.updateAffiliateSale(sale.id, {
+            status: 'withdrawal_requested',
+            withdrawalId: withdrawal.id,
+          });
+          linkedSaleIds.push(sale.id);
+        }
+
+        // Step 3: Deduct from available balance
+        await storage.updateAffiliate(affiliate.id, {
+          availableAmount: availableAmount - withdrawalAmount,
+        });
+      } catch (error) {
+        // Compensating rollback on any failure
+        console.error("[affiliate-withdrawal] Error during withdrawal, rolling back:", error);
+        
+        // Rollback linked sales
+        for (const saleId of linkedSaleIds) {
+          try {
+            await storage.updateAffiliateSale(saleId, {
+              status: 'available',
+              withdrawalId: null,
+            });
+          } catch (e) {
+            console.error("[affiliate-withdrawal] Failed to rollback sale:", saleId, e);
+          }
+        }
+        
+        // Delete withdrawal if created
+        if (withdrawal) {
+          try {
+            await storage.updateAffiliateWithdrawal(withdrawal.id, { status: 'cancelled' });
+          } catch (e) {
+            console.error("[affiliate-withdrawal] Failed to cancel withdrawal:", e);
+          }
+        }
+        
+        throw error;
+      }
 
       // Send email notification for withdrawal request
       import("./email").then(({ sendAffiliateWithdrawalRequestedEmail }) => {
         sendAffiliateWithdrawalRequestedEmail(
           email,
           admin.name || "Afiliado",
-          amount,
+          withdrawalAmount,
           affiliate.pixKey!
         ).catch(err => {
           console.error("[affiliate] Erro ao enviar email de solicitação de saque:", err);
         });
       });
 
+      // Inform user if amount was adjusted
+      const adjustedMessage = withdrawalAmount !== amount 
+        ? ` (ajustado de R$ ${(amount / 100).toFixed(2)} para R$ ${(withdrawalAmount / 100).toFixed(2)} baseado nas comissões disponíveis)`
+        : "";
+
       res.json({ 
         success: true, 
-        message: "Solicitação de saque criada com sucesso",
-        withdrawal 
+        message: `Solicitação de saque de R$ ${(withdrawalAmount / 100).toFixed(2)} criada com sucesso${adjustedMessage}`,
+        withdrawal,
+        requestedAmount: amount,
+        actualAmount: withdrawalAmount,
       });
     } catch (error: any) {
       res.status(400).json({ error: error.message });
