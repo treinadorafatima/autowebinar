@@ -1495,6 +1495,22 @@ async function validateMediaBeforeSend(media: MediaMessage): Promise<MediaValida
   }
 
   try {
+    // For internal R2/storage URLs, skip HTTP validation if we have mimetype
+    // These URLs are guaranteed to exist since they come from our own storage
+    const isInternalUrl = media.url.includes('/api/media/r2/') || 
+                          media.url.includes('/api/media/') ||
+                          media.url.includes('r2.cloudflarestorage.com');
+    
+    if (isInternalUrl && media.mimetype) {
+      // Validate using provided mimetype only (trusted internal source)
+      const mimeValidation = validateMimeType(media, "");
+      if (!mimeValidation.valid) {
+        return { valid: false, error: mimeValidation.error };
+      }
+      console.log(`[whatsapp] Skipping HTTP validation for internal URL: ${media.url.substring(0, 50)}...`);
+      return { valid: true };
+    }
+
     // Convert relative URLs to absolute URLs
     let mediaUrl = media.url;
     if (mediaUrl.startsWith('/')) {
@@ -1515,16 +1531,33 @@ async function validateMediaBeforeSend(media: MediaMessage): Promise<MediaValida
       }
     }
     
-    // HEAD request to check size and type without downloading
-    const headResponse = await fetch(mediaUrl, { method: "HEAD" });
+    // HEAD request to check size and type without downloading (with timeout)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+    
+    let headResponse: Response;
+    try {
+      headResponse = await fetch(mediaUrl, { method: "HEAD", signal: controller.signal });
+    } finally {
+      clearTimeout(timeoutId);
+    }
+    
     if (!headResponse.ok) {
       // Try GET with range to check if URL is accessible
-      const rangeResponse = await fetch(mediaUrl, { 
-        method: "GET",
-        headers: { "Range": "bytes=0-0" }
-      });
-      if (!rangeResponse.ok && rangeResponse.status !== 206) {
-        return { valid: false, error: `Não foi possível acessar o arquivo de mídia (HTTP ${headResponse.status})` };
+      const rangeController = new AbortController();
+      const rangeTimeoutId = setTimeout(() => rangeController.abort(), 15000);
+      
+      try {
+        const rangeResponse = await fetch(mediaUrl, { 
+          method: "GET",
+          headers: { "Range": "bytes=0-0" },
+          signal: rangeController.signal
+        });
+        if (!rangeResponse.ok && rangeResponse.status !== 206) {
+          return { valid: false, error: `Não foi possível acessar o arquivo de mídia (HTTP ${headResponse.status})` };
+        }
+      } finally {
+        clearTimeout(rangeTimeoutId);
       }
     }
 
@@ -1558,6 +1591,17 @@ async function validateMediaBeforeSend(media: MediaMessage): Promise<MediaValida
 
     return { valid: true, contentLength, contentType };
   } catch (error: any) {
+    // If fetch fails for internal URLs with mimetype, still allow (fallback)
+    const isInternalUrl = media.url.includes('/api/media/r2/') || 
+                          media.url.includes('/api/media/');
+    if (isInternalUrl && media.mimetype) {
+      console.warn(`[whatsapp] HTTP validation failed for internal URL, using mimetype fallback: ${error.message}`);
+      const mimeValidation = validateMimeType(media, "");
+      if (mimeValidation.valid) {
+        return { valid: true };
+      }
+    }
+    
     console.error("[whatsapp] Error validating media:", error);
     return { valid: false, error: `Erro ao validar arquivo: ${error.message}` };
   }
