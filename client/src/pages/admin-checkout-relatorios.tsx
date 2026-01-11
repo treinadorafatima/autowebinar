@@ -42,6 +42,11 @@ interface Stats {
   receitaTotal: number;
   ticketMedio: number;
   taxaConversao: number;
+  vendasUnicas: number;
+  receitaUnicas: number;
+  vendasRenovacao: number;
+  receitaRenovacao: number;
+  assinaturasAtivas: number;
 }
 
 interface VendaPorPlano {
@@ -64,6 +69,10 @@ interface VendaPorAfiliado {
   quantidade: number;
   valorVendas: number;
   valorComissao: number;
+  vendasUnicas: number;
+  valorUnicas: number;
+  vendasRenovacao: number;
+  valorRenovacao: number;
 }
 
 interface Pagamento {
@@ -386,7 +395,7 @@ export default function AdminCheckoutRelatorios() {
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4 mb-6">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-1 pb-2">
             <CardTitle className="text-sm font-medium">Total de Vendas</CardTitle>
@@ -436,6 +445,64 @@ export default function AdminCheckoutRelatorios() {
               {(stats?.taxaConversao || 0).toFixed(1)}%
             </div>
             <p className="text-xs text-muted-foreground">checkout → aprovado</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between gap-1 pb-2">
+            <CardTitle className="text-sm font-medium">Vendas Únicas</CardTitle>
+            <ShoppingCart className="h-4 w-4 text-blue-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600" data-testid="text-vendas-unicas">
+              {stats?.vendasUnicas || 0}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {formatCurrency(stats?.receitaUnicas || 0)}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between gap-1 pb-2">
+            <CardTitle className="text-sm font-medium">Renovações</CardTitle>
+            <RefreshCw className="h-4 w-4 text-purple-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-purple-600" data-testid="text-vendas-renovacao">
+              {stats?.vendasRenovacao || 0}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {formatCurrency(stats?.receitaRenovacao || 0)}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between gap-1 pb-2">
+            <CardTitle className="text-sm font-medium">Assinaturas Ativas</CardTitle>
+            <Users className="h-4 w-4 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600" data-testid="text-assinaturas-ativas">
+              {stats?.assinaturasAtivas || 0}
+            </div>
+            <p className="text-xs text-muted-foreground">recorrências ativas</p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-muted/30">
+          <CardHeader className="flex flex-row items-center justify-between gap-1 pb-2">
+            <CardTitle className="text-sm font-medium">Receita Recorrente</CardTitle>
+            <DollarSign className="h-4 w-4 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600" data-testid="text-receita-recorrente">
+              {formatCurrency(stats?.receitaRenovacao || 0)}
+            </div>
+            <p className="text-xs text-muted-foreground">de renovações</p>
           </CardContent>
         </Card>
       </div>
@@ -501,32 +568,42 @@ export default function AdminCheckoutRelatorios() {
         <Card className="mb-6">
           <CardHeader>
             <CardTitle>Vendas por Afiliado</CardTitle>
-            <CardDescription>Performance individual de cada afiliado</CardDescription>
+            <CardDescription>Performance individual de cada afiliado (vendas únicas e recorrentes)</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               {vendasPorAfiliado.map((afiliado) => (
-                <div key={afiliado.afiliadoId} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10">
-                      <User className="h-5 w-5 text-primary" />
+                <div key={afiliado.afiliadoId} className="p-4 border rounded-lg">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10">
+                        <User className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <p className="font-medium">{afiliado.afiliadoNome}</p>
+                        <p className="text-sm text-muted-foreground">{afiliado.afiliadoEmail}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium">{afiliado.afiliadoNome}</p>
-                      <p className="text-sm text-muted-foreground">{afiliado.afiliadoEmail}</p>
+                    <div className="text-right">
+                      <p className="text-xs text-muted-foreground">Comissão Total</p>
+                      <p className="font-bold text-green-600">{formatCurrency(afiliado.valorComissao)}</p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm text-muted-foreground">{afiliado.quantidade} vendas</p>
-                    <div className="flex items-center gap-4">
-                      <div>
-                        <p className="text-xs text-muted-foreground">Total Vendas</p>
-                        <p className="font-bold">{formatCurrency(afiliado.valorVendas)}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Comissão</p>
-                        <p className="font-bold text-green-600">{formatCurrency(afiliado.valorComissao)}</p>
-                      </div>
+                  <div className="grid grid-cols-3 gap-4 pt-3 border-t">
+                    <div className="text-center">
+                      <p className="text-xs text-muted-foreground mb-1">Vendas Únicas</p>
+                      <p className="font-semibold">{afiliado.vendasUnicas}</p>
+                      <p className="text-xs text-muted-foreground">{formatCurrency(afiliado.valorUnicas)}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xs text-muted-foreground mb-1">Renovações</p>
+                      <p className="font-semibold">{afiliado.vendasRenovacao}</p>
+                      <p className="text-xs text-muted-foreground">{formatCurrency(afiliado.valorRenovacao)}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xs text-muted-foreground mb-1">Total</p>
+                      <p className="font-semibold">{afiliado.quantidade}</p>
+                      <p className="text-xs text-muted-foreground">{formatCurrency(afiliado.valorVendas)}</p>
                     </div>
                   </div>
                 </div>

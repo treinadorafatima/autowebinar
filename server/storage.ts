@@ -3030,15 +3030,21 @@ export class DatabaseStorage implements IStorage {
     const ticketMedio = totalVendas > 0 ? receitaTotal / totalVendas : 0;
     const taxaConversao = allPagamentos.length > 0 ? (totalVendas / allPagamentos.length) * 100 : 0;
     
+    // Helper para detectar renovação (normaliza texto, remove acentos)
+    const isRenovacao = (statusDetail: string | null): boolean => {
+      if (!statusDetail) return false;
+      const normalized = statusDetail.toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, ''); // remove acentos
+      return normalized.includes('renovacao') || 
+             normalized.includes('renewal') ||
+             normalized.includes('auto-renewal') ||
+             normalized.includes('recorrente') ||
+             normalized.includes('recurring');
+    };
+    
     // Separar vendas únicas (primeiro pagamento) vs renovações
-    const vendasRenovacao = vendas.filter(p => 
-      p.statusDetail?.includes('Renovação') || 
-      p.statusDetail?.includes('renovação')
-    );
-    const vendasUnicas = vendas.filter(p => 
-      !p.statusDetail?.includes('Renovação') && 
-      !p.statusDetail?.includes('renovação')
-    );
+    const vendasRenovacao = vendas.filter(p => isRenovacao(p.statusDetail));
+    const vendasUnicas = vendas.filter(p => !isRenovacao(p.statusDetail));
     
     // Contar assinaturas recorrentes ativas
     const assinaturas = await db.select().from(checkoutAssinaturas);
@@ -3134,13 +3140,25 @@ export class DatabaseStorage implements IStorage {
       valorRenovacao: number;
     }>();
     
+    // Helper para detectar renovação (normaliza texto, remove acentos)
+    const isRenovacaoStatus = (statusDetail: string | null): boolean => {
+      if (!statusDetail) return false;
+      const normalized = statusDetail.toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, ''); // remove acentos
+      return normalized.includes('renovacao') || 
+             normalized.includes('renewal') ||
+             normalized.includes('auto-renewal') ||
+             normalized.includes('recorrente') ||
+             normalized.includes('recurring');
+    };
+    
     for (const sale of sales) {
       // Conta apenas vendas cujo pagamento foi confirmado E não foram canceladas/reembolsadas
       if (sale.status === 'cancelled' || sale.status === 'refunded') continue;
       const pagamento = vendaPagamentosMap.get(sale.pagamentoId);
       if (!pagamento) continue;
       
-      const isRenovacao = pagamento.statusDetail?.includes('Renovação') || pagamento.statusDetail?.includes('renovação');
+      const isRenovacao = isRenovacaoStatus(pagamento.statusDetail);
       
       const current = result.get(sale.affiliateId) || { 
         quantidade: 0, 
