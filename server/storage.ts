@@ -379,7 +379,8 @@ export interface IStorage {
   getAffiliateSaleByPagamentoId(pagamentoId: string): Promise<AffiliateSale | undefined>;
   createAffiliateSale(data: AffiliateSaleInsert): Promise<AffiliateSale>;
   updateAffiliateSale(id: string, data: Partial<AffiliateSaleInsert>): Promise<AffiliateSale | undefined>;
-  listPendingPayoutSales(): Promise<AffiliateSale[]>;
+  listSalesReadyForAvailability(): Promise<AffiliateSale[]>;
+  listAvailableSalesForAffiliate(affiliateId: string): Promise<AffiliateSale[]>;
   listAllAffiliateSales(): Promise<AffiliateSale[]>;
   // Affiliate Config
   getAffiliateConfig(): Promise<AffiliateConfig | undefined>;
@@ -4789,14 +4790,11 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
       affiliateLinkId: data.affiliateLinkId ?? null,
       status: data.status ?? "pending",
       commissionPercent: data.commissionPercent ?? null,
-      splitMethod: data.splitMethod ?? null,
+      paymentMethod: data.paymentMethod ?? "pix",
       mpPaymentId: data.mpPaymentId ?? null,
-      mpTransferId: data.mpTransferId ?? null,
       stripePaymentIntentId: data.stripePaymentIntentId ?? null,
-      stripeTransferId: data.stripeTransferId ?? null,
-      payoutScheduledAt: data.payoutScheduledAt ?? null,
-      payoutAttempts: data.payoutAttempts ?? 0,
-      payoutError: data.payoutError ?? null,
+      withdrawalId: data.withdrawalId ?? null,
+      availableAt: data.availableAt ?? null,
       paidAt: data.paidAt ?? null,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -4813,15 +4811,26 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
     return result[0];
   }
 
-  async listPendingPayoutSales(): Promise<AffiliateSale[]> {
+  async listSalesReadyForAvailability(): Promise<AffiliateSale[]> {
     return db.select().from(affiliateSales)
       .where(
         and(
-          eq(affiliateSales.status, 'pending_payout'),
-          lte(affiliateSales.payoutScheduledAt, new Date())
+          eq(affiliateSales.status, 'pending'),
+          lte(affiliateSales.availableAt, new Date())
         )
       )
-      .orderBy(affiliateSales.payoutScheduledAt);
+      .orderBy(affiliateSales.availableAt);
+  }
+
+  async listAvailableSalesForAffiliate(affiliateId: string): Promise<AffiliateSale[]> {
+    return db.select().from(affiliateSales)
+      .where(
+        and(
+          eq(affiliateSales.affiliateId, affiliateId),
+          eq(affiliateSales.status, 'available')
+        )
+      )
+      .orderBy(desc(affiliateSales.createdAt));
   }
 
   async listAllAffiliateSales(): Promise<AffiliateSale[]> {
@@ -4839,11 +4848,15 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
   async upsertAffiliateConfig(data: Partial<AffiliateConfigInsert>): Promise<AffiliateConfig> {
     const existing = await this.getAffiliateConfig();
     
-    // IMPORTANT: Enforce minimum 7-day hold for refund period
-    const MIN_HOLD_DAYS = 7;
+    // IMPORTANT: Enforce minimum hold days for refund period
+    const MIN_HOLD_DAYS_PIX = 7;
+    const MIN_HOLD_DAYS_CARD = 30;
     const validatedData = { ...data };
-    if (validatedData.holdDays !== undefined) {
-      validatedData.holdDays = Math.max(Number(validatedData.holdDays) || MIN_HOLD_DAYS, MIN_HOLD_DAYS);
+    if (validatedData.holdDaysPix !== undefined) {
+      validatedData.holdDaysPix = Math.max(Number(validatedData.holdDaysPix) || MIN_HOLD_DAYS_PIX, MIN_HOLD_DAYS_PIX);
+    }
+    if (validatedData.holdDaysCard !== undefined) {
+      validatedData.holdDaysCard = Math.max(Number(validatedData.holdDaysCard) || MIN_HOLD_DAYS_CARD, MIN_HOLD_DAYS_CARD);
     }
     
     if (existing) {

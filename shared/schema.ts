@@ -1064,15 +1064,12 @@ export const affiliateSales = pgTable("affiliate_sales", {
   saleAmount: integer("sale_amount").notNull(), // Valor da venda (centavos)
   commissionAmount: integer("commission_amount").notNull(), // Valor da comissão (centavos)
   commissionPercent: integer("commission_percent"), // Percentual de comissão usado
-  status: text("status").notNull().default("pending"), // 'pending', 'pending_payout', 'paid', 'refunded', 'cancelled', 'payout_failed'
-  splitMethod: text("split_method"), // 'mp_marketplace', 'stripe_connect', 'manual'
+  paymentMethod: text("payment_method").notNull().default("pix"), // 'pix', 'card', 'boleto' - método de pagamento usado
+  status: text("status").notNull().default("pending"), // 'pending', 'available', 'withdrawal_requested', 'paid', 'refunded', 'cancelled'
   mpPaymentId: text("mp_payment_id"), // ID do pagamento original no MP (para verificar reembolso)
-  mpTransferId: text("mp_transfer_id"), // ID da transferência no MP (quando pago via split)
   stripePaymentIntentId: text("stripe_payment_intent_id"), // ID do PaymentIntent no Stripe
-  stripeTransferId: text("stripe_transfer_id"), // ID da transferência no Stripe Connect
-  payoutScheduledAt: timestamp("payout_scheduled_at"), // Data agendada para pagamento ao afiliado
-  payoutAttempts: integer("payout_attempts").notNull().default(0), // Tentativas de pagamento
-  payoutError: text("payout_error"), // Último erro de pagamento
+  withdrawalId: text("withdrawal_id"), // FK para affiliate_withdrawals quando incluído em saque
+  availableAt: timestamp("available_at"), // Data quando comissão fica disponível para saque
   paidAt: timestamp("paid_at"), // Data do pagamento efetivo
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -1087,11 +1084,9 @@ export const affiliateConfig = pgTable("affiliate_config", {
   id: text("id").primaryKey().default("default"),
   defaultCommissionPercent: integer("default_commission_percent").notNull().default(30),
   minWithdrawal: integer("min_withdrawal").notNull().default(5000), // Mínimo para saque (R$ 50,00)
-  holdDays: integer("hold_days").notNull().default(7), // Dias para reter comissão
-  autoPayEnabled: boolean("auto_pay_enabled").notNull().default(true), // Split automático
+  holdDaysPix: integer("hold_days_pix").notNull().default(7), // Dias para liberar comissão PIX/boleto
+  holdDaysCard: integer("hold_days_card").notNull().default(30), // Dias para liberar comissão cartão
   autoApprove: boolean("auto_approve").notNull().default(false), // Aprovação automática de afiliados
-  mpAppId: text("mp_app_id"), // App ID do MP para OAuth
-  mpAppSecret: text("mp_app_secret"), // App Secret (criptografado)
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 

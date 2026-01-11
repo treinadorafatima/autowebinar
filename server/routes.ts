@@ -426,8 +426,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
    * Helper function to create affiliate sale when payment is approved
    * Called from webhooks (MP and Stripe) when payment is confirmed
    * 
-   * IMPORTANT: The affiliate payout is SCHEDULED for holdDays (default 7) days later
-   * to allow for refunds. The actual transfer happens via the payout scheduler.
+   * Hold periods for commission availability:
+   * - PIX/Boleto: 7 dias
+   * - Cartão: 30 dias
+   * 
+   * Comissão fica disponível para saque manual via PIX após o hold period.
    */
   async function processAffiliateSale(pagamento: any, plano: any, gateway: 'mercadopago' | 'stripe' = 'mercadopago'): Promise<void> {
     try {
@@ -445,38 +448,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
       
-      // Get commission config to calculate commission and hold days
+      // Get commission config
       const config = await storage.getAffiliateConfig();
-      // Use nullish coalescing to allow 0% commission (0 is falsy but valid)
       const commissionPercent = affiliate.commissionPercent ?? config?.defaultCommissionPercent ?? 10;
-      // IMPORTANT: Minimum 7-day hold is mandatory to allow for refunds
-      const MIN_HOLD_DAYS = 7;
-      const holdDays = Math.max(config?.holdDays ?? MIN_HOLD_DAYS, MIN_HOLD_DAYS);
       
       // Calculate commission (valor is in centavos)
       const commissionAmount = Math.floor(pagamento.valor * (commissionPercent / 100));
       
-      // Check if sale already exists for this payment (use dedicated function)
+      // Check if sale already exists for this payment
       const existingSale = await storage.getAffiliateSaleByPagamentoId(pagamento.id);
-      
       if (existingSale) {
         console.log(`[Affiliate] Sale already exists for pagamento: ${pagamento.id}`);
         return;
       }
       
-      // Calculate payout scheduled date (now + holdDays)
-      const payoutScheduledAt = new Date();
-      payoutScheduledAt.setDate(payoutScheduledAt.getDate() + holdDays);
-      
-      // Determine split method based on affiliate connected accounts
-      let splitMethod: 'mp_marketplace' | 'stripe_connect' | 'manual' | null = 'manual';
-      if (gateway === 'mercadopago' && affiliate.mpUserId && config?.autoPayEnabled) {
-        splitMethod = 'mp_marketplace';
-      } else if (gateway === 'stripe' && affiliate.stripeConnectAccountId && affiliate.stripeConnectStatus === 'connected' && config?.autoPayEnabled) {
-        splitMethod = 'stripe_connect';
+      // Determine payment method from pagamento
+      const metodoPagamento = (pagamento.metodoPagamento || '').toLowerCase();
+      let paymentMethod: 'pix' | 'card' | 'boleto' = 'pix';
+      if (metodoPagamento.includes('card') || metodoPagamento.includes('cartao') || metodoPagamento.includes('credit') || metodoPagamento.includes('debit')) {
+        paymentMethod = 'card';
+      } else if (metodoPagamento.includes('boleto') || metodoPagamento.includes('ticket')) {
+        paymentMethod = 'boleto';
       }
       
-      // Create affiliate sale with scheduled payout
+      // Calculate availability date based on payment method
+      // PIX/Boleto: 7 days, Card: 30 days
+      const holdDays = paymentMethod === 'card' 
+        ? (config?.holdDaysCard ?? 30) 
+        : (config?.holdDaysPix ?? 7);
+      
+      const availableAt = new Date();
+      availableAt.setDate(availableAt.getDate() + holdDays);
+      
+      // Create affiliate sale (manual withdrawal only)
       await storage.createAffiliateSale({
         affiliateId: affiliate.id,
         affiliateLinkId: link.id,
@@ -484,15 +488,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         saleAmount: pagamento.valor,
         commissionAmount,
         commissionPercent,
-        status: splitMethod !== 'manual' ? "pending_payout" : "pending", // pending_payout = scheduled for auto transfer
-        splitMethod,
+        paymentMethod,
+        status: "pending", // pending = aguardando liberação
         mpPaymentId: gateway === 'mercadopago' ? pagamento.mercadopagoPaymentId : null,
         stripePaymentIntentId: gateway === 'stripe' ? pagamento.stripePaymentIntentId : null,
-        payoutScheduledAt: splitMethod !== 'manual' ? payoutScheduledAt : null,
-        payoutAttempts: 0,
+        availableAt,
       });
       
-      // Update affiliate balance (add to pending and total earnings)
+      // Update affiliate balance (add to pending)
       const newPendingAmount = (affiliate.pendingAmount || 0) + commissionAmount;
       const newTotalEarnings = (affiliate.totalEarnings || 0) + commissionAmount;
       await storage.updateAffiliate(affiliate.id, {
@@ -503,10 +506,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Increment conversions on the link
       await storage.incrementAffiliateLinkConversions(link.id);
       
-      const payoutInfo = splitMethod !== 'manual' 
-        ? `scheduled for ${payoutScheduledAt.toISOString()} via ${splitMethod}` 
-        : 'manual payout required';
-      console.log(`[Affiliate] Sale created - affiliateId: ${affiliate.id}, pagamentoId: ${pagamento.id}, commission: ${commissionAmount} (${commissionPercent}%), ${payoutInfo}`);
+      console.log(`[Affiliate] Sale created - affiliateId: ${affiliate.id}, pagamentoId: ${pagamento.id}, commission: ${commissionAmount} (${commissionPercent}%), paymentMethod: ${paymentMethod}, availableAt: ${availableAt.toISOString()}`);
       
       // Send sale notification email to affiliate (non-blocking)
       const affiliateAdmin = await storage.getAdminById(affiliate.adminId);
