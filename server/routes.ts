@@ -10817,15 +10817,36 @@ Seja conversacional e objetivo.`;
                 paymentFailedReason: null,
               });
               
-              // Update the original payment record with renewal info
-              await storage.updateCheckoutPagamento(originalPagamento.id, {
-                dataAprovacao: paymentDate,
-                dataPagamento: paymentDate,
-                dataExpiracao: newExpiration,
-                statusDetail: `Renovação automática Stripe - ${paymentDate.toISOString().split('T')[0]}`,
-              });
+              // Create a NEW payment record for this renewal instead of updating
+              const paymentIntentId = paymentIntent.id;
+              const existingForPI = await db.select().from(checkoutPagamentos)
+                .where(eq(checkoutPagamentos.stripePaymentIntentId, paymentIntentId))
+                .limit(1);
               
-              console.log(`[Stripe Webhook] RENEWAL SUCCESS for ${admin.email}: extended from ${extensionBase.toISOString()} to ${newExpiration.toISOString()}`);
+              if (existingForPI.length === 0) {
+                // Create new payment record for this renewal
+                const renewalPagamento = await storage.createCheckoutPagamento({
+                  email: originalPagamento.email,
+                  nome: originalPagamento.nome,
+                  cpf: originalPagamento.cpf,
+                  telefone: originalPagamento.telefone,
+                  planoId: originalPagamento.planoId,
+                  valor: originalPagamento.valor,
+                  status: 'approved',
+                  statusDetail: `Renovação automática Stripe - ${paymentDate.toISOString().split('T')[0]}`,
+                  metodoPagamento: originalPagamento.metodoPagamento || 'card',
+                  stripePaymentIntentId: paymentIntentId,
+                  stripeSubscriptionId: originalPagamento.stripeSubscriptionId,
+                  stripeCustomerId: originalPagamento.stripeCustomerId,
+                  dataPagamento: paymentDate,
+                  dataAprovacao: paymentDate,
+                  dataExpiracao: newExpiration,
+                  adminId: admin.id,
+                });
+                console.log(`[Stripe Webhook] RENEWAL SUCCESS - Created NEW payment record ${renewalPagamento.id} for ${admin.email}: extended to ${newExpiration.toISOString()}`);
+              } else {
+                console.log(`[Stripe Webhook] RENEWAL already processed for PI ${paymentIntentId}`);
+              }
               
               // Send confirmation notifications
               sendPaymentConfirmedEmailSafe(originalPagamento.email, originalPagamento.nome, plano.nome, newExpiration);
@@ -10942,18 +10963,45 @@ Seja conversacional e objetivo.`;
                 ? new Date(invoice.status_transitions.paid_at * 1000) 
                 : (invoice.created ? new Date(invoice.created * 1000) : new Date());
               
-              // Use pagamento.id since pagamentoId might be null for renewals found by subscriptionId
-              await storage.updateCheckoutPagamento(pagamento.id, {
-                status: 'approved',
-                statusDetail: foundPagamento ? `Renovação automática - ${invoicePaymentDate.toISOString().split('T')[0]}` : 'Assinatura ativa',
-                dataPagamento: invoicePaymentDate,
-                dataAprovacao: invoicePaymentDate,
-                dataExpiracao: expirationDate,
-                adminId: admin.id,
-              });
+              // Check if this is a renewal (foundPagamento means we found it by subscriptionId, not pagamentoId)
+              // Also check if there's already a payment for this invoice to avoid duplicates
+              const invoiceId = invoice.id;
+              const existingForInvoice = await db.select().from(checkoutPagamentos)
+                .where(sql`${checkoutPagamentos.statusDetail} LIKE ${'%' + invoiceId + '%'}`)
+                .limit(1);
               
-              if (foundPagamento) {
-                console.log(`[Stripe Webhook] RENEWAL via invoice.paid for ${pagamento.email}, expires: ${expirationDate.toISOString()}`);
+              if (foundPagamento && existingForInvoice.length === 0) {
+                // This is a renewal - create a NEW payment record instead of updating
+                const renewalPagamento = await storage.createCheckoutPagamento({
+                  email: pagamento.email,
+                  nome: pagamento.nome,
+                  cpf: pagamento.cpf,
+                  telefone: pagamento.telefone,
+                  planoId: pagamento.planoId,
+                  valor: pagamento.valor,
+                  status: 'approved',
+                  statusDetail: `Renovação automática - ${invoicePaymentDate.toISOString().split('T')[0]} - ${invoiceId}`,
+                  metodoPagamento: pagamento.metodoPagamento || 'card',
+                  stripePaymentIntentId: typeof invoice.payment_intent === 'string' ? invoice.payment_intent : null,
+                  stripeSubscriptionId: pagamento.stripeSubscriptionId,
+                  stripeCustomerId: pagamento.stripeCustomerId,
+                  dataPagamento: invoicePaymentDate,
+                  dataAprovacao: invoicePaymentDate,
+                  dataExpiracao: expirationDate,
+                  adminId: admin.id,
+                });
+                console.log(`[Stripe Webhook] RENEWAL - Created NEW payment record ${renewalPagamento.id} for ${pagamento.email}, expires: ${expirationDate.toISOString()}`);
+              } else {
+                // First payment or already processed - just update
+                await storage.updateCheckoutPagamento(pagamento.id, {
+                  status: 'approved',
+                  statusDetail: 'Assinatura ativa',
+                  dataPagamento: invoicePaymentDate,
+                  dataAprovacao: invoicePaymentDate,
+                  dataExpiracao: expirationDate,
+                  adminId: admin.id,
+                });
+                console.log(`[Stripe Webhook] Updated payment ${pagamento.id} for ${pagamento.email}, expires: ${expirationDate.toISOString()}`);
               }
             }
           }
