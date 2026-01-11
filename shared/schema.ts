@@ -1107,6 +1107,7 @@ export const affiliateWithdrawals = pgTable("affiliate_withdrawals", {
   paidAt: timestamp("paid_at"), // Data do pagamento efetivo
   processedBy: text("processed_by"), // ID do admin que processou
   transactionId: text("transaction_id"), // ID da transação PIX (opcional)
+  proofUrl: text("proof_url"), // URL do comprovante de pagamento (imagem ou PDF)
   notes: text("notes"), // Observações do admin
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

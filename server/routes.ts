@@ -14761,7 +14761,7 @@ Seja conversacional e objetivo.`;
       }
 
       const { id } = req.params;
-      const { transactionId, notes } = req.body;
+      const { transactionId, notes, proofUrl } = req.body;
 
       const withdrawal = await storage.getAffiliateWithdrawalById(id);
       if (!withdrawal) {
@@ -14772,22 +14772,33 @@ Seja conversacional e objetivo.`;
         return res.status(400).json({ error: "Este saque já foi processado" });
       }
 
-      // Update withdrawal
+      // Update withdrawal with proof
       await storage.updateAffiliateWithdrawal(id, {
         status: 'paid',
         paidAt: new Date(),
         processedAt: new Date(),
         processedBy: admin.id,
         transactionId: transactionId || null,
+        proofUrl: proofUrl || null,
         notes: notes || null,
       });
 
-      // Update affiliate paid amount
+      // Update affiliate paid amount - move from available to paid
       const affiliate = await storage.getAffiliateById(withdrawal.affiliateId);
       if (affiliate) {
         await storage.updateAffiliate(affiliate.id, {
           paidAmount: (affiliate.paidAmount || 0) + withdrawal.amount,
         });
+
+        // Update all sales linked to this withdrawal to 'paid' status
+        const allSales = await storage.listAffiliateSalesByAffiliate(affiliate.id);
+        const withdrawalSales = allSales.filter(s => s.withdrawalId === id);
+        for (const sale of withdrawalSales) {
+          await storage.updateAffiliateSale(sale.id, {
+            status: 'paid',
+            paidAt: new Date(),
+          });
+        }
 
         // Send email notification for withdrawal paid
         const affiliateAdmin = await storage.getAdminById(affiliate.adminId);
@@ -14807,6 +14818,49 @@ Seja conversacional e objetivo.`;
 
       res.json({ success: true, message: "Saque marcado como pago" });
     } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Upload withdrawal proof (super admin only)
+  app.post("/api/affiliate-withdrawals/:id/proof", upload.single("proof"), async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) return res.status(401).json({ error: "Unauthorized" });
+
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin || admin.role !== "superadmin") {
+        return res.status(403).json({ error: "Apenas super admin pode anexar comprovantes" });
+      }
+
+      const { id } = req.params;
+      const withdrawal = await storage.getAffiliateWithdrawalById(id);
+      if (!withdrawal) {
+        return res.status(404).json({ error: "Saque não encontrado" });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ error: "Arquivo de comprovante é obrigatório" });
+      }
+
+      // Upload to storage
+      const fileBuffer = fs.readFileSync(req.file.path);
+      const fileName = `withdrawal-proofs/${id}-${Date.now()}-${req.file.originalname}`;
+      
+      const proofUrl = await storage.uploadFile(fileBuffer, fileName, req.file.mimetype);
+      
+      // Clean up temp file
+      fs.unlinkSync(req.file.path);
+
+      // Update withdrawal with proof URL
+      await storage.updateAffiliateWithdrawal(id, {
+        proofUrl,
+      });
+
+      res.json({ success: true, proofUrl });
+    } catch (error: any) {
+      console.error("[affiliate] Error uploading proof:", error);
       res.status(400).json({ error: error.message });
     }
   });
