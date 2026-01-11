@@ -27,6 +27,7 @@ interface AdminWithPlan {
   accessExpiresAt: Date | null;
   planoId: string | null;
   lastExpirationEmailSent: Date | null;
+  lastExpirationWhatsappSent: Date | null;
   planName?: string;
   telefone?: string | null;
 }
@@ -139,6 +140,7 @@ async function getAdminsExpiringInDays(days: number): Promise<AdminWithPlan[]> {
       accessExpiresAt: admins.accessExpiresAt,
       planoId: admins.planoId,
       lastExpirationEmailSent: admins.lastExpirationEmailSent,
+      lastExpirationWhatsappSent: admins.lastExpirationWhatsappSent,
       telefone: admins.telefone,
     })
     .from(admins)
@@ -167,6 +169,7 @@ async function getAdminsExpiringInHours(hours: number): Promise<AdminWithPlan[]>
       accessExpiresAt: admins.accessExpiresAt,
       planoId: admins.planoId,
       lastExpirationEmailSent: admins.lastExpirationEmailSent,
+      lastExpirationWhatsappSent: admins.lastExpirationWhatsappSent,
       telefone: admins.telefone,
     })
     .from(admins)
@@ -195,6 +198,7 @@ async function getAdminsExpiredInLastHours(hours: number): Promise<AdminWithPlan
       accessExpiresAt: admins.accessExpiresAt,
       planoId: admins.planoId,
       lastExpirationEmailSent: admins.lastExpirationEmailSent,
+      lastExpirationWhatsappSent: admins.lastExpirationWhatsappSent,
       telefone: admins.telefone,
     })
     .from(admins)
@@ -225,6 +229,7 @@ async function getAdminsExpiredYesterday(): Promise<AdminWithPlan[]> {
       accessExpiresAt: admins.accessExpiresAt,
       planoId: admins.planoId,
       lastExpirationEmailSent: admins.lastExpirationEmailSent,
+      lastExpirationWhatsappSent: admins.lastExpirationWhatsappSent,
       telefone: admins.telefone,
     })
     .from(admins)
@@ -577,6 +582,34 @@ function shouldSendEmail(admin: AdminWithPlan, daysType: '3days' | '1day' | 'exp
   return true;
 }
 
+function shouldSendWhatsApp(admin: AdminWithPlan, daysType: '3days' | '1day' | 'expired' | 'daily_reminder' | 'daily_expired'): boolean {
+  if (!admin.lastExpirationWhatsappSent) return true;
+  
+  const lastSent = new Date(admin.lastExpirationWhatsappSent);
+  const now = new Date();
+  const hoursSinceLastWhatsapp = (now.getTime() - lastSent.getTime()) / (1000 * 60 * 60);
+  
+  if (daysType === '3days') return hoursSinceLastWhatsapp >= 48;
+  if (daysType === '1day') return hoursSinceLastWhatsapp >= 20;
+  if (daysType === 'expired') return hoursSinceLastWhatsapp >= 20;
+  // Para planos diários: não enviar mais de 1 WhatsApp a cada 4 horas
+  if (daysType === 'daily_reminder') return hoursSinceLastWhatsapp >= 4;
+  if (daysType === 'daily_expired') return hoursSinceLastWhatsapp >= 4;
+  
+  return true;
+}
+
+async function markWhatsappSent(adminId: string): Promise<void> {
+  try {
+    await db
+      .update(admins)
+      .set({ lastExpirationWhatsappSent: new Date() })
+      .where(eq(admins.id, adminId));
+  } catch (error) {
+    console.error(`[subscription-scheduler] Error marking whatsapp sent for ${adminId}:`, error);
+  }
+}
+
 async function processExpirationReminders(): Promise<void> {
   const currentHour = new Date().getHours();
   const todayStr = new Date().toISOString().split('T')[0];
@@ -622,17 +655,23 @@ async function processExpirationReminders(): Promise<void> {
         admin.telefone
       );
       
-      // Enviar WhatsApp também
-      const whatsappSuccess = await sendWhatsAppExpirationReminderSafe(
-        admin.telefone,
-        admin.name || "Cliente",
-        planName,
-        0,
-        admin.accessExpiresAt!,
-        admin.email,
-        admin.planoId,
-        admin.telefone
-      );
+      // Enviar WhatsApp também (com verificação de duplicata)
+      let whatsappSuccess = false;
+      if (shouldSendWhatsApp(admin, 'daily_reminder')) {
+        whatsappSuccess = await sendWhatsAppExpirationReminderSafe(
+          admin.telefone,
+          admin.name || "Cliente",
+          planName,
+          0,
+          admin.accessExpiresAt!,
+          admin.email,
+          admin.planoId,
+          admin.telefone
+        );
+        if (whatsappSuccess) {
+          await markWhatsappSent(admin.id);
+        }
+      }
       
       if (emailSuccess || whatsappSuccess) {
         processedAdmins.add(admin.id);
@@ -670,14 +709,20 @@ async function processExpirationReminders(): Promise<void> {
         admin.telefone
       );
       
-      // Enviar WhatsApp também
-      const whatsappSuccess = await sendWhatsAppPlanExpiredSafe(
-        admin.telefone,
-        admin.name || "Cliente",
-        planName,
-        admin.email,
-        admin.planoId
-      );
+      // Enviar WhatsApp também (com verificação de duplicata)
+      let whatsappSuccess = false;
+      if (shouldSendWhatsApp(admin, 'daily_expired')) {
+        whatsappSuccess = await sendWhatsAppPlanExpiredSafe(
+          admin.telefone,
+          admin.name || "Cliente",
+          planName,
+          admin.email,
+          admin.planoId
+        );
+        if (whatsappSuccess) {
+          await markWhatsappSent(admin.id);
+        }
+      }
       
       if (emailSuccess || whatsappSuccess) {
         processedAdmins.add(admin.id);
@@ -721,17 +766,23 @@ async function processExpirationReminders(): Promise<void> {
         admin.telefone
       );
       
-      // Enviar WhatsApp também
-      const whatsappSuccess = await sendWhatsAppExpirationReminderSafe(
-        admin.telefone,
-        admin.name || "Cliente",
-        planName,
-        3,
-        admin.accessExpiresAt!,
-        admin.email,
-        admin.planoId,
-        admin.telefone
-      );
+      // Enviar WhatsApp também (com verificação de duplicata)
+      let whatsappSuccess = false;
+      if (shouldSendWhatsApp(admin, '3days')) {
+        whatsappSuccess = await sendWhatsAppExpirationReminderSafe(
+          admin.telefone,
+          admin.name || "Cliente",
+          planName,
+          3,
+          admin.accessExpiresAt!,
+          admin.email,
+          admin.planoId,
+          admin.telefone
+        );
+        if (whatsappSuccess) {
+          await markWhatsappSent(admin.id);
+        }
+      }
       
       if (emailSuccess || whatsappSuccess) {
         processedAdmins.add(admin.id);
@@ -768,17 +819,23 @@ async function processExpirationReminders(): Promise<void> {
         admin.telefone
       );
       
-      // Enviar WhatsApp também
-      const whatsappSuccess = await sendWhatsAppExpirationReminderSafe(
-        admin.telefone,
-        admin.name || "Cliente",
-        planName,
-        1,
-        admin.accessExpiresAt!,
-        admin.email,
-        admin.planoId,
-        admin.telefone
-      );
+      // Enviar WhatsApp também (com verificação de duplicata)
+      let whatsappSuccess = false;
+      if (shouldSendWhatsApp(admin, '1day')) {
+        whatsappSuccess = await sendWhatsAppExpirationReminderSafe(
+          admin.telefone,
+          admin.name || "Cliente",
+          planName,
+          1,
+          admin.accessExpiresAt!,
+          admin.email,
+          admin.planoId,
+          admin.telefone
+        );
+        if (whatsappSuccess) {
+          await markWhatsappSent(admin.id);
+        }
+      }
       
       if (emailSuccess || whatsappSuccess) {
         processedAdmins.add(admin.id);
@@ -815,14 +872,20 @@ async function processExpirationReminders(): Promise<void> {
           admin.telefone
         );
         
-        // Enviar WhatsApp também
-        const whatsappSuccess = await sendWhatsAppPlanExpiredSafe(
-          admin.telefone,
-          admin.name || "Cliente",
-          planName,
-          admin.email,
-          admin.planoId
-        );
+        // Enviar WhatsApp também (com verificação de duplicata)
+        let whatsappSuccess = false;
+        if (shouldSendWhatsApp(admin, 'expired')) {
+          whatsappSuccess = await sendWhatsAppPlanExpiredSafe(
+            admin.telefone,
+            admin.name || "Cliente",
+            planName,
+            admin.email,
+            admin.planoId
+          );
+          if (whatsappSuccess) {
+            await markWhatsappSent(admin.id);
+          }
+        }
         
         if (emailSuccess || whatsappSuccess) {
           processedAdmins.add(admin.id);

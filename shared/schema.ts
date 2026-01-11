@@ -32,6 +32,7 @@ export const admins = pgTable("admins", {
   landingPageTitle: text("landing_page_title").default("Meus Webinários"), // Título da página inicial
   landingPageDescription: text("landing_page_description").default(""), // Descrição da página inicial
   lastExpirationEmailSent: timestamp("last_expiration_email_sent"), // Último email de vencimento enviado
+  lastExpirationWhatsappSent: timestamp("last_expiration_whatsapp_sent"), // Último WhatsApp de vencimento enviado
   createdAt: timestamp("created_at").defaultNow(),
 });
 
