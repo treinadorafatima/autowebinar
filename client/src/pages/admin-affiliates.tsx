@@ -834,35 +834,63 @@ export default function AdminAffiliatesPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <LinkIcon className="h-5 w-5" />
-                  Link de Convite
+                  Links de Afiliados
                 </CardTitle>
                 <CardDescription>
-                  Compartilhe este link para convidar novos afiliados
+                  Links para cadastro e login de afiliados
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="flex gap-2">
-                  <Input
-                    readOnly
-                    value={`${window.location.origin}/afiliado/cadastro`}
-                    className="font-mono text-sm"
-                    data-testid="input-invite-link"
-                  />
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => {
-                      navigator.clipboard.writeText(`${window.location.origin}/afiliado/cadastro`);
-                      toast({ title: "Link copiado!" });
-                    }}
-                    data-testid="button-copy-invite"
-                  >
-                    <Copy className="h-4 w-4" />
-                  </Button>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label className="text-sm font-medium mb-2 block">Link de Convite (Cadastro)</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      readOnly
+                      value={`${window.location.origin}/afiliado/cadastro`}
+                      className="font-mono text-sm"
+                      data-testid="input-invite-link"
+                    />
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => {
+                        navigator.clipboard.writeText(`${window.location.origin}/afiliado/cadastro`);
+                        toast({ title: "Link copiado!" });
+                      }}
+                      data-testid="button-copy-invite"
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Novos afiliados podem se cadastrar usando este link
+                  </p>
                 </div>
-                <p className="text-sm text-muted-foreground mt-2">
-                  Novos afiliados podem se cadastrar usando este link
-                </p>
+                <div>
+                  <Label className="text-sm font-medium mb-2 block">Link de Login (Painel do Afiliado)</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      readOnly
+                      value={`${window.location.origin}/afiliado/login`}
+                      className="font-mono text-sm"
+                      data-testid="input-login-link"
+                    />
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => {
+                        navigator.clipboard.writeText(`${window.location.origin}/afiliado/login`);
+                        toast({ title: "Link copiado!" });
+                      }}
+                      data-testid="button-copy-login"
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Afiliados cadastrados podem acessar o painel por aqui
+                  </p>
+                </div>
               </CardContent>
             </Card>
 

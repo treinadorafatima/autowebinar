@@ -15167,13 +15167,58 @@ Seja conversacional e objetivo.`;
         }
       }
 
-      if ((newStatus === "refunded" || newStatus === "cancelled") && oldStatus === "pending") {
+      // Handle refund/cancellation from any status (pending, available, withdrawal_requested)
+      if ((newStatus === "refunded" || newStatus === "cancelled") && oldStatus !== "paid" && oldStatus !== "refunded" && oldStatus !== "cancelled") {
         const affiliate = await storage.getAffiliateById(sale.affiliateId);
         if (affiliate) {
-          await storage.updateAffiliate(affiliate.id, {
+          const updates: Record<string, number> = {
             totalEarnings: Math.max(0, (affiliate.totalEarnings || 0) - sale.commissionAmount),
-            pendingAmount: Math.max(0, (affiliate.pendingAmount || 0) - sale.commissionAmount),
-          });
+          };
+          
+          // Deduct from appropriate balance based on current status
+          if (oldStatus === "pending") {
+            updates.pendingAmount = Math.max(0, (affiliate.pendingAmount || 0) - sale.commissionAmount);
+          } else if (oldStatus === "available") {
+            updates.availableAmount = Math.max(0, (affiliate.availableAmount || 0) - sale.commissionAmount);
+          } else if (oldStatus === "withdrawal_requested") {
+            // When refunding from withdrawal_requested:
+            // 1. The sale's commission was never in availableAmount (it was already deducted when withdrawal was created)
+            // 2. We need to cancel the withdrawal and restore OTHER linked sales to available
+            // 3. The refunded sale's commission is lost (no balance adjustment needed beyond totalEarnings)
+            
+            if (sale.withdrawalId) {
+              const withdrawal = await storage.getAffiliateWithdrawalById(sale.withdrawalId);
+              if (withdrawal && withdrawal.status === 'pending') {
+                // Get other sales linked to this withdrawal (excluding the refunded one)
+                const linkedSales = await storage.listAffiliateSalesByAffiliate(affiliate.id);
+                const otherWithdrawalSales = linkedSales.filter(s => 
+                  s.withdrawalId === sale.withdrawalId && 
+                  s.id !== sale.id && 
+                  s.status === 'withdrawal_requested'
+                );
+                
+                // Restore other linked sales to available status
+                for (const linkedSale of otherWithdrawalSales) {
+                  await storage.updateAffiliateSale(linkedSale.id, {
+                    status: 'available',
+                    withdrawalId: null,
+                  });
+                }
+                
+                // Cancel the withdrawal
+                await storage.updateAffiliateWithdrawal(sale.withdrawalId, { status: 'cancelled' });
+                
+                // Add back only the OTHER sales to availableAmount
+                // (the refunded sale's commission is lost, so we don't add it back)
+                const otherSalesTotal = otherWithdrawalSales.reduce((sum, s) => sum + s.commissionAmount, 0);
+                if (otherSalesTotal > 0) {
+                  updates.availableAmount = (affiliate.availableAmount || 0) + otherSalesTotal;
+                }
+              }
+            }
+          }
+          
+          await storage.updateAffiliate(affiliate.id, updates);
         }
       }
 
