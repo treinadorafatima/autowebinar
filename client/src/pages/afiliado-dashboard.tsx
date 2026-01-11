@@ -233,7 +233,7 @@ export default function AfiliadoDashboardPage() {
   });
 
   const { data: planos } = useQuery<Plano[]>({
-    queryKey: ["/api/checkout/planos/ativos"],
+    queryKey: ["/api/checkout/planos/ativos?afiliados=true"],
   });
 
   const { data: affiliateLeads, isLoading: isLoadingLeads } = useQuery<AffiliateLead[]>({

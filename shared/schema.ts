@@ -422,6 +422,7 @@ export const checkoutPlanos = pgTable("checkout_planos", {
   frequencia: integer("frequencia").default(1), // Para recorrente: a cada X períodos
   frequenciaTipo: text("frequencia_tipo").default("months"), // 'days', 'months', 'years'
   disponivelRenovacao: boolean("disponivel_renovacao").notNull().default(false),
+  disponivelAfiliados: boolean("disponivel_afiliados").notNull().default(true), // Exibir no gerador de links de afiliados
   beneficios: text("beneficios").default("[]"), // JSON array de benefícios
   destaque: boolean("destaque").notNull().default(false), // Destacar plano na página
   exibirNaLanding: boolean("exibir_na_landing").notNull().default(true), // Exibir na landing page

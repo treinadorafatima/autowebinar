@@ -54,6 +54,7 @@ interface Plano {
   frequencia: number;
   frequenciaTipo: string;
   disponivelRenovacao: boolean;
+  disponivelAfiliados: boolean;
   beneficios: string;
   destaque: boolean;
   exibirNaLanding: boolean;
@@ -81,6 +82,7 @@ const defaultPlano: Partial<Plano> = {
   frequencia: 1,
   frequenciaTipo: "months",
   disponivelRenovacao: false,
+  disponivelAfiliados: true,
   beneficios: "[]",
   destaque: false,
   exibirNaLanding: true,
@@ -747,6 +749,20 @@ export default function AdminCheckoutPlanos() {
                       <Label htmlFor="disponivelRenovacao">Renovação</Label>
                     </div>
                     <p className="text-xs text-muted-foreground">Aparece para quem renova</p>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        id="disponivelAfiliados"
+                        checked={editingPlano.disponivelAfiliados ?? true}
+                        onCheckedChange={(checked) =>
+                          setEditingPlano({ ...editingPlano, disponivelAfiliados: checked })
+                        }
+                        data-testid="switch-plano-afiliados"
+                      />
+                      <Label htmlFor="disponivelAfiliados">Afiliados</Label>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Aparece no gerador de links</p>
                   </div>
                 </div>
               </div>

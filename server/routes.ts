@@ -6972,8 +6972,14 @@ Seja conversacional e objetivo.`;
 
   app.get("/api/checkout/planos/ativos", async (req, res) => {
     try {
-      const { renovacao, incluirTodos } = req.query;
+      const { renovacao, incluirTodos, afiliados } = req.query;
       let planos = await storage.listCheckoutPlanosAtivos();
+      
+      // Filter for affiliate link generator
+      if (afiliados === 'true') {
+        planos = planos.filter(p => p.disponivelAfiliados !== false);
+        return res.json(planos);
+      }
       
       // By default, only show plans available for renewal (hide test/internal plans)
       // Plans with disponivelRenovacao=false are considered internal/test plans
