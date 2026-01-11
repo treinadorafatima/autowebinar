@@ -260,6 +260,39 @@ async function getPlanName(planoId: string | null): Promise<string> {
   }
 }
 
+/**
+ * Verifica se há um pagamento aprovado recentemente para o admin
+ * Isso evita enviar notificações de expiração logo após um pagamento ser processado
+ */
+async function hasRecentApprovedPayment(adminId: string, hoursBack: number = 24): Promise<boolean> {
+  try {
+    const cutoffDate = new Date();
+    cutoffDate.setHours(cutoffDate.getHours() - hoursBack);
+    
+    const recentPayment = await db
+      .select({ id: checkoutPagamentos.id })
+      .from(checkoutPagamentos)
+      .where(
+        and(
+          eq(checkoutPagamentos.adminId, adminId),
+          eq(checkoutPagamentos.status, 'approved'),
+          gte(checkoutPagamentos.atualizadoEm, cutoffDate)
+        )
+      )
+      .limit(1);
+    
+    if (recentPayment[0]) {
+      console.log(`[subscription-scheduler] Admin ${adminId} has recent approved payment (last ${hoursBack}h) - skipping expiration notification`);
+      return true;
+    }
+    
+    return false;
+  } catch (error) {
+    console.error(`[subscription-scheduler] Error checking recent payments for ${adminId}:`, error);
+    return false; // Em caso de erro, permite o envio
+  }
+}
+
 async function markEmailSent(adminId: string): Promise<void> {
   try {
     await db
@@ -632,6 +665,12 @@ async function processExpirationReminders(): Promise<void> {
         continue;
       }
       
+      // Skip if has recent approved payment (prevents notification after renewal)
+      if (await hasRecentApprovedPayment(admin.id, 24)) {
+        processedAdmins.add(admin.id);
+        continue;
+      }
+      
       const planFreq = await getPlanFrequency(admin.planoId);
       
       // Só processa se for plano diário
@@ -687,6 +726,12 @@ async function processExpirationReminders(): Promise<void> {
       // Skip if already processed in this run
       if (processedAdmins.has(admin.id)) {
         console.log(`[subscription-scheduler] Skipping duplicate for ${admin.email} - already processed`);
+        continue;
+      }
+      
+      // Skip if has recent approved payment (prevents notification after renewal)
+      if (await hasRecentApprovedPayment(admin.id, 24)) {
+        processedAdmins.add(admin.id);
         continue;
       }
       
@@ -747,6 +792,12 @@ async function processExpirationReminders(): Promise<void> {
         continue;
       }
       
+      // Skip if has recent approved payment (prevents notification after renewal)
+      if (await hasRecentApprovedPayment(admin.id, 24)) {
+        processedAdmins.add(admin.id);
+        continue;
+      }
+      
       const planFreq = await getPlanFrequency(admin.planoId);
       if (isDailyPlan(planFreq)) continue; // Ignora planos diários aqui
       
@@ -797,6 +848,12 @@ async function processExpirationReminders(): Promise<void> {
       // Skip if already processed in this run
       if (processedAdmins.has(admin.id)) {
         console.log(`[subscription-scheduler] Skipping duplicate for ${admin.email} - already processed`);
+        continue;
+      }
+      
+      // Skip if has recent approved payment (prevents notification after renewal)
+      if (await hasRecentApprovedPayment(admin.id, 24)) {
+        processedAdmins.add(admin.id);
         continue;
       }
       
@@ -852,6 +909,12 @@ async function processExpirationReminders(): Promise<void> {
         // Skip if already processed in this run
         if (processedAdmins.has(admin.id)) {
           console.log(`[subscription-scheduler] Skipping duplicate for ${admin.email} - already processed`);
+          continue;
+        }
+        
+        // Skip if has recent approved payment (prevents notification after renewal)
+        if (await hasRecentApprovedPayment(admin.id, 24)) {
+          processedAdmins.add(admin.id);
           continue;
         }
         
