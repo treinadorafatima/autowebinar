@@ -1245,3 +1245,75 @@ export function stopPendingMessagesRetry(): void {
     console.log("[whatsapp-notifications] Retry de mensagens pendentes parado");
   }
 }
+
+/**
+ * Envia confirmacao de renovacao via WhatsApp
+ * Informa o usuario que seu plano foi renovado por mais X dias
+ * Safe version - nunca lanca erros
+ */
+export async function sendWhatsAppRenewalConfirmedSafe(
+  phone: string | null | undefined,
+  name: string,
+  planName: string,
+  renewedDays: number,
+  expirationDate: Date | string
+): Promise<boolean> {
+  try {
+    if (!phone) {
+      console.warn("[whatsapp-notifications] Phone nao disponivel para renovacao");
+      return false;
+    }
+
+    const enabled = await isWhatsAppNotificationsEnabled();
+    if (!enabled) {
+      console.warn("[whatsapp-notifications] Notificacoes desabilitadas, nao enviando renovacao");
+      return false;
+    }
+
+    const formattedPhone = formatPhoneNumber(phone);
+    if (!formattedPhone) {
+      console.warn("[whatsapp-notifications] Numero invalido para renovacao:", phone);
+      return false;
+    }
+
+    const dateStr = typeof expirationDate === 'string' 
+      ? new Date(expirationDate).toLocaleDateString('pt-BR')
+      : expirationDate.toLocaleDateString('pt-BR');
+    
+    const periodText = renewedDays === 1 ? '1 dia' : 
+                       renewedDays === 7 ? '1 semana' :
+                       renewedDays === 30 ? '1 mes' :
+                       renewedDays === 365 ? '1 ano' :
+                       `${renewedDays} dias`;
+
+    const defaultMessage = `Ola ${name}!
+
+*Sua assinatura foi renovada com sucesso!*
+
+Plano: ${planName}
+Periodo renovado: *${periodText}*
+Novo vencimento: ${dateStr}
+
+Seu acesso continua ativo e voce pode aproveitar todos os recursos da plataforma.
+
+Acesse: ${getLoginUrl()}
+
+Obrigado por continuar com a gente!`;
+
+    const templateData = {
+      name,
+      planName,
+      renewedDays: renewedDays.toString(),
+      periodText,
+      expirationDate: dateStr,
+      loginUrl: getLoginUrl(),
+      appName: APP_NAME,
+    };
+
+    const message = await getTemplateMessage("renewal_confirmed", templateData, defaultMessage);
+    return await sendNotificationMessage(formattedPhone, message, 'renewal_confirmed', name);
+  } catch (error) {
+    console.error("[whatsapp-notifications] Erro em sendWhatsAppRenewalConfirmedSafe:", error);
+    return false;
+  }
+}

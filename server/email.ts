@@ -3745,3 +3745,188 @@ ${APP_NAME}
     return false;
   }
 }
+
+/**
+ * Envia email de confirmacao de renovacao de assinatura
+ * Informa o usuario que seu plano foi renovado por mais X dias
+ */
+export async function sendRenewalConfirmedEmail(
+  to: string,
+  name: string,
+  planName: string,
+  renewedDays: number,
+  expirationDate: Date | string
+): Promise<boolean> {
+  try {
+    const { client, fromEmail } = await getResendClient();
+    
+    const dateStr = typeof expirationDate === 'string' 
+      ? new Date(expirationDate).toLocaleDateString('pt-BR')
+      : expirationDate.toLocaleDateString('pt-BR');
+    
+    const periodText = renewedDays === 1 ? '1 dia' : 
+                       renewedDays === 7 ? '1 semana' :
+                       renewedDays === 30 ? '1 mes' :
+                       renewedDays === 365 ? '1 ano' :
+                       `${renewedDays} dias`;
+
+    const subject = `Assinatura Renovada - ${planName} - ${APP_NAME}`;
+    
+    const text = `Ola ${name}!
+
+Otimas noticias! Sua assinatura foi renovada com sucesso!
+
+Plano: ${planName}
+Periodo renovado: ${periodText}
+Novo vencimento: ${dateStr}
+
+Seu acesso continua ativo e voce pode aproveitar todos os recursos da plataforma.
+
+Acesse sua conta: ${getLoginUrl()}
+
+Obrigado por continuar com a gente!
+
+---
+${APP_NAME}
+    `.trim();
+
+    const html = `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Assinatura Renovada - ${APP_NAME}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background-color: #f4f4f5;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f5;">
+    <tr>
+      <td style="padding: 40px 20px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+          <tr>
+            <td style="background-color: #10b981; padding: 30px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 600;">Assinatura Renovada!</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 40px 30px;">
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Ola <strong>${name}</strong>,
+              </p>
+              <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Otimas noticias! Sua assinatura foi <strong style="color: #10b981;">renovada com sucesso</strong>!
+              </p>
+              
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 25px 0; background-color: #ecfdf5; border-radius: 6px; border: 2px solid #10b981;">
+                <tr>
+                  <td style="padding: 20px;">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                      <tr>
+                        <td style="padding: 8px 0; color: #374151; font-size: 14px;">
+                          <strong>Plano:</strong> ${planName}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 8px 0; color: #374151; font-size: 14px;">
+                          <strong>Periodo renovado:</strong> <span style="color: #10b981; font-weight: 600;">${periodText}</span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 8px 0; color: #374151; font-size: 14px;">
+                          <strong>Novo vencimento:</strong> ${dateStr}
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+              
+              <p style="margin: 0 0 30px; color: #374151; font-size: 16px; line-height: 1.6;">
+                Seu acesso continua ativo e voce pode aproveitar todos os recursos da plataforma.
+              </p>
+              
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                <tr>
+                  <td style="text-align: center;">
+                    <a href="${getLoginUrl()}" style="display: inline-block; background-color: #10b981; color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 6px; font-weight: 600; font-size: 16px;">
+                      Acessar Conta
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              
+              <p style="margin: 30px 0 0; color: #6b7280; font-size: 14px; line-height: 1.6; text-align: center;">
+                Obrigado por continuar com a gente!
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color: #f8fafc; padding: 20px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0; color: #9ca3af; font-size: 12px;">
+                ${APP_NAME}
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `;
+
+    const result = await client.emails.send({
+      from: fromEmail,
+      replyTo: REPLY_TO_EMAIL,
+      to: [to],
+      subject,
+      html,
+      text,
+    });
+
+    console.log(`[email] Email de renovacao enviado para ${to}`, result);
+    return true;
+  } catch (error) {
+    console.error(`[email] Erro ao enviar email de renovacao para ${to}:`, error);
+    return false;
+  }
+}
+
+/**
+ * Safe version of sendRenewalConfirmedEmail - never throws, queues for retry on failure
+ */
+export async function sendRenewalConfirmedEmailSafe(
+  to: string,
+  name: string,
+  planName: string,
+  renewedDays: number,
+  expirationDate: Date | string
+): Promise<boolean> {
+  const emailType = 'renewal_confirmed';
+  let logId: string | null = null;
+  
+  try {
+    const resend = await getResendClientSafe();
+    if (!resend) {
+      await updateEmailLog(null, 'failed', emailType, to, name, 'RESEND_API_KEY nao configurada');
+      queueEmailForRetry(emailType, to, { name, planName, renewedDays, expirationDate }, 'RESEND_API_KEY not configured');
+      return false;
+    }
+    
+    logId = await logEmailToDatabase(emailType, to, name, 'pending');
+    
+    const result = await sendRenewalConfirmedEmail(to, name, planName, renewedDays, expirationDate);
+    if (result) {
+      await updateEmailLog(logId, 'sent', emailType, to, name);
+      return true;
+    } else {
+      await updateEmailLog(logId, 'failed', emailType, to, name, 'Email send returned false');
+      queueEmailForRetry(emailType, to, { name, planName, renewedDays, expirationDate }, 'Email send returned false');
+      return false;
+    }
+  } catch (err: any) {
+    await updateEmailLog(logId, 'failed', emailType, to, name, err.message);
+    queueEmailForRetry(emailType, to, { name, planName, renewedDays, expirationDate }, err.message);
+    return false;
+  }
+}
