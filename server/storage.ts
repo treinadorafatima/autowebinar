@@ -201,10 +201,31 @@ export interface IStorage {
   createCheckoutAssinatura(assinatura: CheckoutAssinaturaInsert): Promise<CheckoutAssinatura>;
   updateCheckoutAssinatura(id: string, data: Partial<CheckoutAssinaturaInsert>): Promise<CheckoutAssinatura | undefined>;
   // Checkout - Relatórios
-  getCheckoutStats(): Promise<{ totalVendas: number; receitaTotal: number; ticketMedio: number; taxaConversao: number }>;
+  getCheckoutStats(): Promise<{ 
+    totalVendas: number; 
+    receitaTotal: number; 
+    ticketMedio: number; 
+    taxaConversao: number;
+    vendasUnicas: number;
+    receitaUnicas: number;
+    vendasRenovacao: number;
+    receitaRenovacao: number;
+    assinaturasAtivas: number;
+  }>;
   getCheckoutVendasPorPlano(): Promise<{ planoId: string; planoNome: string; quantidade: number; valor: number }[]>;
   getCheckoutVendasPorMetodo(): Promise<{ metodo: string; quantidade: number; valor: number }[]>;
-  getCheckoutVendasPorAfiliado(): Promise<{ afiliadoId: string; afiliadoNome: string; afiliadoEmail: string; quantidade: number; valorVendas: number; valorComissao: number }[]>;
+  getCheckoutVendasPorAfiliado(): Promise<{ 
+    afiliadoId: string; 
+    afiliadoNome: string; 
+    afiliadoEmail: string; 
+    quantidade: number; 
+    valorVendas: number; 
+    valorComissao: number;
+    vendasUnicas: number;
+    valorUnicas: number;
+    vendasRenovacao: number;
+    valorRenovacao: number;
+  }[]>;
   // AI Chat History (Script Generator)
   createAiChat(chat: AiChatInsert): Promise<AiChat>;
   getAiChatById(id: string): Promise<AiChat | undefined>;
@@ -2990,7 +3011,17 @@ export class DatabaseStorage implements IStorage {
     return p.status === 'approved';
   }
 
-  async getCheckoutStats(): Promise<{ totalVendas: number; receitaTotal: number; ticketMedio: number; taxaConversao: number }> {
+  async getCheckoutStats(): Promise<{ 
+    totalVendas: number; 
+    receitaTotal: number; 
+    ticketMedio: number; 
+    taxaConversao: number;
+    vendasUnicas: number;
+    receitaUnicas: number;
+    vendasRenovacao: number;
+    receitaRenovacao: number;
+    assinaturasAtivas: number;
+  }> {
     const allPagamentos = await db.select().from(checkoutPagamentos);
     // Vendas = status approved (pagamento confirmado ou liberado manualmente)
     const vendas = allPagamentos.filter(p => this.isPagamentoVenda(p));
@@ -2998,7 +3029,32 @@ export class DatabaseStorage implements IStorage {
     const receitaTotal = vendas.reduce((sum, p) => sum + (p.valor || 0), 0);
     const ticketMedio = totalVendas > 0 ? receitaTotal / totalVendas : 0;
     const taxaConversao = allPagamentos.length > 0 ? (totalVendas / allPagamentos.length) * 100 : 0;
-    return { totalVendas, receitaTotal, ticketMedio, taxaConversao };
+    
+    // Separar vendas únicas (primeiro pagamento) vs renovações
+    const vendasRenovacao = vendas.filter(p => 
+      p.statusDetail?.includes('Renovação') || 
+      p.statusDetail?.includes('renovação')
+    );
+    const vendasUnicas = vendas.filter(p => 
+      !p.statusDetail?.includes('Renovação') && 
+      !p.statusDetail?.includes('renovação')
+    );
+    
+    // Contar assinaturas recorrentes ativas
+    const assinaturas = await db.select().from(checkoutAssinaturas);
+    const assinaturasAtivas = assinaturas.filter(a => a.status === 'active').length;
+    
+    return { 
+      totalVendas, 
+      receitaTotal, 
+      ticketMedio, 
+      taxaConversao,
+      vendasUnicas: vendasUnicas.length,
+      receitaUnicas: vendasUnicas.reduce((sum, p) => sum + (p.valor || 0), 0),
+      vendasRenovacao: vendasRenovacao.length,
+      receitaRenovacao: vendasRenovacao.reduce((sum, p) => sum + (p.valor || 0), 0),
+      assinaturasAtivas,
+    };
   }
 
   async getCheckoutVendasPorPlano(): Promise<{ planoId: string; planoNome: string; quantidade: number; valor: number }[]> {
@@ -3045,28 +3101,68 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
-  async getCheckoutVendasPorAfiliado(): Promise<{ afiliadoId: string; afiliadoNome: string; afiliadoEmail: string; quantidade: number; valorVendas: number; valorComissao: number }[]> {
+  async getCheckoutVendasPorAfiliado(): Promise<{ 
+    afiliadoId: string; 
+    afiliadoNome: string; 
+    afiliadoEmail: string; 
+    quantidade: number; 
+    valorVendas: number; 
+    valorComissao: number;
+    vendasUnicas: number;
+    valorUnicas: number;
+    vendasRenovacao: number;
+    valorRenovacao: number;
+  }[]> {
     // Busca todas as vendas de afiliados
     const sales = await db.select().from(affiliateSales);
     const allAffiliates = await db.select().from(affiliates);
     const affiliatesMap = new Map(allAffiliates.map(a => [a.id, { nome: a.name, email: a.email }]));
     
-    // Busca pagamentos para verificar quais foram vendas (adminId preenchido OU status approved)
+    // Busca pagamentos para verificar quais foram vendas e separar por tipo
     const allPagamentos = await db.select().from(checkoutPagamentos);
-    const vendaPagamentoIds = new Set(
-      allPagamentos.filter(p => this.isPagamentoVenda(p)).map(p => p.id)
+    const vendaPagamentosMap = new Map(
+      allPagamentos.filter(p => this.isPagamentoVenda(p)).map(p => [p.id, p])
     );
     
-    const result = new Map<string, { quantidade: number; valorVendas: number; valorComissao: number }>();
+    const result = new Map<string, { 
+      quantidade: number; 
+      valorVendas: number; 
+      valorComissao: number;
+      vendasUnicas: number;
+      valorUnicas: number;
+      vendasRenovacao: number;
+      valorRenovacao: number;
+    }>();
+    
     for (const sale of sales) {
       // Conta apenas vendas cujo pagamento foi confirmado E não foram canceladas/reembolsadas
       if (sale.status === 'cancelled' || sale.status === 'refunded') continue;
-      if (!vendaPagamentoIds.has(sale.pagamentoId)) continue;
+      const pagamento = vendaPagamentosMap.get(sale.pagamentoId);
+      if (!pagamento) continue;
       
-      const current = result.get(sale.affiliateId) || { quantidade: 0, valorVendas: 0, valorComissao: 0 };
+      const isRenovacao = pagamento.statusDetail?.includes('Renovação') || pagamento.statusDetail?.includes('renovação');
+      
+      const current = result.get(sale.affiliateId) || { 
+        quantidade: 0, 
+        valorVendas: 0, 
+        valorComissao: 0,
+        vendasUnicas: 0,
+        valorUnicas: 0,
+        vendasRenovacao: 0,
+        valorRenovacao: 0,
+      };
       current.quantidade++;
       current.valorVendas += sale.saleAmount || 0;
       current.valorComissao += sale.commissionAmount || 0;
+      
+      if (isRenovacao) {
+        current.vendasRenovacao++;
+        current.valorRenovacao += sale.saleAmount || 0;
+      } else {
+        current.vendasUnicas++;
+        current.valorUnicas += sale.saleAmount || 0;
+      }
+      
       result.set(sale.affiliateId, current);
     }
     
@@ -3079,6 +3175,10 @@ export class DatabaseStorage implements IStorage {
         quantidade: data.quantidade,
         valorVendas: data.valorVendas,
         valorComissao: data.valorComissao,
+        vendasUnicas: data.vendasUnicas,
+        valorUnicas: data.valorUnicas,
+        vendasRenovacao: data.vendasRenovacao,
+        valorRenovacao: data.valorRenovacao,
       };
     });
   }
