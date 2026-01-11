@@ -4,10 +4,16 @@ import type { AffiliateSale, Affiliate } from "@shared/schema";
 const SCHEDULER_INTERVAL_MS = 3600000; // Check every hour
 let schedulerInterval: NodeJS.Timeout | null = null;
 
+type PaymentVerificationResult = {
+  status: 'valid' | 'refunded' | 'api_error';
+  reason?: string;
+};
+
 /**
  * Verifica se pagamento do MercadoPago foi reembolsado
+ * Retorna 'valid' se aprovado, 'refunded' se reembolsado/cancelado, 'api_error' se falha de API
  */
-async function verifyMercadoPagoPaymentNotRefunded(mpPaymentId: string, accessToken: string): Promise<boolean> {
+async function verifyMercadoPagoPaymentNotRefunded(mpPaymentId: string, accessToken: string): Promise<PaymentVerificationResult> {
   try {
     const response = await fetch(`https://api.mercadopago.com/v1/payments/${mpPaymentId}`, {
       headers: {
@@ -16,33 +22,35 @@ async function verifyMercadoPagoPaymentNotRefunded(mpPaymentId: string, accessTo
     });
 
     if (!response.ok) {
-      console.error(`[payout-scheduler] Error fetching MP payment ${mpPaymentId}:`, await response.text());
-      return false;
+      const errorText = await response.text();
+      console.error(`[payout-scheduler] API error fetching MP payment ${mpPaymentId}:`, errorText);
+      return { status: 'api_error', reason: `HTTP ${response.status}: ${errorText}` };
     }
 
     const payment = await response.json();
     
     if (payment.status === 'refunded' || payment.status === 'cancelled' || payment.status === 'charged_back') {
       console.log(`[payout-scheduler] MP payment ${mpPaymentId} was refunded/cancelled/chargeback - status: ${payment.status}`);
-      return false;
+      return { status: 'refunded', reason: payment.status };
     }
 
     if (payment.status !== 'approved') {
       console.log(`[payout-scheduler] MP payment ${mpPaymentId} is not approved - status: ${payment.status}`);
-      return false;
+      return { status: 'api_error', reason: `Payment status: ${payment.status}` };
     }
 
-    return true;
-  } catch (error) {
-    console.error(`[payout-scheduler] Error verifying MP payment ${mpPaymentId}:`, error);
-    return false;
+    return { status: 'valid' };
+  } catch (error: any) {
+    console.error(`[payout-scheduler] Network error verifying MP payment ${mpPaymentId}:`, error);
+    return { status: 'api_error', reason: error.message };
   }
 }
 
 /**
  * Verifica se pagamento do Stripe foi reembolsado
+ * Retorna 'valid' se aprovado, 'refunded' se reembolsado/cancelado, 'api_error' se falha de API
  */
-async function verifyStripePaymentNotRefunded(stripePaymentIntentId: string, stripeSecretKey: string): Promise<boolean> {
+async function verifyStripePaymentNotRefunded(stripePaymentIntentId: string, stripeSecretKey: string): Promise<PaymentVerificationResult> {
   try {
     const response = await fetch(`https://api.stripe.com/v1/payment_intents/${stripePaymentIntentId}`, {
       headers: {
@@ -51,15 +59,16 @@ async function verifyStripePaymentNotRefunded(stripePaymentIntentId: string, str
     });
 
     if (!response.ok) {
-      console.error(`[payout-scheduler] Error fetching Stripe payment ${stripePaymentIntentId}:`, await response.text());
-      return false;
+      const errorText = await response.text();
+      console.error(`[payout-scheduler] API error fetching Stripe payment ${stripePaymentIntentId}:`, errorText);
+      return { status: 'api_error', reason: `HTTP ${response.status}: ${errorText}` };
     }
 
     const paymentIntent = await response.json();
     
     if (paymentIntent.status === 'canceled') {
       console.log(`[payout-scheduler] Stripe payment ${stripePaymentIntentId} was cancelled`);
-      return false;
+      return { status: 'refunded', reason: 'canceled' };
     }
 
     const chargesResponse = await fetch(`https://api.stripe.com/v1/charges?payment_intent=${stripePaymentIntentId}`, {
@@ -73,21 +82,30 @@ async function verifyStripePaymentNotRefunded(stripePaymentIntentId: string, str
       for (const charge of charges.data) {
         if (charge.refunded || charge.amount_refunded > 0) {
           console.log(`[payout-scheduler] Stripe payment ${stripePaymentIntentId} was refunded`);
-          return false;
+          return { status: 'refunded', reason: 'refunded' };
         }
       }
+    } else {
+      const errorText = await chargesResponse.text();
+      console.error(`[payout-scheduler] API error fetching Stripe charges:`, errorText);
+      return { status: 'api_error', reason: `Charges fetch failed: ${errorText}` };
     }
 
-    return paymentIntent.status === 'succeeded';
-  } catch (error) {
-    console.error(`[payout-scheduler] Error verifying Stripe payment ${stripePaymentIntentId}:`, error);
-    return false;
+    if (paymentIntent.status === 'succeeded') {
+      return { status: 'valid' };
+    }
+    
+    return { status: 'api_error', reason: `Payment status: ${paymentIntent.status}` };
+  } catch (error: any) {
+    console.error(`[payout-scheduler] Network error verifying Stripe payment ${stripePaymentIntentId}:`, error);
+    return { status: 'api_error', reason: error.message };
   }
 }
 
 /**
  * Processa vendas que atingiram o hold period e marca como disponíveis para saque
  * Também verifica se houve reembolso antes de liberar
+ * Trata falhas de API como soft failures (retry na próxima execução)
  */
 async function processSaleAvailability(sale: AffiliateSale): Promise<void> {
   try {
@@ -105,22 +123,29 @@ async function processSaleAvailability(sale: AffiliateSale): Promise<void> {
     }
 
     // Verificar se pagamento foi reembolsado antes de liberar
-    let isPaymentValid = true;
+    let verificationResult: PaymentVerificationResult = { status: 'valid' };
 
     if (sale.mpPaymentId) {
       const accessToken = await storage.getCheckoutConfig('MERCADOPAGO_ACCESS_TOKEN');
       if (accessToken) {
-        isPaymentValid = await verifyMercadoPagoPaymentNotRefunded(sale.mpPaymentId, accessToken);
+        verificationResult = await verifyMercadoPagoPaymentNotRefunded(sale.mpPaymentId, accessToken);
       }
     } else if (sale.stripePaymentIntentId) {
       const stripeSecretKey = await storage.getCheckoutConfig('STRIPE_SECRET_KEY');
       if (stripeSecretKey) {
-        isPaymentValid = await verifyStripePaymentNotRefunded(sale.stripePaymentIntentId, stripeSecretKey);
+        verificationResult = await verifyStripePaymentNotRefunded(sale.stripePaymentIntentId, stripeSecretKey);
       }
     }
 
-    if (!isPaymentValid) {
-      console.log(`[payout-scheduler] Payment was refunded - marking sale as refunded`);
+    // Se houve erro de API, pular esta venda e tentar novamente na próxima execução
+    if (verificationResult.status === 'api_error') {
+      console.log(`[payout-scheduler] API error for sale ${sale.id} - will retry later: ${verificationResult.reason}`);
+      return;
+    }
+
+    // Se pagamento foi explicitamente reembolsado/cancelado
+    if (verificationResult.status === 'refunded') {
+      console.log(`[payout-scheduler] Payment was refunded - marking sale as refunded: ${verificationResult.reason}`);
       await storage.updateAffiliateSale(sale.id, {
         status: 'refunded',
       });
@@ -136,6 +161,8 @@ async function processSaleAvailability(sale: AffiliateSale): Promise<void> {
     }
 
     // Pagamento válido - marcar como disponível para saque
+    // Nota: não sobrescrevemos availableAt pois ele serve como data de elegibilidade prevista
+    // O campo updatedAt registra quando a venda foi realmente liberada
     await storage.updateAffiliateSale(sale.id, {
       status: 'available',
     });

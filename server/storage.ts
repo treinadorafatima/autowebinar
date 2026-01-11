@@ -4812,14 +4812,40 @@ Sempre adapte o tom ao contexto fornecido pelo usuário.`;
   }
 
   async listSalesReadyForAvailability(): Promise<AffiliateSale[]> {
-    return db.select().from(affiliateSales)
-      .where(
-        and(
-          eq(affiliateSales.status, 'pending'),
-          lte(affiliateSales.availableAt, new Date())
-        )
-      )
-      .orderBy(affiliateSales.availableAt);
+    // Get affiliate config for hold periods
+    const config = await this.getAffiliateConfig();
+    const holdDaysPix = config?.holdDaysPix ?? 7;
+    const holdDaysCard = config?.holdDaysCard ?? 30;
+    
+    // Get all pending sales
+    const pendingSales = await db.select().from(affiliateSales)
+      .where(eq(affiliateSales.status, 'pending'))
+      .orderBy(affiliateSales.createdAt);
+    
+    const now = new Date();
+    
+    // Filter based on availableAt (if set) or calculated hold period
+    return pendingSales.filter(sale => {
+      // If availableAt is already set, respect it (manual override or precomputed)
+      if (sale.availableAt) {
+        return now >= new Date(sale.availableAt);
+      }
+      
+      // Otherwise, calculate from createdAt + hold days based on payment method
+      const createdAt = new Date(sale.createdAt);
+      const paymentMethod = sale.paymentMethod || 'pix';
+      
+      // Determine hold days based on payment method
+      // card/cartao/credit/debit = 30 days, pix/boleto = 7 days
+      const isCardPayment = ['card', 'cartao', 'credit', 'debit', 'credit_card', 'debit_card'].includes(paymentMethod.toLowerCase());
+      const holdDays = isCardPayment ? holdDaysCard : holdDaysPix;
+      
+      // Calculate when sale should become available
+      const availableDate = new Date(createdAt);
+      availableDate.setDate(availableDate.getDate() + holdDays);
+      
+      return now >= availableDate;
+    });
   }
 
   async listAvailableSalesForAffiliate(affiliateId: string): Promise<AffiliateSale[]> {
