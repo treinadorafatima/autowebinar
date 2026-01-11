@@ -13890,6 +13890,156 @@ Seja conversacional e objetivo.`;
     }
   });
 
+  // Get affiliate balance (pending, available, requested, paid)
+  app.get("/api/affiliates/:id/balance", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) return res.status(401).json({ error: "Unauthorized" });
+
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin) return res.status(401).json({ error: "Unauthorized" });
+
+      const affiliate = await storage.getAffiliateById(req.params.id);
+      if (!affiliate) return res.status(404).json({ error: "Afiliado não encontrado" });
+
+      if (admin.role !== "superadmin" && affiliate.adminId !== admin.id) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+
+      // Get config for hold days info
+      const config = await storage.getAffiliateConfig();
+      
+      // Get available sales to show details
+      const availableSales = await storage.listAvailableSalesForAffiliate(req.params.id);
+      const pendingSales = await storage.listAffiliateSalesByAffiliate(req.params.id);
+      const pendingSalesFiltered = pendingSales.filter(s => s.status === 'pending');
+
+      res.json({
+        pendingAmount: affiliate.pendingAmount || 0,
+        availableAmount: affiliate.availableAmount || 0,
+        paidAmount: affiliate.paidAmount || 0,
+        totalEarnings: affiliate.totalEarnings || 0,
+        minWithdrawal: config?.minWithdrawal || 5000,
+        holdDaysPix: config?.holdDaysPix || 7,
+        holdDaysCard: config?.holdDaysCard || 30,
+        availableSalesCount: availableSales.length,
+        pendingSalesCount: pendingSalesFiltered.length,
+        pixKey: affiliate.pixKey || null,
+        pixKeyType: affiliate.pixKeyType || null,
+      });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Request withdrawal
+  app.post("/api/affiliates/:id/withdrawals", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) return res.status(401).json({ error: "Unauthorized" });
+
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin) return res.status(401).json({ error: "Unauthorized" });
+
+      const affiliate = await storage.getAffiliateById(req.params.id);
+      if (!affiliate) return res.status(404).json({ error: "Afiliado não encontrado" });
+
+      if (affiliate.adminId !== admin.id) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+
+      // Validate affiliate has PIX key configured
+      if (!affiliate.pixKey || !affiliate.pixKeyType) {
+        return res.status(400).json({ error: "Configure sua chave PIX antes de solicitar saque" });
+      }
+
+      // Get config for minimum withdrawal
+      const config = await storage.getAffiliateConfig();
+      const minWithdrawal = config?.minWithdrawal || 5000;
+
+      // Check available balance
+      const availableAmount = affiliate.availableAmount || 0;
+      if (availableAmount < minWithdrawal) {
+        return res.status(400).json({ 
+          error: `Saldo disponível insuficiente. Mínimo para saque: R$ ${(minWithdrawal / 100).toFixed(2)}` 
+        });
+      }
+
+      // Get all available sales for this affiliate
+      const availableSales = await storage.listAvailableSalesForAffiliate(req.params.id);
+      if (availableSales.length === 0) {
+        return res.status(400).json({ error: "Nenhuma comissão disponível para saque" });
+      }
+
+      // Calculate total amount from available sales
+      const totalAmount = availableSales.reduce((sum, s) => sum + s.commissionAmount, 0);
+
+      // Create withdrawal request
+      const withdrawal = await storage.createAffiliateWithdrawal({
+        affiliateId: affiliate.id,
+        amount: totalAmount,
+        status: "pending",
+        pixKey: affiliate.pixKey,
+        pixKeyType: affiliate.pixKeyType,
+        requestedAt: new Date(),
+      });
+
+      // Update all available sales to link them to this withdrawal
+      for (const sale of availableSales) {
+        await storage.updateAffiliateSale(sale.id, {
+          status: 'withdrawal_requested',
+          withdrawalId: withdrawal.id,
+        });
+      }
+
+      // Update affiliate balance: move from available to 0 (will be paid by admin)
+      await storage.updateAffiliate(affiliate.id, {
+        availableAmount: 0,
+      });
+
+      console.log(`[Affiliate] Withdrawal requested - affiliateId: ${affiliate.id}, amount: ${totalAmount}, withdrawalId: ${withdrawal.id}`);
+
+      res.json({
+        success: true,
+        withdrawal: {
+          id: withdrawal.id,
+          amount: totalAmount,
+          salesCount: availableSales.length,
+          status: 'pending',
+        },
+      });
+    } catch (error: any) {
+      console.error("[Affiliate] Error requesting withdrawal:", error);
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Get affiliate withdrawals
+  app.get("/api/affiliates/:id/withdrawals", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) return res.status(401).json({ error: "Unauthorized" });
+
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin) return res.status(401).json({ error: "Unauthorized" });
+
+      const affiliate = await storage.getAffiliateById(req.params.id);
+      if (!affiliate) return res.status(404).json({ error: "Afiliado não encontrado" });
+
+      if (admin.role !== "superadmin" && affiliate.adminId !== admin.id) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+
+      const withdrawals = await storage.listAffiliateWithdrawalsByAffiliate(req.params.id);
+      res.json(withdrawals);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
   // ============================================
   // AFFILIATE PAYOUT MANAGEMENT (ADMIN ONLY)
   // ============================================
@@ -13928,18 +14078,18 @@ Seja conversacional e objetivo.`;
       const { getAffiliatePayoutSchedulerStatus } = await import("./affiliate-payout-scheduler");
       const status = await getAffiliatePayoutSchedulerStatus();
       
-      const pendingSales = await storage.listPendingPayoutSales();
+      const pendingSales = await storage.listSalesReadyForAvailability();
       
       res.json({
         ...status,
-        pendingPayouts: pendingSales.length,
+        pendingAvailability: pendingSales.length,
       });
     } catch (error: any) {
       res.status(400).json({ error: error.message });
     }
   });
 
-  // Manually trigger payout processing
+  // Manually trigger availability processing
   app.post("/api/admin/affiliate-payout/process", async (req, res) => {
     try {
       const token = req.headers.authorization?.split(" ")[1];
@@ -13951,8 +14101,8 @@ Seja conversacional e objetivo.`;
         return res.status(403).json({ error: "Acesso negado - apenas superadmin" });
       }
 
-      const { manualProcessPendingPayouts } = await import("./affiliate-payout-scheduler");
-      const result = await manualProcessPendingPayouts();
+      const { manualProcessAvailability } = await import("./affiliate-payout-scheduler");
+      const result = await manualProcessAvailability();
       
       res.json({
         success: true,
@@ -14066,6 +14216,156 @@ Seja conversacional e objetivo.`;
       });
 
       res.json({ success: true, message: "Comissão cancelada" });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // ============================================
+  // AFFILIATE WITHDRAWALS MANAGEMENT (ADMIN ONLY)
+  // ============================================
+
+  // List all pending withdrawals (admin view)
+  app.get("/api/admin/affiliate-withdrawals", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) return res.status(401).json({ error: "Unauthorized" });
+
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin || admin.role !== "superadmin") {
+        return res.status(403).json({ error: "Acesso negado - apenas superadmin" });
+      }
+
+      const withdrawals = await storage.listAffiliateWithdrawals();
+      
+      // Enrich with affiliate info
+      const enrichedWithdrawals = await Promise.all(
+        withdrawals.map(async (w) => {
+          const affiliate = await storage.getAffiliateById(w.affiliateId);
+          const affiliateAdmin = affiliate ? await storage.getAdminById(affiliate.adminId) : null;
+          return {
+            ...w,
+            affiliateName: affiliateAdmin?.name || 'Desconhecido',
+            affiliateEmail: affiliateAdmin?.email || 'Desconhecido',
+          };
+        })
+      );
+
+      res.json(enrichedWithdrawals);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Approve withdrawal (mark as paid by admin)
+  app.post("/api/admin/affiliate-withdrawals/:id/approve", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) return res.status(401).json({ error: "Unauthorized" });
+
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin || admin.role !== "superadmin") {
+        return res.status(403).json({ error: "Acesso negado - apenas superadmin" });
+      }
+
+      const withdrawal = await storage.getAffiliateWithdrawalById(req.params.id);
+      if (!withdrawal) return res.status(404).json({ error: "Solicitação de saque não encontrada" });
+
+      if (withdrawal.status !== 'pending') {
+        return res.status(400).json({ error: `Saque já está ${withdrawal.status}` });
+      }
+
+      const affiliate = await storage.getAffiliateById(withdrawal.affiliateId);
+      if (!affiliate) return res.status(404).json({ error: "Afiliado não encontrado" });
+
+      // Get all sales linked to this withdrawal
+      const allSales = await storage.listAffiliateSalesByAffiliate(withdrawal.affiliateId);
+      const withdrawalSales = allSales.filter(s => s.withdrawalId === withdrawal.id);
+
+      // Mark withdrawal as approved/paid
+      await storage.updateAffiliateWithdrawal(req.params.id, {
+        status: 'approved',
+        processedAt: new Date(),
+        processedBy: admin.id,
+        paidAt: new Date(),
+      });
+
+      // Mark all linked sales as paid
+      for (const sale of withdrawalSales) {
+        await storage.updateAffiliateSale(sale.id, {
+          status: 'paid',
+          paidAt: new Date(),
+        });
+      }
+
+      // Update affiliate balance
+      const newPaidAmount = (affiliate.paidAmount || 0) + withdrawal.amount;
+      await storage.updateAffiliate(affiliate.id, {
+        paidAmount: newPaidAmount,
+      });
+
+      console.log(`[Affiliate] Withdrawal approved - id: ${withdrawal.id}, amount: ${withdrawal.amount}, by: ${admin.email}`);
+
+      res.json({ success: true, message: "Saque aprovado com sucesso" });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Reject withdrawal
+  app.post("/api/admin/affiliate-withdrawals/:id/reject", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) return res.status(401).json({ error: "Unauthorized" });
+
+      const admin = await storage.getAdminByEmail(email);
+      if (!admin || admin.role !== "superadmin") {
+        return res.status(403).json({ error: "Acesso negado - apenas superadmin" });
+      }
+
+      const { reason } = req.body;
+      const withdrawal = await storage.getAffiliateWithdrawalById(req.params.id);
+      if (!withdrawal) return res.status(404).json({ error: "Solicitação de saque não encontrada" });
+
+      if (withdrawal.status !== 'pending') {
+        return res.status(400).json({ error: `Saque já está ${withdrawal.status}` });
+      }
+
+      const affiliate = await storage.getAffiliateById(withdrawal.affiliateId);
+      if (!affiliate) return res.status(404).json({ error: "Afiliado não encontrado" });
+
+      // Get all sales linked to this withdrawal
+      const allSales = await storage.listAffiliateSalesByAffiliate(withdrawal.affiliateId);
+      const withdrawalSales = allSales.filter(s => s.withdrawalId === withdrawal.id);
+
+      // Mark withdrawal as rejected
+      await storage.updateAffiliateWithdrawal(req.params.id, {
+        status: 'rejected',
+        processedAt: new Date(),
+        processedBy: admin.id,
+        notes: reason || 'Rejeitado pelo administrador',
+      });
+
+      // Return sales to available status
+      for (const sale of withdrawalSales) {
+        await storage.updateAffiliateSale(sale.id, {
+          status: 'available',
+          withdrawalId: null,
+        });
+      }
+
+      // Return amount to available balance
+      const newAvailableAmount = (affiliate.availableAmount || 0) + withdrawal.amount;
+      await storage.updateAffiliate(affiliate.id, {
+        availableAmount: newAvailableAmount,
+      });
+
+      console.log(`[Affiliate] Withdrawal rejected - id: ${withdrawal.id}, reason: ${reason}, by: ${admin.email}`);
+
+      res.json({ success: true, message: "Saque rejeitado" });
     } catch (error: any) {
       res.status(400).json({ error: error.message });
     }
