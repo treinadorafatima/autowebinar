@@ -1498,9 +1498,21 @@ async function validateMediaBeforeSend(media: MediaMessage): Promise<MediaValida
     // Convert relative URLs to absolute URLs
     let mediaUrl = media.url;
     if (mediaUrl.startsWith('/')) {
-      const host = process.env.REPLIT_DEV_DOMAIN || 'localhost:5000';
-      const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
-      mediaUrl = `${protocol}://${host}${mediaUrl}`;
+      // Support multiple hosting environments: Render, Replit, localhost
+      const renderUrl = process.env.RENDER_EXTERNAL_URL; // e.g., https://app-name.onrender.com
+      const replitDomain = process.env.REPLIT_DEV_DOMAIN;
+      const appUrl = process.env.APP_URL; // Custom domain if set
+      
+      if (renderUrl) {
+        mediaUrl = `${renderUrl}${mediaUrl}`;
+      } else if (appUrl) {
+        mediaUrl = `${appUrl}${mediaUrl}`;
+      } else if (replitDomain) {
+        const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
+        mediaUrl = `${protocol}://${replitDomain}${mediaUrl}`;
+      } else {
+        mediaUrl = `http://localhost:5000${mediaUrl}`;
+      }
     }
     
     // HEAD request to check size and type without downloading
