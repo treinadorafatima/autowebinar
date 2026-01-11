@@ -5,12 +5,14 @@ import {
   sendExpirationReminderEmail, 
   sendExpiredRenewalEmail,
   sendAutoRenewalPaymentEmail,
-  sendRecurringPaymentFailedReminderEmail
+  sendRecurringPaymentFailedReminderEmail,
+  sendRenewalConfirmedEmailSafe
 } from "./email";
 import { 
   sendWhatsAppPlanExpiredSafe,
   sendWhatsAppExpirationReminderSafe,
-  sendWhatsAppRecurringPaymentFailedReminderSafe
+  sendWhatsAppRecurringPaymentFailedReminderSafe,
+  sendWhatsAppRenewalConfirmedSafe
 } from "./whatsapp-notifications";
 import { storage } from "./storage";
 import { getAppUrl } from "./utils/getAppUrl";
@@ -112,6 +114,108 @@ function calculateExpirationDate(plano: {
 
 // Exportar para uso nos webhooks
 export { calculateExpirationDate };
+
+/**
+ * Calcula quantos dias o plano renova baseado nas configurações do plano
+ * Retorna o número de dias para exibir nas notificações
+ */
+export function calculateRenewedDays(plano: {
+  tipoCobranca?: string;
+  frequencia?: number;
+  frequenciaTipo?: string;
+  prazoDias?: number;
+}): number {
+  if (plano.tipoCobranca === 'recorrente') {
+    const freq = plano.frequencia || 1;
+    const freqTipo = plano.frequenciaTipo || 'months';
+    
+    if (freqTipo === 'days') {
+      return freq;
+    } else if (freqTipo === 'weeks') {
+      return freq * 7;
+    } else if (freqTipo === 'months') {
+      return freq * 30; // Aproximação
+    } else if (freqTipo === 'years') {
+      return freq * 365;
+    }
+    return freq * 30; // Fallback
+  }
+  return plano.prazoDias || 30;
+}
+
+/**
+ * Cache de notificações enviadas para evitar duplicatas
+ * Chave: `renewal_${adminId}_${pagamentoId}`
+ * TTL: 1 hora (suficiente para evitar duplicatas de webhooks)
+ */
+const renewalNotificationCache = new Map<string, number>();
+const RENEWAL_NOTIFICATION_TTL = 3600000; // 1 hora
+
+function cleanupRenewalCache(): void {
+  const now = Date.now();
+  for (const [key, timestamp] of renewalNotificationCache.entries()) {
+    if (now - timestamp > RENEWAL_NOTIFICATION_TTL) {
+      renewalNotificationCache.delete(key);
+    }
+  }
+}
+
+// Limpar cache a cada 30 minutos
+setInterval(cleanupRenewalCache, 1800000);
+
+/**
+ * Envia notificações de renovação confirmada (email + WhatsApp)
+ * Com deduplicação para evitar múltiplas mensagens do mesmo evento
+ * 
+ * @param adminEmail - Email do admin
+ * @param adminName - Nome do admin  
+ * @param adminPhone - Telefone do admin (opcional)
+ * @param planName - Nome do plano
+ * @param plano - Configurações do plano para calcular dias
+ * @param expirationDate - Nova data de expiração
+ * @param pagamentoId - ID do pagamento (para deduplicação)
+ * @param adminId - ID do admin (para deduplicação)
+ * @returns true se notificações foram enviadas, false se já foram enviadas antes
+ */
+export async function sendRenewalNotification(
+  adminEmail: string,
+  adminName: string,
+  adminPhone: string | null | undefined,
+  planName: string,
+  plano: {
+    tipoCobranca?: string;
+    frequencia?: number;
+    frequenciaTipo?: string;
+    prazoDias?: number;
+  },
+  expirationDate: Date,
+  pagamentoId: string,
+  adminId: string
+): Promise<boolean> {
+  // Verificar cache de deduplicação
+  const cacheKey = `renewal_${adminId}_${pagamentoId}`;
+  if (renewalNotificationCache.has(cacheKey)) {
+    console.log(`[subscription-scheduler] Renewal notification already sent for ${cacheKey}, skipping`);
+    return false;
+  }
+  
+  // Marcar como enviado imediatamente (antes de enviar, para evitar race conditions)
+  renewalNotificationCache.set(cacheKey, Date.now());
+  
+  const renewedDays = calculateRenewedDays(plano);
+  
+  // Enviar notificações em paralelo
+  const [emailResult, whatsappResult] = await Promise.all([
+    sendRenewalConfirmedEmailSafe(adminEmail, adminName, planName, renewedDays, expirationDate),
+    adminPhone 
+      ? sendWhatsAppRenewalConfirmedSafe(adminPhone, adminName, planName, renewedDays, expirationDate)
+      : Promise.resolve(false)
+  ]);
+  
+  console.log(`[subscription-scheduler] Renewal notification sent to ${adminEmail}: email=${emailResult}, whatsapp=${whatsappResult}`);
+  
+  return emailResult || whatsappResult;
+}
 
 interface RenewalPaymentData {
   pixCopiaCola: string | null;
