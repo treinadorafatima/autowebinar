@@ -167,13 +167,15 @@ setInterval(cleanupRenewalCache, 1800000);
  * Envia notificações de renovação confirmada (email + WhatsApp)
  * Com deduplicação para evitar múltiplas mensagens do mesmo evento
  * 
+ * Deduplicação baseada em adminId + expirationDate (YYYY-MM-DD) para garantir
+ * que tanto webhooks quanto sync jobs usem a mesma chave de cache.
+ * 
  * @param adminEmail - Email do admin
  * @param adminName - Nome do admin  
  * @param adminPhone - Telefone do admin (opcional)
  * @param planName - Nome do plano
  * @param plano - Configurações do plano para calcular dias
  * @param expirationDate - Nova data de expiração
- * @param pagamentoId - ID do pagamento (para deduplicação)
  * @param adminId - ID do admin (para deduplicação)
  * @returns true se notificações foram enviadas, false se já foram enviadas antes
  */
@@ -189,11 +191,13 @@ export async function sendRenewalNotification(
     prazoDias?: number;
   },
   expirationDate: Date,
-  pagamentoId: string,
   adminId: string
 ): Promise<boolean> {
   // Verificar cache de deduplicação
-  const cacheKey = `renewal_${adminId}_${pagamentoId}`;
+  // Usar adminId + expirationDate.toISOString().split('T')[0] como chave
+  // Isso garante que webhooks e sync jobs usem a mesma chave
+  const expirationDateStr = expirationDate.toISOString().split('T')[0];
+  const cacheKey = `renewal_${adminId}_${expirationDateStr}`;
   if (renewalNotificationCache.has(cacheKey)) {
     console.log(`[subscription-scheduler] Renewal notification already sent for ${cacheKey}, skipping`);
     return false;
@@ -1328,7 +1332,6 @@ async function syncMercadoPagoSubscriptions(): Promise<void> {
                   plano.nome,
                   plano,
                   finalExpiration,
-                  `mp_sync_${pagamento.id}_${realApprovalDate.toISOString().split('T')[0]}`,
                   admin.id
                 );
                 
@@ -1453,7 +1456,6 @@ async function syncStripePayments(): Promise<void> {
                     plano.nome,
                     plano,
                     finalExpiration,
-                    `stripe_sync_${pagamento.id}_${paymentDate.toISOString().split('T')[0]}`,
                     admin.id
                   );
                   
@@ -1607,7 +1609,6 @@ async function syncStripeActiveSubscriptions(): Promise<void> {
                 plano.nome,
                 plano,
                 newExpiration,
-                `sync_${pagamento.id}_${invoiceDate}`,
                 admin.id
               );
 

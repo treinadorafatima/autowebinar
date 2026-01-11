@@ -10851,12 +10851,6 @@ Seja conversacional e objetivo.`;
               
               // Send renewal confirmation notifications (centralized with deduplication)
               const telefoneRenewal = admin.telefone || originalPagamento.telefone;
-              const renewalPagamentoId = existingForPI.length === 0 
-                ? (await db.select().from(checkoutPagamentos)
-                    .where(eq(checkoutPagamentos.stripePaymentIntentId, paymentIntentId))
-                    .limit(1))[0]?.id || `renewal_pi_${paymentIntentId}`
-                : `already_${paymentIntentId}`;
-              
               sendRenewalNotification(
                 originalPagamento.email,
                 originalPagamento.nome,
@@ -10864,7 +10858,6 @@ Seja conversacional e objetivo.`;
                 plano.nome,
                 plano,
                 newExpiration,
-                renewalPagamentoId,
                 admin.id
               );
             }
@@ -11014,7 +11007,6 @@ Seja conversacional e objetivo.`;
                   plano.nome,
                   plano,
                   expirationDate,
-                  renewalPagamento.id,
                   admin.id
                 );
               } else {
