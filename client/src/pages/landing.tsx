@@ -1412,11 +1412,11 @@ export default function LandingPage() {
             <Button
               size="lg"
               onClick={() => setLocation("/register")}
-              className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-lg h-14 px-12 shadow-xl shadow-blue-500/25"
+              className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-base sm:text-lg h-12 sm:h-14 px-6 sm:px-12 shadow-xl shadow-blue-500/25 w-full sm:w-auto"
               data-testid="button-final-cta"
             >
               Começar Agora - É Grátis
-              <ArrowRight className="w-5 h-5 ml-2" />
+              <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 ml-2" />
             </Button>
             <p className="text-slate-400 text-sm mt-4">
               Sem cartão de crédito. Cancele quando quiser.
