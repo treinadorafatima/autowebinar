@@ -10301,6 +10301,62 @@ Seja conversacional e objetivo.`;
               }
             }
 
+            // Handle refund/chargeback from MercadoPago
+            if (payment.status === 'refunded' || payment.status === 'charged_back') {
+              console.log(`[MP Webhook] Refund/Chargeback received for payment ${pagamentoId}: ${payment.status}`);
+              
+              // Handle affiliate sale refund if exists
+              const affiliateSale = await storage.getAffiliateSaleByPagamentoId(pagamentoId);
+              if (affiliateSale && affiliateSale.status !== 'refunded' && affiliateSale.status !== 'cancelled' && affiliateSale.status !== 'paid') {
+                const affiliate = await storage.getAffiliateById(affiliateSale.affiliateId);
+                
+                if (affiliate) {
+                  const oldStatus = affiliateSale.status;
+                  
+                  // Calculate balance adjustments based on current status
+                  const updates: Record<string, number> = {
+                    totalEarnings: Math.max(0, (affiliate.totalEarnings || 0) - affiliateSale.commissionAmount),
+                  };
+                  
+                  if (oldStatus === 'pending') {
+                    updates.pendingAmount = Math.max(0, (affiliate.pendingAmount || 0) - affiliateSale.commissionAmount);
+                  } else if (oldStatus === 'available') {
+                    updates.availableAmount = Math.max(0, (affiliate.availableAmount || 0) - affiliateSale.commissionAmount);
+                  } else if (oldStatus === 'withdrawal_requested' && affiliateSale.withdrawalId) {
+                    // Cancel associated withdrawal and restore other sales
+                    const withdrawal = await storage.getAffiliateWithdrawalById(affiliateSale.withdrawalId);
+                    if (withdrawal && withdrawal.status === 'pending') {
+                      const linkedSales = await storage.listAffiliateSalesByAffiliate(affiliate.id);
+                      const otherWithdrawalSales = linkedSales.filter(s => 
+                        s.withdrawalId === affiliateSale.withdrawalId && 
+                        s.id !== affiliateSale.id && 
+                        s.status === 'withdrawal_requested'
+                      );
+                      
+                      for (const linkedSale of otherWithdrawalSales) {
+                        await storage.updateAffiliateSale(linkedSale.id, {
+                          status: 'available',
+                          withdrawalId: null,
+                        });
+                      }
+                      
+                      await storage.updateAffiliateWithdrawal(affiliateSale.withdrawalId, { status: 'cancelled' });
+                      
+                      const otherSalesTotal = otherWithdrawalSales.reduce((sum, s) => sum + s.commissionAmount, 0);
+                      if (otherSalesTotal > 0) {
+                        updates.availableAmount = (affiliate.availableAmount || 0) + otherSalesTotal;
+                      }
+                    }
+                  }
+                  
+                  await storage.updateAffiliate(affiliate.id, updates);
+                  await storage.updateAffiliateSale(affiliateSale.id, { status: 'refunded' });
+                  
+                  console.log(`[MP Webhook] Affiliate sale ${affiliateSale.id} refunded, deducted ${affiliateSale.commissionAmount} from affiliate ${affiliate.id}`);
+                }
+              }
+            }
+
             await storage.updateCheckoutPagamento(pagamentoId, updateData);
             console.log(`[MP Webhook] Updated payment ${pagamentoId} to status: ${payment.status}`);
           }
@@ -11112,6 +11168,81 @@ Seja conversacional e objetivo.`;
             }
             
             console.log(`[Stripe Webhook] Sent payment failed email to ${pagamento.email}`);
+          }
+        }
+      }
+
+      // Handle charge.refunded (refund issued)
+      if (event.type === 'charge.refunded') {
+        const charge = event.data.object;
+        const paymentIntentId = charge.payment_intent;
+        
+        console.log(`[Stripe Webhook] Refund issued for charge: ${charge.id}, PI: ${paymentIntentId}`);
+        
+        if (paymentIntentId) {
+          // Find payment by stripePaymentIntentId
+          const pagamentos = await storage.listCheckoutPagamentos();
+          const pagamento = pagamentos.find(p => p.stripePaymentIntentId === paymentIntentId);
+          
+          if (pagamento) {
+            // Update payment status to refunded
+            await storage.updateCheckoutPagamento(pagamento.id, {
+              status: 'refunded',
+              statusDetail: `Reembolso processado em ${new Date().toLocaleDateString('pt-BR')}`,
+            });
+            
+            console.log(`[Stripe Webhook] Updated payment ${pagamento.id} to refunded`);
+            
+            // Handle affiliate sale refund if exists
+            const affiliateSale = await storage.getAffiliateSaleByPagamentoId(pagamento.id);
+            if (affiliateSale && affiliateSale.status !== 'refunded' && affiliateSale.status !== 'cancelled' && affiliateSale.status !== 'paid') {
+              const affiliate = await storage.getAffiliateById(affiliateSale.affiliateId);
+              
+              if (affiliate) {
+                const oldStatus = affiliateSale.status;
+                
+                // Calculate balance adjustments based on current status
+                const updates: Record<string, number> = {
+                  totalEarnings: Math.max(0, (affiliate.totalEarnings || 0) - affiliateSale.commissionAmount),
+                };
+                
+                if (oldStatus === 'pending') {
+                  updates.pendingAmount = Math.max(0, (affiliate.pendingAmount || 0) - affiliateSale.commissionAmount);
+                } else if (oldStatus === 'available') {
+                  updates.availableAmount = Math.max(0, (affiliate.availableAmount || 0) - affiliateSale.commissionAmount);
+                } else if (oldStatus === 'withdrawal_requested' && affiliateSale.withdrawalId) {
+                  // Cancel associated withdrawal and restore other sales
+                  const withdrawal = await storage.getAffiliateWithdrawalById(affiliateSale.withdrawalId);
+                  if (withdrawal && withdrawal.status === 'pending') {
+                    const linkedSales = await storage.listAffiliateSalesByAffiliate(affiliate.id);
+                    const otherWithdrawalSales = linkedSales.filter(s => 
+                      s.withdrawalId === affiliateSale.withdrawalId && 
+                      s.id !== affiliateSale.id && 
+                      s.status === 'withdrawal_requested'
+                    );
+                    
+                    for (const linkedSale of otherWithdrawalSales) {
+                      await storage.updateAffiliateSale(linkedSale.id, {
+                        status: 'available',
+                        withdrawalId: null,
+                      });
+                    }
+                    
+                    await storage.updateAffiliateWithdrawal(affiliateSale.withdrawalId, { status: 'cancelled' });
+                    
+                    const otherSalesTotal = otherWithdrawalSales.reduce((sum, s) => sum + s.commissionAmount, 0);
+                    if (otherSalesTotal > 0) {
+                      updates.availableAmount = (affiliate.availableAmount || 0) + otherSalesTotal;
+                    }
+                  }
+                }
+                
+                await storage.updateAffiliate(affiliate.id, updates);
+                await storage.updateAffiliateSale(affiliateSale.id, { status: 'refunded' });
+                
+                console.log(`[Stripe Webhook] Affiliate sale ${affiliateSale.id} refunded, deducted ${affiliateSale.commissionAmount} from affiliate ${affiliate.id}`);
+              }
+            }
           }
         }
       }
