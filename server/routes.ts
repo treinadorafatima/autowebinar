@@ -11187,6 +11187,15 @@ Seja conversacional e objetivo.`;
       const userEmail = decodeURIComponent(req.params.userEmail);
       const userPagamentos = await storage.listCheckoutPagamentosByEmail(userEmail);
       
+      // Debug log for payment history
+      const targetAdmin = await storage.getAdminByEmail(userEmail);
+      console.log(`[payment-history] Searching for email: ${userEmail}, adminId: ${targetAdmin?.id || 'not found'}, found ${userPagamentos.length} payments`);
+      if (userPagamentos.length > 0) {
+        userPagamentos.forEach((p, i) => {
+          console.log(`[payment-history] Payment ${i + 1}: id=${p.id}, email=${p.email}, adminId=${p.adminId}, status=${p.status}`);
+        });
+      }
+      
       res.json(userPagamentos);
     } catch (error: any) {
       res.status(500).json({ error: error.message });

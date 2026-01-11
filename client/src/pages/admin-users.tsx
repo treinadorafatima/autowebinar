@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
+import { format } from "date-fns";
+import { toZonedTime } from "date-fns-tz";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -63,6 +65,14 @@ import {
 } from "@/components/ui/collapsible";
 
 const ITEMS_PER_PAGE = 10;
+const BRAZIL_TIMEZONE = "America/Sao_Paulo";
+
+function formatDateTimeBR(dateStr: string | null | undefined): string {
+  if (!dateStr) return "-";
+  const date = new Date(dateStr);
+  const zonedDate = toZonedTime(date, BRAZIL_TIMEZONE);
+  return format(zonedDate, "dd/MM/yyyy, HH:mm:ss");
+}
 
 interface User {
   id: string;
@@ -1924,7 +1934,7 @@ export default function AdminUsersPage() {
                             {(payment.valor / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            {payment.criadoEm ? new Date(payment.criadoEm).toLocaleString('pt-BR') : 'Data não disponível'}
+                            {payment.criadoEm ? formatDateTimeBR(payment.criadoEm) : 'Data não disponível'}
                           </p>
                         </div>
                       </div>
@@ -1942,7 +1952,7 @@ export default function AdminUsersPage() {
                         {payment.dataAprovacao && (
                           <div>
                             <p className="text-muted-foreground text-xs">Aprovado em</p>
-                            <p className="font-medium">{new Date(payment.dataAprovacao).toLocaleString('pt-BR')}</p>
+                            <p className="font-medium">{formatDateTimeBR(payment.dataAprovacao)}</p>
                           </div>
                         )}
                       </div>
