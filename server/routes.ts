@@ -12263,12 +12263,11 @@ Seja conversacional e objetivo.`;
         isSuperadmin: isSuperadmin,
       };
 
-      // Get payment history for this user
+      // Get payment history for this user (by both adminId and email to catch all payments)
       const allPagamentos = await storage.listCheckoutPagamentos();
       const faturas = allPagamentos
-        .filter(p => p.adminId === admin.id)
+        .filter(p => p.adminId === admin.id || (p.email && p.email.toLowerCase() === admin.email.toLowerCase()))
         .sort((a, b) => new Date(b.criadoEm!).getTime() - new Date(a.criadoEm!).getTime())
-        .slice(0, 10)
         .map(p => ({
           id: p.id,
           valor: p.valor,
