@@ -14844,11 +14844,11 @@ Seja conversacional e objetivo.`;
         return res.status(400).json({ error: "Arquivo de comprovante é obrigatório" });
       }
 
-      // Upload to storage
+      // Upload to storage using existing uploadImage method
       const fileBuffer = fs.readFileSync(req.file.path);
-      const fileName = `withdrawal-proofs/${id}-${Date.now()}-${req.file.originalname}`;
+      const proofFilename = `proof_${id}_${Date.now()}.${req.file.originalname.split('.').pop() || 'jpg'}`;
       
-      const proofUrl = await storage.uploadFile(fileBuffer, fileName, req.file.mimetype);
+      const proofUrl = await storage.uploadImage(fileBuffer, proofFilename);
       
       // Clean up temp file
       fs.unlinkSync(req.file.path);
@@ -14861,6 +14861,30 @@ Seja conversacional e objetivo.`;
       res.json({ success: true, proofUrl });
     } catch (error: any) {
       console.error("[affiliate] Error uploading proof:", error);
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Get withdrawal proof (for affiliate to download)
+  app.get("/api/affiliate-withdrawals/:id/proof", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const email = await validateSession(token || "");
+      if (!email) return res.status(401).json({ error: "Unauthorized" });
+
+      const { id } = req.params;
+      const withdrawal = await storage.getAffiliateWithdrawalById(id);
+      if (!withdrawal) {
+        return res.status(404).json({ error: "Saque não encontrado" });
+      }
+
+      if (!withdrawal.proofUrl) {
+        return res.status(404).json({ error: "Comprovante não encontrado" });
+      }
+
+      // Return proof URL - image served through existing image endpoint
+      res.json({ proofUrl: withdrawal.proofUrl });
+    } catch (error: any) {
       res.status(400).json({ error: error.message });
     }
   });
