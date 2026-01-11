@@ -11180,9 +11180,8 @@ Seja conversacional e objetivo.`;
         console.log(`[Stripe Webhook] Refund issued for charge: ${charge.id}, PI: ${paymentIntentId}`);
         
         if (paymentIntentId) {
-          // Find payment by stripePaymentIntentId
-          const pagamentos = await storage.listCheckoutPagamentos();
-          const pagamento = pagamentos.find(p => p.stripePaymentIntentId === paymentIntentId);
+          // Find payment by stripePaymentIntentId using direct lookup
+          const pagamento = await storage.getCheckoutPagamentoByExternalId(paymentIntentId as string, 'stripe');
           
           if (pagamento) {
             // Update payment status to refunded
