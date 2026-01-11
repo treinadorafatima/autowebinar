@@ -1319,6 +1319,19 @@ async function syncMercadoPagoSubscriptions(): Promise<void> {
                   accessExpiresAt: finalExpiration,
                   planoId: plano.id,
                 });
+                
+                // Send renewal confirmation notifications (centralized with deduplication)
+                sendRenewalNotification(
+                  admin.email,
+                  admin.name || pagamento.nome,
+                  admin.telefone || pagamento.telefone,
+                  plano.nome,
+                  plano,
+                  finalExpiration,
+                  `mp_sync_${pagamento.id}_${realApprovalDate.toISOString().split('T')[0]}`,
+                  admin.id
+                );
+                
                 reactivated++;
                 console.log(`[subscription-scheduler] Auto-reactivated ${pagamento.email}, new expiration: ${finalExpiration.toISOString()}`);
               }
@@ -1431,6 +1444,19 @@ async function syncStripePayments(): Promise<void> {
                     paymentStatus: 'ok',
                     paymentFailedReason: null,
                   });
+                  
+                  // Send renewal confirmation notifications (centralized with deduplication)
+                  sendRenewalNotification(
+                    admin.email,
+                    admin.name || pagamento.nome,
+                    admin.telefone || pagamento.telefone,
+                    plano.nome,
+                    plano,
+                    finalExpiration,
+                    `stripe_sync_${pagamento.id}_${paymentDate.toISOString().split('T')[0]}`,
+                    admin.id
+                  );
+                  
                   updated++;
                   console.log(`[subscription-scheduler] Stripe auto-sync: Extended access for ${pagamento.email}, base: ${extensionBase.toISOString()}, expires: ${finalExpiration.toISOString()}`);
                 }
@@ -1572,6 +1598,18 @@ async function syncStripeActiveSubscriptions(): Promise<void> {
                 dataExpiracao: newExpiration,
                 statusDetail: `Renovação automática Stripe (sync ${invoiceDate})`,
               });
+
+              // Send renewal confirmation notifications (centralized with deduplication)
+              sendRenewalNotification(
+                admin.email,
+                admin.name || pagamento.nome,
+                admin.telefone || pagamento.telefone,
+                plano.nome,
+                plano,
+                newExpiration,
+                `sync_${pagamento.id}_${invoiceDate}`,
+                admin.id
+              );
 
               renewed++;
               console.log(`[subscription-scheduler] Stripe subscription renewal synced for ${admin.email}: invoice ${latestInvoice.id}, new expiration: ${newExpiration.toISOString()}`);

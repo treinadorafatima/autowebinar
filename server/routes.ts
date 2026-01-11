@@ -24,6 +24,7 @@ import { z } from "zod";
 import XLSX from "xlsx";
 import { spawn } from "child_process";
 import { getMercadoPagoErrorMessage, getStripeErrorMessage, logPaymentError, logPaymentSuccess } from "./payment-errors";
+import { sendRenewalNotification } from "./subscription-scheduler";
 import { createWriteStream } from "fs";
 import { 
   sendAccessCredentialsEmailSafe, 
@@ -10848,12 +10849,24 @@ Seja conversacional e objetivo.`;
                 console.log(`[Stripe Webhook] RENEWAL already processed for PI ${paymentIntentId}`);
               }
               
-              // Send confirmation notifications
-              sendPaymentConfirmedEmailSafe(originalPagamento.email, originalPagamento.nome, plano.nome, newExpiration);
+              // Send renewal confirmation notifications (centralized with deduplication)
               const telefoneRenewal = admin.telefone || originalPagamento.telefone;
-              if (telefoneRenewal) {
-                sendWhatsAppPaymentConfirmedSafe(telefoneRenewal, originalPagamento.nome, plano.nome, newExpiration);
-              }
+              const renewalPagamentoId = existingForPI.length === 0 
+                ? (await db.select().from(checkoutPagamentos)
+                    .where(eq(checkoutPagamentos.stripePaymentIntentId, paymentIntentId))
+                    .limit(1))[0]?.id || `renewal_pi_${paymentIntentId}`
+                : `already_${paymentIntentId}`;
+              
+              sendRenewalNotification(
+                originalPagamento.email,
+                originalPagamento.nome,
+                telefoneRenewal,
+                plano.nome,
+                plano,
+                newExpiration,
+                renewalPagamentoId,
+                admin.id
+              );
             }
           }
         }
@@ -10991,6 +11004,19 @@ Seja conversacional e objetivo.`;
                   adminId: admin.id,
                 });
                 console.log(`[Stripe Webhook] RENEWAL - Created NEW payment record ${renewalPagamento.id} for ${pagamento.email}, expires: ${expirationDate.toISOString()}`);
+                
+                // Send renewal confirmation notifications (centralized with deduplication)
+                const telefoneInvoiceRenewal = admin.telefone || pagamento.telefone;
+                sendRenewalNotification(
+                  pagamento.email,
+                  pagamento.nome,
+                  telefoneInvoiceRenewal,
+                  plano.nome,
+                  plano,
+                  expirationDate,
+                  renewalPagamento.id,
+                  admin.id
+                );
               } else {
                 // First payment or already processed - just update
                 await storage.updateCheckoutPagamento(pagamento.id, {
